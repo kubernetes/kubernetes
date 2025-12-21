@@ -155,27 +155,30 @@ func (pl *PodTopologySpread) PreFilterExtensions() fwk.PreFilterExtensions {
 
 // AddPod from pre-computed data in cycleState.
 func (pl *PodTopologySpread) AddPod(ctx context.Context, cycleState fwk.CycleState, podToSchedule *v1.Pod, podInfoToAdd fwk.PodInfo, nodeInfo fwk.NodeInfo) *fwk.Status {
+	logger := klog.FromContext(ctx)
+
 	s, err := getPreFilterState(cycleState)
 	if err != nil {
 		return fwk.AsStatus(err)
 	}
 
-	pl.updateWithPod(s, podInfoToAdd.GetPod(), podToSchedule, nodeInfo.Node(), 1)
+	pl.updateWithPod(logger, s, podInfoToAdd.GetPod(), podToSchedule, nodeInfo.Node(), 1)
 	return nil
 }
 
 // RemovePod from pre-computed data in cycleState.
 func (pl *PodTopologySpread) RemovePod(ctx context.Context, cycleState fwk.CycleState, podToSchedule *v1.Pod, podInfoToRemove fwk.PodInfo, nodeInfo fwk.NodeInfo) *fwk.Status {
+	logger := klog.FromContext(ctx)
 	s, err := getPreFilterState(cycleState)
 	if err != nil {
 		return fwk.AsStatus(err)
 	}
 
-	pl.updateWithPod(s, podInfoToRemove.GetPod(), podToSchedule, nodeInfo.Node(), -1)
+	pl.updateWithPod(logger, s, podInfoToRemove.GetPod(), podToSchedule, nodeInfo.Node(), -1)
 	return nil
 }
 
-func (pl *PodTopologySpread) updateWithPod(s *preFilterState, updatedPod, preemptorPod *v1.Pod, node *v1.Node, delta int) {
+func (pl *PodTopologySpread) updateWithPod(logger klog.Logger, s *preFilterState, updatedPod, preemptorPod *v1.Pod, node *v1.Node, delta int) {
 	if s == nil || updatedPod.Namespace != preemptorPod.Namespace || node == nil {
 		return
 	}
@@ -199,7 +202,7 @@ func (pl *PodTopologySpread) updateWithPod(s *preFilterState, updatedPod, preemp
 		}
 
 		if pl.enableNodeInclusionPolicyInPodTopologySpread &&
-			!constraint.matchNodeInclusionPolicies(preemptorPod, node, requiredSchedulingTerm) {
+			!constraint.matchNodeInclusionPolicies(logger, preemptorPod, node, requiredSchedulingTerm, pl.enableTaintTolerationComparisonOperators) {
 			continue
 		}
 
@@ -240,6 +243,7 @@ func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod,
 		return &preFilterState{}, nil
 	}
 
+	logger := klog.FromContext(ctx)
 	s := preFilterState{
 		Constraints:       constraints,
 		CriticalPaths:     make([]*criticalPaths, len(constraints)),
@@ -271,7 +275,7 @@ func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod,
 		tpCounts := make([]topologyCount, 0, len(constraints))
 		for i, c := range constraints {
 			if pl.enableNodeInclusionPolicyInPodTopologySpread &&
-				!c.matchNodeInclusionPolicies(pod, node, requiredNodeAffinity) {
+				!c.matchNodeInclusionPolicies(logger, pod, node, requiredNodeAffinity, pl.enableTaintTolerationComparisonOperators) {
 				continue
 			}
 

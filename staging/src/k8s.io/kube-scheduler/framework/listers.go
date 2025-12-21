@@ -17,7 +17,11 @@ limitations under the License.
 package framework
 
 import (
+	"time"
+
+	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/dynamic-resource-allocation/structured"
@@ -46,6 +50,13 @@ type StorageInfoLister interface {
 type SharedLister interface {
 	NodeInfos() NodeInfoLister
 	StorageInfos() StorageInfoLister
+}
+
+type CSINodeLister interface {
+	// List returns a list of all CSINodes.
+	List() ([]*storagev1.CSINode, error)
+	// Get returns the CSINode with the given name.
+	Get(name string) (*storagev1.CSINode, error)
 }
 
 // ResourceSliceLister can be used to obtain ResourceSlices.
@@ -108,6 +119,14 @@ type ResourceClaimTracker interface {
 	AssumedClaimRestore(namespace, claimName string)
 }
 
+// DeviceClassResolver resolves device class names from extended resource names.
+type DeviceClassResolver interface {
+	// GetDeviceClass returns the device class for the given extended resource name.
+	// Returns nil if no mapping exists for the resource name or
+	// the DRAExtendedResource feature is disabled.
+	GetDeviceClass(resourceName v1.ResourceName) *resourceapi.DeviceClass
+}
+
 // SharedDRAManager can be used to obtain DRA objects, and track modifications to them in-memory - mainly by the DRA plugin.
 // The plugin's default implementation obtains the objects from the API. A different implementation can be
 // plugged into the framework in order to simulate the state of DRA objects. For example, Cluster Autoscaler
@@ -116,4 +135,42 @@ type SharedDRAManager interface {
 	ResourceClaims() ResourceClaimTracker
 	ResourceSlices() ResourceSliceLister
 	DeviceClasses() DeviceClassLister
+	DeviceClassResolver() DeviceClassResolver
+}
+
+// CSIManager can be used to obtain CSINode objects, and track changes to CSINode objects in-memory.
+// The plugin's default implementation obtains the objects from the API. A different implementation can be
+// plugged into the framework in order to simulate the state of CSINode objects. For example, Cluster Autoscaler
+// can use this to provide the correct CSINode object state to the CSINode plugin when simulating scheduling changes in-memory.
+type CSIManager interface {
+	CSINodes() CSINodeLister
+}
+
+// WorkloadManager provides an interface for scheduling plugins to provide workload-aware scheduling.
+// It acts as the central source of truth for runtime information about workloads.
+type WorkloadManager interface {
+	// PodGroupInfo retrieves the runtime state for a specific pod group, identified by workload's namespace and reference.
+	PodGroupInfo(namespace string, workloadRef *v1.WorkloadReference) (PodGroupInfo, error)
+}
+
+// PodGroupInfo provides an interface to view and modify the state of a single pod group.
+type PodGroupInfo interface {
+	// AllPods returns the UIDs of all pods known to the scheduler for this group.
+	AllPods() sets.Set[types.UID]
+	// UnscheduledPods returns all pods that are unscheduled for this group,
+	// i.e., are neither assumed nor assigned.
+	// The returned map type corresponds to the argument of the PodActivator.Activate method.
+	UnscheduledPods() map[string]*v1.Pod
+	// AssumedPods returns the UIDs of all pods for this group in the "assumed" state,
+	// i.e., passed the Reserve gate.
+	AssumedPods() sets.Set[types.UID]
+	// AssignedPods returns the UIDs of all pods already assigned (bound) for this group.
+	AssignedPods() sets.Set[types.UID]
+	// AssumePod marks a pod as having reached the Reserve stage.
+	AssumePod(podUID types.UID)
+	// ForgetPod removes a pod from the assumed state.
+	ForgetPod(podUID types.UID)
+	// SchedulingTimeout returns the remaining time until the pod group scheduling times out.
+	// A new deadline is created if one doesn't exist, or if the previous one has expired.
+	SchedulingTimeout() time.Duration
 }

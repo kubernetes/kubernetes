@@ -56,15 +56,15 @@ func Validate_Scale(ctx context.Context, op operation.Operation, fldPath *field.
 
 	// field Scale.Spec
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *ScaleSpec) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *ScaleSpec, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_ScaleSpec(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("spec"), &obj.Spec, safe.Field(oldObj, func(oldObj *Scale) *ScaleSpec { return &oldObj.Spec }))...)
+		}(fldPath.Child("spec"), &obj.Spec, safe.Field(oldObj, func(oldObj *Scale) *ScaleSpec { return &oldObj.Spec }), oldObj != nil)...)
 
 	// field Scale.Status has no validation
 	return errs
@@ -75,16 +75,16 @@ func Validate_Scale(ctx context.Context, op operation.Operation, fldPath *field.
 func Validate_ScaleSpec(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ScaleSpec) (errs field.ErrorList) {
 	// field ScaleSpec.Replicas
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *int32) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *int32, oldValueCorrelated bool) (errs field.ErrorList) {
 			// optional value-type fields with zero-value defaults are purely documentation
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call field-attached validations
 			errs = append(errs, validate.Minimum(ctx, op, fldPath, obj, oldObj, 0)...)
 			return
-		}(fldPath.Child("replicas"), &obj.Replicas, safe.Field(oldObj, func(oldObj *ScaleSpec) *int32 { return &oldObj.Replicas }))...)
+		}(fldPath.Child("replicas"), &obj.Replicas, safe.Field(oldObj, func(oldObj *ScaleSpec) *int32 { return &oldObj.Replicas }), oldObj != nil)...)
 
 	return errs
 }

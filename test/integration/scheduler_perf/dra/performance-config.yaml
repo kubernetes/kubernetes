@@ -130,8 +130,9 @@
     featureGates:
       SchedulerQueueingHints: false
     labels: [performance]
-    # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FSchedulingWithResourceClaimTemplate%2F5000pods_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
-    threshold: 40 # typically above 51
+    threshold:
+      # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FSchedulingWithResourceClaimTemplate%2F5000pods_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
+      dra: 40 # typically above 51
     params:
       nodesWithDRA: 500
       nodesWithoutDRA: 0
@@ -142,8 +143,9 @@
     featureGates:
       SchedulerQueueingHints: true
     labels: [performance]
-    # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FSchedulingWithResourceClaimTemplate%2F5000pods_500nodes_QueueingHintsEnabled%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
-    threshold: 56 # typically above 70
+    threshold:
+      # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FSchedulingWithResourceClaimTemplate%2F5000pods_500nodes_QueueingHintsEnabled%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
+      dra: 56 # typically above 70
     params:
       nodesWithDRA: 500
       nodesWithoutDRA: 0
@@ -208,8 +210,9 @@
     featureGates:
       SchedulerQueueingHints: false
     labels: [performance]
-    # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FSteadyStateClusterResourceClaimTemplate%2Fempty_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
-    threshold: 64 # typically above 81
+    threshold:
+      # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FSteadyStateClusterResourceClaimTemplate%2Fempty_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
+      dra: 64 # typically above 81
     params:
       nodesWithDRA: 500
       nodesWithoutDRA: 0
@@ -220,8 +223,9 @@
     featureGates:
       SchedulerQueueingHints: true
     labels: [performance]
-    # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FSteadyStateClusterResourceClaimTemplate%2Fempty_500nodes_QueueingHintsEnabled%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
-    threshold: 64 # typically above 81
+    threshold:
+      # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FSteadyStateClusterResourceClaimTemplate%2Fempty_500nodes_QueueingHintsEnabled%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
+      dra: 64 # typically above 81
     params:
       nodesWithDRA: 500
       nodesWithoutDRA: 0
@@ -247,8 +251,9 @@
     featureGates:
       SchedulerQueueingHints: false
     labels: [performance]
-    # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FSteadyStateClusterResourceClaimTemplate%2Fhalf_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
-    threshold: 70 # typically over 78
+    threshold:
+      # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FSteadyStateClusterResourceClaimTemplate%2Fhalf_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
+      dra: 70 # typically over 78
     params:
       nodesWithDRA: 500
       nodesWithoutDRA: 0
@@ -259,8 +264,9 @@
     featureGates:
       SchedulerQueueingHints: true
     labels: [performance]
-    # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FSteadyStateClusterResourceClaimTemplate%2Fhalf_500nodes_QueueingHintsEnabled%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
-    threshold: 60 # typically over 75
+    threshold:
+      # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FSteadyStateClusterResourceClaimTemplate%2Fhalf_500nodes_QueueingHintsEnabled%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
+      dra: 60 # typically over 75
     params:
       nodesWithDRA: 500
       nodesWithoutDRA: 0
@@ -286,8 +292,9 @@
     featureGates:
       SchedulerQueueingHints: false
     labels: [performance]
-    # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FSteadyStateClusterResourceClaimTemplate%2Ffull_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
-    threshold: 60 # typically over 75
+    threshold:
+      # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FSteadyStateClusterResourceClaimTemplate%2Ffull_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
+      dra: 60 # typically over 75
     params:
       nodesWithDRA: 500
       nodesWithoutDRA: 0
@@ -298,8 +305,9 @@
     featureGates:
       SchedulerQueueingHints: true
     labels: [performance]
-    # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FSteadyStateClusterResourceClaimTemplate%2Ffull_500nodes_QueueingHintsEnabled%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
-    threshold: 60 # typically over 75
+    threshold:
+      # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FSteadyStateClusterResourceClaimTemplate%2Ffull_500nodes_QueueingHintsEnabled%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
+      dra: 60 # typically over 75
     params:
       nodesWithDRA: 500
       nodesWithoutDRA: 0

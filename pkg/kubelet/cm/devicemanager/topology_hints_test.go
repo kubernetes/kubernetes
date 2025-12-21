@@ -29,6 +29,7 @@ import (
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 type mockAffinityStore struct {
@@ -109,6 +110,7 @@ func TestGetTopologyHints(t *testing.T) {
 }
 
 func TestTopologyAlignedAllocation(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	tcases := []struct {
 		description                 string
 		resource                    string
@@ -441,7 +443,7 @@ func TestTopologyAlignedAllocation(t *testing.T) {
 			}
 		}
 
-		allocated, err := m.devicesToAllocate("podUID", "containerName", tc.resource, tc.request, sets.New[string]())
+		allocated, err := m.devicesToAllocate(tCtx, "podUID", "containerName", tc.resource, tc.request, sets.New[string]())
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 			continue
@@ -471,6 +473,7 @@ func TestTopologyAlignedAllocation(t *testing.T) {
 }
 
 func TestGetPreferredAllocationParameters(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	tcases := []struct {
 		description         string
 		resource            string
@@ -639,7 +642,7 @@ func TestGetPreferredAllocationParameters(t *testing.T) {
 			opts: &pluginapi.DevicePluginOptions{GetPreferredAllocationAvailable: true},
 		}
 
-		_, err := m.devicesToAllocate("podUID", "containerName", tc.resource, tc.request, sets.New[string](tc.reusableDevices...))
+		_, err := m.devicesToAllocate(tCtx, "podUID", "containerName", tc.resource, tc.request, sets.New[string](tc.reusableDevices...))
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 			continue

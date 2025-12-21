@@ -23,6 +23,12 @@ limitations under the License.
 // This version improves on the v1beta3 format by fixing some minor issues and adding a few new fields.
 //
 // A list of changes since v1beta3:
+// v1.35:
+//   - Add `HTTPEndpoints` field to `ClusterConfiguration.Etcd.ExternalEtcd` that can be used to configure the HTTP endpoints for etcd communication in v1beta4.
+//     This field is used to separate the HTTP traffic (such as /metrics and /health endpoints) from the gRPC traffic handled by Endpoints.
+//     This separation allows for better access control, as HTTP endpoints can be exposed without exposing the primary gRPC interface.
+//     Corresponds to etcd's --listen-client-http-urls configuration.
+//     If not provided, Endpoints will be used for both gRPC and HTTP traffic.
 //
 // v1.34:
 //   - Add "ECDSA-P384" to the allowed encryption algorithm options for `ClusterConfiguration.EncryptionAlgorithm`.

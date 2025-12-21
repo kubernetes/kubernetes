@@ -1,0 +1,41 @@
+# One external resource claim, one pod, two containers.
+# One container uses resource, one does not.
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+  name: external-claim
+spec:
+  devices:
+    requests:
+    - name: my-device
+      exactly:
+        deviceClassName: example
+        tolerations:
+        - key: "dra.example.com/unhealthy"
+          operator: "Exists"
+          effect: "NoExecute"
+    config:
+    - opaque:
+        driver: test-driver.cdi.k8s.io
+        parameters:
+          a: b
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-external-claim
+spec:
+  restartPolicy: Never
+  containers:
+  - name: with-resource
+    image: registry.k8s.io/e2e-test-images/agnhost:2.53
+    command: ["sh", "-c", "set && mount && ls -la /dev/ && /agnhost pause"]
+    resources:
+      claims:
+      - name: resource
+  - name: without-resource
+    image: registry.k8s.io/e2e-test-images/agnhost:2.53
+    command: ["sh", "-c", "set && mount && ls -la /dev/ && /agnhost pause"]
+  resourceClaims:
+  - name: resource
+    resourceClaimName: external-claim

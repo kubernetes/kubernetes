@@ -40,6 +40,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -159,7 +160,6 @@ func InitHostPathCSIDriver() storageframework.TestDriver {
 		storageframework.CapReadWriteOncePod:               true,
 		storageframework.CapMultiplePVsSameID:              true,
 		storageframework.CapFSResizeFromSourceNotSupported: true,
-		storageframework.CapVolumeGroupSnapshot:            true,
 		// There are extensive tests that NodeStage / NodePublish are called with -o context in csimock/csi_selinux_mount.go,
 		// but the csi-driver-hostpath can't physically make -o context to appear in the mount table that the CapSELinuxMount tests expect.
 		storageframework.CapSELinuxMount: false,
@@ -169,6 +169,10 @@ func InitHostPathCSIDriver() storageframework.TestDriver {
 		// test. --maxvolumespernode=10 gets
 		// added when patching the deployment.
 		storageframework.CapVolumeLimits: true,
+	}
+	// TODO: It can be removed after the VolumeGroupSnapshot feature is default enabled
+	if os.Getenv("CSI_PROW_ENABLE_GROUP_SNAPSHOT") == "true" {
+		capabilities[storageframework.CapVolumeGroupSnapshot] = true
 	}
 	return initHostPathCSIDriver("csi-hostpath",
 		capabilities,
@@ -293,6 +297,15 @@ func (h *hostpathCSIDriver) PrepareTest(ctx context.Context, f *framework.Framew
 		DriverContainerArguments: []string{"--feature-gates=VolumeAttributesClass=true"},
 	})
 
+	// VGS E2E FeatureGate patches
+	// TODO: These can be removed after the VolumeGroupSnapshot feature is default enabled
+	if os.Getenv("CSI_PROW_ENABLE_GROUP_SNAPSHOT") == "true" {
+		patches = append(patches, utils.PatchCSIOptions{
+			DriverContainerName:      "csi-snapshotter",
+			DriverContainerArguments: []string{"--feature-gates=CSIVolumeGroupSnapshot=true"},
+		})
+	}
+
 	err = utils.CreateFromManifests(ctx, config.Framework, driverNamespace, func(item interface{}) error {
 		for _, o := range patches {
 			if err := utils.PatchCSIDeployment(config.Framework, o, item); err != nil {
@@ -340,25 +353,27 @@ func (h *hostpathCSIDriver) PrepareTest(ctx context.Context, f *framework.Framew
 
 // mockCSI
 type mockCSIDriver struct {
-	driverInfo                 storageframework.DriverInfo
-	manifests                  []string
-	podInfo                    *bool
-	storageCapacity            *bool
-	attachable                 bool
-	attachLimit                int
-	enableTopology             bool
-	enableNodeExpansion        bool
-	hooks                      Hooks
-	tokenRequests              []storagev1.TokenRequest
-	requiresRepublish          *bool
-	fsGroupPolicy              *storagev1.FSGroupPolicy
-	enableVolumeMountGroup     bool
-	enableNodeVolumeCondition  bool
-	embedded                   bool
-	calls                      MockCSICalls
-	embeddedCSIDriver          *mockdriver.CSIDriver
-	enableSELinuxMount         *bool
-	disableControllerExpansion bool
+	driverInfo                           storageframework.DriverInfo
+	manifests                            []string
+	podInfo                              *bool
+	storageCapacity                      *bool
+	attachable                           bool
+	attachLimit                          int
+	enableTopology                       bool
+	enableNodeExpansion                  bool
+	hooks                                Hooks
+	tokenRequests                        []storagev1.TokenRequest
+	requiresRepublish                    *bool
+	serviceAccountTokenInSecrets         *bool
+	fsGroupPolicy                        *storagev1.FSGroupPolicy
+	enableVolumeMountGroup               bool
+	enableNodeVolumeCondition            bool
+	embedded                             bool
+	calls                                MockCSICalls
+	embeddedCSIDriver                    *mockdriver.CSIDriver
+	enableSELinuxMount                   *bool
+	disableControllerExpansion           bool
+	enableMutableCSINodeAllocatableCount bool
 
 	// Additional values set during PrepareTest
 	clientSet       clientset.Interface
@@ -392,22 +407,24 @@ type MockCSITestDriver interface {
 
 // CSIMockDriverOpts defines options used for csi driver
 type CSIMockDriverOpts struct {
-	RegisterDriver             bool
-	DisableAttach              bool
-	PodInfo                    *bool
-	StorageCapacity            *bool
-	AttachLimit                int
-	EnableTopology             bool
-	EnableResizing             bool
-	EnableNodeExpansion        bool
-	DisableControllerExpansion bool
-	EnableSnapshot             bool
-	EnableVolumeMountGroup     bool
-	EnableNodeVolumeCondition  bool
-	TokenRequests              []storagev1.TokenRequest
-	RequiresRepublish          *bool
-	FSGroupPolicy              *storagev1.FSGroupPolicy
-	EnableSELinuxMount         *bool
+	RegisterDriver                       bool
+	DisableAttach                        bool
+	PodInfo                              *bool
+	StorageCapacity                      *bool
+	AttachLimit                          int
+	EnableTopology                       bool
+	EnableResizing                       bool
+	EnableNodeExpansion                  bool
+	DisableControllerExpansion           bool
+	EnableSnapshot                       bool
+	EnableVolumeMountGroup               bool
+	EnableNodeVolumeCondition            bool
+	TokenRequests                        []storagev1.TokenRequest
+	ServiceAccountTokenInSecrets         *bool
+	RequiresRepublish                    *bool
+	FSGroupPolicy                        *storagev1.FSGroupPolicy
+	EnableSELinuxMount                   *bool
+	EnableMutableCSINodeAllocatableCount bool
 
 	// Embedded defines whether the CSI mock driver runs
 	// inside the cluster (false, the default) or just a proxy
@@ -549,22 +566,24 @@ func InitMockCSIDriver(driverOpts CSIMockDriverOpts) MockCSITestDriver {
 				storageframework.CapMultiplePVsSameID: true,
 			},
 		},
-		manifests:                  driverManifests,
-		podInfo:                    driverOpts.PodInfo,
-		storageCapacity:            driverOpts.StorageCapacity,
-		enableTopology:             driverOpts.EnableTopology,
-		attachable:                 !driverOpts.DisableAttach,
-		attachLimit:                driverOpts.AttachLimit,
-		enableNodeExpansion:        driverOpts.EnableNodeExpansion,
-		enableNodeVolumeCondition:  driverOpts.EnableNodeVolumeCondition,
-		disableControllerExpansion: driverOpts.DisableControllerExpansion,
-		tokenRequests:              driverOpts.TokenRequests,
-		requiresRepublish:          driverOpts.RequiresRepublish,
-		fsGroupPolicy:              driverOpts.FSGroupPolicy,
-		enableVolumeMountGroup:     driverOpts.EnableVolumeMountGroup,
-		enableSELinuxMount:         driverOpts.EnableSELinuxMount,
-		embedded:                   driverOpts.Embedded,
-		hooks:                      driverOpts.Hooks,
+		manifests:                            driverManifests,
+		podInfo:                              driverOpts.PodInfo,
+		storageCapacity:                      driverOpts.StorageCapacity,
+		enableTopology:                       driverOpts.EnableTopology,
+		attachable:                           !driverOpts.DisableAttach,
+		attachLimit:                          driverOpts.AttachLimit,
+		enableNodeExpansion:                  driverOpts.EnableNodeExpansion,
+		enableNodeVolumeCondition:            driverOpts.EnableNodeVolumeCondition,
+		disableControllerExpansion:           driverOpts.DisableControllerExpansion,
+		tokenRequests:                        driverOpts.TokenRequests,
+		requiresRepublish:                    driverOpts.RequiresRepublish,
+		serviceAccountTokenInSecrets:         driverOpts.ServiceAccountTokenInSecrets,
+		fsGroupPolicy:                        driverOpts.FSGroupPolicy,
+		enableVolumeMountGroup:               driverOpts.EnableVolumeMountGroup,
+		enableSELinuxMount:                   driverOpts.EnableSELinuxMount,
+		enableMutableCSINodeAllocatableCount: driverOpts.EnableMutableCSINodeAllocatableCount,
+		embedded:                             driverOpts.Embedded,
+		hooks:                                driverOpts.Hooks,
 	}
 }
 
@@ -714,11 +733,15 @@ func (m *mockCSIDriver) PrepareTest(ctx context.Context, f *framework.Framework)
 			storagev1.VolumeLifecyclePersistent,
 			storagev1.VolumeLifecycleEphemeral,
 		},
-		TokenRequests:     m.tokenRequests,
-		RequiresRepublish: m.requiresRepublish,
-		FSGroupPolicy:     m.fsGroupPolicy,
-		SELinuxMount:      m.enableSELinuxMount,
-		Features:          map[string][]string{},
+		TokenRequests:                m.tokenRequests,
+		RequiresRepublish:            m.requiresRepublish,
+		ServiceAccountTokenInSecrets: m.serviceAccountTokenInSecrets,
+		FSGroupPolicy:                m.fsGroupPolicy,
+		SELinuxMount:                 m.enableSELinuxMount,
+		Features:                     map[string][]string{},
+	}
+	if m.enableMutableCSINodeAllocatableCount {
+		o.Features["csi-attacher"] = []string{"MutableCSINodeAllocatableCount=true"}
 	}
 
 	err = utils.CreateFromManifests(ctx, f, m.driverNamespace, func(item interface{}) error {

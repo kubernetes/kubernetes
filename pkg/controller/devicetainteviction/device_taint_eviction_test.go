@@ -19,9 +19,10 @@ package devicetainteviction
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"math"
+	"reflect"
 	"slices"
-	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -35,32 +36,65 @@ import (
 	gomegatypes "github.com/onsi/gomega/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"k8s.io/apimachinery/pkg/watch"
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
+	resourcealpha "k8s.io/api/resource/v1alpha3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/watch"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	metricstestutil "k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/devicetainteviction/metrics"
 	"k8s.io/kubernetes/pkg/controller/tainteviction"
 	controllertestutil "k8s.io/kubernetes/pkg/controller/testutil"
+	"k8s.io/kubernetes/pkg/features"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
+// Reduce typing with some constructors.
+
+func metav1Time(time time.Time) *metav1.Time {
+	return &metav1.Time{Time: time}
+}
+
+func ac(claim *resourceapi.ResourceClaim, eviction ...*evictionAndReason) allocatedClaim {
+	ac := allocatedClaim{
+		ResourceClaim: claim,
+	}
+	switch len(eviction) {
+	case 1:
+		ac.eviction = eviction[0]
+	case 0:
+	default:
+		panic("wrong number of evictions")
+	}
+	return ac
+}
+
+func l[T any](items ...T) []T {
+	return items
+}
+
 // setup creates a controller which is ready to have its handle* methods called.
-func setup(tb testing.TB) *testContext {
-	tCtx := ktesting.Init(tb)
-	fakeClientset := fake.NewSimpleClientset()
+func setup(tCtx ktesting.TContext) *testContext {
+	featuregatetesting.SetFeatureGatesDuringTest(tCtx, utilfeature.DefaultFeatureGate,
+		featuregatetesting.FeatureOverrides{
+			features.DRADeviceTaints:     true,
+			features.DRADeviceTaintRules: true,
+		},
+	)
+
+	fakeClientset := fake.NewClientset()
 	informerFactory := informers.NewSharedInformerFactory(fakeClientset, 0)
 	controller := New(fakeClientset,
 		informerFactory.Core().V1().Pods(),
@@ -77,38 +111,10 @@ func setup(tb testing.TB) *testContext {
 		client:          fakeClientset,
 		informerFactory: informerFactory,
 	}
+	controller.workqueue = &tContext.mockQueue
 	tContext.logger = tCtx.Logger()
 	// Always log, not matter what the -v value is.
 	controller.eventLogger = &tContext.logger
-	tContext.evictPod = func(podRef tainteviction.NamespacedObject, fireAt time.Time) {
-		// Always replace an existing entry for the same pod.
-		index := slices.IndexFunc(tContext.evicting, func(e evictAt) bool {
-			return e.podRef == podRef
-		})
-		e := evictAt{podRef, fireAt}
-		if index == -1 {
-			tContext.evicting = append(tContext.evicting, e)
-		} else {
-			tContext.evicting[index] = e
-		}
-		sort.Slice(tContext.evicting, func(i, j int) bool {
-			switch strings.Compare(tContext.evicting[i].podRef.Namespace, tContext.evicting[j].podRef.Namespace) {
-			case 1:
-				return false
-			case -1:
-				return true
-			}
-			return tContext.evicting[i].podRef.Name < tContext.evicting[j].podRef.Name
-		})
-	}
-	tContext.cancelEvict = func(pod tainteviction.NamespacedObject) bool {
-		index := slices.IndexFunc(tContext.evicting, func(e evictAt) bool { return e.podRef == pod })
-		if index >= 0 {
-			tContext.evicting = slices.Delete(tContext.evicting, index, index+1)
-			return true
-		}
-		return false
-	}
 	tContext.Controller.recorder = tContext.recorder
 
 	return tContext
@@ -117,23 +123,42 @@ func setup(tb testing.TB) *testContext {
 type testContext struct {
 	ktesting.TContext
 	*Controller
-	evicting        []evictAt // sorted by namespace, name
+	mockQueue       Mock[workItem]
 	recorder        *controllertestutil.FakeRecorder
 	client          *fake.Clientset
 	informerFactory informers.SharedInformerFactory
-}
-
-type evictAt struct {
-	podRef tainteviction.NamespacedObject
-	fireAt time.Time
 }
 
 type state struct {
 	pods            []*v1.Pod
 	allocatedClaims []allocatedClaim
 	slices          []*resourceapi.ResourceSlice
-	evicting        []evictAt
+	rules           []*resourcealpha.DeviceTaintRule
+	ruleStats       map[types.UID]taintRuleStats
+
+	// Pods might have been queued in the past and then not removed when removing from deletePodAt.
+	// Therefore we need to describe the expected state separately for both fields.
+
+	deletePodAt evictMap
+	queued      MockState[workItem]
 }
+
+// step describes a state after handling ready work items and how much to move time forward.
+type step struct {
+	pods        []*v1.Pod
+	rules       []*resourcealpha.DeviceTaintRule
+	ruleStats   map[types.UID]taintRuleStats
+	deletePodAt evictMap
+
+	// queuedProcessed is the state after handling all ready items.
+	queuedProcessed MockState[workItem]
+	// Move time forward.
+	advance time.Duration
+	// queuedShifted is the state after reducing the delay for future items.
+	queuedShifted MockState[workItem]
+}
+
+type evictMap map[tainteviction.NamespacedObject]evictionAndReason
 
 func (s state) allocatedClaimsAsMap() map[types.NamespacedName]allocatedClaim {
 	claims := make(map[types.NamespacedName]allocatedClaim)
@@ -149,14 +174,14 @@ func (s state) slicesAsMap() map[poolID]pool {
 		id := poolID{driverName: slice.Spec.Driver, poolName: slice.Spec.Pool.Name}
 		pool := pools[id]
 		if pool.slices == nil {
-			pool.slices = sets.New[*resourceapi.ResourceSlice]()
+			pool.slices = make(map[string]*resourceapi.ResourceSlice)
 		}
-		pool.slices.Insert(slice)
+		pool.slices[slice.Name] = slice
 		pools[id] = pool
 	}
 	for id, pool := range pools {
 		maxGeneration := int64(math.MinInt64)
-		for slice := range pool.slices {
+		for _, slice := range pool.slices {
 			if slice.Spec.Pool.Generation > maxGeneration {
 				maxGeneration = slice.Spec.Pool.Generation
 			}
@@ -165,6 +190,24 @@ func (s state) slicesAsMap() map[poolID]pool {
 		pools[id] = pool
 	}
 	return pools
+}
+
+// assertEqual uses cmp.Diff instead of spew+diff like testify's Equal.
+// This provides a full context for a modified field.
+// Allows comparing unexported fields, empty and nil maps/slices are equal.
+func assertEqual[T any](t interface {
+	Helper()
+	Errorf(string, ...any)
+}, expected, actual T, what string, opts ...cmp.Option) bool {
+	t.Helper()
+
+	opts = append(opts, cmp.Exporter(func(reflect.Type) bool { return true }), cmpopts.EquateEmpty())
+
+	if diff := cmp.Diff(expected, actual, opts...); diff != "" {
+		t.Errorf("Unexpected diff for %s (-expected, +actual):\n%s", what, diff)
+		return false
+	}
+	return true
 }
 
 type testCase struct {
@@ -181,7 +224,14 @@ type testCase struct {
 	// in each event entry.
 	events []any
 
+	// finalState represents the result of feeding the event handlers.
 	finalState state
+
+	// process represents the result of processing all of the ready work queue items,
+	// potentially multiple times. After each flush the time advances and pending
+	// work items become ready. The default is []step{{}}.
+	process []step
+
 	wantEvents []*v1.Event
 }
 
@@ -208,16 +258,23 @@ var (
 	resourceName = "my-resource"
 	claimName    = podName + "-" + resourceName
 	namespace    = "default"
-	taintTime    = metav1.Now() // This cannot be a fixed value in the past, otherwise the "seconds since taint time" delta overflows.
-	taintKey     = "example.com/taint"
-	taintValue   = "something"
-	simpleSlice  = st.MakeResourceSlice(nodeName, driver).
+	// taintTime is the start time of a synctest bubble.
+	// All tests run inside such a bubble and thus have a deterministic
+	// delta between this taint time and their current clock.
+	taintTime  = metav1Time(time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC))
+	taintKey   = "example.com/taint"
+	taintValue = "something"
+
+	// All slices use the internal format.
+	// For client-go they get converted back to the v1 API.
+
+	simpleSlice = st.MakeResourceSlice(nodeName, driver).
 			Device("instance").
 			Obj()
 	slice = st.MakeResourceSlice(nodeName, driver).
 		Device("instance").
 		Device("instance-no-schedule", resourceapi.DeviceTaint{Key: taintKey, Effect: resourceapi.DeviceTaintEffectNoSchedule}).
-		Device("instance-no-execute", resourceapi.DeviceTaint{Key: taintKey, Effect: resourceapi.DeviceTaintEffectNoExecute, TimeAdded: &taintTime}).
+		Device("instance-no-execute", resourceapi.DeviceTaint{Key: taintKey, Effect: resourceapi.DeviceTaintEffectNone, TimeAdded: taintTime}, resourceapi.DeviceTaint{Key: taintKey, Effect: resourceapi.DeviceTaintEffectNoExecute, TimeAdded: taintTime}).
 		Obj()
 	sliceReplaced = func() *resourceapi.ResourceSlice {
 		slice := slice.DeepCopy()
@@ -232,15 +289,34 @@ var (
 		}
 		return slice
 	}()
+	taint        = &resourceapi.DeviceTaint{Key: taintKey, Effect: resourceapi.DeviceTaintEffectNoExecute, Value: taintValue, TimeAdded: taintTime}
 	sliceTainted = func() *resourceapi.ResourceSlice {
 		slice := slice.DeepCopy()
-		slice.Spec.Devices[0].Taints = []resourceapi.DeviceTaint{{Key: taintKey, Effect: resourceapi.DeviceTaintEffectNoExecute, Value: taintValue, TimeAdded: &taintTime}}
+		slice.Spec.Devices[0].Taints = []resourceapi.DeviceTaint{*taint}
 		return slice
 	}()
 	sliceTaintedExtended = func() *resourceapi.ResourceSlice {
 		slice := sliceTainted.DeepCopy()
 		slice.Spec.Devices = append(slice.Spec.Devices, *slice.Spec.Devices[0].DeepCopy())
 		slice.Spec.Devices[len(slice.Spec.Devices)-1].Name += "-other"
+		return slice
+	}()
+	sliceTaintedNone = func() *resourceapi.ResourceSlice {
+		slice := sliceTainted.DeepCopy()
+		for i := range slice.Spec.Devices {
+			for j := range slice.Spec.Devices[i].Taints {
+				slice.Spec.Devices[i].Taints[j].Effect = resourceapi.DeviceTaintEffectNone
+			}
+		}
+		return slice
+	}()
+	sliceTaintedUnknown = func() *resourceapi.ResourceSlice {
+		slice := sliceTainted.DeepCopy()
+		for i := range slice.Spec.Devices {
+			for j := range slice.Spec.Devices[i].Taints {
+				slice.Spec.Devices[i].Taints[j].Effect = resourceapi.DeviceTaintEffect("unknown-effect")
+			}
+		}
 		return slice
 	}()
 	sliceTaintedNoSchedule = func() *resourceapi.ResourceSlice {
@@ -252,21 +328,17 @@ var (
 		}
 		return slice
 	}()
+	taintOther             = &resourceapi.DeviceTaint{Key: taintKey, Effect: resourceapi.DeviceTaintEffectNoExecute, Value: taintValue + "-other", TimeAdded: taintTime}
 	sliceTaintedValueOther = func() *resourceapi.ResourceSlice {
 		slice := sliceTainted.DeepCopy()
-		for i := range slice.Spec.Devices {
-			for j := range slice.Spec.Devices[i].Taints {
-				slice.Spec.Devices[i].Taints[j].Value += "-other"
-			}
-		}
+		slice.Spec.Devices[0].Taints[0] = *taintOther
 		return slice
 	}()
+	taint1            = &resourceapi.DeviceTaint{Key: taintKey, Effect: resourceapi.DeviceTaintEffectNoExecute, TimeAdded: taintTime}
+	taint2            = &resourceapi.DeviceTaint{Key: taintKey + "-other", Effect: resourceapi.DeviceTaintEffectNoExecute, TimeAdded: taintTime}
 	sliceTaintedTwice = func() *resourceapi.ResourceSlice {
 		slice := slice.DeepCopy()
-		slice.Spec.Devices[0].Taints = []resourceapi.DeviceTaint{
-			{Key: taintKey, Effect: resourceapi.DeviceTaintEffectNoExecute, TimeAdded: &taintTime},
-			{Key: taintKey + "-other", Effect: resourceapi.DeviceTaintEffectNoExecute, TimeAdded: &taintTime},
-		}
+		slice.Spec.Devices[0].Taints = []resourceapi.DeviceTaint{*taint1, *taint2}
 		return slice
 	}()
 	sliceUntainted = func() *resourceapi.ResourceSlice {
@@ -283,6 +355,99 @@ var (
 		slice.Spec.Pool.Generation++
 		return slice
 	}()
+	ruleEvict = &resourcealpha.DeviceTaintRule{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "evict",
+			UID:  "1234",
+		},
+
+		Spec: resourcealpha.DeviceTaintRuleSpec{
+			DeviceSelector: &resourcealpha.DeviceTaintSelector{
+				Driver: ptr.To(driver),
+			},
+			Taint: resourcealpha.DeviceTaint{
+				Key:       taint.Key,
+				Value:     taint.Value,
+				Effect:    resourcealpha.DeviceTaintEffect(taint.Effect),
+				TimeAdded: taint.TimeAdded,
+			},
+		},
+	}
+	ruleEvictInstance1 = &resourcealpha.DeviceTaintRule{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "evict-instance",
+			UID:  "1234",
+		},
+
+		Spec: resourcealpha.DeviceTaintRuleSpec{
+			DeviceSelector: &resourcealpha.DeviceTaintSelector{
+				Driver: ptr.To(driver),
+				Device: ptr.To("instance"),
+			},
+			Taint: resourcealpha.DeviceTaint{
+				Key:       taint.Key,
+				Value:     taint.Value,
+				Effect:    resourcealpha.DeviceTaintEffect(taint.Effect),
+				TimeAdded: taintTime,
+			},
+		},
+	}
+	taintTimeLater          = metav1Time(taintTime.Add(40 * time.Second))
+	ruleEvictInstance2Later = &resourcealpha.DeviceTaintRule{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "evict-instance-no-execute",
+			UID:  "5678",
+		},
+
+		Spec: resourcealpha.DeviceTaintRuleSpec{
+			DeviceSelector: &resourcealpha.DeviceTaintSelector{
+				Driver: ptr.To(driver),
+				Device: ptr.To("instance-no-execute"),
+			},
+			Taint: resourcealpha.DeviceTaint{
+				Key:       taint.Key,
+				Value:     taint.Value,
+				Effect:    resourcealpha.DeviceTaintEffect(taint.Effect),
+				TimeAdded: taintTimeLater,
+			},
+		},
+	}
+	ruleNone = &resourcealpha.DeviceTaintRule{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "evict",
+			UID:  "1234",
+		},
+
+		Spec: resourcealpha.DeviceTaintRuleSpec{
+			DeviceSelector: &resourcealpha.DeviceTaintSelector{
+				Driver: ptr.To(driver),
+			},
+			Taint: resourcealpha.DeviceTaint{
+				Key:       taint.Key,
+				Value:     taint.Value,
+				Effect:    resourcealpha.DeviceTaintEffectNone,
+				TimeAdded: taint.TimeAdded,
+			},
+		},
+	}
+	ruleEvictOther = &resourcealpha.DeviceTaintRule{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "evict-other",
+			UID:  "1234-other",
+		},
+
+		Spec: resourcealpha.DeviceTaintRuleSpec{
+			DeviceSelector: &resourcealpha.DeviceTaintSelector{
+				Device: ptr.To("instance"),
+			},
+			Taint: resourcealpha.DeviceTaint{
+				Key:       taint.Key,
+				Value:     taint.Value,
+				Effect:    resourcealpha.DeviceTaintEffect(taint.Effect),
+				TimeAdded: taint.TimeAdded,
+			},
+		},
+	}
 	claim = st.MakeResourceClaim().
 		Name(claimName).
 		Namespace(namespace).
@@ -298,11 +463,47 @@ var (
 			}},
 		},
 	}
+	allocationResultOtherDevices = &resourceapi.AllocationResult{
+		Devices: resourceapi.DeviceAllocationResult{
+			Results: []resourceapi.DeviceRequestAllocationResult{
+				{
+					Driver:  driver,
+					Pool:    nodeName,
+					Device:  "instance-no-schedule",
+					Request: "req-1",
+				},
+				{
+					Driver:  driver,
+					Pool:    nodeName,
+					Device:  "instance-no-execute",
+					Request: "req-1",
+				},
+			},
+		},
+	}
 	inUseClaim = st.FromResourceClaim(claim).
 			OwnerReference(podName, podUID, podKind).
 			Allocation(allocationResult).
 			ReservedForPod(podName, types.UID(podUID)).
 			Obj()
+	inUseClaimOtherNamespace = st.FromResourceClaim(claim).
+					Namespace(namespace+"-other").
+					OwnerReference(podName, podUID+"-2", podKind). // podWithClaimNameOtherNamespace below.
+					Allocation(allocationResultOtherDevices).
+					ReservedForPod(podName, types.UID(podUID+"-2")).
+					Obj()
+	inUseClaimOtherName = st.FromResourceClaim(claim).
+				Name(claimName+"-other").
+				OwnerReference(podName+"-other", podUID+"-3", podKind). // podWithClaimNameOtherName below.
+				Allocation(allocationResultOtherDevices).
+				ReservedForPod(podName+"-other", types.UID(podUID+"-3")).
+				Obj()
+	inUseClaimOtherNameShared = st.FromResourceClaim(claim).
+					Name(claimName+"-other").
+					OwnerReference(podName+"-other", podUID+"-3", podKind). // podWithClaimNameOtherName below.
+					Allocation(allocationResultOtherDevices).
+					ReservedFor(resourceapi.ResourceClaimConsumerReference{Resource: "pods", Name: podName, UID: types.UID(podUID)}, resourceapi.ResourceClaimConsumerReference{Resource: "pods", Name: podName + "-other", UID: types.UID(podUID + "-3")}).
+					Obj()
 	// A test may run for an hour without reaching the end of this period.
 	tolerationDuration       = 60 * 60 * time.Second
 	inUseClaimWithToleration = func() *resourceapi.ResourceClaim {
@@ -329,11 +530,27 @@ var (
 				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimName: &claimName}).
 				Node(nodeName).
 				Obj()
-	podWithClaimNameOther = st.MakePod().Name(podName).Namespace(namespace).
-				UID(podUID + "-other").
-				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimName: &claimName}).
+	podWithTwoClaimNames = st.MakePod().Name(podName).Namespace(namespace).
+				UID(podUID).
+				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimName: &inUseClaim.Name}).
+				PodResourceClaims(v1.PodResourceClaim{Name: resourceName + "-other", ResourceClaimName: &inUseClaimOtherName.Name}).
 				Node(nodeName).
 				Obj()
+	podWithClaimNameOtherUID = st.MakePod().Name(podName).Namespace(namespace).
+					UID(podUID + "-other").
+					PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimName: &claimName}).
+					Node(nodeName).
+					Obj()
+	podWithClaimNameOtherNamespace = st.MakePod().Name(podName).Namespace(namespace + "-other").
+					UID(podUID + "-2").
+					PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimName: &claimName}).
+					Node(nodeName).
+					Obj()
+	podWithClaimNameOtherName = st.MakePod().Name(podName + "-other").Namespace(namespace).
+					UID(podUID + "-3").
+					PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimName: &inUseClaimOtherName.Name}).
+					Node(nodeName).
+					Obj()
 	podWithClaimTemplate = st.MakePod().Name(podName).Namespace(namespace).
 				UID(podUID).
 				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimTemplateName: &claimName}).
@@ -377,7 +594,113 @@ var (
 		},
 		Count: 1,
 	}
+	deletePodEvent = &v1.Event{
+		InvolvedObject: v1.ObjectReference{
+			Kind:       "Pod",
+			APIVersion: "v1",
+			Namespace:  namespace,
+			Name:       podName,
+			UID:        types.UID(podUID),
+		},
+		Reason:  "DeviceTaintManagerEviction",
+		Message: "Marking for deletion",
+		Type:    v1.EventTypeNormal,
+		Source: v1.EventSource{
+			Component: "nodeControllerTest",
+		},
+		Count: 1,
+	}
+	deletePodEventOtherNamespace = &v1.Event{
+		InvolvedObject: v1.ObjectReference{
+			Kind:       "Pod",
+			APIVersion: "v1",
+			Namespace:  namespace + "-other",
+			Name:       podName,
+			UID:        types.UID(podUID + "-2"),
+		},
+		Reason:  "DeviceTaintManagerEviction",
+		Message: "Marking for deletion",
+		Type:    v1.EventTypeNormal,
+		Source: v1.EventSource{
+			Component: "nodeControllerTest",
+		},
+		Count: 1,
+	}
+	deletePodEventOtherName = &v1.Event{
+		InvolvedObject: v1.ObjectReference{
+			Kind:       "Pod",
+			APIVersion: "v1",
+			Namespace:  namespace,
+			Name:       podName + "-other",
+			UID:        types.UID(podUID + "-3"),
+		},
+		Reason:  "DeviceTaintManagerEviction",
+		Message: "Marking for deletion",
+		Type:    v1.EventTypeNormal,
+		Source: v1.EventSource{
+			Component: "nodeControllerTest",
+		},
+		Count: 1,
+	}
 )
+
+func newEvictionTime(when *metav1.Time, args ...any) *evictionAndReason {
+	if when == nil {
+		return nil
+	}
+
+	var reason []trackedTaint
+	i := 0
+	for i < len(args) {
+		switch obj := args[i].(type) {
+		case *resourceapi.ResourceSlice:
+			reason = append(reason, trackedTaint{slice: sliceDeviceTaint{slice: obj, deviceName: args[i+1].(string), taintIndex: args[i+2].(int)}})
+			i += 3
+		case *resourcealpha.DeviceTaintRule:
+			reason = append(reason, trackedTaint{rule: obj})
+			i++
+		default:
+			panic(fmt.Sprintf("unsupported argument type %T", args[i]))
+		}
+	}
+
+	return &evictionAndReason{
+		when:   *when,
+		reason: reason,
+	}
+}
+
+func newWorkItems(objs ...metav1.Object) []workItem {
+	var items []workItem
+	for _, obj := range objs {
+		items = append(items, newWorkItem(obj))
+	}
+	return items
+}
+
+func newWorkItem(obj metav1.Object) workItem {
+	ref := newObject(obj)
+	var item workItem
+	switch obj.(type) {
+	case *resourcealpha.DeviceTaintRule:
+		item.ruleRef = ref
+	case *v1.Pod:
+		item.podRef = ref
+	default:
+		panic(fmt.Sprintf("invalid type %T", obj))
+	}
+	return item
+}
+
+func newDelayedWorkItems(objsAndDelay ...any) []MockDelayedItem[workItem] {
+	var items []MockDelayedItem[workItem]
+	for i := 0; i < len(objsAndDelay); i += 2 {
+		item := newWorkItem(objsAndDelay[i].(metav1.Object))
+		delay := objsAndDelay[i+1].(time.Duration)
+		items = append(items, MockDelayedItem[workItem]{item, delay})
+	}
+	return items
+}
 
 func matchDeletionEvent() gomegatypes.GomegaMatcher {
 	return matchEvent("Marking for deletion")
@@ -409,14 +732,36 @@ func listEvents(tCtx ktesting.TContext) []v1.Event {
 	return events.Items
 }
 
-// TestHandlers covers the event handler logic. Each test case starts with
+func inProgress(rule *resourcealpha.DeviceTaintRule, status bool, reason, message string, when *metav1.Time) *resourcealpha.DeviceTaintRule {
+	rule = rule.DeepCopy()
+	condition := metav1.Condition{
+		Type:               resourcealpha.DeviceTaintConditionEvictionInProgress,
+		Status:             metav1.ConditionFalse,
+		Reason:             reason,
+		Message:            message,
+		ObservedGeneration: rule.Generation,
+		LastTransitionTime: *when,
+	}
+	if status {
+		condition.Status = metav1.ConditionTrue
+	}
+	rule.Status.Conditions = []metav1.Condition{condition}
+	return rule
+}
+
+// TestController covers the event handler logic and handling work.
+//
+// It runs inside a synctest bubble without actually starting the
+// controller. Each test case starts with
 // some known state, applies a sequence of independent events in all
 // permutations of their order, then checks against the expected final
 // state. The final state must be the same in all permutations. This simulates
 // the random order in which informer updates can be perceived.
-func TestHandlers(t *testing.T) {
-	t.Parallel()
-
+//
+// Then pending work gets handled, potentially multiple times after
+// advancing time to reach "later" work items.
+func TestController(t *testing.T) { testController(ktesting.Init(t)) }
+func testController(tCtx ktesting.TContext) {
 	for name, tc := range map[string]testCase{
 		"empty": {},
 		"populate-pools": {
@@ -425,19 +770,19 @@ func TestHandlers(t *testing.T) {
 				add(slice2),
 			},
 			finalState: state{
-				slices: []*resourceapi.ResourceSlice{slice, slice2},
+				slices: l(slice, slice2),
 			},
 		},
 		"update-pools": {
 			initialState: state{
-				slices: []*resourceapi.ResourceSlice{slice, slice2},
+				slices: l(slice, slice2),
 			},
 			events: []any{
 				update(slice, sliceUntainted),
 				remove(slice2),
 			},
 			finalState: state{
-				slices: []*resourceapi.ResourceSlice{sliceUntainted},
+				slices: l(sliceUntainted),
 			},
 		},
 		"untainted-claim": {
@@ -447,20 +792,44 @@ func TestHandlers(t *testing.T) {
 				add(inUseClaim),
 			},
 			finalState: state{
-				slices:          []*resourceapi.ResourceSlice{slice, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim}},
+				slices:          l(slice, slice2),
+				allocatedClaims: l(ac(inUseClaim)),
 			},
 		},
-		"tainted-claim": {
+		"tainted-claim-through-resourceslice": {
 			events: []any{
 				add(sliceTainted),
 				add(slice2),
 				add(inUseClaim),
 			},
 			finalState: state{
-				slices:          []*resourceapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime}},
+				slices:          l(sliceTainted, slice2),
+				allocatedClaims: l(ac(inUseClaim, newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0))),
 			},
+		},
+		"rule-status": {
+			events: []any{
+				add(ruleEvict),
+			},
+			finalState: state{
+				queued: MockState[workItem]{Ready: newWorkItems(ruleEvict)},
+			},
+			process: []step{{
+				rules: l(inProgress(ruleEvict, false, "NotStarted", "", taintTime)),
+			}},
+		},
+		"tainted-claim-through-rule": {
+			events: []any{
+				add(ruleEvict),
+				add(inUseClaim),
+			},
+			finalState: state{
+				allocatedClaims: l(ac(inUseClaim, newEvictionTime(taintTime, ruleEvict))),
+				queued:          MockState[workItem]{Ready: newWorkItems(ruleEvict)},
+			},
+			process: []step{{
+				rules: l(inProgress(ruleEvict, false, "NotStarted", "", taintTime)),
+			}},
 		},
 		"evict-pod-resourceclaim": {
 			events: []any{
@@ -470,25 +839,321 @@ func TestHandlers(t *testing.T) {
 				add(podWithClaimName),
 			},
 			finalState: state{
-				slices:          []*resourceapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime}},
-				evicting:        []evictAt{{newObject(podWithClaimName), taintTime.Time}},
+				slices:          l(sliceTainted, slice2),
+				allocatedClaims: l(ac(inUseClaim, newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0))),
+				deletePodAt:     evictMap{newObject(podWithClaimName): *newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0)},
+				queued:          MockState[workItem]{Ready: newWorkItems(podWithClaimName)},
 			},
+			wantEvents: l(deletePodEvent),
+		},
+		"evict-pod-rule": {
+			events: []any{
+				add(inUseClaim),
+				add(podWithClaimName),
+				add(ruleEvict),
+			},
+			finalState: state{
+				allocatedClaims: l(ac(inUseClaim, newEvictionTime(taintTime, ruleEvict))),
+				deletePodAt:     evictMap{newObject(podWithClaimName): *newEvictionTime(taintTime, ruleEvict)},
+				queued:          MockState[workItem]{Ready: newWorkItems(ruleEvict, podWithClaimName)},
+			},
+			process: []step{
+				{
+					ruleStats: map[types.UID]taintRuleStats{ruleEvict.UID: {numEvictedPods: 1}},
+					// Initial update.
+					rules:           l(inProgress(ruleEvict, true, "PodsPendingEviction", "1 pod needs to be evicted in 1 namespace.", taintTime)),
+					queuedProcessed: MockState[workItem]{Later: newDelayedWorkItems(ruleEvict, ruleStatusPeriod)},
+					advance:         ruleStatusPeriod,
+					queuedShifted:   MockState[workItem]{Ready: newWorkItems(ruleEvict)},
+				},
+				{
+					ruleStats: map[types.UID]taintRuleStats{ruleEvict.UID: {numEvictedPods: 1}},
+					// Final update.
+					rules: l(inProgress(ruleEvict, false, "Completed", "1 pod evicted since starting the controller.", metav1Time(taintTime.Add(ruleStatusPeriod)))),
+				},
+			},
+			wantEvents: l(deletePodEvent),
+		},
+		"evict-pod-rule-later": {
+			events: []any{
+				add(inUseClaimWithToleration),
+				add(podWithClaimName),
+				add(ruleEvict),
+			},
+			finalState: state{
+				allocatedClaims: l(ac(inUseClaimWithToleration, newEvictionTime(metav1Time(taintTime.Add(tolerationDuration)), ruleEvict))),
+				deletePodAt:     evictMap{newObject(podWithClaimName): *newEvictionTime(metav1Time(taintTime.Add(tolerationDuration)), ruleEvict)},
+				queued:          MockState[workItem]{Ready: newWorkItems(ruleEvict), Later: newDelayedWorkItems(podWithClaimName, tolerationDuration)},
+			},
+			process: []step{
+				{
+					// Initial update.
+					deletePodAt: evictMap{newObject(podWithClaimName): *newEvictionTime(metav1Time(taintTime.Add(tolerationDuration)), ruleEvict)},
+					pods:        l(podWithClaimName),
+					rules:       l(inProgress(ruleEvict, true, "PodsPendingEviction", "1 pod needs to be evicted in 1 namespace.", taintTime)),
+
+					queuedProcessed: MockState[workItem]{Later: newDelayedWorkItems(podWithClaimName, tolerationDuration)},
+					advance:         tolerationDuration,
+					queuedShifted:   MockState[workItem]{Ready: newWorkItems(podWithClaimName)},
+				},
+				{
+					// Deleted, but condition not updated yet.
+					ruleStats:       map[types.UID]taintRuleStats{ruleEvict.UID: {numEvictedPods: 1}},
+					rules:           l(inProgress(ruleEvict, true, "PodsPendingEviction", "1 pod needs to be evicted in 1 namespace.", taintTime)),
+					queuedProcessed: MockState[workItem]{Later: newDelayedWorkItems(ruleEvict, ruleStatusPeriod)},
+					advance:         ruleStatusPeriod,
+					queuedShifted:   MockState[workItem]{Ready: newWorkItems(ruleEvict)},
+				},
+				{
+					// Final update.
+					ruleStats: map[types.UID]taintRuleStats{ruleEvict.UID: {numEvictedPods: 1}},
+					rules:     l(inProgress(ruleEvict, false, "Completed", "1 pod evicted since starting the controller.", metav1Time(taintTime.Add(tolerationDuration+ruleStatusPeriod)))),
+				},
+			},
+			wantEvents: l(deletePodEvent),
+		},
+		"evict-many-pods-many-namespaces": {
+			events: []any{
+				add(inUseClaim),
+				add(podWithClaimName),
+				add(inUseClaimOtherNamespace),
+				add(podWithClaimNameOtherNamespace),
+				add(ruleEvict),
+			},
+			finalState: state{
+				allocatedClaims: l(ac(inUseClaim, newEvictionTime(taintTime, ruleEvict)), ac(inUseClaimOtherNamespace, newEvictionTime(taintTime, ruleEvict))),
+				deletePodAt:     evictMap{newObject(podWithClaimName): *newEvictionTime(taintTime, ruleEvict), newObject(podWithClaimNameOtherNamespace): *newEvictionTime(taintTime, ruleEvict)},
+				queued:          MockState[workItem]{Ready: newWorkItems(ruleEvict, podWithClaimName, podWithClaimNameOtherNamespace)},
+			},
+			process: []step{
+				{
+					ruleStats: map[types.UID]taintRuleStats{ruleEvict.UID: {numEvictedPods: 2}},
+					// Initial update.
+					rules:           l(inProgress(ruleEvict, true, "PodsPendingEviction", "2 pods need to be evicted in 2 different namespaces.", taintTime)),
+					queuedProcessed: MockState[workItem]{Later: newDelayedWorkItems(ruleEvict, ruleStatusPeriod)},
+					advance:         ruleStatusPeriod,
+					queuedShifted:   MockState[workItem]{Ready: newWorkItems(ruleEvict)},
+				},
+				{
+					ruleStats: map[types.UID]taintRuleStats{ruleEvict.UID: {numEvictedPods: 2}},
+					// Final update.
+					rules: l(inProgress(ruleEvict, false, "Completed", "2 pods evicted since starting the controller.", metav1Time(taintTime.Add(ruleStatusPeriod)))),
+				},
+			},
+			wantEvents: l(deletePodEvent, deletePodEventOtherNamespace),
+		},
+		"evict-many-pods-same-namespace": {
+			events: []any{
+				add(inUseClaim),
+				add(podWithClaimName),
+				add(inUseClaimOtherName),
+				add(podWithClaimNameOtherName),
+				add(ruleEvict),
+			},
+			finalState: state{
+				allocatedClaims: l(ac(inUseClaim, newEvictionTime(taintTime, ruleEvict)), ac(inUseClaimOtherName, newEvictionTime(taintTime, ruleEvict))),
+				deletePodAt:     evictMap{newObject(podWithClaimName): *newEvictionTime(taintTime, ruleEvict), newObject(podWithClaimNameOtherName): *newEvictionTime(taintTime, ruleEvict)},
+				queued:          MockState[workItem]{Ready: newWorkItems(ruleEvict, podWithClaimName, podWithClaimNameOtherName)},
+			},
+			process: []step{
+				{
+					ruleStats: map[types.UID]taintRuleStats{ruleEvict.UID: {numEvictedPods: 2}},
+					// Initial update.
+					rules:           l(inProgress(ruleEvict, true, "PodsPendingEviction", "2 pods need to be evicted in 1 namespace.", taintTime)),
+					queuedProcessed: MockState[workItem]{Later: newDelayedWorkItems(ruleEvict, ruleStatusPeriod)},
+					advance:         ruleStatusPeriod,
+					queuedShifted:   MockState[workItem]{Ready: newWorkItems(ruleEvict)},
+				},
+				{
+					ruleStats: map[types.UID]taintRuleStats{ruleEvict.UID: {numEvictedPods: 2}},
+					// Final update.
+					rules: l(inProgress(ruleEvict, false, "Completed", "2 pods evicted since starting the controller.", metav1Time(taintTime.Add(ruleStatusPeriod)))),
+				},
+			},
+			wantEvents: l(deletePodEvent, deletePodEventOtherName),
+		},
+		"none-pod-rule": {
+			events: []any{
+				add(slice),
+				add(inUseClaim),
+				add(podWithClaimName),
+				add(ruleNone),
+			},
+			finalState: state{
+				slices:          l(slice),
+				allocatedClaims: l(ac(inUseClaim)),
+				queued:          MockState[workItem]{Ready: newWorkItems(ruleNone)},
+			},
+			process: []step{
+				{
+					pods:  l(podWithClaimName),
+					rules: l(inProgress(ruleNone, false, "NoEffect", "3 published devices selected. 1 allocated device selected. 1 pod would be evicted in 1 namespace if the effect was NoExecute. This information will not be updated again. Recreate the DeviceTaintRule to trigger an update.", taintTime)),
+				},
+			},
+		},
+		"none-many-pods-many-namespaces": {
+			events: []any{
+				add(inUseClaim),
+				add(podWithClaimName),
+				add(inUseClaimOtherNamespace),
+				add(podWithClaimNameOtherNamespace),
+				add(ruleNone),
+			},
+			finalState: state{
+				allocatedClaims: l(ac(inUseClaim), ac(inUseClaimOtherNamespace)),
+				queued:          MockState[workItem]{Ready: newWorkItems(ruleNone)},
+			},
+			process: []step{
+				{
+					pods:  l(podWithClaimName, podWithClaimNameOtherNamespace),
+					rules: l(inProgress(ruleNone, false, "NoEffect", "0 published devices selected. 3 allocated devices selected. 2 pods would be evicted in 2 different namespaces if the effect was NoExecute. This information will not be updated again. Recreate the DeviceTaintRule to trigger an update.", taintTime)),
+				},
+			},
+		},
+		"none-many-pods-same-namespace": {
+			events: []any{
+				add(inUseClaim),
+				add(podWithClaimName),
+				add(inUseClaimOtherName),
+				add(podWithClaimNameOtherName),
+				add(ruleNone),
+			},
+			finalState: state{
+				allocatedClaims: l(ac(inUseClaim), ac(inUseClaimOtherName)),
+				queued:          MockState[workItem]{Ready: newWorkItems(ruleNone)},
+			},
+			process: []step{
+				{
+					pods:  l(podWithClaimName, podWithClaimNameOtherName),
+					rules: l(inProgress(ruleNone, false, "NoEffect", "0 published devices selected. 3 allocated devices selected. 2 pods would be evicted in 1 namespace if the effect was NoExecute. This information will not be updated again. Recreate the DeviceTaintRule to trigger an update.", taintTime)),
+				},
+			},
+		},
+		"multiple-claims-same-rule": {
+			events: []any{
+				add(inUseClaim),
+				add(inUseClaimOtherNameShared),
+				add(podWithTwoClaimNames),
+				add(ruleEvict),
+			},
+			finalState: state{
+				allocatedClaims: l(ac(inUseClaim, newEvictionTime(taintTime, ruleEvict)), ac(inUseClaimOtherNameShared, newEvictionTime(taintTime, ruleEvict))),
+				deletePodAt:     evictMap{newObject(podWithTwoClaimNames): *newEvictionTime(taintTime, ruleEvict)},
+				queued:          MockState[workItem]{Ready: newWorkItems(ruleEvict, podWithTwoClaimNames)},
+			},
+			process: []step{
+				{
+					ruleStats: map[types.UID]taintRuleStats{ruleEvict.UID: {numEvictedPods: 1}},
+					// Initial update.
+					rules:           l(inProgress(ruleEvict, true, "PodsPendingEviction", "1 pod needs to be evicted in 1 namespace.", taintTime)),
+					queuedProcessed: MockState[workItem]{Later: newDelayedWorkItems(ruleEvict, ruleStatusPeriod)},
+					advance:         ruleStatusPeriod,
+					queuedShifted:   MockState[workItem]{Ready: newWorkItems(ruleEvict)},
+				},
+				{
+					ruleStats: map[types.UID]taintRuleStats{ruleEvict.UID: {numEvictedPods: 1}},
+					// Final update.
+					rules: l(inProgress(ruleEvict, false, "Completed", "1 pod evicted since starting the controller.", metav1Time(taintTime.Add(ruleStatusPeriod)))),
+				},
+			},
+			wantEvents: l(deletePodEvent),
+		},
+		"multiple-claims-different-rules-order-1": {
+			// Different rules cause eviction at different times because the second one gets added a bit in the future.
+			// It's debatable whether eviction of the pod should then be attributed to both rules. That is
+			// how it is currently implemented, based on the rationale that the second rule would have caused
+			// eviction eventually if it just had been given more time.
+			//
+			// The order matters here: the work queue gets populate differently depending on what is observed first,
+			// see next case. The `queued` state is compared without considering the order, so the actual
+			// order of the queue is not visible in the tests. Typically it doesn't matter, but here it does.
+			events: []any{
+				[]any{
+					add(inUseClaim),
+					add(inUseClaimOtherNameShared),
+					add(podWithTwoClaimNames),
+					add(ruleEvictInstance1),
+					add(ruleEvictInstance2Later),
+				},
+			},
+			finalState: state{
+				allocatedClaims: l(ac(inUseClaim, newEvictionTime(taintTime, ruleEvictInstance1)), ac(inUseClaimOtherNameShared, newEvictionTime(taintTimeLater, ruleEvictInstance2Later))),
+				deletePodAt:     evictMap{newObject(podWithTwoClaimNames): *newEvictionTime(taintTime, ruleEvictInstance1, ruleEvictInstance2Later)},
+				queued:          MockState[workItem]{Ready: newWorkItems(ruleEvictInstance1, ruleEvictInstance2Later, podWithTwoClaimNames)},
+			},
+			process: []step{
+				{
+					ruleStats: map[types.UID]taintRuleStats{ruleEvictInstance1.UID: {numEvictedPods: 1}, ruleEvictInstance2Later.UID: {numEvictedPods: 1}},
+					// Initial update of ruleEvictInstance1 before eviction, then update of ruleEvictInstance2Later.
+					rules:           l(inProgress(ruleEvictInstance1, true, "PodsPendingEviction", "1 pod needs to be evicted in 1 namespace.", taintTime), inProgress(ruleEvictInstance2Later, false, "Completed", "1 pod evicted since starting the controller.", taintTime)),
+					queuedProcessed: MockState[workItem]{Later: newDelayedWorkItems(ruleEvictInstance1, ruleStatusPeriod, ruleEvictInstance2Later, ruleStatusPeriod)},
+					advance:         ruleStatusPeriod,
+					queuedShifted:   MockState[workItem]{Ready: newWorkItems(ruleEvictInstance1, ruleEvictInstance2Later)},
+				},
+				{
+					ruleStats: map[types.UID]taintRuleStats{ruleEvict.UID: {numEvictedPods: 1}, ruleEvictInstance2Later.UID: {numEvictedPods: 1}},
+					// Final update.
+					rules: l(inProgress(ruleEvictInstance1, false, "Completed", "1 pod evicted since starting the controller.", metav1Time(taintTime.Add(ruleStatusPeriod))), inProgress(ruleEvictInstance2Later, false, "Completed", "1 pod evicted since starting the controller.", metav1Time(taintTime.Add(ruleStatusPeriod)))),
+				},
+			},
+			wantEvents: l(deletePodEvent),
+		},
+		"multiple-claims-different-rules-order-2": {
+			events: []any{
+				[]any{
+					add(inUseClaim),
+					add(inUseClaimOtherNameShared),
+					add(podWithTwoClaimNames),
+					add(ruleEvictInstance2Later), // Reversed, so now the pod gets scheduled for delayed eviction, which cannot get canceled.
+					add(ruleEvictInstance1),
+				},
+			},
+			finalState: state{
+				allocatedClaims: l(ac(inUseClaim, newEvictionTime(taintTime, ruleEvictInstance1)), ac(inUseClaimOtherNameShared, newEvictionTime(taintTimeLater, ruleEvictInstance2Later))),
+				deletePodAt:     evictMap{newObject(podWithTwoClaimNames): *newEvictionTime(taintTime, ruleEvictInstance1, ruleEvictInstance2Later)},
+				queued:          MockState[workItem]{Ready: newWorkItems(ruleEvictInstance1, ruleEvictInstance2Later, podWithTwoClaimNames), Later: newDelayedWorkItems(podWithTwoClaimNames, ruleEvictInstance2Later.Spec.Taint.TimeAdded.Sub(taintTime.Time))},
+			},
+			process: []step{
+				// The pod is scheduled for much later and time needs to advance a few times before it gets processed.
+				{
+					ruleStats: map[types.UID]taintRuleStats{ruleEvictInstance1.UID: {numEvictedPods: 1}, ruleEvictInstance2Later.UID: {numEvictedPods: 1}},
+					// Initial update of both rules before eviction.
+					rules:           l(inProgress(ruleEvictInstance1, true, "PodsPendingEviction", "1 pod needs to be evicted in 1 namespace.", taintTime), inProgress(ruleEvictInstance2Later, true, "PodsPendingEviction", "1 pod needs to be evicted in 1 namespace.", taintTime)),
+					queuedProcessed: MockState[workItem]{Later: newDelayedWorkItems(podWithTwoClaimNames, ruleEvictInstance2Later.Spec.Taint.TimeAdded.Sub(taintTime.Time), ruleEvictInstance1, ruleStatusPeriod, ruleEvictInstance2Later, ruleStatusPeriod)},
+					advance:         ruleStatusPeriod,
+					queuedShifted:   MockState[workItem]{Ready: newWorkItems(ruleEvictInstance1, ruleEvictInstance2Later), Later: newDelayedWorkItems(podWithTwoClaimNames, ruleEvictInstance2Later.Spec.Taint.TimeAdded.Sub(taintTime.Time)-ruleStatusPeriod)},
+				},
+				{
+					ruleStats: map[types.UID]taintRuleStats{ruleEvict.UID: {numEvictedPods: 1}, ruleEvictInstance2Later.UID: {numEvictedPods: 1}},
+					// Final update.
+					rules:           l(inProgress(ruleEvictInstance1, false, "Completed", "1 pod evicted since starting the controller.", metav1Time(taintTime.Add(ruleStatusPeriod))), inProgress(ruleEvictInstance2Later, false, "Completed", "1 pod evicted since starting the controller.", metav1Time(taintTime.Add(ruleStatusPeriod)))),
+					queuedProcessed: MockState[workItem]{Later: newDelayedWorkItems(podWithTwoClaimNames, ruleEvictInstance2Later.Spec.Taint.TimeAdded.Sub(taintTime.Time)-ruleStatusPeriod)},
+					advance:         ruleEvictInstance2Later.Spec.Taint.TimeAdded.Sub(taintTime.Time) - ruleStatusPeriod,
+					queuedShifted:   MockState[workItem]{Ready: newWorkItems(podWithTwoClaimNames)},
+				},
+				{
+					ruleStats: map[types.UID]taintRuleStats{ruleEvict.UID: {numEvictedPods: 1}, ruleEvictInstance2Later.UID: {numEvictedPods: 1}},
+					rules:     l(inProgress(ruleEvictInstance1, false, "Completed", "1 pod evicted since starting the controller.", metav1Time(taintTime.Add(ruleStatusPeriod))), inProgress(ruleEvictInstance2Later, false, "Completed", "1 pod evicted since starting the controller.", metav1Time(taintTime.Add(ruleStatusPeriod)))),
+					// The pod gets removed from the work queue without doing anything.
+				},
+			},
+			wantEvents: l(deletePodEvent),
 		},
 		"evict-pod-resourceclaim-again": {
 			initialState: state{
-				pods:            []*v1.Pod{podWithClaimName},
-				slices:          []*resourceapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime}},
-				evicting:        []evictAt{{newObject(podWithClaimName), taintTime.Time}},
+				pods:            l(podWithClaimName),
+				slices:          l(sliceTainted, slice2),
+				allocatedClaims: l(ac(inUseClaim, newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0))),
+				deletePodAt:     evictMap{newObject(podWithClaimName): *newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0)},
 			},
 			events: []any{
 				[]any{remove(sliceTainted), add(sliceTainted)},
 			},
 			finalState: state{
-				slices:          []*resourceapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime}},
-				evicting:        []evictAt{{newObject(podWithClaimName), taintTime.Time}},
+				slices:          l(sliceTainted, slice2),
+				allocatedClaims: l(ac(inUseClaim, newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0))),
+				deletePodAt:     evictMap{newObject(podWithClaimName): *newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0)},
+				queued:          MockState[workItem]{Ready: newWorkItems(podWithClaimName)},
 			},
 			// It is debatable whether the controller should react
 			// to slice changes (a deletion in this case)
@@ -498,13 +1163,13 @@ func TestHandlers(t *testing.T) {
 			// an event, as in this test case.
 			//
 			// At the moment, the code reliably cancels right away.
-			wantEvents: []*v1.Event{cancelPodEviction},
+			wantEvents: l(cancelPodEviction, deletePodEvent),
 		},
 		"evict-pod-after-scheduling": {
 			initialState: state{
-				pods:            []*v1.Pod{unscheduledPodWithClaimName},
-				slices:          []*resourceapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime}},
+				pods:            l(unscheduledPodWithClaimName),
+				slices:          l(sliceTainted, slice2),
+				allocatedClaims: l(ac(inUseClaim, newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0))),
 			},
 			events: []any{
 				// Normally the scheduler shouldn't schedule when there is a taint,
@@ -512,17 +1177,19 @@ func TestHandlers(t *testing.T) {
 				update(unscheduledPodWithClaimName, podWithClaimName),
 			},
 			finalState: state{
-				slices:          []*resourceapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime}},
-				evicting:        []evictAt{{newObject(podWithClaimName), taintTime.Time}},
+				slices:          l(sliceTainted, slice2),
+				allocatedClaims: l(ac(inUseClaim, newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0))),
+				deletePodAt:     evictMap{newObject(podWithClaimName): *newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0)},
+				queued:          MockState[workItem]{Ready: newWorkItems(podWithClaimName)},
 			},
+			wantEvents: l(deletePodEvent),
 		},
 		"evict-pod-resourceclaim-unrelated-changes": {
 			initialState: state{
-				pods:            []*v1.Pod{podWithClaimName},
-				slices:          []*resourceapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime}},
-				evicting:        []evictAt{{newObject(podWithClaimName), taintTime.Time}},
+				pods:            l(podWithClaimName),
+				slices:          l(sliceTainted, slice2),
+				allocatedClaims: l(ac(inUseClaim, newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0))),
+				deletePodAt:     evictMap{newObject(podWithClaimName): *newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0)},
 			},
 			events: []any{
 				update(sliceTainted, sliceTaintedExtended),
@@ -530,10 +1197,12 @@ func TestHandlers(t *testing.T) {
 				update(podWithClaimName, podWithClaimName), // Same here.
 			},
 			finalState: state{
-				slices:          []*resourceapi.ResourceSlice{sliceTaintedExtended, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime}},
-				evicting:        []evictAt{{newObject(podWithClaimName), taintTime.Time}},
+				slices:          l(sliceTaintedExtended, slice2),
+				allocatedClaims: l(ac(inUseClaim, newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0))),
+				deletePodAt:     evictMap{newObject(podWithClaimName): *newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0)},
+				queued:          MockState[workItem]{Ready: newWorkItems(podWithClaimName)},
 			},
+			wantEvents: l(deletePodEvent),
 		},
 		"evict-pod-resourceclaimtemplate": {
 			events: []any{
@@ -543,10 +1212,12 @@ func TestHandlers(t *testing.T) {
 				add(podWithClaimTemplateInStatus),
 			},
 			finalState: state{
-				slices:          []*resourceapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime}},
-				evicting:        []evictAt{{newObject(podWithClaimTemplateInStatus), taintTime.Time}},
+				slices:          l(sliceTainted, slice2),
+				allocatedClaims: l(ac(inUseClaim, newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0))),
+				deletePodAt:     evictMap{newObject(podWithClaimTemplateInStatus): *newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0)},
+				queued:          MockState[workItem]{Ready: newWorkItems(podWithClaimTemplateInStatus)},
 			},
+			wantEvents: l(deletePodEvent),
 		},
 		"evict-pod-later": {
 			events: []any{
@@ -556,10 +1227,23 @@ func TestHandlers(t *testing.T) {
 				add(podWithClaimName),
 			},
 			finalState: state{
-				slices:          []*resourceapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaimWithToleration, evictionTime: &metav1.Time{Time: taintTime.Add(tolerationDuration)}}},
-				evicting:        []evictAt{{newObject(podWithClaimName), taintTime.Time.Add(tolerationDuration)}},
+				slices:          l(sliceTainted, slice2),
+				allocatedClaims: l(ac(inUseClaimWithToleration, newEvictionTime(metav1Time(taintTime.Add(tolerationDuration)), sliceTainted, sliceTainted.Spec.Devices[0].Name, 0))),
+				deletePodAt:     evictMap{newObject(podWithClaimName): *newEvictionTime(metav1Time(taintTime.Add(tolerationDuration)), sliceTainted, sliceTainted.Spec.Devices[0].Name, 0)},
+				queued:          MockState[workItem]{Later: newDelayedWorkItems(podWithClaimName, tolerationDuration)},
 			},
+			process: []step{
+				// First advance time, then delete.
+				{
+					deletePodAt:     evictMap{newObject(podWithClaimName): *newEvictionTime(metav1Time(taintTime.Add(tolerationDuration)), sliceTainted, sliceTainted.Spec.Devices[0].Name, 0)},
+					pods:            l(podWithClaimName),
+					queuedProcessed: MockState[workItem]{Later: newDelayedWorkItems(podWithClaimName, tolerationDuration)},
+					advance:         tolerationDuration,
+					queuedShifted:   MockState[workItem]{Ready: newWorkItems(podWithClaimName)},
+				},
+				{},
+			},
+			wantEvents: l(deletePodEvent),
 		},
 		"evict-pod-later-many": {
 			events: []any{
@@ -591,8 +1275,8 @@ func TestHandlers(t *testing.T) {
 				add(podWithClaimName),
 			},
 			finalState: state{
-				slices: []*resourceapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: func() *resourceapi.ResourceClaim {
+				slices: l(sliceTainted, slice2),
+				allocatedClaims: l(ac(func() *resourceapi.ResourceClaim {
 					claim := inUseClaim.DeepCopy()
 					claim.Status.Allocation.Devices.Results[0].Tolerations = []resourceapi.DeviceToleration{
 						{
@@ -614,9 +1298,22 @@ func TestHandlers(t *testing.T) {
 						},
 					}
 					return claim
-				}(), evictionTime: &metav1.Time{Time: taintTime.Add(30 * time.Second)}}},
-				evicting: []evictAt{{newObject(podWithClaimName), taintTime.Time.Add(30 * time.Second)}},
+				}(), newEvictionTime(metav1Time(taintTime.Add(30*time.Second)), sliceTainted, sliceTainted.Spec.Devices[0].Name, 0))),
+				deletePodAt: evictMap{newObject(podWithClaimName): *newEvictionTime(metav1Time(taintTime.Add(30*time.Second)), sliceTainted, sliceTainted.Spec.Devices[0].Name, 0)},
+				queued:      MockState[workItem]{Later: newDelayedWorkItems(podWithClaimName, 30*time.Second)},
 			},
+			process: []step{
+				// First advance time, then delete.
+				{
+					deletePodAt:     evictMap{newObject(podWithClaimName): *newEvictionTime(metav1Time(taintTime.Add(30*time.Second)), sliceTainted, sliceTainted.Spec.Devices[0].Name, 0)},
+					pods:            l(podWithClaimName),
+					queuedProcessed: MockState[workItem]{Later: newDelayedWorkItems(podWithClaimName, 30*time.Second)},
+					advance:         30 * time.Second,
+					queuedShifted:   MockState[workItem]{Ready: newWorkItems(podWithClaimName)},
+				},
+				{},
+			},
+			wantEvents: l(deletePodEvent),
 		},
 		"evict-pod-toleration-mismatch": {
 			events: []any{
@@ -636,8 +1333,8 @@ func TestHandlers(t *testing.T) {
 				add(podWithClaimName),
 			},
 			finalState: state{
-				slices: []*resourceapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: func() *resourceapi.ResourceClaim {
+				slices: l(sliceTainted, slice2),
+				allocatedClaims: l(ac(func() *resourceapi.ResourceClaim {
 					claim := inUseClaim.DeepCopy()
 					claim.Status.Allocation.Devices.Results[0].Tolerations = []resourceapi.DeviceToleration{{
 						Key:               taintKey + "-other",
@@ -647,9 +1344,11 @@ func TestHandlers(t *testing.T) {
 						TolerationSeconds: ptr.To(int64(60)),
 					}}
 					return claim
-				}(), evictionTime: &metav1.Time{Time: taintTime.Time}}},
-				evicting: []evictAt{{newObject(podWithClaimName), taintTime.Time}},
+				}(), newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0))),
+				deletePodAt: evictMap{newObject(podWithClaimName): *newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0)},
+				queued:      MockState[workItem]{Ready: newWorkItems(podWithClaimName)},
 			},
+			wantEvents: l(deletePodEvent),
 		},
 		"no-evict-pod-toleration-forever": {
 			events: []any{
@@ -666,16 +1365,17 @@ func TestHandlers(t *testing.T) {
 				add(podWithClaimName),
 			},
 			finalState: state{
-				slices: []*resourceapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: func() *resourceapi.ResourceClaim {
+				slices: l(sliceTainted, slice2),
+				allocatedClaims: l(ac(func() *resourceapi.ResourceClaim {
 					claim := inUseClaim.DeepCopy()
 					claim.Status.Allocation.Devices.Results[0].Tolerations = []resourceapi.DeviceToleration{{
 						Operator: resourceapi.DeviceTolerationOpExists,
 						Effect:   resourceapi.DeviceTaintEffectNoExecute,
 					}}
 					return claim
-				}()}},
+				}())),
 			},
+			process: []step{{pods: l(podWithClaimName)}},
 		},
 		"no-evict-pod-toleration-forever-many": {
 			events: []any{
@@ -699,8 +1399,8 @@ func TestHandlers(t *testing.T) {
 				add(podWithClaimName),
 			},
 			finalState: state{
-				slices: []*resourceapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: func() *resourceapi.ResourceClaim {
+				slices: l(sliceTainted, slice2),
+				allocatedClaims: l(ac(func() *resourceapi.ResourceClaim {
 					claim := inUseClaim.DeepCopy()
 					claim.Status.Allocation.Devices.Results[0].Tolerations = []resourceapi.DeviceToleration{
 						{
@@ -714,8 +1414,9 @@ func TestHandlers(t *testing.T) {
 						},
 					}
 					return claim
-				}()}},
+				}())),
 			},
+			process: []step{{pods: l(podWithClaimName)}},
 		},
 		"evict-pod-partial-toleration": {
 			events: []any{
@@ -725,7 +1426,7 @@ func TestHandlers(t *testing.T) {
 					claim := inUseClaim.DeepCopy()
 					claim.Status.Allocation.Devices.Results[0].Tolerations = []resourceapi.DeviceToleration{{
 						Operator: resourceapi.DeviceTolerationOpExists,
-						Key:      taintKey,
+						Key:      taint1.Key,
 						Effect:   resourceapi.DeviceTaintEffectNoExecute,
 					}}
 					return claim
@@ -733,21 +1434,25 @@ func TestHandlers(t *testing.T) {
 				add(podWithClaimName),
 			},
 			finalState: state{
-				slices: []*resourceapi.ResourceSlice{sliceTaintedTwice, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: func() *resourceapi.ResourceClaim {
+				slices: l(sliceTaintedTwice, slice2),
+				allocatedClaims: l(ac(func() *resourceapi.ResourceClaim {
 					claim := inUseClaim.DeepCopy()
 					claim.Status.Allocation.Devices.Results[0].Tolerations = []resourceapi.DeviceToleration{{
 						Operator: resourceapi.DeviceTolerationOpExists,
-						Key:      taintKey,
+						Key:      taint1.Key,
 						Effect:   resourceapi.DeviceTaintEffectNoExecute,
 					}}
 					return claim
-				}(), evictionTime: &taintTime}},
-				evicting: []evictAt{{newObject(podWithClaimName), taintTime.Time}},
+				}(), newEvictionTime(taintTime, sliceTaintedTwice, sliceTainted.Spec.Devices[0].Name, 1))),
+				deletePodAt: evictMap{newObject(podWithClaimName): *newEvictionTime(taintTime, sliceTaintedTwice, sliceTainted.Spec.Devices[0].Name, 1)},
+				queued:      MockState[workItem]{Ready: newWorkItems(podWithClaimName)},
 			},
+			wantEvents: l(deletePodEvent),
 		},
 		"evict-pod-many-taints": {
 			events: []any{
+				add(ruleEvict),
+				add(ruleEvictOther),
 				add(sliceTaintedTwice),
 				add(slice2),
 				add(func() *resourceapi.ResourceClaim {
@@ -755,13 +1460,13 @@ func TestHandlers(t *testing.T) {
 					claim.Status.Allocation.Devices.Results[0].Tolerations = []resourceapi.DeviceToleration{
 						{
 							Operator:          resourceapi.DeviceTolerationOpExists,
-							Key:               taintKey,
+							Key:               taint1.Key,
 							Effect:            resourceapi.DeviceTaintEffectNoExecute,
 							TolerationSeconds: ptr.To(int64(60)),
 						},
 						{
 							Operator:          resourceapi.DeviceTolerationOpExists,
-							Key:               taintKey + "-other",
+							Key:               taint2.Key,
 							Effect:            resourceapi.DeviceTaintEffectNoExecute,
 							TolerationSeconds: ptr.To(int64(30)),
 						},
@@ -771,27 +1476,54 @@ func TestHandlers(t *testing.T) {
 				add(podWithClaimName),
 			},
 			finalState: state{
-				slices: []*resourceapi.ResourceSlice{sliceTaintedTwice, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: func() *resourceapi.ResourceClaim {
+				slices: l(sliceTaintedTwice, slice2),
+				allocatedClaims: l(ac(func() *resourceapi.ResourceClaim {
 					claim := inUseClaim.DeepCopy()
 					claim.Status.Allocation.Devices.Results[0].Tolerations = []resourceapi.DeviceToleration{
 						{
 							Operator:          resourceapi.DeviceTolerationOpExists,
-							Key:               taintKey,
+							Key:               taint1.Key,
 							Effect:            resourceapi.DeviceTaintEffectNoExecute,
 							TolerationSeconds: ptr.To(int64(60)),
 						},
 						{
 							Operator:          resourceapi.DeviceTolerationOpExists,
-							Key:               taintKey + "-other",
+							Key:               taint2.Key,
 							Effect:            resourceapi.DeviceTaintEffectNoExecute,
 							TolerationSeconds: ptr.To(int64(30)),
 						},
 					}
 					return claim
-				}(), evictionTime: &metav1.Time{Time: taintTime.Add(30 * time.Second)}}},
-				evicting: []evictAt{{newObject(podWithClaimName), taintTime.Time.Add(30 * time.Second)}},
+				}(), newEvictionTime(metav1Time(taintTime.Add(30*time.Second)), ruleEvict, ruleEvictOther, sliceTaintedTwice, sliceTaintedTwice.Spec.Devices[0].Name, 0, sliceTaintedTwice, sliceTaintedTwice.Spec.Devices[0].Name, 1))),
+				deletePodAt: evictMap{newObject(podWithClaimName): *newEvictionTime(metav1Time(taintTime.Add(30*time.Second)), ruleEvict, ruleEvictOther, sliceTaintedTwice, sliceTaintedTwice.Spec.Devices[0].Name, 0, sliceTaintedTwice, sliceTaintedTwice.Spec.Devices[0].Name, 1)},
+				queued:      MockState[workItem]{Ready: newWorkItems(ruleEvict, ruleEvictOther), Later: newDelayedWorkItems(podWithClaimName, 30*time.Second)},
 			},
+			process: []step{
+				// First advance time, then delete.
+				{
+					deletePodAt:     evictMap{newObject(podWithClaimName): *newEvictionTime(metav1Time(taintTime.Add(30*time.Second)), ruleEvict, ruleEvictOther, sliceTaintedTwice, sliceTaintedTwice.Spec.Devices[0].Name, 0, sliceTaintedTwice, sliceTaintedTwice.Spec.Devices[0].Name, 1)},
+					pods:            l(podWithClaimName),
+					rules:           l(inProgress(ruleEvict, true, "PodsPendingEviction", "1 pod needs to be evicted in 1 namespace.", taintTime), inProgress(ruleEvictOther, true, "PodsPendingEviction", "1 pod needs to be evicted in 1 namespace.", taintTime)),
+					queuedProcessed: MockState[workItem]{Later: newDelayedWorkItems(podWithClaimName, 30*time.Second)},
+					advance:         30 * time.Second,
+					queuedShifted:   MockState[workItem]{Ready: newWorkItems(podWithClaimName)},
+				},
+				{
+					ruleStats: map[types.UID]taintRuleStats{ruleEvict.UID: {numEvictedPods: 1}, ruleEvictOther.UID: {numEvictedPods: 1}},
+					// Not updated yet.
+					rules:           l(inProgress(ruleEvict, true, "PodsPendingEviction", "1 pod needs to be evicted in 1 namespace.", taintTime), inProgress(ruleEvictOther, true, "PodsPendingEviction", "1 pod needs to be evicted in 1 namespace.", taintTime)),
+					queuedProcessed: MockState[workItem]{Later: newDelayedWorkItems(ruleEvict, ruleStatusPeriod, ruleEvictOther, ruleStatusPeriod)},
+					advance:         ruleStatusPeriod,
+					queuedShifted:   MockState[workItem]{Ready: newWorkItems(ruleEvict, ruleEvictOther)},
+				},
+				{
+					ruleStats: map[types.UID]taintRuleStats{ruleEvict.UID: {numEvictedPods: 1}, ruleEvictOther.UID: {numEvictedPods: 1}},
+
+					// Final update.
+					rules: l(inProgress(ruleEvict, false, "Completed", "1 pod evicted since starting the controller.", metav1Time(taintTime.Add(30*time.Second+ruleStatusPeriod))), inProgress(ruleEvictOther, false, "Completed", "1 pod evicted since starting the controller.", metav1Time(taintTime.Add(30*time.Second+ruleStatusPeriod)))),
+				},
+			},
+			wantEvents: l(deletePodEvent),
 		},
 		"no-evict-pod-not-scheduled": {
 			events: []any{
@@ -805,8 +1537,8 @@ func TestHandlers(t *testing.T) {
 				}()),
 			},
 			finalState: state{
-				slices:          []*resourceapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime}},
+				slices:          l(sliceTainted, slice2),
+				allocatedClaims: l(ac(inUseClaim, newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0))),
 			},
 		},
 		"no-evict-no-taint": {
@@ -816,22 +1548,22 @@ func TestHandlers(t *testing.T) {
 				add(podWithClaimName),
 			},
 			finalState: state{
-				slices:          []*resourceapi.ResourceSlice{simpleSlice},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim}},
+				slices:          l(simpleSlice),
+				allocatedClaims: l(ac(inUseClaim)),
 			},
 		},
 		"no-evict-no-taint-update": {
 			initialState: state{
-				pods:            []*v1.Pod{podWithClaimName},
-				slices:          []*resourceapi.ResourceSlice{simpleSlice},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim}},
+				pods:            l(podWithClaimName),
+				slices:          l(simpleSlice),
+				allocatedClaims: l(ac(inUseClaim)),
 			},
 			events: []any{
 				update(simpleSlice, simpleSlice),
 			},
 			finalState: state{
-				slices:          []*resourceapi.ResourceSlice{simpleSlice},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim}},
+				slices:          l(simpleSlice),
+				allocatedClaims: l(ac(inUseClaim)),
 			},
 		},
 		"no-evict-pod-resourceclaimtemplate-no-status": {
@@ -842,8 +1574,8 @@ func TestHandlers(t *testing.T) {
 				add(podWithClaimTemplate),
 			},
 			finalState: state{
-				slices:          []*resourceapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime}},
+				slices:          l(sliceTainted, slice2),
+				allocatedClaims: l(ac(inUseClaim, newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0))),
 			},
 		},
 		"no-evict-pod-resourceclaimtemplate-no-claim": {
@@ -856,8 +1588,8 @@ func TestHandlers(t *testing.T) {
 				add(podWithClaimTemplateNoClaimInStatus),
 			},
 			finalState: state{
-				slices:          []*resourceapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime}},
+				slices:          l(sliceTainted, slice2),
+				allocatedClaims: l(ac(inUseClaim, newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0))),
 			},
 		},
 		"no-evict-other-device": {
@@ -868,8 +1600,8 @@ func TestHandlers(t *testing.T) {
 				add(podWithClaimTemplateInStatus),
 			},
 			finalState: state{
-				slices:          []*resourceapi.ResourceSlice{sliceOtherDevices, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim}},
+				slices:          l(sliceOtherDevices, slice2),
+				allocatedClaims: l(ac(inUseClaim)),
 			},
 		},
 		"no-evict-wrong-pod": {
@@ -877,83 +1609,109 @@ func TestHandlers(t *testing.T) {
 				add(sliceTainted),
 				add(slice2),
 				add(inUseClaim),
-				add(podWithClaimNameOther),
+				add(podWithClaimNameOtherUID),
 			},
 			finalState: state{
-				slices:          []*resourceapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime}},
+				slices:          l(sliceTainted, slice2),
+				allocatedClaims: l(ac(inUseClaim, newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0))),
 			},
 		},
 		"evict-wrong-pod-replaced": {
 			initialState: state{
-				pods:            []*v1.Pod{podWithClaimNameOther},
-				slices:          []*resourceapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime}},
+				pods:            l(podWithClaimNameOtherUID),
+				slices:          l(sliceTainted, slice2),
+				allocatedClaims: l(ac(inUseClaim, newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0))),
 			},
 			events: []any{
-				[]any{remove(podWithClaimNameOther), add(podWithClaimName)},
+				[]any{remove(podWithClaimNameOtherUID), add(podWithClaimName)},
 			},
 			finalState: state{
-				slices:          []*resourceapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime}},
-				evicting:        []evictAt{{newObject(podWithClaimName), taintTime.Time}},
+				slices:          l(sliceTainted, slice2),
+				allocatedClaims: l(ac(inUseClaim, newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0))),
+				deletePodAt:     evictMap{newObject(podWithClaimName): *newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0)},
+				queued:          MockState[workItem]{Ready: newWorkItems(podWithClaimName)},
 			},
+			wantEvents: l(deletePodEvent),
 		},
 		"cancel-eviction-remove-taint": {
 			initialState: state{
-				pods:            []*v1.Pod{podWithClaimTemplateInStatus},
-				slices:          []*resourceapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime}},
-				evicting:        []evictAt{{newObject(podWithClaimTemplateInStatus), taintTime.Time}},
+				pods:            l(podWithClaimTemplateInStatus),
+				slices:          l(sliceTainted, slice2),
+				allocatedClaims: l(ac(inUseClaim, newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0))),
+				deletePodAt:     evictMap{newObject(podWithClaimTemplateInStatus): *newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0)},
 			},
 			events: []any{
 				update(sliceTainted, slice),
 			},
 			finalState: state{
-				slices:          []*resourceapi.ResourceSlice{slice, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim}},
+				slices:          l(slice, slice2),
+				allocatedClaims: l(ac(inUseClaim)),
 			},
-			wantEvents: []*v1.Event{cancelPodEviction},
+			wantEvents: l(cancelPodEviction),
 		},
 		"cancel-eviction-reduce-taint": {
 			initialState: state{
-				pods:            []*v1.Pod{podWithClaimTemplateInStatus},
-				slices:          []*resourceapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime}},
-				evicting:        []evictAt{{newObject(podWithClaimTemplateInStatus), taintTime.Time}},
+				pods:            l(podWithClaimTemplateInStatus),
+				slices:          l(sliceTainted, slice2),
+				allocatedClaims: l(ac(inUseClaim, newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0))),
+				deletePodAt:     evictMap{newObject(podWithClaimTemplateInStatus): *newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0)},
 			},
 			events: []any{
 				update(sliceTainted, sliceTaintedNoSchedule),
 			},
 			finalState: state{
-				slices:          []*resourceapi.ResourceSlice{sliceTaintedNoSchedule, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim}},
+				slices:          l(sliceTaintedNoSchedule, slice2),
+				allocatedClaims: l(ac(inUseClaim)),
 			},
-			wantEvents: []*v1.Event{cancelPodEviction},
+			wantEvents: l(cancelPodEviction),
+		},
+		"ignore-none-effect": {
+			initialState: state{
+				pods:            l(podWithClaimTemplateInStatus),
+				slices:          l(sliceTaintedNone, slice2),
+				allocatedClaims: l(ac(inUseClaim)),
+			},
+			finalState: state{
+				slices:          l(sliceTaintedNone, slice2),
+				allocatedClaims: l(ac(inUseClaim)),
+			},
+		},
+		"ignore-unknown-effect": {
+			initialState: state{
+				pods:            l(podWithClaimTemplateInStatus),
+				slices:          l(sliceTaintedUnknown, slice2),
+				allocatedClaims: l(ac(inUseClaim)),
+			},
+			finalState: state{
+				slices:          l(sliceTaintedUnknown, slice2),
+				allocatedClaims: l(ac(inUseClaim)),
+			},
 		},
 		"eviction-change-taint": {
 			initialState: state{
-				pods:            []*v1.Pod{podWithClaimTemplateInStatus},
-				slices:          []*resourceapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaimWithToleration, evictionTime: &metav1.Time{Time: taintTime.Add(tolerationDuration)}}},
-				evicting:        []evictAt{{newObject(podWithClaimTemplateInStatus), taintTime.Time.Add(tolerationDuration)}},
+				pods:            l(podWithClaimTemplateInStatus),
+				slices:          l(sliceTainted, slice2),
+				allocatedClaims: l(ac(inUseClaimWithToleration, newEvictionTime(metav1Time(taintTime.Add(tolerationDuration)), sliceTainted, sliceTainted.Spec.Devices[0].Name, 0))),
+				deletePodAt:     evictMap{newObject(podWithClaimTemplateInStatus): *newEvictionTime(metav1Time(taintTime.Add(tolerationDuration)), sliceTainted, sliceTainted.Spec.Devices[0].Name, 0)},
 			},
 			events: []any{
 				// Going from a taint which is tolerated for 60 seconds to one which isn't.
 				update(sliceTainted, sliceTaintedValueOther),
 			},
 			finalState: state{
-				slices:          []*resourceapi.ResourceSlice{sliceTaintedValueOther, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaimWithToleration, evictionTime: &taintTime}},
-				evicting:        []evictAt{{newObject(podWithClaimTemplateInStatus), taintTime.Time}},
+				slices:          l(sliceTaintedValueOther, slice2),
+				allocatedClaims: l(ac(inUseClaimWithToleration, newEvictionTime(taintTime, sliceTaintedValueOther, sliceTainted.Spec.Devices[0].Name, 0))),
+				deletePodAt:     evictMap{newObject(podWithClaimTemplateInStatus): *newEvictionTime(taintTime, sliceTaintedValueOther, sliceTainted.Spec.Devices[0].Name, 0)},
+				queued:          MockState[workItem]{Ready: newWorkItems(podWithClaimName)},
 			},
+			wantEvents: l(deletePodEvent),
 		},
 		"cancel-eviction-remove-taint-in-new-slice": {
 			initialState: state{
-				pods:            []*v1.Pod{podWithClaimTemplateInStatus},
-				slices:          []*resourceapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime}},
-				evicting:        []evictAt{{newObject(podWithClaimTemplateInStatus), taintTime.Time}},
+				pods:            l(podWithClaimTemplateInStatus),
+				slices:          l(sliceTainted, slice2),
+				allocatedClaims: l(ac(inUseClaim, newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0))),
+				deletePodAt:     evictMap{newObject(podWithClaimTemplateInStatus): *newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0)},
 			},
 			events: []any{
 				// This moves the in-use device from one slice to another and removes the taint at the same time.
@@ -961,32 +1719,32 @@ func TestHandlers(t *testing.T) {
 				add(sliceReplaced),
 			},
 			finalState: state{
-				slices:          []*resourceapi.ResourceSlice{sliceReplaced, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim}},
+				slices:          l(sliceReplaced, slice2),
+				allocatedClaims: l(ac(inUseClaim)),
 			},
-			wantEvents: []*v1.Event{cancelPodEviction},
+			wantEvents: l(cancelPodEviction),
 		},
 		"cancel-eviction-remove-slice": {
 			initialState: state{
-				pods:            []*v1.Pod{podWithClaimTemplateInStatus},
-				slices:          []*resourceapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime}},
-				evicting:        []evictAt{{newObject(podWithClaimTemplateInStatus), taintTime.Time}},
+				pods:            l(podWithClaimTemplateInStatus),
+				slices:          l(sliceTainted, slice2),
+				allocatedClaims: l(ac(inUseClaim, newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0))),
+				deletePodAt:     evictMap{newObject(podWithClaimTemplateInStatus): *newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0)},
 			},
 			events: []any{
 				remove(sliceTainted),
 			},
 			finalState: state{
-				slices:          []*resourceapi.ResourceSlice{slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim}},
+				slices:          l(slice2),
+				allocatedClaims: l(ac(inUseClaim)),
 			},
-			wantEvents: []*v1.Event{cancelPodEviction},
+			wantEvents: l(cancelPodEviction),
 		},
 		"cancel-eviction-pod-deletion": {
 			initialState: state{
-				pods:   []*v1.Pod{podWithClaimName},
-				slices: []*resourceapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: func() *resourceapi.ResourceClaim {
+				pods:   l(podWithClaimName),
+				slices: l(sliceTainted, slice2),
+				allocatedClaims: l(ac(func() *resourceapi.ResourceClaim {
 					claim := inUseClaim.DeepCopy()
 					claim.Status.Allocation.Devices.Results[0].Tolerations = []resourceapi.DeviceToleration{{
 						Operator:          resourceapi.DeviceTolerationOpExists,
@@ -994,15 +1752,15 @@ func TestHandlers(t *testing.T) {
 						TolerationSeconds: ptr.To(int64(60)),
 					}}
 					return claim
-				}(), evictionTime: &metav1.Time{Time: taintTime.Add(60 * time.Second)}}},
-				evicting: []evictAt{{newObject(podWithClaimName), taintTime.Time.Add(60 * time.Second)}},
+				}(), newEvictionTime(metav1Time(taintTime.Add(60*time.Second))))),
+				deletePodAt: evictMap{newObject(podWithClaimName): *newEvictionTime(metav1Time(taintTime.Add(60 * time.Second)))},
 			},
 			events: []any{
 				remove(podWithClaimName),
 			},
 			finalState: state{
-				slices: []*resourceapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: func() *resourceapi.ResourceClaim {
+				slices: l(sliceTainted, slice2),
+				allocatedClaims: l(ac(func() *resourceapi.ResourceClaim {
 					claim := inUseClaim.DeepCopy()
 					claim.Status.Allocation.Devices.Results[0].Tolerations = []resourceapi.DeviceToleration{{
 						Operator:          resourceapi.DeviceTolerationOpExists,
@@ -1010,7 +1768,7 @@ func TestHandlers(t *testing.T) {
 						TolerationSeconds: ptr.To(int64(60)),
 					}}
 					return claim
-				}(), evictionTime: &metav1.Time{Time: taintTime.Add(60 * time.Second)}}},
+				}(), newEvictionTime(metav1Time(taintTime.Add(60*time.Second))))),
 			},
 		},
 		"no-evict-wrong-resourceclaim": {
@@ -1021,31 +1779,33 @@ func TestHandlers(t *testing.T) {
 				add(podWithClaimTemplateInStatus),
 			},
 			finalState: state{
-				slices:          []*resourceapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaimOld, evictionTime: &taintTime}},
+				slices:          l(sliceTainted, slice2),
+				allocatedClaims: l(ac(inUseClaimOld, newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0))),
 			},
 		},
 		"evict-wrong-resourceclaim-replaced": {
 			initialState: state{
-				pods:            []*v1.Pod{podWithClaimTemplateInStatus},
-				slices:          []*resourceapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaimOld, evictionTime: &taintTime}},
+				pods:            l(podWithClaimTemplateInStatus),
+				slices:          l(sliceTainted, slice2),
+				allocatedClaims: l(ac(inUseClaimOld, newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0))),
 			},
 			events: []any{
 				update(inUseClaimOld, inUseClaim),
 			},
 			finalState: state{
-				slices:          []*resourceapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime}},
-				evicting:        []evictAt{{newObject(podWithClaimTemplateInStatus), taintTime.Time}},
+				slices:          l(sliceTainted, slice2),
+				allocatedClaims: l(ac(inUseClaim, newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0))),
+				deletePodAt:     evictMap{newObject(podWithClaimTemplateInStatus): *newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0)},
+				queued:          MockState[workItem]{Ready: newWorkItems(podWithClaimTemplateInStatus)},
 			},
+			wantEvents: l(deletePodEvent),
 		},
 		"no-evict-resourceclaim-deallocated": {
 			initialState: state{
-				pods:            []*v1.Pod{podWithClaimTemplateInStatus},
-				slices:          []*resourceapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime}},
-				evicting:        []evictAt{{newObject(podWithClaimTemplateInStatus), taintTime.Time}},
+				pods:            l(podWithClaimTemplateInStatus),
+				slices:          l(sliceTainted, slice2),
+				allocatedClaims: l(ac(inUseClaim, newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0))),
+				deletePodAt:     evictMap{newObject(podWithClaimTemplateInStatus): *newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0)},
 			},
 			events: []any{
 				// This removes the allocation while the pod is scheduled.
@@ -1061,16 +1821,16 @@ func TestHandlers(t *testing.T) {
 				update(inUseClaim, claim),
 			},
 			finalState: state{
-				slices: []*resourceapi.ResourceSlice{sliceTainted, slice2},
+				slices: l(sliceTainted, slice2),
 			},
-			wantEvents: []*v1.Event{cancelPodEviction},
+			wantEvents: l(cancelPodEviction),
 		},
 		"no-evict-resourceclaim-deleted": {
 			initialState: state{
-				pods:            []*v1.Pod{podWithClaimTemplateInStatus},
-				slices:          []*resourceapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime}},
-				evicting:        []evictAt{{newObject(podWithClaimTemplateInStatus), taintTime.Time}},
+				pods:            l(podWithClaimTemplateInStatus),
+				slices:          l(sliceTainted, slice2),
+				allocatedClaims: l(ac(inUseClaim, newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0))),
+				deletePodAt:     evictMap{newObject(podWithClaimTemplateInStatus): *newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0)},
 			},
 			events: []any{
 				// Same as for "no-evict-resourceclaim-deallocated" this can be normal
@@ -1078,17 +1838,19 @@ func TestHandlers(t *testing.T) {
 				remove(inUseClaim),
 			},
 			finalState: state{
-				slices: []*resourceapi.ResourceSlice{sliceTainted, slice2},
+				slices: l(sliceTainted, slice2),
 			},
-			wantEvents: []*v1.Event{cancelPodEviction},
+			wantEvents: l(cancelPodEviction),
 		},
 	} {
-		t.Run(name, func(t *testing.T) {
+		tCtx.Run(name, func(tCtx ktesting.TContext) {
 			numEvents := len(tc.events)
 			if numEvents <= 1 {
 				// No permutations.
-				tContext := setup(t)
-				testHandlers(tContext, tc)
+				tCtx.SyncTest("", func(tCtx ktesting.TContext) {
+					tContext := setup(tCtx)
+					testHandlers(tContext, tc)
+				})
 				return
 			}
 
@@ -1104,8 +1866,8 @@ func TestHandlers(t *testing.T) {
 					tc := tc
 					tc.events = events
 					name := strings.Trim(fmt.Sprintf("%v", permutation), "[]")
-					t.Run(name, func(t *testing.T) {
-						tContext := setup(t)
+					tCtx.SyncTest(name, func(tCtx ktesting.TContext) {
+						tContext := setup(tCtx)
 						testHandlers(tContext, tc)
 					})
 					return
@@ -1127,16 +1889,38 @@ func TestHandlers(t *testing.T) {
 }
 
 func testHandlers(tContext *testContext, tc testCase) {
+	assertEqual(tContext, MockState[workItem]{}, tc.initialState.queued, "initial work queue state")
+	tContext.taintRuleStats = tc.initialState.ruleStats
+	if tContext.taintRuleStats == nil {
+		tContext.taintRuleStats = make(map[types.UID]taintRuleStats)
+	}
+
 	// Shallow copy of slice and maps is sufficient for now.
-	tContext.evicting = slices.Clone(tc.initialState.evicting)
+	if len(tc.initialState.deletePodAt) > 0 {
+		tContext.deletePodAt = maps.Clone(tc.initialState.deletePodAt)
+	}
 	tContext.allocatedClaims = tc.initialState.allocatedClaimsAsMap()
 	tContext.pools = tc.initialState.slicesAsMap()
 
-	// Pods are the only items which get retrieved from the informer cache,
-	// so for those (and only those) we have to keep the store up-to-date.
-	store := tContext.informerFactory.Core().V1().Pods().Informer().GetStore()
+	// Pods and DeviceTaintRules are the only items which get retrieved from the informer cache,
+	// so for those (and only those) we have to keep the podStore up-to-date.
+	// Same for the fake store. Because the informers are not running, API calls
+	// must directly get mirrored in the caches.
+	podStore := tContext.informerFactory.Core().V1().Pods().Informer().GetStore()
 	for _, pod := range tc.initialState.pods {
-		tContext.ExpectNoError(store.Add(pod))
+		tContext.ExpectNoError(podStore.Add(pod))
+		tContext.ExpectNoError(tContext.client.Tracker().Add(pod))
+	}
+	tContext.client.PrependReactor("delete", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		if err := podStore.Delete(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: action.GetNamespace(), Name: action.(core.DeleteAction).GetName()}}); err != nil {
+			return false, nil, fmt.Errorf("delete pod in informer cache: %w", err)
+		}
+		return false, nil, nil
+	})
+	ruleStore := tContext.informerFactory.Resource().V1alpha3().DeviceTaintRules().Informer().GetStore()
+	for _, rule := range tc.initialState.rules {
+		tContext.ExpectNoError(ruleStore.Add(rule))
+		tContext.ExpectNoError(tContext.client.Tracker().Add(rule))
 	}
 
 	for _, event := range tc.events {
@@ -1150,46 +1934,130 @@ func testHandlers(tContext *testContext, tc testCase) {
 		}
 	}
 
-	// Use nil instead of empty map or slice to avoid nil vs. empty differences.
-	if len(tContext.evicting) == 0 {
-		tContext.evicting = nil
-	}
-	if len(tContext.recorder.Events) == 0 {
-		tContext.recorder.Events = nil
-	}
-	assert.Equal(tContext, tc.finalState.evicting, tContext.evicting, "evicting pods")
-	assert.Equal(tContext, tc.finalState.allocatedClaimsAsMap(), tContext.allocatedClaims, "allocated claims")
-	if !assert.Equal(tContext, tc.finalState.slicesAsMap(), tContext.pools, "pools") {
+	assertEqual(tContext, tc.finalState.ruleStats, tContext.taintRuleStats, "taintRuleStats")
+	assertEqual(tContext, tc.finalState.deletePodAt, tContext.deletePodAt, "deletePodAt")
+	assertEqual(tContext, tc.finalState.allocatedClaimsAsMap(), tContext.allocatedClaims, "allocated claims")
+	if !assertEqual(tContext, tc.finalState.slicesAsMap(), tContext.pools, "pools") {
 		for key := range tContext.pools {
 			assert.Equal(tContext, tc.finalState.slicesAsMap()[key], tContext.pools[key], "pool")
 		}
 	}
-	if diff := cmp.Diff(tc.wantEvents, tContext.recorder.Events, cmpopts.IgnoreTypes(metav1.ObjectMeta{}, metav1.Time{})); diff != "" {
-		tContext.Errorf("unexpected events (-want, +got):\n%s", diff)
+	assertEqual(tContext, tc.finalState.queued, tContext.mockQueue.State(), "work queue after event handlers", cmpopts.SortSlices(compareWorkItems))
+	assert.Empty(tContext, tc.finalState.pods, "pods not checked for final state")
+	assert.Empty(tContext, tc.finalState.rules, "rules not checked for final state")
+
+	process := tc.process
+	if process == nil && len(tc.finalState.queued.Ready) > 0 {
+		// Expect to clear workqueue and delete pods.
+		process = []step{{}}
 	}
+	for i, state := range process {
+		prefix := fmt.Sprintf("process #%d: ", i)
+
+		// This runs until the "Ready" queue is empty.
+		// Some state may have changed (e.g. rule status), some must remain the same (allocated claims).
+		tContext.Log(prefix + "handling ready work items")
+		tContext.Controller.worker(tContext)
+
+		assertEqual(tContext, state.ruleStats, tContext.taintRuleStats, prefix+"taintRuleStats")
+		assertEqual(tContext, state.deletePodAt, tContext.deletePodAt, prefix+"deletePodAt")
+		assertEqual(tContext, tc.finalState.allocatedClaimsAsMap(), tContext.allocatedClaims, prefix+"allocated claims")
+		pods, err := tContext.client.CoreV1().Pods("").List(tContext, metav1.ListOptions{})
+		tContext.ExpectNoError(err, prefix+"list pods")
+		assertEqual(tContext, state.pods, trimPods(pods.Items), prefix+"pods after flushing work queue")
+		rules, err := tContext.client.ResourceV1alpha3().DeviceTaintRules().List(tContext, metav1.ListOptions{})
+		tContext.ExpectNoError(err, prefix+"list rules")
+		actualRules := trimRules(rules.Items)
+		assertEqual(tContext, state.rules, actualRules, prefix+"rules after flushing work queue")
+
+		// Advance time and potentially make pending work items ready.
+		assertEqual(tContext, state.queuedProcessed, tContext.mockQueue.State(), prefix+"work queue after processing", cmpopts.SortSlices(compareWorkItems))
+		time.Sleep(state.advance)
+		for _, item := range tContext.mockQueue.State().Later {
+			tContext.mockQueue.CancelAfter(item.Item)
+			tContext.mockQueue.AddAfter(item.Item, item.Duration-state.advance)
+		}
+		assertEqual(tContext, state.queuedShifted, tContext.mockQueue.State(), prefix+"work queue after moving time forward", cmpopts.SortSlices(compareWorkItems))
+	}
+
+	assertEqual(tContext, tc.wantEvents, tContext.recorder.Events, "overall events",
+		cmpopts.IgnoreTypes(metav1.ObjectMeta{}, metav1.Time{}),
+		cmpopts.SortSlices(compareEvents))
+}
+
+// More fields might be needed for these compare functions in the future, but for now this is enough.
+
+func compareEvents(a, b *v1.Event) int {
+	if cmp := strings.Compare(string(a.InvolvedObject.UID), string(b.InvolvedObject.UID)); cmp != 0 {
+		return cmp
+	}
+	return strings.Compare(a.Kind, b.Kind)
+}
+
+func compareWorkItems(a, b workItem) int {
+	if cmp := strings.Compare(string(a.podRef.UID), string(b.podRef.UID)); cmp != 0 {
+		return cmp
+	}
+	return strings.Compare(string(a.ruleRef.UID), string(b.ruleRef.UID))
 }
 
 func applyEventPair(tContext *testContext, event any) {
-	store := tContext.informerFactory.Core().V1().Pods().Informer().GetStore()
-
 	switch pair := event.(type) {
 	case [2]*resourceapi.ResourceSlice:
 		tContext.handleSliceChange(pair[0], pair[1])
 	case [2]*resourceapi.ResourceClaim:
 		tContext.handleClaimChange(pair[0], pair[1])
 	case [2]*v1.Pod:
+		store := tContext.informerFactory.Core().V1().Pods().Informer().GetStore()
 		switch {
 		case pair[0] != nil && pair[1] != nil:
 			tContext.ExpectNoError(store.Update(pair[1]))
+			tContext.ExpectNoError(tContext.client.Tracker().Update(v1.SchemeGroupVersion.WithResource("pods"), pair[1], pair[1].Namespace))
 		case pair[0] != nil:
 			tContext.ExpectNoError(store.Delete(pair[0]))
+			tContext.ExpectNoError(tContext.client.Tracker().Delete(v1.SchemeGroupVersion.WithResource("pods"), pair[0].Namespace, pair[0].Name))
 		default:
 			tContext.ExpectNoError(store.Add(pair[1]))
+			tContext.ExpectNoError(tContext.client.Tracker().Add(pair[1]))
 		}
 		tContext.handlePodChange(pair[0], pair[1])
+	case [2]*resourcealpha.DeviceTaintRule:
+		store := tContext.informerFactory.Resource().V1alpha3().DeviceTaintRules().Informer().GetStore()
+		switch {
+		case pair[0] != nil && pair[1] != nil:
+			tContext.ExpectNoError(store.Update(pair[1]))
+			tContext.ExpectNoError(tContext.client.Tracker().Update(resourcealpha.SchemeGroupVersion.WithResource("devicetaintrules"), pair[1], pair[1].Namespace))
+		case pair[0] != nil:
+			tContext.ExpectNoError(store.Delete(pair[0]))
+			tContext.ExpectNoError(tContext.client.Tracker().Delete(resourcealpha.SchemeGroupVersion.WithResource("devicetaintrules"), pair[0].Namespace, pair[0].Name))
+		default:
+			tContext.ExpectNoError(store.Add(pair[1]))
+			tContext.ExpectNoError(tContext.client.Tracker().Add(pair[1]))
+		}
+		tContext.handleRuleChange(pair[0], pair[1])
 	default:
 		tContext.Fatalf("unexpected event type %T", event)
 	}
+}
+
+func trimPods(objs []v1.Pod) (trimmed []*v1.Pod) {
+	for _, in := range objs {
+		out := in.DeepCopy()
+		out.ManagedFields = nil
+		trimmed = append(trimmed, out)
+	}
+	return trimmed
+}
+
+func trimRules(objs []resourcealpha.DeviceTaintRule) (trimmed []*resourcealpha.DeviceTaintRule) {
+	for _, in := range objs {
+		out := in.DeepCopy()
+		out.ManagedFields = nil
+		out.Kind = ""
+		out.APIVersion = ""
+		trimmed = append(trimmed, out)
+	}
+	return trimmed
 }
 
 func newTestController(tCtx ktesting.TContext, clientSet *fake.Clientset) *Controller {
@@ -1224,6 +2092,12 @@ func newTestController(tCtx ktesting.TContext, clientSet *fake.Clientset) *Contr
 
 	informerFactory := informers.NewSharedInformerFactory(clientSet, 0)
 
+	featuregatetesting.SetFeatureGatesDuringTest(tCtx, utilfeature.DefaultFeatureGate,
+		featuregatetesting.FeatureOverrides{
+			features.DRADeviceTaints:     true,
+			features.DRADeviceTaintRules: true,
+		},
+	)
 	controller := New(tCtx.Client(),
 		informerFactory.Core().V1().Pods(),
 		informerFactory.Resource().V1().ResourceClaims(),
@@ -1232,7 +2106,7 @@ func newTestController(tCtx ktesting.TContext, clientSet *fake.Clientset) *Contr
 		informerFactory.Resource().V1().DeviceClasses(),
 		"device-taint-eviction",
 	)
-	controller.metrics = metrics.New(300 /* one large initial bucket for testing */)
+	controller.metrics = metrics.New(300 /* one large initial bucket for testing */) // TODO: inside a synctest bubble we should have deterministic delays and shouldn't need this trick. The remaining uncertainty comes from polling for informer cache sync.
 	// Always log, not matter what the -v value is.
 	logger := klog.FromContext(tCtx)
 	controller.eventLogger = &logger
@@ -1240,9 +2114,16 @@ func newTestController(tCtx ktesting.TContext, clientSet *fake.Clientset) *Contr
 	informerFactory.Start(tCtx.Done())
 	tCtx.Cleanup(informerFactory.Shutdown)
 
-	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) int32 {
-		return numWatches.Load()
-	}).WithTimeout(5*time.Second).Should(gomega.Equal(int32(5)), "All watches should be registered.")
+	tCtx.Log("starting to wait for watches")
+	if tCtx.IsSyncTest() {
+		tCtx.Wait()
+		require.Equal(tCtx, int32(5), numWatches.Load(), "All watches should be registered.")
+	} else {
+		ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) int32 {
+			return numWatches.Load()
+		}).WithTimeout(5*time.Second).Should(gomega.Equal(int32(5)), "All watches should be registered.")
+	}
+	tCtx.Log("done waiting for watches")
 
 	return controller
 }
@@ -1284,10 +2165,11 @@ device_taint_eviction_controller_pod_deletions_total %[1]d
 // This scenario is the same as "evict-pod-resourceclaim" above. It also covers all
 // event handlers by leading to the same end state through several different combinations
 // of initial objects and add/update/delete calls.
-func TestEviction(t *testing.T) {
-	tCtx := ktesting.Init(t)
-	tCtx.Parallel()
-
+//
+// This runs in a bubble (https://pkg.go.dev/testing/synctest), so we can wait for goroutine
+// activity to settle down and then check the state.
+func TestEviction(t *testing.T) { testEviction(ktesting.Init(t)) }
+func testEviction(tCtx ktesting.TContext) {
 	do := func(tCtx ktesting.TContext, what string, action func(tCtx ktesting.TContext) error) {
 		tCtx.Log(what)
 		err := action(tCtx)
@@ -1376,30 +2258,32 @@ func TestEviction(t *testing.T) {
 			},
 		},
 	} {
-		tCtx.Run(name, func(tCtx ktesting.TContext) {
-			tCtx.Parallel()
-			fakeClientset := fake.NewSimpleClientset(tt.initialObjects...)
+		tCtx.SyncTest(name, func(tCtx ktesting.TContext) {
+			start := time.Now()
+			fakeClientset := fake.NewClientset(tt.initialObjects...)
 			tCtx = ktesting.WithClients(tCtx, nil, nil, fakeClientset, nil, nil)
 
-			var mutex sync.Mutex
+			var podGets int
 			var podUpdates int
 			var updatedPod *v1.Pod
 			var podDeletions int
 
+			fakeClientset.PrependReactor("get", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+				podGets++
+				podName := action.(core.GetAction).GetName()
+				assert.Equal(tCtx, podWithClaimName.Name, podName, "name of pod to patch")
+				return false, nil, nil
+			})
 			fakeClientset.PrependReactor("patch", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-				mutex.Lock()
-				defer mutex.Unlock()
 				podUpdates++
 				podName := action.(core.PatchAction).GetName()
-				assert.Equal(t, podWithClaimName.Name, podName, "name of patched pod")
+				assert.Equal(tCtx, podWithClaimName.Name, podName, "name of pod to get")
 				return false, nil, nil
 			})
 			fakeClientset.PrependReactor("delete", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-				mutex.Lock()
-				defer mutex.Unlock()
 				podDeletions++
 				podName := action.(core.DeleteAction).GetName()
-				assert.Equal(t, podWithClaimName.Name, podName, "name of deleted pod")
+				assert.Equal(tCtx, podWithClaimName.Name, podName, "name of pod to delete")
 				obj, err := fakeClientset.Tracker().Get(v1.SchemeGroupVersion.WithResource("pods"), pod.Namespace, pod.Name)
 				require.NoError(tCtx, err)
 				updatedPod = obj.(*v1.Pod)
@@ -1416,22 +2300,46 @@ func TestEviction(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				assert.NoError(tCtx, controller.Run(tCtx), "eviction controller failed")
+				assert.NoError(tCtx, controller.Run(tCtx, 10 /* workers */), "eviction controller failed")
 			}()
 
 			// Eventually the controller should have synced it's informers.
-			ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) bool {
-				return controller.hasSynced.Load() > 0
-			}).WithTimeout(30 * time.Second).Should(gomega.BeTrueBecause("controller synced"))
-			if tt.afterSync != nil {
-				tt.afterSync(tCtx)
+			if false {
+				// This feels like it should work (controller should run until it has started up, then block durably), but it doesn't.
+				// Time progresses while the controller is blocked in cache.WaitForNamedCacheSyncWithContext, so this is
+				// probably a good place to start looking.
+				// TODO: make "wait for cache sync" block on a channel. Alternatively, use a context and let `context.Cause`
+				// report success or failure (might be too hacky).
+				tCtx.Wait()
+				if controller.hasSynced.Load() <= 0 {
+					tCtx.Fatal("controller should have synced")
+				}
+			} else {
+				ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) bool {
+					return controller.hasSynced.Load() > 0
+				}).WithTimeout(30 * time.Second).Should(gomega.BeTrueBecause("controller synced"))
+				if tt.afterSync != nil {
+					tt.afterSync(tCtx)
+				}
 			}
 
-			// Eventually the pod gets deleted (= evicted).
-			ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) bool {
-				_, err := fakeClientset.CoreV1().Pods(pod.Namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
-				return apierrors.IsNotFound(err)
-			}).WithTimeout(30 * time.Second).Should(gomega.BeTrueBecause("pod evicted"))
+			// We can wait for the controller to be idle.
+			tCtx.Wait()
+
+			// The number of API calls is deterministic.
+			assert.Equal(tCtx, 1, podGets, "get pod once")
+			assert.Equal(tCtx, 1, podUpdates, "update pod once")
+			assert.Equal(tCtx, 1, podDeletions, "delete pod once")
+
+			_, err := fakeClientset.CoreV1().Pods(pod.Namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
+			switch {
+			case err == nil:
+				tCtx.Fatalf("Pod should have been deleted, it still exists")
+			case apierrors.IsNotFound(err):
+				// Okay.
+			default:
+				tCtx.Fatalf("Retrieving pod failed: %v", err)
+			}
 
 			pod := pod.DeepCopy()
 			pod.Status.Conditions = []v1.PodCondition{{
@@ -1440,78 +2348,188 @@ func TestEviction(t *testing.T) {
 				Reason:  "DeletionByDeviceTaintManager",
 				Message: "Device Taint manager: deleting due to NoExecute taint",
 			}}
-			if diff := cmp.Diff(pod, updatedPod, cmpopts.IgnoreTypes(metav1.Time{})); diff != "" {
+			if diff := cmp.Diff(pod, updatedPod, cmpopts.IgnoreTypes(metav1.Time{}, metav1.TypeMeta{}), cmpopts.IgnoreFields(metav1.ObjectMeta{}, "ManagedFields")); diff != "" {
 				tCtx.Errorf("unexpected modified pod (-want, +got):\n%s", diff)
 			}
 
 			// Shortly after deletion we should also see updated metrics.
 			// This is the last thing the controller does for a pod.
-			// However, actually creating the event on the server is asynchronous,
-			// so we also have to wait for that.
-			ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) error {
-				gomega.NewWithT(tCtx).Expect(listEvents(tCtx)).Should(matchDeletionEvent())
-				return testPodDeletionsMetrics(controller, 1)
-			}).WithTimeout(30*time.Second).Should(gomega.Succeed(), "pod eviction done")
+			// Because of Wait we know that all goroutines are durably blocked and won't
+			// wake up again to change the metrics => no need for a "Consistently"!
+			gomega.NewWithT(tCtx).Expect(listEvents(tCtx)).Should(matchDeletionEvent())
+			tCtx.ExpectNoError(testPodDeletionsMetrics(controller, 1), "pod eviction done")
 
-			// We also don't want any other events, in particular not a cancellation event
-			// because the pod deletion was observed or another occurrence of the same event.
-			ktesting.Consistently(tCtx, func(tCtx ktesting.TContext) error {
-				mutex.Lock()
-				defer mutex.Unlock()
-				assert.Equal(tCtx, 1, podUpdates, "number of pod update calls")
-				assert.Equal(tCtx, 1, podDeletions, "number of pod delete calls")
-				gomega.NewWithT(tCtx).Expect(listEvents(tCtx)).Should(matchDeletionEvent())
-				tCtx.ExpectNoError(testPodDeletionsMetrics(controller, 1))
-				return nil
-			}).WithTimeout(5 * time.Second).Should(gomega.Succeed())
+			// Depending on timing, some of the "wait for cache synced" polling sleep a bit more or less,
+			// so there is a certain delta of uncertainty about the overall duration. Without that polling
+			// we probably could assert zero runtime here.
+			tCtx.Logf("eviction duration: %s", time.Since(start))
+			delta := time.Second
+			require.WithinRange(tCtx, time.Now(), start, start.Add(delta), "time to evict pod")
 		})
 	}
 }
 
-// TestCancelEviction deletes the pod before the controller deletes it
-// or removes the slice. Either way, eviction gets cancelled.
-func TestCancelEviction(t *testing.T) {
-	tCtx := ktesting.Init(t)
-	tCtx.Parallel()
+// TestDeviceTaintRule runs through the full flow of simulating eviction with the None effect,
+// updating the rule with NoExecute, and then evicting the pod.
+//
+// This runs in a bubble (https://pkg.go.dev/testing/synctest), so we can wait for goroutine
+// activity to settle down and then check the state.
+func TestDeviceTaintRule(t *testing.T) { ktesting.Init(t).SyncTest("", synctestDeviceTaintRule) }
+func synctestDeviceTaintRule(tCtx ktesting.TContext) {
+	rule := ruleNone.DeepCopy()
+	fakeClientset := fake.NewClientset(podWithClaimName, inUseClaim, rule)
+	tCtx = ktesting.WithClients(tCtx, nil, nil, fakeClientset, nil, nil)
+	controller := newTestController(tCtx, fakeClientset)
 
-	tCtx.Run("pod-deleted", func(tCtx ktesting.TContext) { testCancelEviction(tCtx, true) })
-	tCtx.Run("slice-deleted", func(tCtx ktesting.TContext) { testCancelEviction(tCtx, false) })
+	var wg sync.WaitGroup
+	defer func() {
+		tCtx.Log("Waiting for goroutine termination...")
+		tCtx.Cancel("time to stop")
+		wg.Wait()
+	}()
+	wg.Go(func() {
+		assert.NoError(tCtx, controller.Run(tCtx, 10 /* workers */), "eviction controller failed")
+	})
+
+	// Eventually the controller should have synced it's informers.
+	if false {
+		// This feels like it should work (controller should run until it has started up, then block durably), but it doesn't.
+		// Time progresses while the controller is blocked in cache.WaitForNamedCacheSyncWithContext, so this is
+		// probably a good place to start looking.
+		// TODO: make "wait for cache sync" block on a channel. Alternatively, use a context and let `context.Cause`
+		// report success or failure (might be too hacky).
+		tCtx.Wait()
+		if controller.hasSynced.Load() <= 0 {
+			tCtx.Fatal("controller should have synced")
+		}
+	} else {
+		ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) bool {
+			return controller.hasSynced.Load() > 0
+		}).WithTimeout(30 * time.Second).Should(gomega.BeTrueBecause("controller synced"))
+	}
+
+	// We can wait for the controller to be idle.
+	tCtx.Wait()
+	start := metav1.Now()
+	tCtx.Logf("TIME: start at %s", start)
+	check(tCtx, "initial processing: ", l(inProgress(ruleNone, false, "NoEffect", "0 published devices selected. 1 allocated device selected. 1 pod would be evicted in 1 namespace if the effect was NoExecute. This information will not be updated again. Recreate the DeviceTaintRule to trigger an update.", &start /* processed before waiting for cache sync completion */)), l(podWithClaimName))
+
+	// Move time forward to ensure that we get different time stamps.
+	time.Sleep(20 * time.Second)
+	rule.Spec.Taint.Effect = resourcealpha.DeviceTaintEffectNoExecute
+	rule, err := tCtx.Client().ResourceV1alpha3().DeviceTaintRules().Update(tCtx, rule, metav1.UpdateOptions{})
+	tCtx.ExpectNoError(err, "update rule")
+
+	// Wait for eviction. The rule gets updated with another delay.
+	tCtx.Wait()
+	evicted := metav1.Now()
+	tCtx.Logf("TIME: eviction done at %s", evicted)
+	check(tCtx, "evict: ", l(inProgress(rule, true, "PodsPendingEviction", "1 pod needs to be evicted in 1 namespace.", &evicted)), nil)
+
+	// AddAfter does not move time forward. Do it ourselves...
+	time.Sleep(ruleStatusPeriod)
+	slept := metav1.Now()
+	tCtx.Logf("TIME: slept till %s", slept)
+	tCtx.Wait()
+	done := metav1.Now()
+	tCtx.Logf("TIME: done at %s", done)
+	check(tCtx, "done: ", l(inProgress(rule, false, "Completed", "1 pod evicted since starting the controller.", &slept)), nil)
+	assertEqual(tCtx, map[types.UID]taintRuleStats{rule.UID: {numEvictedPods: 1}}, controller.taintRuleStats, "taint rule statistics should have counted the pod")
+
+	// Delete the rule and verify that we don't leak memory by still tracking it.
+	err = tCtx.Client().ResourceV1alpha3().DeviceTaintRules().Delete(tCtx, rule.Name, metav1.DeleteOptions{})
+	tCtx.ExpectNoError(err, "delete rule")
+	tCtx.Wait()
+	deleted := metav1.Now()
+	tCtx.Logf("TIME: deleted at %s", deleted)
+	assert.Empty(tCtx, controller.taintRuleStats, "taint rule statistics should have dropped the deleted rule")
 }
 
-func testCancelEviction(tCtx ktesting.TContext, deletePod bool) {
+func check(tCtx ktesting.TContext, prefix string, expectRules []*resourcealpha.DeviceTaintRule, expectPods []*v1.Pod) {
+	tCtx.Helper()
+
+	opts := []cmp.Option{
+		// Expected objects don't have managed fields, API objects do.
+		cmpopts.IgnoreFields(metav1.ObjectMeta{}, "ManagedFields"),
+		// metav1.Time gets rounded to seconds during serialization.
+		cmpopts.AcyclicTransformer("RoundTime", func(t metav1.Time) metav1.Time {
+			return metav1.Time{Time: t.Round(time.Second)}
+		}),
+	}
+
+	actualPods, err := tCtx.Client().CoreV1().Pods("").List(tCtx, metav1.ListOptions{})
+	tCtx.ExpectNoError(err, prefix+"list pods")
+	assertEqual(tCtx, expectPods, trimPods(actualPods.Items), prefix+"pods", opts...)
+	rules, err := tCtx.Client().ResourceV1alpha3().DeviceTaintRules().List(tCtx, metav1.ListOptions{})
+	tCtx.ExpectNoError(err, prefix+"list rules")
+	assertEqual(tCtx, expectRules, trimRules(rules.Items), prefix+"rules", opts...)
+}
+
+// TestCancelEviction deletes the pod before the controller deletes it
+// or removes the slice. Either way, eviction gets cancelled.
+func TestCancelEviction(t *testing.T) { testCancelEviction(ktesting.Init(t)) }
+func testCancelEviction(tCtx ktesting.TContext) {
+	tCtx.SyncTest("pod-deleted", func(tCtx ktesting.TContext) { doCancelEviction(tCtx, true) })
+	tCtx.SyncTest("slice-deleted", func(tCtx ktesting.TContext) { doCancelEviction(tCtx, false) })
+}
+
+func doCancelEviction(tCtx ktesting.TContext, deletePod bool) {
 	// The claim tolerates the taint long enough for us to
 	// do something which cancels eviction.
 	pod := podWithClaimName.DeepCopy()
 	slice := sliceTainted.DeepCopy()
-	slice.Spec.Devices[0].Taints[0].TimeAdded = &metav1.Time{Time: time.Now()}
+	slice.Spec.Devices[0].Taints[0].TimeAdded = metav1Time(time.Now())
 	claim := inUseClaim.DeepCopy()
+	tolerationSeconds := int64(60)
 	claim.Status.Allocation.Devices.Results[0].Tolerations = []resourceapi.DeviceToleration{{
 		Operator:          resourceapi.DeviceTolerationOpExists,
 		Effect:            resourceapi.DeviceTaintEffectNoExecute,
-		TolerationSeconds: ptr.To(int64(60)),
+		TolerationSeconds: &tolerationSeconds,
 	}}
-	fakeClientset := fake.NewSimpleClientset(
+	fakeClientset := fake.NewClientset(
 		slice,
 		claim,
 		pod,
 	)
-	tCtx = ktesting.WithClients(tCtx, nil, nil, fakeClientset, nil, nil)
-
 	pod, err := fakeClientset.CoreV1().Pods(pod.Namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
 	require.NoError(tCtx, err, "get pod before eviction")
 	assert.Equal(tCtx, podWithClaimName, pod, "test pod")
 
+	var podGets int
+	var podUpdates int
+	var podDeletions int
+
+	fakeClientset.PrependReactor("get", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		podGets++
+		podName := action.(core.GetAction).GetName()
+		assert.Equal(tCtx, podWithClaimName.Name, podName, "name of pod to patch")
+		return false, nil, nil
+	})
+	fakeClientset.PrependReactor("patch", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		podUpdates++
+		podName := action.(core.PatchAction).GetName()
+		assert.Equal(tCtx, podWithClaimName.Name, podName, "name of pod to get")
+		return false, nil, nil
+	})
+	fakeClientset.PrependReactor("delete", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		podDeletions++
+		podName := action.(core.DeleteAction).GetName()
+		assert.Equal(tCtx, podWithClaimName.Name, podName, "name of pod to delete")
+		return false, nil, nil
+	})
+
+	tCtx = ktesting.WithClients(tCtx, nil, nil, fakeClientset, nil, nil)
 	controller := newTestController(tCtx, fakeClientset)
 
 	var mutex sync.Mutex
 	podEvicting := false
-	controller.evictPod = func(podRef tainteviction.NamespacedObject, fireAt time.Time) {
+	controller.evictPodHook = func(podRef tainteviction.NamespacedObject, eviction evictionAndReason) {
 		assert.Equal(tCtx, newObject(pod), podRef)
 		mutex.Lock()
 		defer mutex.Unlock()
 		podEvicting = true
 	}
-	controller.cancelEvict = func(podRef tainteviction.NamespacedObject) bool {
+	controller.cancelEvictHook = func(podRef tainteviction.NamespacedObject) bool {
 		assert.Equal(tCtx, newObject(pod), podRef)
 		mutex.Lock()
 		defer mutex.Unlock()
@@ -1528,7 +2546,7 @@ func testCancelEviction(tCtx ktesting.TContext, deletePod bool) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		assert.NoError(tCtx, controller.Run(tCtx), "eviction controller failed")
+		assert.NoError(tCtx, controller.Run(tCtx, 10 /* workers */), "eviction controller failed")
 	}()
 
 	// Eventually the pod gets scheduled for eviction.
@@ -1557,26 +2575,115 @@ func testCancelEviction(tCtx ktesting.TContext, deletePod bool) {
 	if !deletePod {
 		ktesting.Eventually(tCtx, listEvents).WithTimeout(30 * time.Second).Should(matchCancellationEvent())
 	}
-	ktesting.Consistently(tCtx, func(tCtx ktesting.TContext) error {
-		matchEvents := matchCancellationEvent()
-		if deletePod {
-			matchEvents = gomega.BeEmpty()
-		}
-		gomega.NewWithT(tCtx).Expect(listEvents(tCtx)).Should(matchEvents)
-		tCtx.ExpectNoError(testPodDeletionsMetrics(controller, 0))
-		return nil
-	}).WithTimeout(5 * time.Second).Should(gomega.Succeed())
+	tCtx.Wait()
+
+	matchEvents := matchCancellationEvent()
+	if deletePod {
+		matchEvents = gomega.BeEmpty()
+		assert.Equal(tCtx, 1, podDeletions, "Pod should have been deleted exactly once by test.")
+	} else {
+		assert.Equal(tCtx, 0, podDeletions, "Pod should not have been deleted.")
+	}
+
+	// Naively (?) one could expect synctest.Wait to have blocked until the work item added via AddAfter
+	// got processed because before that the overall state isn't stable yet. But the workqueue package
+	// seems to implement AddAfter in a way which is not detected as "blocking on time to pass" by
+	// by synctest and therefore it returns without advancing time enough.
+	//
+	// Here we trigger that manually as a workaround (?). The factor doesn't really matter.
+	// Commenting this out causes the controller.maybeDeletePodCount check to fail.
+	time.Sleep(10 * time.Duration(tolerationSeconds) * time.Second)
+	tCtx.Wait()
+
+	assert.Equal(tCtx, 0, podGets, "Worker should not have needed to get the pod.")
+	assert.Equal(tCtx, 0, podUpdates, "Worker should not have needed to update the pod.")
+	assert.Equal(tCtx, 0, controller.workqueue.Len(), "Work queue should be empty now.")
+	assert.Equal(tCtx, int64(1), controller.maybeDeletePodCount, "Work queue should have processed pod.")
+	gomega.NewWithT(tCtx).Expect(listEvents(tCtx)).Should(matchEvents)
+	tCtx.ExpectNoError(testPodDeletionsMetrics(controller, 0))
 }
 
 // TestParallelPodDeletion covers the scenario that a pod gets deleted right before
 // trying to evict it.
-func TestParallelPodDeletion(t *testing.T) {
-	tCtx := ktesting.Init(t)
+func TestParallelPodDeletion(t *testing.T) { testParallelPodDeletion(ktesting.Init(t)) }
+func testParallelPodDeletion(tCtx ktesting.TContext) {
 	tCtx.Parallel()
 
+	tCtx.SyncTest("", func(tCtx ktesting.TContext) {
+		// This scenario is the same as "evict-pod-resourceclaim" above.
+		pod := podWithClaimName.DeepCopy()
+		fakeClientset := fake.NewClientset(
+			sliceTainted,
+			slice2,
+			inUseClaim,
+			pod,
+		)
+		tCtx = ktesting.WithClients(tCtx, nil, nil, fakeClientset, nil, nil)
+
+		pod, err := fakeClientset.CoreV1().Pods(pod.Namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
+		require.NoError(tCtx, err, "get pod before eviction")
+		assert.Equal(tCtx, podWithClaimName, pod, "test pod")
+
+		var mutex sync.Mutex
+		var podGets int
+		var podDeletions int
+
+		fakeClientset.PrependReactor("get", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+			mutex.Lock()
+			defer mutex.Unlock()
+			podGets++
+			podName := action.(core.GetAction).GetName()
+			assert.Equal(tCtx, podWithClaimName.Name, podName, "name of patched pod")
+
+			// This gets called directly before eviction. Pretend that it is deleted.
+			err = fakeClientset.Tracker().Delete(v1.SchemeGroupVersion.WithResource("pods"), pod.Namespace, pod.Name)
+			assert.NoError(tCtx, err, "delete pod") //nolint:testifylint // Here recording an unknown error and continuing is okay.
+			return true, nil, apierrors.NewNotFound(v1.SchemeGroupVersion.WithResource("pods").GroupResource(), pod.Name)
+		})
+		fakeClientset.PrependReactor("delete", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+			mutex.Lock()
+			defer mutex.Unlock()
+			podDeletions++
+			podName := action.(core.DeleteAction).GetName()
+			assert.Equal(tCtx, podWithClaimName.Name, podName, "name of deleted pod")
+			return false, nil, nil
+		})
+		controller := newTestController(tCtx, fakeClientset)
+
+		var wg sync.WaitGroup
+		defer func() {
+			tCtx.Log("Waiting for goroutine termination...")
+			tCtx.Cancel("time to stop")
+			wg.Wait()
+		}()
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			assert.NoError(tCtx, controller.Run(tCtx, 10 /* workers */), "eviction controller failed")
+		}()
+
+		// Eventually the pod gets deleted, in this test by us.
+		ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) bool {
+			mutex.Lock()
+			defer mutex.Unlock()
+			return podGets >= 1
+		}).WithTimeout(30 * time.Second).Should(gomega.BeTrueBecause("pod eviction started"))
+
+		// We don't want any events.
+		tCtx.Wait()
+		assert.Equal(tCtx, 1, podGets, "number of pod get calls")
+		assert.Equal(tCtx, 0, podDeletions, "number of pod delete calls")
+		gomega.NewWithT(tCtx).Expect(listEvents(tCtx)).Should(gomega.BeEmpty())
+		tCtx.ExpectNoError(testPodDeletionsMetrics(controller, 0))
+	})
+}
+
+// TestRetry covers the scenario that an eviction attempt must be retried.
+func TestRetry(t *testing.T) { ktesting.Init(t).SyncTest("", synctestRetry) }
+func synctestRetry(tCtx ktesting.TContext) {
 	// This scenario is the same as "evict-pod-resourceclaim" above.
 	pod := podWithClaimName.DeepCopy()
-	fakeClientset := fake.NewSimpleClientset(
+	fakeClientset := fake.NewClientset(
 		sliceTainted,
 		slice2,
 		inUseClaim,
@@ -1597,19 +2704,20 @@ func TestParallelPodDeletion(t *testing.T) {
 		defer mutex.Unlock()
 		podGets++
 		podName := action.(core.GetAction).GetName()
-		assert.Equal(t, podWithClaimName.Name, podName, "name of patched pod")
+		assert.Equal(tCtx, podWithClaimName.Name, podName, "name of patched pod")
 
-		// This gets called directly before eviction. Pretend that it is deleted.
-		err = fakeClientset.Tracker().Delete(v1.SchemeGroupVersion.WithResource("pods"), pod.Namespace, pod.Name)
-		assert.NoError(tCtx, err, "delete pod") //nolint:testifylint // Here recording an unknown error and continuing is okay.
-		return true, nil, apierrors.NewNotFound(v1.SchemeGroupVersion.WithResource("pods").GroupResource(), pod.Name)
+		// This gets called directly before eviction. Pretend that there is an intermittent error.
+		if podGets == 1 {
+			return true, nil, apierrors.NewInternalError(errors.New("fake error"))
+		}
+		return false, nil, nil
 	})
 	fakeClientset.PrependReactor("delete", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		mutex.Lock()
 		defer mutex.Unlock()
 		podDeletions++
 		podName := action.(core.DeleteAction).GetName()
-		assert.Equal(t, podWithClaimName.Name, podName, "name of deleted pod")
+		assert.Equal(tCtx, podWithClaimName.Name, podName, "name of deleted pod")
 		return false, nil, nil
 	})
 	controller := newTestController(tCtx, fakeClientset)
@@ -1623,84 +2731,7 @@ func TestParallelPodDeletion(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		assert.NoError(tCtx, controller.Run(tCtx), "eviction controller failed")
-	}()
-
-	// Eventually the pod gets deleted, in this test by us.
-	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) bool {
-		mutex.Lock()
-		defer mutex.Unlock()
-		return podGets >= 1
-	}).WithTimeout(30 * time.Second).Should(gomega.BeTrueBecause("pod eviction started"))
-
-	// We don't want any events.
-	ktesting.Consistently(tCtx, func(tCtx ktesting.TContext) error {
-		mutex.Lock()
-		defer mutex.Unlock()
-		assert.Equal(tCtx, 1, podGets, "number of pod get calls")
-		assert.Equal(tCtx, 0, podDeletions, "number of pod delete calls")
-		gomega.NewWithT(tCtx).Expect(listEvents(tCtx)).Should(gomega.BeEmpty())
-		tCtx.ExpectNoError(testPodDeletionsMetrics(controller, 0))
-		return nil
-	}).WithTimeout(5 * time.Second).Should(gomega.Succeed())
-}
-
-// TestRetry covers the scenario that an eviction attempt must be retried.
-func TestRetry(t *testing.T) {
-	tCtx := ktesting.Init(t)
-	tCtx.Parallel()
-
-	// This scenario is the same as "evict-pod-resourceclaim" above.
-	pod := podWithClaimName.DeepCopy()
-	fakeClientset := fake.NewSimpleClientset(
-		sliceTainted,
-		slice2,
-		inUseClaim,
-		pod,
-	)
-	tCtx = ktesting.WithClients(tCtx, nil, nil, fakeClientset, nil, nil)
-
-	pod, err := fakeClientset.CoreV1().Pods(pod.Namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
-	require.NoError(tCtx, err, "get pod before eviction")
-	assert.Equal(tCtx, podWithClaimName, pod, "test pod")
-
-	var mutex sync.Mutex
-	var podGets int
-	var podDeletions int
-
-	fakeClientset.PrependReactor("get", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-		mutex.Lock()
-		defer mutex.Unlock()
-		podGets++
-		podName := action.(core.GetAction).GetName()
-		assert.Equal(t, podWithClaimName.Name, podName, "name of patched pod")
-
-		// This gets called directly before eviction. Pretend that there is an intermittent error.
-		if podGets == 1 {
-			return true, nil, apierrors.NewInternalError(errors.New("fake error"))
-		}
-		return false, nil, nil
-	})
-	fakeClientset.PrependReactor("delete", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-		mutex.Lock()
-		defer mutex.Unlock()
-		podDeletions++
-		podName := action.(core.DeleteAction).GetName()
-		assert.Equal(t, podWithClaimName.Name, podName, "name of deleted pod")
-		return false, nil, nil
-	})
-	controller := newTestController(tCtx, fakeClientset)
-
-	var wg sync.WaitGroup
-	defer func() {
-		t.Log("Waiting for goroutine termination...")
-		tCtx.Cancel("time to stop")
-		wg.Wait()
-	}()
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		assert.NoError(tCtx, controller.Run(tCtx), "eviction controller failed")
+		assert.NoError(tCtx, controller.Run(tCtx, 10 /* workers */), "eviction controller failed")
 	}()
 
 	// Eventually the pod gets deleted and the event is recorded.
@@ -1710,116 +2741,42 @@ func TestRetry(t *testing.T) {
 	}).WithTimeout(30*time.Second).Should(gomega.Succeed(), "pod eviction done")
 
 	// Now we can check the API calls.
-	ktesting.Consistently(tCtx, func(tCtx ktesting.TContext) error {
-		mutex.Lock()
-		defer mutex.Unlock()
-		assert.Equal(tCtx, 2, podGets, "number of pod get calls")
-		assert.Equal(tCtx, 1, podDeletions, "number of pod delete calls")
-		gomega.NewWithT(tCtx).Expect(listEvents(tCtx)).Should(matchDeletionEvent())
-		tCtx.ExpectNoError(testPodDeletionsMetrics(controller, 1))
-		return nil
-	}).WithTimeout(5 * time.Second).Should(gomega.Succeed())
-}
-
-// TestRetry covers the scenario that an eviction attempt fails.
-func TestEvictionFailure(t *testing.T) {
-	tCtx := ktesting.Init(t)
-	tCtx.Parallel()
-
-	// This scenario is the same as "evict-pod-resourceclaim" above.
-	pod := podWithClaimName.DeepCopy()
-	fakeClientset := fake.NewSimpleClientset(
-		sliceTainted,
-		slice2,
-		inUseClaim,
-		pod,
-	)
-	tCtx = ktesting.WithClients(tCtx, nil, nil, fakeClientset, nil, nil)
-
-	pod, err := fakeClientset.CoreV1().Pods(pod.Namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
-	require.NoError(tCtx, err, "get pod before eviction")
-	assert.Equal(tCtx, podWithClaimName, pod, "test pod")
-
-	var mutex sync.Mutex
-	var podGets int
-	var podDeletions int
-
-	fakeClientset.PrependReactor("get", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-		mutex.Lock()
-		defer mutex.Unlock()
-		podGets++
-		podName := action.(core.GetAction).GetName()
-		assert.Equal(t, podWithClaimName.Name, podName, "name of patched pod")
-		return false, nil, nil
-	})
-	fakeClientset.PrependReactor("delete", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-		mutex.Lock()
-		defer mutex.Unlock()
-		podDeletions++
-		podName := action.(core.DeleteAction).GetName()
-		assert.Equal(t, podWithClaimName.Name, podName, "name of deleted pod")
-		return true, nil, apierrors.NewInternalError(errors.New("fake error"))
-	})
-	controller := newTestController(tCtx, fakeClientset)
-
-	var wg sync.WaitGroup
-	defer func() {
-		t.Log("Waiting for goroutine termination...")
-		tCtx.Cancel("time to stop")
-		wg.Wait()
-	}()
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		assert.NoError(tCtx, controller.Run(tCtx), "eviction controller failed")
-	}()
-
-	// Eventually deletion is attempted a few times.
-	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) int {
-		mutex.Lock()
-		defer mutex.Unlock()
-		return podDeletions
-	}).WithTimeout(30*time.Second).Should(gomega.BeNumerically(">=", retries), "pod eviction failed")
-
-	// Now we can check the API calls.
-	ktesting.Consistently(tCtx, func(tCtx ktesting.TContext) error {
-		mutex.Lock()
-		defer mutex.Unlock()
-		assert.Equal(tCtx, retries, podGets, "number of pod get calls")
-		assert.Equal(tCtx, retries, podDeletions, "number of pod delete calls")
-		gomega.NewWithT(tCtx).Expect(listEvents(tCtx)).Should(matchDeletionEvent())
-		tCtx.ExpectNoError(testPodDeletionsMetrics(controller, 0))
-		return nil
-	}).WithTimeout(5 * time.Second).Should(gomega.Succeed())
+	tCtx.Wait()
+	assert.Equal(tCtx, 2, podGets, "number of pod get calls")
+	assert.Equal(tCtx, 1, podDeletions, "number of pod delete calls")
+	gomega.NewWithT(tCtx).Expect(listEvents(tCtx)).Should(matchDeletionEvent())
+	tCtx.ExpectNoError(testPodDeletionsMetrics(controller, 1))
 }
 
 // BenchTaintUntaint checks the full flow of detecting a claim as
 // tainted because of a new DeviceTaintRule, starting to evict its
 // consumer, and then undoing that when the DeviceTaintRule is removed.
 func BenchmarkTaintUntaint(b *testing.B) {
-	tContext := setup(b)
+	tCtx := ktesting.Init(b)
+	tContext := setup(tCtx)
 	podStore := tContext.informerFactory.Core().V1().Pods().Informer().GetStore()
 	// No output, comment out if output is desired.
 	tContext.Controller.eventLogger = nil
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	// Condition must be exactly "b.Loop" to ensure that the special support
+	// in the compiler for benchmarks is active.
+	for b.Loop() {
 		// Add objects...
 		tContext.handleSliceChange(nil, slice)
 		tContext.handleClaimChange(nil, inUseClaimWithToleration)
 		require.NoError(tContext, podStore.Add(podWithClaimName), "add pod")
 		tContext.handlePodChange(nil, podWithClaimName)
-		require.Empty(tContext, tContext.evicting)
+		require.Empty(tContext, tContext.deletePodAt)
 
 		// Now evict.
 		tContext.handleSliceChange(slice, sliceTainted)
 
 		// Because informer event handlers are synchronous, we get the expected result immediately.
-		require.NotEmpty(tContext, tContext.evicting)
+		require.NotEmpty(tContext, tContext.deletePodAt)
 
 		// ... and remove them again.
 		tContext.handleSliceChange(sliceTainted, slice)
-		require.Empty(tContext, tContext.evicting)
+		require.Empty(tContext, tContext.deletePodAt)
 
 		tContext.handlePodChange(podWithClaimName, nil)
 		require.NoError(tContext, podStore.Delete(podWithClaimName), "remove pod")

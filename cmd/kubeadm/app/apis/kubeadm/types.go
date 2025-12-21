@@ -167,6 +167,7 @@ type ControlPlaneComponent struct {
 	// An argument name in this list is the flag name as it appears on the
 	// command line except without leading dash(es). Extra arguments will override existing
 	// default arguments. Duplicate extra arguments are allowed.
+	// The default arguments are sorted alpha-numerically but the extra arguments are not.
 	ExtraArgs []Arg
 
 	// ExtraVolumes is an extra set of host volumes, mounted to the control plane component.
@@ -249,6 +250,7 @@ type NodeRegistrationOptions struct {
 	// Flags have higher priority when parsing. These values are local and specific to the node kubeadm is executing on.
 	// An argument name in this list is the flag name as it appears on the command line except without leading dash(es).
 	// Extra arguments will override existing default arguments. Duplicate extra arguments are allowed.
+	// The default arguments are sorted alpha-numerically but the extra arguments are not.
 	KubeletExtraArgs []Arg
 
 	// IgnorePreflightErrors provides a slice of pre-flight errors to be ignored when the current node is registered, e.g. 'IsPrivilegedUser,Swap'.
@@ -301,6 +303,7 @@ type LocalEtcd struct {
 	// An argument name in this list is the flag name as it appears on the
 	// command line except without leading dash(es). Extra arguments will override existing
 	// default arguments. Duplicate extra arguments are allowed.
+	// The default arguments are sorted alpha-numerically but the extra arguments are not.
 	ExtraArgs []Arg
 
 	// ExtraEnvs is an extra set of environment variables to pass to the control plane component.
@@ -316,10 +319,23 @@ type LocalEtcd struct {
 
 // ExternalEtcd describes an external etcd cluster
 type ExternalEtcd struct {
-
-	// Endpoints of etcd members. Useful for using external etcd.
-	// If not provided, kubeadm will run etcd in a static pod.
+	// Endpoints of etcd members. Required when using external etcd.
+	// Specifies the client URLs (usually gRPC endpoints) for etcd communication.
+	// By default, these endpoints handle both gRPC traffic (primary etcd protocol)
+	// and HTTP traffic (metrics, health checks). However, if HTTPEndpoints is configured,
+	// the gRPC and HTTP traffic can be separated for better security and performance.
+	// Corresponds to etcd's --listen-client-urls configuration.
 	Endpoints []string
+
+	// HTTPEndpoints are the dedicated HTTP endpoints for etcd communication.
+	// When configured, HTTP traffic (such as /metrics and /health endpoints) is separated
+	// from the gRPC traffic handled by Endpoints. This separation allows for better access
+	// control, as HTTP endpoints can be exposed without exposing the primary gRPC interface.
+	// Corresponds to etcd's --listen-client-http-urls configuration.
+	// If not provided, Endpoints will be used for both gRPC and HTTP traffic.
+	// +optional
+	HTTPEndpoints []string
+
 	// CAFile is an SSL Certificate Authority file used to secure etcd communication.
 	CAFile string
 	// CertFile is an SSL certification file used to secure etcd communication.

@@ -38,8 +38,6 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/matchconditions"
 	"k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/environment"
-	"k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/util/jsonpath"
 
@@ -226,7 +224,6 @@ func ValidateValidatingWebhookConfiguration(e *admissionregistration.ValidatingW
 		requireRecognizedAdmissionReviewVersion: true,
 		requireUniqueWebhookNames:               true,
 		allowInvalidLabelValueInSelector:        false,
-		strictCostEnforcement:                   utilfeature.DefaultFeatureGate.Enabled(features.StrictCostEnforcementForWebhooks),
 	})
 }
 
@@ -256,7 +253,6 @@ func ValidateMutatingWebhookConfiguration(e *admissionregistration.MutatingWebho
 		requireRecognizedAdmissionReviewVersion: true,
 		requireUniqueWebhookNames:               true,
 		allowInvalidLabelValueInSelector:        false,
-		strictCostEnforcement:                   utilfeature.DefaultFeatureGate.Enabled(features.StrictCostEnforcementForWebhooks),
 	})
 }
 
@@ -268,7 +264,6 @@ type validationOptions struct {
 	requireUniqueWebhookNames               bool
 	allowInvalidLabelValueInSelector        bool
 	preexistingExpressions                  preexistingExpressions
-	strictCostEnforcement                   bool
 }
 
 type preexistingExpressions struct {
@@ -739,7 +734,6 @@ func ValidateValidatingWebhookConfigurationUpdate(newC, oldC *admissionregistrat
 		requireUniqueWebhookNames:               validatingHasUniqueWebhookNames(oldC.Webhooks),
 		allowInvalidLabelValueInSelector:        validatingWebhookHasInvalidLabelValueInSelector(oldC.Webhooks),
 		preexistingExpressions:                  findValidatingPreexistingExpressions(oldC),
-		strictCostEnforcement:                   utilfeature.DefaultFeatureGate.Enabled(features.StrictCostEnforcementForWebhooks),
 	})
 }
 
@@ -753,7 +747,6 @@ func ValidateMutatingWebhookConfigurationUpdate(newC, oldC *admissionregistratio
 		requireUniqueWebhookNames:               mutatingHasUniqueWebhookNames(oldC.Webhooks),
 		allowInvalidLabelValueInSelector:        mutatingWebhookHasInvalidLabelValueInSelector(oldC.Webhooks),
 		preexistingExpressions:                  findMutatingPreexistingExpressions(oldC),
-		strictCostEnforcement:                   utilfeature.DefaultFeatureGate.Enabled(features.StrictCostEnforcementForWebhooks),
 	})
 }
 
@@ -767,7 +760,7 @@ const (
 
 // ValidateValidatingAdmissionPolicy validates a ValidatingAdmissionPolicy before creation.
 func ValidateValidatingAdmissionPolicy(p *admissionregistration.ValidatingAdmissionPolicy) field.ErrorList {
-	return validateValidatingAdmissionPolicy(p, validationOptions{ignoreMatchConditions: false, strictCostEnforcement: utilfeature.DefaultFeatureGate.Enabled(features.StrictCostEnforcementForVAP)})
+	return validateValidatingAdmissionPolicy(p, validationOptions{ignoreMatchConditions: false})
 }
 
 func validateValidatingAdmissionPolicy(p *admissionregistration.ValidatingAdmissionPolicy, opts validationOptions) field.ErrorList {
@@ -782,7 +775,7 @@ func validateValidatingAdmissionPolicySpec(meta metav1.ObjectMeta, spec *admissi
 	getCompiler := func() plugincel.Compiler {
 		if compiler == nil {
 			needsComposition := len(spec.Variables) > 0
-			compiler = createCompiler(needsComposition, opts.strictCostEnforcement)
+			compiler = createCompiler(needsComposition)
 		}
 		return compiler
 	}
@@ -1027,7 +1020,6 @@ func validateVariable(compiler plugincel.Compiler, v *admissionregistration.Vari
 			result := compiler.CompileAndStoreVariable(variable, plugincel.OptionalVariableDeclarations{
 				HasParams:     paramKind != nil,
 				HasAuthorizer: true,
-				StrictCost:    opts.strictCostEnforcement,
 			}, envType)
 			if result.Error != nil {
 				allErrors = append(allErrors, convertCELErrorToValidationError(fldPath.Child("expression"), variable, result.Error))
@@ -1102,7 +1094,6 @@ func validateValidationExpression(compiler plugincel.Compiler, expression string
 	}, plugincel.OptionalVariableDeclarations{
 		HasParams:     hasParams,
 		HasAuthorizer: true,
-		StrictCost:    opts.strictCostEnforcement,
 	}, envType, fldPath)
 }
 
@@ -1112,17 +1103,12 @@ func validateMatchConditionsExpression(expression string, opts validationOptions
 		envType = environment.StoredExpressions
 	}
 	var compiler plugincel.Compiler
-	if opts.strictCostEnforcement {
-		compiler = getStrictStatelessCELCompiler()
-	} else {
-		compiler = getNonStrictStatelessCELCompiler()
-	}
+	compiler = getStrictStatelessCELCompiler()
 	return validateCELCondition(compiler, &matchconditions.MatchCondition{
 		Expression: expression,
 	}, plugincel.OptionalVariableDeclarations{
 		HasParams:     opts.allowParamsInMatchConditions,
 		HasAuthorizer: true,
-		StrictCost:    opts.strictCostEnforcement,
 	}, envType, fldPath)
 }
 
@@ -1136,7 +1122,6 @@ func validateMessageExpression(compiler plugincel.Compiler, expression string, o
 	}, plugincel.OptionalVariableDeclarations{
 		HasParams:     opts.allowParamsInMatchConditions,
 		HasAuthorizer: false,
-		StrictCost:    opts.strictCostEnforcement,
 	}, envType, fldPath)
 }
 
@@ -1161,7 +1146,7 @@ func validateAuditAnnotation(compiler plugincel.Compiler, meta metav1.ObjectMeta
 		}
 		result := compiler.CompileCELExpression(&validatingadmissionpolicy.AuditAnnotationCondition{
 			ValueExpression: trimmedValueExpression,
-		}, plugincel.OptionalVariableDeclarations{HasParams: paramKind != nil, HasAuthorizer: true, StrictCost: opts.strictCostEnforcement}, envType)
+		}, plugincel.OptionalVariableDeclarations{HasParams: paramKind != nil, HasAuthorizer: true}, envType)
 		if result.Error != nil {
 			switch result.Error.Type {
 			case cel.ErrorTypeRequired:
@@ -1255,7 +1240,6 @@ func ValidateValidatingAdmissionPolicyUpdate(newC, oldC *admissionregistration.V
 	return validateValidatingAdmissionPolicy(newC, validationOptions{
 		ignoreMatchConditions:  ignoreValidatingAdmissionPolicyMatchConditions(newC, oldC),
 		preexistingExpressions: findValidatingPolicyPreexistingExpressions(oldC),
-		strictCostEnforcement:  utilfeature.DefaultFeatureGate.Enabled(features.StrictCostEnforcementForVAP),
 	})
 }
 
@@ -1320,38 +1304,24 @@ func validateFieldRef(fieldRef string, fldPath *field.Path) field.ErrorList {
 var (
 	lazyStrictStatelessCELCompilerInit sync.Once
 	lazyStrictStatelessCELCompiler     plugincel.Compiler
-
-	lazyNonStrictStatelessCELCompilerInit sync.Once
-	lazyNonStrictStatelessCELCompiler     plugincel.Compiler
 )
 
 func getStrictStatelessCELCompiler() plugincel.Compiler {
 	lazyStrictStatelessCELCompilerInit.Do(func() {
-		lazyStrictStatelessCELCompiler = plugincel.NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true))
+		lazyStrictStatelessCELCompiler = plugincel.NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))
 	})
 	return lazyStrictStatelessCELCompiler
 }
 
-func getNonStrictStatelessCELCompiler() plugincel.Compiler {
-	lazyNonStrictStatelessCELCompilerInit.Do(func() {
-		lazyNonStrictStatelessCELCompiler = plugincel.NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), false))
-	})
-	return lazyNonStrictStatelessCELCompiler
-}
-
-func createCompiler(allowComposition, strictCost bool) plugincel.Compiler {
+func createCompiler(allowComposition bool) plugincel.Compiler {
 	if !allowComposition {
-		if strictCost {
-			return getStrictStatelessCELCompiler()
-		} else {
-			return getNonStrictStatelessCELCompiler()
-		}
+		return getStrictStatelessCELCompiler()
 	}
-	compiler, err := plugincel.NewCompositedCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), strictCost))
+	compiler, err := plugincel.NewCompositedCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))
 	if err != nil {
 		// should never happen, but cannot panic either.
 		utilruntime.HandleError(err)
-		return plugincel.NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), strictCost))
+		return plugincel.NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))
 	}
 	return compiler
 }
@@ -1380,7 +1350,6 @@ func ValidateMutatingAdmissionPolicyUpdate(newC, oldC *admissionregistration.Mut
 	return validateMutatingAdmissionPolicy(newC, validationOptions{
 		ignoreMatchConditions:  ignoreMutatingAdmissionPolicyMatchConditions(newC, oldC),
 		preexistingExpressions: findMutatingPolicyPreexistingExpressions(oldC),
-		strictCostEnforcement:  true,
 	})
 }
 
@@ -1391,7 +1360,7 @@ func ValidateMutatingAdmissionPolicyBindingUpdate(newC, oldC *admissionregistrat
 
 // ValidateMutatingAdmissionPolicy validates a MutatingAdmissionPolicy before creation.
 func ValidateMutatingAdmissionPolicy(p *admissionregistration.MutatingAdmissionPolicy) field.ErrorList {
-	return validateMutatingAdmissionPolicy(p, validationOptions{ignoreMatchConditions: false, strictCostEnforcement: true})
+	return validateMutatingAdmissionPolicy(p, validationOptions{ignoreMatchConditions: false})
 }
 
 func validateMutatingAdmissionPolicy(p *admissionregistration.MutatingAdmissionPolicy, opts validationOptions) field.ErrorList {
@@ -1403,7 +1372,7 @@ func validateMutatingAdmissionPolicy(p *admissionregistration.MutatingAdmissionP
 func validateMutatingAdmissionPolicySpec(meta metav1.ObjectMeta, spec *admissionregistration.MutatingAdmissionPolicySpec, opts validationOptions, fldPath *field.Path) field.ErrorList {
 	var allErrors field.ErrorList
 
-	compiler := createCompiler(true, true)
+	compiler := createCompiler(true)
 
 	if spec.FailurePolicy == nil {
 		allErrors = append(allErrors, field.Required(fldPath.Child("failurePolicy"), ""))
@@ -1496,7 +1465,7 @@ func validateApplyConfiguration(compiler plugincel.Compiler, applyConfig *admiss
 		accessor := &patch.ApplyConfigurationCondition{
 			Expression: trimmedExpression,
 		}
-		opts := plugincel.OptionalVariableDeclarations{HasParams: paramKind != nil, HasAuthorizer: true, StrictCost: true, HasPatchTypes: true}
+		opts := plugincel.OptionalVariableDeclarations{HasParams: paramKind != nil, HasAuthorizer: true, HasPatchTypes: true}
 		result := compiler.CompileCELExpression(accessor, opts, envType)
 
 		if result.Error != nil {
@@ -1519,7 +1488,7 @@ func validateJSONPatch(compiler plugincel.Compiler, jsonPatch *admissionregistra
 		accessor := &patch.JSONPatchCondition{
 			Expression: trimmedExpression,
 		}
-		opts := plugincel.OptionalVariableDeclarations{HasParams: paramKind != nil, HasAuthorizer: true, StrictCost: true, HasPatchTypes: true}
+		opts := plugincel.OptionalVariableDeclarations{HasParams: paramKind != nil, HasAuthorizer: true, HasPatchTypes: true}
 		result := compiler.CompileCELExpression(accessor, opts, envType)
 
 		if result.Error != nil {

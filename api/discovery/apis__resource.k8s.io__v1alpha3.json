@@ -19,6 +19,17 @@
         "update",
         "watch"
       ]
+    },
+    {
+      "kind": "DeviceTaintRule",
+      "name": "devicetaintrules/status",
+      "namespaced": false,
+      "singularName": "",
+      "verbs": [
+        "get",
+        "patch",
+        "update"
+      ]
     }
   ]
 }

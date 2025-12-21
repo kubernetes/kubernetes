@@ -23,6 +23,9 @@ import (
 	"fmt"
 	"sort"
 	"testing"
+	"time"
+
+	"github.com/onsi/gomega"
 
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -37,9 +40,9 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
-	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/history"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 var parentKind = apps.SchemeGroupVersion.WithKind("StatefulSet")
@@ -166,7 +169,7 @@ func TestStatefulSetControllerBlocksScaling(t *testing.T) {
 	if err != nil {
 		t.Error("Failed to set pod terminated at ordinal 0")
 	}
-	ssc.enqueueStatefulSet(set)
+	ssc.enqueueStatefulSet(logger, set)
 	fakeWorker(ssc)
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
@@ -181,7 +184,7 @@ func TestStatefulSetControllerBlocksScaling(t *testing.T) {
 	}
 	sort.Sort(ascendingOrdinal(pods))
 	spc.DeleteStatefulPod(set, pods[0])
-	ssc.enqueueStatefulSet(set)
+	ssc.enqueueStatefulSet(logger, set)
 	fakeWorker(ssc)
 	pods, err = om.podsLister.Pods(set.Namespace).List(selector)
 	if err != nil {
@@ -193,7 +196,7 @@ func TestStatefulSetControllerBlocksScaling(t *testing.T) {
 }
 
 func TestStatefulSetControllerDeletionTimestamp(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	set := newStatefulSet(3)
 	set.DeletionTimestamp = new(metav1.Time)
 	ssc, _, om, _ := newFakeStatefulSetController(ctx, set)
@@ -201,7 +204,7 @@ func TestStatefulSetControllerDeletionTimestamp(t *testing.T) {
 	om.setsIndexer.Add(set)
 
 	// Force a sync. It should not try to create any Pods.
-	ssc.enqueueStatefulSet(set)
+	ssc.enqueueStatefulSet(logger, set)
 	fakeWorker(ssc)
 
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
@@ -218,7 +221,7 @@ func TestStatefulSetControllerDeletionTimestamp(t *testing.T) {
 }
 
 func TestStatefulSetControllerDeletionTimestampRace(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	set := newStatefulSet(3)
 	// The bare client says it IS deleted.
 	set.DeletionTimestamp = new(metav1.Time)
@@ -245,7 +248,7 @@ func TestStatefulSetControllerDeletionTimestampRace(t *testing.T) {
 	}
 
 	// Force a sync. It should not try to create any Pods.
-	ssc.enqueueStatefulSet(set)
+	ssc.enqueueStatefulSet(logger, set)
 	fakeWorker(ssc)
 
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
@@ -526,7 +529,7 @@ func TestStatefulSetControllerDeletePodTombstone(t *testing.T) {
 }
 
 func TestStatefulSetControllerGetStatefulSetsForPod(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	ssc, _, om, _ := newFakeStatefulSetController(ctx)
 	set1 := newStatefulSet(3)
 	set2 := newStatefulSet(3)
@@ -535,7 +538,7 @@ func TestStatefulSetControllerGetStatefulSetsForPod(t *testing.T) {
 	om.setsIndexer.Add(set1)
 	om.setsIndexer.Add(set2)
 	om.podsIndexer.Add(pod)
-	sets := ssc.getStatefulSetsForPod(pod)
+	sets := ssc.getStatefulSetsForPod(logger, pod)
 	if got, want := len(sets), 2; got != want {
 		t.Errorf("len(sets) = %v, want %v", got, want)
 	}
@@ -671,7 +674,7 @@ func TestOrphanedPodsWithPVCDeletePolicy(t *testing.T) {
 		*set.Spec.Replicas = 2
 		set.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled = scaledownPolicy
 		set.Spec.PersistentVolumeClaimRetentionPolicy.WhenDeleted = deletionPolicy
-		_, ctx := ktesting.NewTestContext(t)
+		logger, ctx := ktesting.NewTestContext(t)
 		ssc, _, om, _ := newFakeStatefulSetController(ctx, set)
 		om.setsIndexer.Add(set)
 
@@ -730,10 +733,10 @@ func TestOrphanedPodsWithPVCDeletePolicy(t *testing.T) {
 		}
 
 		// First sync to manage orphaned pod, then set replicas.
-		ssc.enqueueStatefulSet(set)
+		ssc.enqueueStatefulSet(logger, set)
 		fakeWorker(ssc)
 		*set.Spec.Replicas = 0 // Put an ownerRef for all scale-down deleted PVCs.
-		ssc.enqueueStatefulSet(set)
+		ssc.enqueueStatefulSet(logger, set)
 		fakeWorker(ssc)
 
 		hasNamedOwnerRef := func(claim *v1.PersistentVolumeClaim, name string) bool {
@@ -907,6 +910,66 @@ func TestStaleOwnerRefOnScaleup(t *testing.T) {
 	}
 }
 
+func TestStatefulSetAvailabilityCheck(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+
+	set := setMinReadySeconds(newStatefulSet(4), int32(5)) // 5 seconds
+	set = setupPodManagementPolicy(apps.ParallelPodManagement, set)
+	ssc, _, om, _ := newFakeStatefulSetController(ctx, set)
+	if err := om.setsIndexer.Add(set); err != nil {
+		t.Fatalf("could not add set to the cache: %v", err)
+	}
+	now := time.Now()
+
+	pods := []*v1.Pod{}
+	pods = append(pods, newStatefulSetPod(set, 0))
+	pods = append(pods, newStatefulSetPod(set, 1))
+	pods[1].Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue, LastTransitionTime: metav1.Time{Time: now}}}
+	pods = append(pods, newStatefulSetPod(set, 2))
+	pods[2].Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue, LastTransitionTime: metav1.Time{Time: now.Add(-2 * time.Second)}}}
+	pods = append(pods, newStatefulSetPod(set, 3))
+	pods[3].Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue, LastTransitionTime: metav1.Time{Time: now.Add(-4300 * time.Millisecond)}}}
+
+	for i, pod := range pods {
+		if err := om.podsIndexer.Add(pod); err != nil {
+			t.Fatalf("could not add pod to the cache %d: %v", i, err)
+		}
+		var err error
+		if pods, err = om.setPodRunning(set, i); err != nil {
+			t.Fatalf("%d: %v", i, err)
+		}
+	}
+	err := ssc.syncStatefulSet(ctx, set, pods)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name); err != nil {
+		t.Fatalf("Could not get StatefulSet: %v", err)
+	}
+
+	// one pod is not ready
+	if set.Status.ReadyReplicas != 3 {
+		t.Errorf("Expected updated StatefulSet to contain ready replicas %v, got %v instead",
+			3, set.Status.ReadyReplicas)
+	}
+	if set.Status.AvailableReplicas != 0 {
+		t.Errorf("Expected updated StatefulSet to contain available replicas %v, got %v instead",
+			0, set.Status.AvailableReplicas)
+	}
+
+	if got, want := ssc.queue.Len(), 0; got != want {
+		t.Errorf("queue.Len() = %v, want %v", got, want)
+	}
+
+	// RS should be re-queued after 700ms to recompute .status.availableReplicas (200ms extra for the test).
+	ktesting.Eventually(ctx, func(tCtx ktesting.TContext) int {
+		return ssc.queue.Len()
+	}).WithTimeout(900*time.Millisecond).
+		WithPolling(10*time.Millisecond).
+		Should(gomega.Equal(1), " StatefulSet should be re-queued to recompute .status.availableReplicas")
+}
+
 func newFakeStatefulSetController(ctx context.Context, initialObjects ...runtime.Object) (*StatefulSetController, *StatefulPodControl, *fakeObjectManager, history.Interface) {
 	client := fake.NewSimpleClientset(initialObjects...)
 	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
@@ -950,7 +1013,7 @@ func scaleUpStatefulSetController(logger klog.Logger, set *apps.StatefulSet, ssc
 
 func scaleUpStatefulSetControllerBounded(logger klog.Logger, set *apps.StatefulSet, ssc *StatefulSetController, spc *StatefulPodControl, om *fakeObjectManager, maxIterations int) error {
 	om.setsIndexer.Add(set)
-	ssc.enqueueStatefulSet(set)
+	ssc.enqueueStatefulSet(logger, set)
 	fakeWorker(ssc)
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
@@ -1013,7 +1076,7 @@ func scaleDownStatefulSetController(logger klog.Logger, set *apps.StatefulSet, s
 	prev := *pod
 	fakeResourceVersion(set)
 	om.setsIndexer.Add(set)
-	ssc.enqueueStatefulSet(set)
+	ssc.enqueueStatefulSet(logger, set)
 	fakeWorker(ssc)
 	pods, err = om.addTerminatingPod(set, ord)
 	if err != nil {

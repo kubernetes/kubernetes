@@ -17,8 +17,9 @@ limitations under the License.
 package cm
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog/v2"
 )
 
 type podContainerManagerStub struct {
@@ -30,7 +31,7 @@ func (m *podContainerManagerStub) Exists(_ *v1.Pod) bool {
 	return true
 }
 
-func (m *podContainerManagerStub) EnsureExists(_ *v1.Pod) error {
+func (m *podContainerManagerStub) EnsureExists(_ klog.Logger, _ *v1.Pod) error {
 	return nil
 }
 
@@ -38,11 +39,11 @@ func (m *podContainerManagerStub) GetPodContainerName(_ *v1.Pod) (CgroupName, st
 	return nil, ""
 }
 
-func (m *podContainerManagerStub) Destroy(_ CgroupName) error {
+func (m *podContainerManagerStub) Destroy(_ klog.Logger, _ CgroupName) error {
 	return nil
 }
 
-func (m *podContainerManagerStub) ReduceCPULimits(_ CgroupName) error {
+func (m *podContainerManagerStub) ReduceCPULimits(_ klog.Logger, _ CgroupName) error {
 	return nil
 }
 
@@ -70,6 +71,6 @@ func (m *podContainerManagerStub) SetPodCgroupMemoryLimit(_ *v1.Pod, _ int64) er
 	return nil
 }
 
-func (m *podContainerManagerStub) SetPodCgroupCpuLimit(_ *v1.Pod, _ *int64, _, _ *uint64) error {
+func (m *podContainerManagerStub) SetPodCgroupCPULimit(_ klog.Logger, _ *v1.Pod, _ *int64, _, _ *uint64) error {
 	return nil
 }

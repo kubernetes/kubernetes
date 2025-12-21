@@ -25,12 +25,28 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
 	"k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/storage"
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/watchlist"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/utils/ptr"
 )
+
+func TestDoesClientSupportWatchListSemanticsForKubeClient(t *testing.T) {
+	target1 := &dummyStorage{}
+	if !watchlist.DoesClientNotSupportWatchListSemantics(target1) {
+		t.Fatalf("dummyStorage should NOT support WatchList semantics")
+	}
+
+	server, target2 := newEtcdTestStorage(t, "/pods/")
+	defer server.Terminate(t)
+
+	if watchlist.DoesClientNotSupportWatchListSemantics(target2) {
+		t.Fatalf("etcd should support WatchList semantics")
+	}
+}
 
 func TestCacherListerWatcher(t *testing.T) {
 	prefix := "/pods/"
@@ -201,5 +217,81 @@ func TestCacherListerWatcherWhenListWatchDisabled(t *testing.T) {
 	expectedErrMsg := "sendInitialEvents is forbidden for watch unless the WatchList feature gate is enabled"
 	if err.Error() != expectedErrMsg {
 		t.Fatalf("Expected error %q, but got %q", expectedErrMsg, err.Error())
+	}
+}
+
+func TestListerWatcherListResourceVersionPropagation(t *testing.T) {
+	scenarios := []struct {
+		name                             string
+		options                          metav1.ListOptions
+		watchListEnabled                 bool
+		watchListConsistencyCheckEnabled bool
+		expectedStorageResourceVer       string
+	}{
+		{
+			name: "WatchList FG disabled - RV not propagated",
+			options: metav1.ListOptions{
+				ResourceVersion:      "123",
+				ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+			},
+			watchListEnabled:                 false,
+			watchListConsistencyCheckEnabled: true,
+			expectedStorageResourceVer:       "",
+		},
+		{
+			name: "WatchList consistency check disabled - RV not propagated",
+			options: metav1.ListOptions{
+				ResourceVersion:      "123",
+				ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+			},
+			watchListEnabled:                 true,
+			watchListConsistencyCheckEnabled: false,
+			expectedStorageResourceVer:       "",
+		},
+		{
+			name: "Unsupported RVM - RV not propagated",
+			options: metav1.ListOptions{
+				ResourceVersion:      "123",
+				ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
+			},
+			watchListEnabled:                 true,
+			watchListConsistencyCheckEnabled: true,
+			expectedStorageResourceVer:       "",
+		},
+		{
+			name: "all conditions satisfied - RV propagated",
+			options: metav1.ListOptions{
+				ResourceVersion:      "123",
+				ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+			},
+			watchListEnabled:                 true,
+			watchListConsistencyCheckEnabled: true,
+			expectedStorageResourceVer:       "123",
+		},
+	}
+
+	for _, scenario := range scenarios {
+		t.Run(scenario.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, scenario.watchListEnabled)
+
+			backingStorage := &dummyStorage{}
+			var capturedOpts storage.ListOptions
+			backingStorage.getListFn = func(ctx context.Context, resPrefix string, opts storage.ListOptions, listObj runtime.Object) error {
+				capturedOpts = opts
+				return nil
+			}
+
+			targetInterface := NewListerWatcher(backingStorage, "/pods/", func() runtime.Object { return &example.PodList{} }, nil)
+			target := targetInterface.(*listerWatcher)
+			target.watchListConsistencyCheckEnabled = scenario.watchListConsistencyCheckEnabled
+
+			if _, err := target.List(scenario.options); err != nil {
+				t.Fatalf("List returned error: %v", err)
+			}
+
+			if capturedOpts.ResourceVersion != scenario.expectedStorageResourceVer {
+				t.Fatalf("expected storage ResourceVersion %q, got %q", scenario.expectedStorageResourceVer, capturedOpts.ResourceVersion)
+			}
+		})
 	}
 }

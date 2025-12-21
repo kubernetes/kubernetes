@@ -1,4 +1,12 @@
 aliases:
+  sig-api-machinery-approvers:
+    - deads2k
+    - jpbetz
+    - sttts
+  sig-api-machinery-reviewers:
+    - deads2k
+    - jpbetz
+    - sttts
   # Note: sig-architecture-approvers has approval on root files (including go.mod/go.sum) until https://github.com/kubernetes/test-infra/pull/21398 is resolved.
   # People with approve rights via this alias should defer dependency update PRs to dep-approvers.
   sig-architecture-approvers:
@@ -173,6 +181,7 @@ aliases:
   # - ravisantoshgudimetla
   # - wojtek-t
   sig-scheduling:
+    - ania-borowiec
     - AxeZhan
     - damemi
     - denkensk
@@ -467,11 +476,22 @@ aliases:
     - MadhavJivrajani
     - mfahlandt
     - Priyankasaggu11929
+  # See https://github.com/kubernetes/org/blob/main/OWNERS_ALIASES
+  # for the authoritative list of SIG Docs leads, or look for
+  # https://github.com/kubernetes/website/blob/main/OWNERS_ALIASES
+  # for the list that this was derived from. SIG Docs' leads can
+  # confirm modifications here.
   sig-docs-approvers:
-    - jimangel
-    - kbhawkey
-    - onlydole
-    - sftim
+    - dipesh-rawat
+    - divya-mohan0209
+    - katcosgrove
+    - lmktfy
+    - natalisucks
+    - nate-double-u
+    - reylejano
+    - salaxander
+    - SayakMukhopadhyay
+    - tengqm
   sig-node-api-reviewers:
     - dchen1107
     - derekwaynecarr
@@ -520,10 +540,9 @@ aliases:
     - logicalhan
   feature-approvers:
     - adrianmoisey # Autoscaling
-    - andrewsykim # Cloud Provider
-    - ahg-g # Scheduling
     - ardaguclu # CLI
     - aojea # Network, Testing
+    - cheftako # Cloud Provider
     - danwinship # Network
     - dashpole # Instrumentation
     - dchen1107 # Node
@@ -531,12 +550,15 @@ aliases:
     - derekwaynecarr # Node
     - dgrisonnet # Instrumentation
     - dims # Architecture
+    - dom4ha # Scheduling
     - eddiezane # CLI
+    - elmiko # Cloud Provider
     - enj # Auth
     - gjtempleton # Autoscaling
     - jackfrancis # Autoscaling
     - janetkuo # Apps
     - jayunit100 # Windows
+    - joelspeed # Cloud Provider
     - jpbetz # API Machinery
     - jsafrane # Storage
     - jsturtevant # Windows
@@ -545,6 +567,7 @@ aliases:
     - liggitt # Auth
     - logicalhan # Instrumentation
     - luxas # Cluster Lifecycle
+    - macsko # Scheduling
     - marosset # Windows
     - mikezappa87 # Network
     - mrunalp # Node
@@ -552,6 +575,7 @@ aliases:
     - rexagod # Instrumentation
     - richabanker # Instrumentation
     - saad-ali # Storage
+    - sanposhiho # Scheduling
     - sergeykanzhelev # Node
     - shaneutt # Network
     - soltysh # Apps, CLI

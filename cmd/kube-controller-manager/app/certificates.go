@@ -242,7 +242,7 @@ func newPodCertificateRequestCleanerControllerDescriptor() *ControllerDescriptor
 func newPodCertificateRequestCleanerController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
 	cleaner := cleaner.NewPCRCleanerController(
 		controllerContext.ClientBuilder.ClientOrDie("podcertificaterequestcleaner"),
-		controllerContext.InformerFactory.Certificates().V1alpha1().PodCertificateRequests(),
+		controllerContext.InformerFactory.Certificates().V1beta1().PodCertificateRequests(),
 		clock.RealClock{},
 		15*time.Minute, // We expect all PodCertificateRequest flows to complete faster than this.
 		5*time.Minute,

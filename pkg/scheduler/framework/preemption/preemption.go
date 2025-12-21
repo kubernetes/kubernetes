@@ -138,6 +138,10 @@ type Evaluator struct {
 	// preempting is a set that records the pods that are currently triggering preemption asynchronously,
 	// which is used to prevent the pods from entering the scheduling cycle meanwhile.
 	preempting sets.Set[types.UID]
+	// lastVictimsPendingPreemption is a map that records the victim pods that are currently being preempted for a given preemptor pod,
+	// with a condition that the preemptor is waiting for one last victim to be preempted. This is used together with `preempting`
+	// to prevent the pods from entering the scheduling cycle while waiting for preemption to complete.
+	lastVictimsPendingPreemption map[types.UID]pendingVictim
 
 	// PreemptPod is a function that actually makes API calls to preempt a specific Pod.
 	// This is exposed to be replaced during tests.
@@ -146,18 +150,24 @@ type Evaluator struct {
 	Interface
 }
 
+type pendingVictim struct {
+	namespace string
+	name      string
+}
+
 func NewEvaluator(pluginName string, fh fwk.Handle, i Interface, enableAsyncPreemption bool) *Evaluator {
 	podLister := fh.SharedInformerFactory().Core().V1().Pods().Lister()
 	pdbLister := fh.SharedInformerFactory().Policy().V1().PodDisruptionBudgets().Lister()
 
 	ev := &Evaluator{
-		PluginName:            pluginName,
-		Handler:               fh,
-		PodLister:             podLister,
-		PdbLister:             pdbLister,
-		Interface:             i,
-		enableAsyncPreemption: enableAsyncPreemption,
-		preempting:            sets.New[types.UID](),
+		PluginName:                   pluginName,
+		Handler:                      fh,
+		PodLister:                    podLister,
+		PdbLister:                    pdbLister,
+		Interface:                    i,
+		enableAsyncPreemption:        enableAsyncPreemption,
+		preempting:                   sets.New[types.UID](),
+		lastVictimsPendingPreemption: make(map[types.UID]pendingVictim),
 	}
 
 	// PreemptPod actually makes API calls to preempt a specific Pod.
@@ -216,7 +226,27 @@ func (ev *Evaluator) IsPodRunningPreemption(podUID types.UID) bool {
 	ev.mu.RLock()
 	defer ev.mu.RUnlock()
 
-	return ev.preempting.Has(podUID)
+	if !ev.preempting.Has(podUID) {
+		return false
+	}
+
+	victim, ok := ev.lastVictimsPendingPreemption[podUID]
+	if !ok {
+		// Since pod is in `preempting` but last victim is not registered yet, the async preemption is pending.
+		return true
+	}
+	// Pod is waiting for preemption of one last victim. We can check if the victim has already been deleted.
+	victimPod, err := ev.PodLister.Pods(victim.namespace).Get(victim.name)
+	if err != nil {
+		// Victim already deleted, preemption is done.
+		return false
+	}
+	if victimPod.DeletionTimestamp != nil {
+		// Victim deletion has started, preemption is done.
+		return false
+	}
+	// Preemption of the last pod is still ongoing.
+	return true
 }
 
 // Preempt returns a PostFilterResult carrying suggested nominatedNodeName, along with a Status.
@@ -440,7 +470,13 @@ func (ev *Evaluator) prepareCandidate(ctx context.Context, c Candidate, pod *v1.
 	logger := klog.FromContext(ctx)
 	errCh := parallelize.NewErrorChannel()
 	fh.Parallelizer().Until(ctx, len(c.Victims().Pods), func(index int) {
-		if err := ev.PreemptPod(ctx, c, pod, c.Victims().Pods[index], pluginName); err != nil {
+		victim := c.Victims().Pods[index]
+		if victim.DeletionTimestamp != nil {
+			// Graceful pod deletion has already started. Sending another API call is unnecessary.
+			logger.V(2).Info("Victim Pod is already being deleted, skipping the API call for it", "preemptor", klog.KObj(pod), "node", c.Name(), "victim", klog.KObj(victim))
+			return
+		}
+		if err := ev.PreemptPod(ctx, c, pod, victim, pluginName); err != nil {
 			errCh.SendErrorWithCancel(err, cancel)
 		}
 	}, ev.PluginName)
@@ -453,7 +489,7 @@ func (ev *Evaluator) prepareCandidate(ctx context.Context, c Candidate, pod *v1.
 	// Lower priority pods nominated to run on this node, may no longer fit on
 	// this node. So, we should remove their nomination. Removing their
 	// nomination updates these pods and moves them to the active queue. It
-	// lets scheduler find another place for them.
+	// lets scheduler find another place for them sooner than after waiting for preemption completion.
 	nominatedPods := getLowerPriorityNominatedPods(logger, fh, pod, c.Name())
 	if err := clearNominatedNodeName(ctx, cs, ev.Handler.APICacher(), nominatedPods...); err != nil {
 		utilruntime.HandleErrorWithContext(ctx, err, "Cannot clear 'NominatedNodeName' field")
@@ -501,9 +537,25 @@ func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName 
 	// Intentionally create a new context, not using a ctx from the scheduling cycle, to create ctx,
 	// because this process could continue even after this scheduling cycle finishes.
 	ctx, cancel := context.WithCancel(context.Background())
+	logger := klog.FromContext(ctx)
+
+	victimPods := make([]*v1.Pod, 0, len(c.Victims().Pods))
+	for _, victim := range c.Victims().Pods {
+		if victim.DeletionTimestamp != nil {
+			// Graceful pod deletion has already started. Sending another API call is unnecessary.
+			logger.V(2).Info("Victim Pod is already being deleted, skipping the API call for it", "preemptor", klog.KObj(pod), "node", c.Name(), "victim", klog.KObj(victim))
+			continue
+		}
+		victimPods = append(victimPods, victim)
+	}
+	if len(victimPods) == 0 {
+		cancel()
+		return
+	}
+
 	errCh := parallelize.NewErrorChannel()
 	preemptPod := func(index int) {
-		victim := c.Victims().Pods[index]
+		victim := victimPods[index]
 		if err := ev.PreemptPod(ctx, c, pod, victim, pluginName); err != nil {
 			errCh.SendErrorWithCancel(err, cancel)
 		}
@@ -513,8 +565,8 @@ func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName 
 	ev.preempting.Insert(pod.UID)
 	ev.mu.Unlock()
 
-	logger := klog.FromContext(ctx)
 	go func() {
+		logger := klog.FromContext(ctx)
 		startTime := time.Now()
 		result := metrics.GoroutineResultSuccess
 		defer metrics.PreemptionGoroutinesDuration.WithLabelValues(result).Observe(metrics.SinceInSeconds(startTime))
@@ -527,12 +579,12 @@ func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName 
 			}
 		}()
 		defer cancel()
-		logger.V(2).Info("Start the preemption asynchronously", "preemptor", klog.KObj(pod), "node", c.Name(), "numVictims", len(c.Victims().Pods))
+		logger.V(2).Info("Start the preemption asynchronously", "preemptor", klog.KObj(pod), "node", c.Name(), "numVictims", len(c.Victims().Pods), "numVictimsToDelete", len(victimPods))
 
 		// Lower priority pods nominated to run on this node, may no longer fit on
 		// this node. So, we should remove their nomination. Removing their
 		// nomination updates these pods and moves them to the active queue. It
-		// lets scheduler find another place for them.
+		// lets scheduler find another place for them sooner than after waiting for preemption completion.
 		nominatedPods := getLowerPriorityNominatedPods(logger, ev.Handler, pod, c.Name())
 		if err := clearNominatedNodeName(ctx, ev.Handler.ClientSet(), ev.Handler.APICacher(), nominatedPods...); err != nil {
 			utilruntime.HandleErrorWithContext(ctx, err, "Cannot clear 'NominatedNodeName' field from lower priority pods on the same target node", "node", c.Name())
@@ -540,34 +592,44 @@ func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName 
 			// We do not return as this error is not critical.
 		}
 
-		if len(c.Victims().Pods) == 0 {
+		preemptLastVictim := true
+		if len(victimPods) > 1 {
+			// In order to prevent requesting preemption of the same pod multiple times for the same preemptor,
+			// preemptor is marked as "waiting for preemption of a victim" (by adding it to preempting map).
+			// We can evict all victims in parallel, but the last one.
+			// While deleting the last victim, we want the PreEnqueue check to be able to verify if the eviction
+			// is in fact ongoing, or if it has already completed, but the function has not returned yet.
+			// In the latter case, PreEnqueue (in `IsPodRunningPreemption`) reads the state of the last victim in
+			// `lastVictimsPendingPreemption` and does not block the pod.
+			// This helps us avoid the situation where pod removal might be notified to the scheduling queue before
+			// the preemptor completes the deletion API calls and is removed from the `preempting` map - that way
+			// the preemptor could end up stuck in the unschedulable pool, with all pod removal events being ignored.
+			ev.Handler.Parallelizer().Until(ctx, len(victimPods)-1, preemptPod, ev.PluginName)
+			if err := errCh.ReceiveError(); err != nil {
+				utilruntime.HandleErrorWithContext(ctx, err, "Error occurred during async preemption")
+				result = metrics.GoroutineResultError
+				preemptLastVictim = false
+			}
+		}
+
+		// If any of the previous victims failed to be preempted, then we can skip
+		// the preemption attempt for the last victim Pod to expedite the preemptor's
+		// re-entry to the scheduling cycle.
+		if preemptLastVictim {
+			lastVictim := victimPods[len(victimPods)-1]
 			ev.mu.Lock()
-			delete(ev.preempting, pod.UID)
+			ev.lastVictimsPendingPreemption[pod.UID] = pendingVictim{namespace: lastVictim.Namespace, name: lastVictim.Name}
 			ev.mu.Unlock()
 
-			return
+			if err := ev.PreemptPod(ctx, c, pod, lastVictim, pluginName); err != nil {
+				utilruntime.HandleErrorWithContext(ctx, err, "Error occurred during async preemption of the last victim")
+				result = metrics.GoroutineResultError
+			}
 		}
-
-		// We can evict all victims in parallel, but the last one.
-		// We have to remove the pod from the preempting map before the last one is evicted
-		// because, otherwise, the pod removal might be notified to the scheduling queue before
-		// we remove this pod from the preempting map,
-		// and the pod could end up stucking at the unschedulable pod pool
-		// by all the pod removal events being ignored.
-		ev.Handler.Parallelizer().Until(ctx, len(c.Victims().Pods)-1, preemptPod, ev.PluginName)
-		if err := errCh.ReceiveError(); err != nil {
-			utilruntime.HandleErrorWithContext(ctx, err, "Error occurred during async preemption")
-			result = metrics.GoroutineResultError
-		}
-
 		ev.mu.Lock()
-		delete(ev.preempting, pod.UID)
+		ev.preempting.Delete(pod.UID)
+		delete(ev.lastVictimsPendingPreemption, pod.UID)
 		ev.mu.Unlock()
-
-		if err := ev.PreemptPod(ctx, c, pod, c.Victims().Pods[len(c.Victims().Pods)-1], pluginName); err != nil {
-			utilruntime.HandleErrorWithContext(ctx, err, "Error occurred during async preemption")
-			result = metrics.GoroutineResultError
-		}
 
 		logger.V(2).Info("Async Preemption finished completely", "preemptor", klog.KObj(pod), "node", c.Name(), "result", result)
 	}()

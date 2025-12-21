@@ -41,6 +41,19 @@ type Struct struct {
 	// +k8s:listMapKey=boolKey
 	// +k8s:item(boolKey: true, stringKey: "target", intKey: 42)=+k8s:validateFalse="item OutOfOrder[boolKey=42,stringKey=target,intKey=42]"
 	OutOfOrder []Item `json:"outOfOrder"`
+
+	// +k8s:listType=map
+	// +k8s:listMapKey=stringKey
+	// +k8s:listMapKey=intKey
+	// +k8s:listMapKey=boolKey
+	// +k8s:item(stringKey: "target-ptr", intKey: 42, boolKey: true)=+k8s:validateFalse="item PtrItems[stringKey=target-ptr,intKey=42,boolKey=true]"
+	PtrItems []PtrItem `json:"ptrItems"`
+
+	// +k8s:listType=map
+	// +k8s:listMapKey=stringPtrKey
+	// +k8s:listMapKey=stringKey
+	// +k8s:item(stringPtrKey: "target-ptr", stringKey: "target")=+k8s:validateFalse="item MixedPtrItems"
+	MixedPtrItems []MixedPtrItem `json:"mixedPtrItems"`
 }
 
 type Item struct {
@@ -48,4 +61,17 @@ type Item struct {
 	IntKey    int    `json:"intKey"`
 	BoolKey   bool   `json:"boolKey"`
 	Data      string `json:"data"`
+}
+
+type PtrItem struct {
+	StringKey *string `json:"stringKey"`
+	IntKey    int     `json:"intKey"`
+	BoolKey   bool    `json:"boolKey"`
+	Data      string  `json:"data"`
+}
+
+type MixedPtrItem struct {
+	StringPtrKey *string `json:"stringPtrKey"`
+	StringKey    string  `json:"stringKey"`
+	Data         string  `json:"data"`
 }

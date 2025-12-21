@@ -63,6 +63,49 @@ func getTestRunningStatusWithStarted(started bool) v1.PodStatus {
 	return podStatus
 }
 
+func getTestRunningStatusWithFailedContainer() v1.PodStatus {
+	return v1.PodStatus{
+		Phase: v1.PodRunning,
+		ContainerStatuses: []v1.ContainerStatus{{
+			Name:        testContainerName,
+			ContainerID: testContainerID.String(),
+			State: v1.ContainerState{
+				Terminated: &v1.ContainerStateTerminated{
+					ExitCode: 1,
+				},
+			},
+		}},
+	}
+}
+
+func getTestRunningStatusWithSucceededContainer() v1.PodStatus {
+	return v1.PodStatus{
+		Phase: v1.PodRunning,
+		ContainerStatuses: []v1.ContainerStatus{{
+			Name:        testContainerName,
+			ContainerID: testContainerID.String(),
+			State: v1.ContainerState{
+				Terminated: &v1.ContainerStateTerminated{
+					ExitCode: 0,
+				},
+			},
+		}},
+	}
+}
+
+func getTestPendingStatus() v1.PodStatus {
+	return v1.PodStatus{
+		Phase: v1.PodPending,
+		ContainerStatuses: []v1.ContainerStatus{{
+			Name:        testContainerName,
+			ContainerID: testContainerID.String(),
+			State: v1.ContainerState{
+				Waiting: &v1.ContainerStateWaiting{},
+			},
+		}},
+	}
+}
+
 func getTestPod() *v1.Pod {
 	container := v1.Container{
 		Name: testContainerName,

@@ -25,6 +25,7 @@ import (
 	cronjobconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/cronjob/config/v1alpha1"
 	daemonconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/daemon/config/v1alpha1"
 	deploymentconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/deployment/config/v1alpha1"
+	devicetaintevictionconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/devicetainteviction/config/v1alpha1"
 	endpointconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/endpoint/config/v1alpha1"
 	endpointsliceconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/endpointslice/config/v1alpha1"
 	endpointslicemirroringconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/endpointslicemirroring/config/v1alpha1"
@@ -71,6 +72,8 @@ func SetDefaults_KubeControllerManagerConfiguration(obj *kubectrlmgrconfigv1alph
 	daemonconfigv1alpha1.RecommendedDefaultDaemonSetControllerConfiguration(&obj.DaemonSetController)
 	// Use the default RecommendedDefaultDeploymentControllerConfiguration options
 	deploymentconfigv1alpha1.RecommendedDefaultDeploymentControllerConfiguration(&obj.DeploymentController)
+	// Use the default RecommendedDefaultDeviceTaintEvictionControllerConfiguration options
+	devicetaintevictionconfigv1alpha1.RecommendedDefaultDeviceTaintEvictionControllerConfiguration(&obj.DeviceTaintEvictionController)
 	// Use the default RecommendedDefaultStatefulSetControllerConfiguration options
 	statefulsetconfigv1alpha1.RecommendedDefaultStatefulSetControllerConfiguration(&obj.StatefulSetController)
 	// Use the default RecommendedDefaultEndpointControllerConfiguration options

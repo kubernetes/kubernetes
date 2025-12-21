@@ -249,7 +249,7 @@ var _ LookupPatchMeta = PatchMetaFromOpenAPI{}
 
 func (s PatchMetaFromOpenAPI) LookupPatchMetadataForStruct(key string) (LookupPatchMeta, PatchMeta, error) {
 	if s.Schema == nil {
-		return nil, PatchMeta{}, nil
+		return &PatchMetaFromOpenAPI{}, PatchMeta{}, nil
 	}
 	kindItem := NewKindItem(key, s.Schema.GetPath())
 	s.Schema.Accept(kindItem)

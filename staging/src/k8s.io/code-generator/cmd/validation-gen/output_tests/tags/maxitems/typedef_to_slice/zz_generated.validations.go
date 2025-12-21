@@ -52,8 +52,12 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 // Validate_Max0Type validates an instance of Max0Type according
 // to declarative validation rules in the API schema.
 func Validate_Max0Type(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj Max0Type) (errs field.ErrorList) {
+	earlyReturn := false
 	if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 0); len(e) != 0 {
 		errs = append(errs, e...)
+		earlyReturn = true
+	}
+	if earlyReturn {
 		return // do not proceed
 	}
 
@@ -63,8 +67,12 @@ func Validate_Max0Type(ctx context.Context, op operation.Operation, fldPath *fie
 // Validate_Max0TypedefType validates an instance of Max0TypedefType according
 // to declarative validation rules in the API schema.
 func Validate_Max0TypedefType(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj Max0TypedefType) (errs field.ErrorList) {
+	earlyReturn := false
 	if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 0); len(e) != 0 {
 		errs = append(errs, e...)
+		earlyReturn = true
+	}
+	if earlyReturn {
 		return // do not proceed
 	}
 
@@ -74,8 +82,12 @@ func Validate_Max0TypedefType(ctx context.Context, op operation.Operation, fldPa
 // Validate_Max10Type validates an instance of Max10Type according
 // to declarative validation rules in the API schema.
 func Validate_Max10Type(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj Max10Type) (errs field.ErrorList) {
+	earlyReturn := false
 	if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 10); len(e) != 0 {
 		errs = append(errs, e...)
+		earlyReturn = true
+	}
+	if earlyReturn {
 		return // do not proceed
 	}
 
@@ -85,8 +97,12 @@ func Validate_Max10Type(ctx context.Context, op operation.Operation, fldPath *fi
 // Validate_Max10TypedefType validates an instance of Max10TypedefType according
 // to declarative validation rules in the API schema.
 func Validate_Max10TypedefType(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj Max10TypedefType) (errs field.ErrorList) {
+	earlyReturn := false
 	if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 10); len(e) != 0 {
 		errs = append(errs, e...)
+		earlyReturn = true
+	}
+	if earlyReturn {
 		return // do not proceed
 	}
 
@@ -101,51 +117,51 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 
 	// field Struct.Max0Field
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj Max0Type) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj Max0Type, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_Max0Type(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("max0Field"), obj.Max0Field, safe.Field(oldObj, func(oldObj *Struct) Max0Type { return oldObj.Max0Field }))...)
+		}(fldPath.Child("max0Field"), obj.Max0Field, safe.Field(oldObj, func(oldObj *Struct) Max0Type { return oldObj.Max0Field }), oldObj != nil)...)
 
 	// field Struct.Max10Field
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj Max10Type) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj Max10Type, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_Max10Type(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("max10Field"), obj.Max10Field, safe.Field(oldObj, func(oldObj *Struct) Max10Type { return oldObj.Max10Field }))...)
+		}(fldPath.Child("max10Field"), obj.Max10Field, safe.Field(oldObj, func(oldObj *Struct) Max10Type { return oldObj.Max10Field }), oldObj != nil)...)
 
 	// field Struct.Max0TypedefField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj Max0TypedefType) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj Max0TypedefType, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_Max0TypedefType(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("max0TypedefField"), obj.Max0TypedefField, safe.Field(oldObj, func(oldObj *Struct) Max0TypedefType { return oldObj.Max0TypedefField }))...)
+		}(fldPath.Child("max0TypedefField"), obj.Max0TypedefField, safe.Field(oldObj, func(oldObj *Struct) Max0TypedefType { return oldObj.Max0TypedefField }), oldObj != nil)...)
 
 	// field Struct.Max10TypedefField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj Max10TypedefType) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj Max10TypedefType, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_Max10TypedefType(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("max10TypedefField"), obj.Max10TypedefField, safe.Field(oldObj, func(oldObj *Struct) Max10TypedefType { return oldObj.Max10TypedefField }))...)
+		}(fldPath.Child("max10TypedefField"), obj.Max10TypedefField, safe.Field(oldObj, func(oldObj *Struct) Max10TypedefType { return oldObj.Max10TypedefField }), oldObj != nil)...)
 
 	return errs
 }

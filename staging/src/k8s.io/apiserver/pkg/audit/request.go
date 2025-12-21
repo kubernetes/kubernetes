@@ -82,12 +82,12 @@ func LogRequestMetadata(ctx context.Context, req *http.Request, requestReceivedT
 }
 
 // LogImpersonatedUser fills in the impersonated user attributes into an audit event.
-func LogImpersonatedUser(ctx context.Context, user user.Info) {
+func LogImpersonatedUser(ctx context.Context, user user.Info, constraint string) {
 	ac := AuditContextFrom(ctx)
 	if !ac.Enabled() {
 		return
 	}
-	ac.LogImpersonatedUser(user)
+	ac.LogImpersonatedUser(user, constraint)
 }
 
 // LogRequestObject fills in the request object into an audit event. The passed runtime.Object

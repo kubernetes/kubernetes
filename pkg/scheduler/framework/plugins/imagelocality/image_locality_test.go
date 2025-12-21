@@ -396,6 +396,82 @@ func TestImageLocalityPriority(t *testing.T) {
 	}
 }
 
+func TestImageSignature(t *testing.T) {
+	tests := []struct {
+		name              string
+		pod               *v1.Pod
+		expectedSignature []fwk.SignFragment
+	}{
+		{
+			name: "no images",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{},
+				},
+			},
+			expectedSignature: []fwk.SignFragment{
+				{
+					Key:   fwk.ImageNamesSignerName,
+					Value: []string{},
+				},
+			},
+		},
+		{
+			name: "one image",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{Name: "c", Image: "myimage"}},
+				},
+			},
+			expectedSignature: []fwk.SignFragment{
+				{
+					Key:   fwk.ImageNamesSignerName,
+					Value: []string{"myimage:latest"},
+				},
+			},
+		},
+		{
+			name: "two images unsorted",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "c", Image: "zmyimage"},
+						{Name: "c2", Image: "myimage"},
+					},
+				},
+			},
+			expectedSignature: []fwk.SignFragment{
+				{
+					Key:   fwk.ImageNamesSignerName,
+					Value: []string{"myimage:latest", "zmyimage:latest"},
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			snapshot := cache.NewSnapshot(nil, nil)
+			fh, _ := runtime.NewFramework(ctx, nil, nil, runtime.WithSnapshotSharedLister(snapshot))
+
+			p, err := New(ctx, nil, fh)
+			if err != nil {
+				t.Fatalf("creating plugin: %v", err)
+			}
+			signature, _ := p.(*ImageLocality).SignPod(ctx, test.pod)
+
+			if diff := cmp.Diff(test.expectedSignature, signature); diff != "" {
+				t.Fatalf("Diff %s", diff)
+			}
+		})
+	}
+
+}
+
 func TestNormalizedImageName(t *testing.T) {
 	for _, testCase := range []struct {
 		Name   string

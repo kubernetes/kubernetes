@@ -56,7 +56,7 @@ func NewFlowSchemaInformer(client kubernetes.Interface, resyncPeriod time.Durati
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredFlowSchemaInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
+		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
@@ -81,7 +81,7 @@ func NewFilteredFlowSchemaInformer(client kubernetes.Interface, resyncPeriod tim
 				}
 				return client.FlowcontrolV1beta3().FlowSchemas().Watch(ctx, options)
 			},
-		},
+		}, client),
 		&apiflowcontrolv1beta3.FlowSchema{},
 		resyncPeriod,
 		indexers,

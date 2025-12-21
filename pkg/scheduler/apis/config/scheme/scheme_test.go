@@ -57,6 +57,7 @@ profiles:
   - name: DynamicResources
     args:
       filterTimeout: 10s
+      bindingTimeout: 30s
   - name: InterPodAffinity
     args:
       hardPodAffinityWeight: 5
@@ -107,7 +108,10 @@ profiles:
 						},
 						{
 							Name: "DynamicResources",
-							Args: &config.DynamicResourcesArgs{FilterTimeout: &metav1.Duration{Duration: 10 * time.Second}},
+							Args: &config.DynamicResourcesArgs{
+								FilterTimeout:  &metav1.Duration{Duration: 10 * time.Second},
+								BindingTimeout: &metav1.Duration{Duration: 30 * time.Second},
+							},
 						},
 						{
 							Name: "InterPodAffinity",

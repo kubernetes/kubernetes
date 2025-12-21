@@ -25,7 +25,7 @@ import (
 func init() {
 	fixtureDataV1Dot34 := fixtureGenerator{
 		expectErrorSubstring: "probe or lifecycle host",
-		generatePass: func(p *corev1.Pod) []*corev1.Pod {
+		generatePass: func(p *corev1.Pod, _ api.Level) []*corev1.Pod {
 			return []*corev1.Pod{
 				p, // A pod with no probes should pass.
 				tweak(p, func(p *corev1.Pod) {

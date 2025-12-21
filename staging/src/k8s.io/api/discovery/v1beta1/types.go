@@ -164,8 +164,6 @@ type EndpointHints struct {
 
 	// forNodes indicates the node(s) this endpoint should be consumed by when
 	// using topology aware routing. May contain a maximum of 8 entries.
-	// This is an Alpha feature and is only used when the PreferSameTrafficDistribution
-	// feature gate is enabled.
 	// +listType=atomic
 	ForNodes []ForNode `json:"forNodes,omitempty" protobuf:"bytes,2,name=forNodes"`
 }

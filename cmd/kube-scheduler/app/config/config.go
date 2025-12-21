@@ -20,6 +20,7 @@ import (
 	"time"
 
 	apiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/flagz"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
@@ -27,7 +28,6 @@ import (
 	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/tools/leaderelection"
 	basecompatibility "k8s.io/component-base/compatibility"
-	"k8s.io/component-base/zpages/flagz"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
 
@@ -38,9 +38,6 @@ type Config struct {
 
 	// ComponentConfig is the scheduler server's configuration object.
 	ComponentConfig kubeschedulerconfig.KubeSchedulerConfiguration
-
-	// LoopbackClientConfig is a config for a privileged loopback connection
-	LoopbackClientConfig *restclient.Config
 
 	Authentication apiserver.AuthenticationInfo
 	Authorization  apiserver.AuthorizationInfo
@@ -80,8 +77,6 @@ type CompletedConfig struct {
 // Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
 func (c *Config) Complete() CompletedConfig {
 	cc := completedConfig{c}
-
-	apiserver.AuthorizeClientBearerToken(c.LoopbackClientConfig, &c.Authentication, &c.Authorization)
 
 	return CompletedConfig{&cc}
 }

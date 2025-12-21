@@ -20,14 +20,12 @@ import (
 	"strconv"
 
 	libcontainercgroups "github.com/opencontainers/cgroups"
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	kubecm "k8s.io/kubernetes/pkg/kubelet/cm"
 )
 
-func getExpectedCPUShares(rr *v1.ResourceRequirements, podOnCgroupv2 bool) []string {
+func getExpectedCPUShares(cpuRequest, cpuLimit *resource.Quantity, podOnCgroupv2 bool) []string {
 	// This function is moved out from cgroups.go because opencontainers/cgroups can only be compiled in linux platforms.
-	cpuRequest := rr.Requests.Cpu()
-	cpuLimit := rr.Limits.Cpu()
 	var shares int64
 	if cpuRequest.IsZero() && !cpuLimit.IsZero() {
 		shares = int64(kubecm.MilliCPUToShares(cpuLimit.MilliValue()))

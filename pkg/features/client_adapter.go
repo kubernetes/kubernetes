@@ -39,7 +39,7 @@ func (a *clientAdapter) Enabled(name clientfeatures.Feature) bool {
 	return a.mfg.Enabled(featuregate.Feature(name))
 }
 
-var _ clientfeatures.Registry = &clientAdapter{}
+var _ clientfeatures.VersionedRegistry = &clientAdapter{}
 
 func (a *clientAdapter) Add(in map[clientfeatures.Feature]clientfeatures.FeatureSpec) error {
 	out := map[featuregate.Feature]featuregate.FeatureSpec{}
@@ -65,7 +65,45 @@ func (a *clientAdapter) Add(in map[clientfeatures.Feature]clientfeatures.Feature
 		}
 		out[featuregate.Feature(name)] = converted
 	}
-	return a.mfg.Add(out) //nolint:forbidigo // No need to support versioned feature gates in client adapter
+	return a.mfg.Add(out) //nolint:forbidigo
+}
+
+// AddVersioned adds the provided versioned feature gates.
+func (a *clientAdapter) AddVersioned(in map[clientfeatures.Feature]clientfeatures.VersionedSpecs) error {
+	mvfg, ok := a.mfg.(featuregate.MutableVersionedFeatureGate)
+	if !ok {
+		return fmt.Errorf("feature gate does not support versioning")
+	}
+
+	out := make(map[featuregate.Feature]featuregate.VersionedSpecs)
+	for name, specs := range in {
+		convertedSpecs := make(featuregate.VersionedSpecs, len(specs))
+		for i, spec := range specs {
+			converted := featuregate.FeatureSpec{
+				Default:       spec.Default,
+				LockToDefault: spec.LockToDefault,
+				Version:       spec.Version,
+			}
+			switch spec.PreRelease {
+			case clientfeatures.Alpha:
+				converted.PreRelease = featuregate.Alpha
+			case clientfeatures.Beta:
+				converted.PreRelease = featuregate.Beta
+			case clientfeatures.GA:
+				converted.PreRelease = featuregate.GA
+			case clientfeatures.Deprecated:
+				converted.PreRelease = featuregate.Deprecated
+			default:
+				// The default case implies programmer error.  The same set of prerelease
+				// constants must exist in both component-base and client-go, and each one
+				// must have a case here.
+				panic(fmt.Sprintf("unrecognized prerelease %q of feature %q", spec.PreRelease, name))
+			}
+			convertedSpecs[i] = converted
+		}
+		out[featuregate.Feature(name)] = convertedSpecs
+	}
+	return mvfg.AddVersioned(out)
 }
 
 // Set implements the unexported interface that client-go feature gate testing expects for

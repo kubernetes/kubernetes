@@ -13,7 +13,7 @@
             "type": "string"
           },
           "operator": {
-            "description": "Operator represents a key's relationship to the value. Valid operators are Exists and Equal. Defaults to Equal. Exists is equivalent to wildcard for value, so that a pod can tolerate all taints of a particular category.",
+            "description": "Operator represents a key's relationship to the value. Valid operators are Exists, Equal, Lt, and Gt. Defaults to Equal. Exists is equivalent to wildcard for value, so that a pod can tolerate all taints of a particular category. Lt and Gt perform numeric comparisons (requires feature gate TaintTolerationComparisonOperators).",
             "type": "string"
           },
           "tolerationSeconds": {
@@ -442,16 +442,6 @@
             "version": "v2"
           },
           {
-            "group": "autoscaling",
-            "kind": "DeleteOptions",
-            "version": "v2beta1"
-          },
-          {
-            "group": "autoscaling",
-            "kind": "DeleteOptions",
-            "version": "v2beta2"
-          },
-          {
             "group": "batch",
             "kind": "DeleteOptions",
             "version": "v1"
@@ -649,7 +639,7 @@
           {
             "group": "storagemigration.k8s.io",
             "kind": "DeleteOptions",
-            "version": "v1alpha1"
+            "version": "v1beta1"
           }
         ]
       },
@@ -1135,16 +1125,6 @@
             "version": "v2"
           },
           {
-            "group": "autoscaling",
-            "kind": "WatchEvent",
-            "version": "v2beta1"
-          },
-          {
-            "group": "autoscaling",
-            "kind": "WatchEvent",
-            "version": "v2beta2"
-          },
-          {
             "group": "batch",
             "kind": "WatchEvent",
             "version": "v1"
@@ -1342,7 +1322,7 @@
           {
             "group": "storagemigration.k8s.io",
             "kind": "WatchEvent",
-            "version": "v1alpha1"
+            "version": "v1beta1"
           }
         ]
       },

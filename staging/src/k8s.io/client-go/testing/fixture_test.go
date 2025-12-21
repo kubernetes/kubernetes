@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/managedfields"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/util/watchlist"
 	"k8s.io/utils/ptr"
 )
 
@@ -739,4 +740,15 @@ func TestManagedFielsdObjectTrackerWithUnstructured(t *testing.T) {
 
 	unstructured.RemoveNestedField(cmActual.Object, "metadata", "managedFields")
 	require.Empty(t, cmp.Diff(cmOriginal, cmActual))
+}
+
+func TestDoesClientSupportWatchListSemantics(t *testing.T) {
+	scheme := runtime.NewScheme()
+	codecs := serializer.NewCodecFactory(scheme)
+
+	target := NewObjectTracker(scheme, codecs.UniversalDecoder())
+
+	if !watchlist.DoesClientNotSupportWatchListSemantics(target) {
+		t.Fatalf("ObjectTracker should NOT support WatchList semantics")
+	}
 }

@@ -67,7 +67,7 @@ func (l *varLexer) emit(t varTokenType) {
 	l.start = l.pos
 }
 
-func (l *varLexer) errorf(format string, v ...interface{}) lexState {
+func (l *varLexer) errorf(format string, v ...any) lexState {
 	l.tokens = append(l.tokens, varToken{
 		tokError,
 		fmt.Sprintf(format, v...),

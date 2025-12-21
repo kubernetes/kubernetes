@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2024 The Kubernetes Authors.
@@ -34,7 +33,7 @@ const userNsUnitLength = 65536
 func validateKubeletOSConfiguration(kc *kubeletconfig.KubeletConfiguration) error {
 	isCgroup1 := !libcontainercgroups.IsCgroup2UnifiedMode()
 	if kc.FailCgroupV1 && isCgroup1 {
-		return fmt.Errorf("kubelet is configured to not run on a host using cgroup v1. cgroup v1 support is in maintenance mode")
+		return fmt.Errorf("kubelet is configured to not run on a host using cgroup v1. cgroup v1 support is unsupported and will be removed in a future release")
 	}
 
 	if isCgroup1 && kc.SingleProcessOOMKill != nil && !ptr.Deref(kc.SingleProcessOOMKill, true) {

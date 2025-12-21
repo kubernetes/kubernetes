@@ -115,7 +115,10 @@ func Test_dropDisabledFieldsOnCreate(t *testing.T) {
 
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PreferSameTrafficDistribution, testcase.preferSameEnabled)
+			if !testcase.preferSameEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PreferSameTrafficDistribution, false)
+			}
 
 			dropDisabledFieldsOnCreate(testcase.eps)
 			if !apiequality.Semantic.DeepEqual(testcase.eps, testcase.expectedEPS) {
@@ -413,9 +416,9 @@ func Test_dropDisabledFieldsOnUpdate(t *testing.T) {
 		t.Run(testcase.name, func(t *testing.T) {
 			if !testcase.hintsGateEnabled {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
-			}
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TopologyAwareHints, testcase.hintsGateEnabled)
-			if testcase.hintsGateEnabled {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TopologyAwareHints, testcase.hintsGateEnabled)
+			} else if !testcase.preferSameEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PreferSameTrafficDistribution, testcase.preferSameEnabled)
 			}
 

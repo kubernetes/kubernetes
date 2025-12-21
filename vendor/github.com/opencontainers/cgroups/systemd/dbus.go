@@ -4,10 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand/v2"
 	"sync"
+	"time"
 
 	systemdDbus "github.com/coreos/go-systemd/v22/dbus"
 	dbus "github.com/godbus/dbus/v5"
+	"golang.org/x/sys/unix"
 )
 
 var (
@@ -64,10 +67,27 @@ func (d *dbusConnManager) getConnection() (*systemdDbus.Conn, error) {
 }
 
 func (d *dbusConnManager) newConnection() (*systemdDbus.Conn, error) {
-	if dbusRootless {
-		return newUserSystemdDbus()
+	newDbusConn := func() (*systemdDbus.Conn, error) {
+		if dbusRootless {
+			return newUserSystemdDbus()
+		}
+		return systemdDbus.NewWithContext(context.TODO())
 	}
-	return systemdDbus.NewWithContext(context.TODO())
+
+	var err error
+	for retry := range 7 {
+		var conn *systemdDbus.Conn
+		conn, err = newDbusConn()
+		if !errors.Is(err, unix.EAGAIN) {
+			return conn, err
+		}
+		// Exponential backoff (100ms * 2^attempt + ~12.5% jitter).
+		// At most we would expect 15 seconds of delay with 7 attempts.
+		delay := 100 * time.Millisecond << retry
+		delay += time.Duration(rand.Int64N(1 + (delay.Milliseconds() >> 3)))
+		time.Sleep(delay)
+	}
+	return nil, fmt.Errorf("dbus connection failed after several retries: %w", err)
 }
 
 // resetConnection resets the connection to its initial state

@@ -31,7 +31,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -49,12 +48,7 @@ func TestWorkloadDefaults(t *testing.T) {
 	t.Run("disabled_features", func(t *testing.T) { testWorkloadDefaults(t, false) })
 }
 func testWorkloadDefaults(t *testing.T, featuresEnabled bool) {
-	allFeatures := utilfeature.DefaultFeatureGate.DeepCopy().GetAll()
-	for feature, featureSpec := range allFeatures {
-		if !featureSpec.LockToDefault {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, featuresEnabled)
-		}
-	}
+	setAllFeatures(t, featuresEnabled)
 	// New defaults under PodTemplateSpec are only acceptable if they would not be applied when reading data from a previous release.
 	// Forbidden: adding a new field `MyField *bool` and defaulting it to a non-nil value
 	// Forbidden: defaulting an existing field `MyField *bool` when it was previously not defaulted
@@ -240,12 +234,7 @@ func TestPodDefaults(t *testing.T) {
 	t.Run("disabled_features", func(t *testing.T) { testPodDefaults(t, false) })
 }
 func testPodDefaults(t *testing.T, featuresEnabled bool) {
-	features := utilfeature.DefaultFeatureGate.DeepCopy().GetAll()
-	for feature, featureSpec := range features {
-		if !featureSpec.LockToDefault {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, featuresEnabled)
-		}
-	}
+	setAllFeatures(t, featuresEnabled)
 	pod := &v1.Pod{}
 	// New defaults under PodSpec are only acceptable if they would not be applied when reading data from a previous release.
 	// Forbidden: adding a new field `MyField *bool` and defaulting it to a non-nil value
@@ -2447,26 +2436,11 @@ func TestSetDefaultServiceLoadbalancerIPMode(t *testing.T) {
 	modeProxy := v1.LoadBalancerIPModeProxy
 	testCases := []struct {
 		name           string
-		ipModeEnabled  bool
 		svc            *v1.Service
 		expectedIPMode []*v1.LoadBalancerIPMode
 	}{
 		{
-			name:          "Set IP but not set IPMode with LoadbalancerIPMode disabled",
-			ipModeEnabled: false,
-			svc: &v1.Service{
-				Spec: v1.ServiceSpec{Type: v1.ServiceTypeLoadBalancer},
-				Status: v1.ServiceStatus{
-					LoadBalancer: v1.LoadBalancerStatus{
-						Ingress: []v1.LoadBalancerIngress{{
-							IP: "1.2.3.4",
-						}},
-					},
-				}},
-			expectedIPMode: []*v1.LoadBalancerIPMode{nil},
-		}, {
-			name:          "Set IP but bot set IPMode with LoadbalancerIPMode enabled",
-			ipModeEnabled: true,
+			name: "Set IP but not set IPMode",
 			svc: &v1.Service{
 				Spec: v1.ServiceSpec{Type: v1.ServiceTypeLoadBalancer},
 				Status: v1.ServiceStatus{
@@ -2478,8 +2452,7 @@ func TestSetDefaultServiceLoadbalancerIPMode(t *testing.T) {
 				}},
 			expectedIPMode: []*v1.LoadBalancerIPMode{&modeVIP},
 		}, {
-			name:          "Both IP and IPMode are set with LoadbalancerIPMode enabled",
-			ipModeEnabled: true,
+			name: "Both IP and IPMode are set",
 			svc: &v1.Service{
 				Spec: v1.ServiceSpec{Type: v1.ServiceTypeLoadBalancer},
 				Status: v1.ServiceStatus{
@@ -2496,10 +2469,6 @@ func TestSetDefaultServiceLoadbalancerIPMode(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			if !tc.ipModeEnabled {
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.31"))
-			}
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, tc.ipModeEnabled)
 			obj := roundTrip(t, runtime.Object(tc.svc))
 			svc := obj.(*v1.Service)
 			for i, s := range svc.Status.LoadBalancer.Ingress {
@@ -3394,4 +3363,14 @@ func TestSetDefaults_PodLogOptions(t *testing.T) {
 			}
 		})
 	}
+}
+
+func setAllFeatures(t *testing.T, featuresEnabled bool) {
+	features := featuregatetesting.FeatureOverrides{}
+	for feature, featureSpec := range utilfeature.DefaultFeatureGate.DeepCopy().GetAll() {
+		if !featureSpec.LockToDefault {
+			features[feature] = featuresEnabled
+		}
+	}
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, features)
 }

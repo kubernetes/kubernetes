@@ -247,30 +247,48 @@ type ListSelectorTerm struct {
 	Value any
 }
 
+// StabilityLevel indicates the stability of a validation tag.
+type StabilityLevel string
+
+const (
+	// Alpha indicates that a tag's semantics may change in the future.
+	Alpha StabilityLevel = "Alpha"
+	// Beta indicates that a tag's semantics will remain unchanged for the
+	// foreseeable future. This is used for soaking tags before qualifying to stable.
+	Beta StabilityLevel = "Beta"
+	// Stable indicates that a tag's semantics will remain unchanged for the
+	// foreseeable future.
+	Stable StabilityLevel = "Stable"
+)
+
 // TagDoc describes a comment-tag and its usage.
 type TagDoc struct {
 	// Tag is the tag name, without the leading '+'.
 	Tag string
+	// StabilityLevel is the stability level of the tag.
+	StabilityLevel StabilityLevel
 	// Args lists any arguments this tag might take.
-	Args []TagArgDoc
+	Args []TagArgDoc `json:",omitempty"`
 	// Usage is how the tag is used, including arguments.
 	Usage string
 	// Description is a short description of this tag's purpose.
 	Description string
 	// Docs is a human-oriented string explaining this tag.
 	Docs string
+	// Warning is an optional warning about this tag.
+	Warning string `json:",omitempty"`
 	// Scopes lists the place or places this tag may be used.
 	Scopes []Scope
 	// Payloads lists zero or more varieties of value for this tag. If this tag
 	// never has a payload, this list should be empty, but if the payload is
 	// optional, this list should include an entry for "<none>".
-	Payloads []TagPayloadDoc
+	Payloads []TagPayloadDoc `json:",omitempty"`
 	// PayloadsType is the type of the payloads.
-	PayloadsType codetags.ValueType
+	PayloadsType codetags.ValueType `json:",omitempty"`
 	// PayloadsRequired is true if a payload is required.
-	PayloadsRequired bool
+	PayloadsRequired bool `json:",omitempty"`
 	// AcceptsUnknownArgs is true if unknown args are accepted
-	AcceptsUnknownArgs bool
+	AcceptsUnknownArgs bool `json:",omitempty"`
 }
 
 func (td TagDoc) Arg(name string) (TagArgDoc, bool) {
@@ -399,7 +417,9 @@ const (
 	DefaultFlags FunctionFlags = 0
 
 	// ShortCircuit indicates that further validations should be skipped if
-	// this validator fails. Most validators are not fatal.
+	// this validator fails. If there are multiple validators with this flag
+	// set, they will ALL run, and if any of them fail, any non-short-circuit
+	// validators will be skipped.  Most validators are not fatal.
 	ShortCircuit FunctionFlags = 1 << iota
 
 	// NonError indicates that a failure of this validator should not be

@@ -1193,7 +1193,7 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 				}
 				sw.Do("// field $.inType|raw$.$.fieldName$\n", targs)
 				sw.Do("errs = append(errs,\n", targs)
-				sw.Do("  func(fldPath *$.field.Path|raw$, obj, oldObj $.fieldTypePfx$$.fieldType|raw$) (errs $.field.ErrorList|raw$) {\n", targs)
+				sw.Do("  func(fldPath *$.field.Path|raw$, obj, oldObj $.fieldTypePfx$$.fieldType|raw$, oldValueCorrelated bool) (errs $.field.ErrorList|raw$) {\n", targs)
 				if err := sw.Merge(buf, bufsw); err != nil {
 					panic(fmt.Sprintf("failed to merge buffer: %v", err))
 				}
@@ -1207,10 +1207,28 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 					sw.Do("$.safe.Value|raw$(fldPath, func() *$.field.Path|raw$ { return fldPath.Child(\"$.fieldType|raw$\") }), ", targs)
 				}
 				sw.Do("    $.fieldExprPfx$obj.$.fieldName$, ", targs)
+				// safe.Field returns a nil if the old object does not have a correlatable
+				// value, such as a map.
+				// This is ambiguous with the case where the field exists and is nil.
+				// This ambiguity is a problem for ratcheting, which needs to distinguish
+				// these cases. For example, if a required field is removed from a map,
+				// safe.Field will return nil for the old value, and the new value is also
+				// nil (because it doesn't exist). Ratcheting would normally allow this,
+				// but it's a validation failure because a required field is missing.
+				//
+				// To solve this, we pass an extra boolean parameter to the validation
+				// function, indicating whether the old value was correlated. If the old
+				// value was uncorrelated, it means the field was not present in the old
+				// object, and we should not apply ratcheting logic. `oldObj != nil`
+				// provides this bit of information.
+				//
+				// This bit is not currently propagated down to deeper levels of
+				// validation, but since the code generator only ever looks one level
+				// down, this is sufficient for now.
 				sw.Do("    $.safe.Field|raw$(oldObj, ", targs)
 				sw.Do("        func(oldObj *$.inType|raw$) $.fieldTypePfx$$.fieldType|raw$ {", targs)
 				sw.Do("            return $.fieldExprPfx$oldObj.$.fieldName$", targs)
-				sw.Do("        }),", targs)
+				sw.Do("        }), oldObj != nil", targs)
 				sw.Do("    )...)\n", targs)
 				sw.Do("\n", nil)
 			} else {
@@ -1257,10 +1275,10 @@ func emitRatchetingCheck(c *generator.Context, t *types.Type, sw *generator.Snip
 		// - obj != nil : handle optional fields which are updated to nil
 		// - oldObj != nil : handle optional fields which are updated from nil
 		// - *obj == *oldObj : compare values
-		sw.Do("if op.Type == $.operation.Update|raw$ && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {\n", targs)
+		sw.Do("if oldValueCorrelated && op.Type == $.operation.Update|raw$ && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {\n", targs)
 	} else {
 		targs["equality"] = mkSymbolArgs(c, equalityPkgSymbols)
-		sw.Do("if op.Type == $.operation.Update|raw$ && $.equality.Semantic|raw$.DeepEqual(obj, oldObj) {\n", targs)
+		sw.Do("if oldValueCorrelated && op.Type == $.operation.Update|raw$ && $.equality.Semantic|raw$.DeepEqual(obj, oldObj) {\n", targs)
 	}
 	sw.Do("   return nil\n", nil)
 	sw.Do("}\n", nil)
@@ -1288,7 +1306,21 @@ func emitCallsToValidators(c *generator.Context, validations []validators.Functi
 		if cohortName != "" {
 			sw.Do("func() { // cohort $.$\n", cohortName)
 		}
-		for _, v := range validations {
+
+		hasShortCircuits := false
+		lastShortCircuitIdx := -1
+		for i, v := range validations {
+			if v.Flags.IsSet(validators.ShortCircuit) {
+				hasShortCircuits = true
+				lastShortCircuitIdx = i
+			}
+		}
+
+		if hasShortCircuits {
+			sw.Do("earlyReturn := false\n", nil)
+		}
+
+		for i, v := range validations {
 			isShortCircuit := v.Flags.IsSet(validators.ShortCircuit)
 			isNonError := v.Flags.IsSet(validators.NonError)
 
@@ -1353,10 +1385,17 @@ func emitCallsToValidators(c *generator.Context, validations []validators.Functi
 				emitCall()
 				sw.Do("; len(e) != 0 {\n", nil)
 				if !isNonError {
-					sw.Do("errs = append(errs, e...)\n", nil)
+					sw.Do("  errs = append(errs, e...)\n", nil)
 				}
-				sw.Do("    return // do not proceed\n", nil)
+				sw.Do("  earlyReturn = true\n", nil)
 				sw.Do("}\n", nil)
+
+				// Check for early return ONLY after the LAST short-circuit
+				if hasShortCircuits && i == lastShortCircuitIdx {
+					sw.Do("if earlyReturn {\n", nil)
+					sw.Do("  return // do not proceed\n", nil)
+					sw.Do("}\n", nil)
+				}
 			} else {
 				if isNonError {
 					emitCall()

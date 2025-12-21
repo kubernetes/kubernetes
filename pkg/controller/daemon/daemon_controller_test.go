@@ -2376,7 +2376,7 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 			node.Status.Conditions = append(node.Status.Conditions, c.nodeCondition...)
 			node.Status.Allocatable = allocatableResources("100M", "1")
 			node.Spec.Unschedulable = c.nodeUnschedulable
-			_, ctx := ktesting.NewTestContext(t)
+			logger, ctx := ktesting.NewTestContext(t)
 			manager, _, _, err := newTestController(ctx)
 			if err != nil {
 				t.Fatalf("error creating DaemonSets controller: %v", err)
@@ -2387,7 +2387,7 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 				manager.podStore.Add(p)
 			}
 			c.ds.Spec.UpdateStrategy = *strategy
-			shouldRun, shouldContinueRunning := NodeShouldRunDaemonPod(node, c.ds)
+			shouldRun, shouldContinueRunning := NodeShouldRunDaemonPod(logger, node, c.ds)
 
 			if shouldRun != c.shouldRun {
 				t.Errorf("[%v] strategy: %v, predicateName: %v expected shouldRun: %v, got: %v", i, c.ds.Spec.UpdateStrategy.Type, c.predicateName, c.shouldRun, shouldRun)

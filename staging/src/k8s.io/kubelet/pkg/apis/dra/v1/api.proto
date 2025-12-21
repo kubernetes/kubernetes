@@ -75,6 +75,10 @@ message Device {
     // A single device instance may map to several CDI device IDs.
     // None is also valid.
     repeated string cdi_device_ids = 4;
+
+    // The share ID of device.
+    // Optional.
+    optional string share_id = 5;
 }
 
 message NodeUnprepareResourcesRequest {

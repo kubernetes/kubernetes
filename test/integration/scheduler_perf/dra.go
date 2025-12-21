@@ -286,12 +286,12 @@ func (op *allocResourceClaimsOp) run(tCtx ktesting.TContext) {
 	claimInformer := informerFactory.Resource().V1().ResourceClaims().Informer()
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
 	resourceSliceTrackerOpts := resourceslicetracker.Options{
-		EnableDeviceTaints:       utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints),
+		EnableDeviceTaintRules:   utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaintRules),
 		EnableConsumableCapacity: utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity),
 		SliceInformer:            informerFactory.Resource().V1().ResourceSlices(),
 		KubeClient:               tCtx.Client(),
 	}
-	if resourceSliceTrackerOpts.EnableDeviceTaints {
+	if resourceSliceTrackerOpts.EnableDeviceTaintRules {
 		resourceSliceTrackerOpts.TaintInformer = informerFactory.Resource().V1alpha3().DeviceTaintRules()
 		resourceSliceTrackerOpts.ClassInformer = informerFactory.Resource().V1().DeviceClasses()
 	}

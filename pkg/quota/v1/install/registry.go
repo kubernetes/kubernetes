@@ -21,21 +21,28 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	quota "k8s.io/apiserver/pkg/quota/v1"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
+	"k8s.io/client-go/informers"
 	"k8s.io/kubernetes/pkg/apis/authentication"
 	"k8s.io/kubernetes/pkg/apis/authorization"
 	"k8s.io/kubernetes/pkg/quota/v1/evaluator/core"
 )
 
 // NewQuotaConfigurationForAdmission returns a quota configuration for admission control.
-func NewQuotaConfigurationForAdmission() quota.Configuration {
-	evaluators := core.NewEvaluators(nil)
-	return generic.NewConfiguration(evaluators, DefaultIgnoredResources())
+func NewQuotaConfigurationForAdmission(i informers.SharedInformerFactory) (quota.Configuration, error) {
+	evaluators, err := core.NewEvaluators(nil, i)
+	if err != nil {
+		return nil, err
+	}
+	return generic.NewConfiguration(evaluators, DefaultIgnoredResources()), nil
 }
 
 // NewQuotaConfigurationForControllers returns a quota configuration for controllers.
-func NewQuotaConfigurationForControllers(f quota.ListerForResourceFunc) quota.Configuration {
-	evaluators := core.NewEvaluators(f)
-	return generic.NewConfiguration(evaluators, DefaultIgnoredResources())
+func NewQuotaConfigurationForControllers(f quota.ListerForResourceFunc, i informers.SharedInformerFactory) (quota.Configuration, error) {
+	evaluators, err := core.NewEvaluators(f, i)
+	if err != nil {
+		return nil, err
+	}
+	return generic.NewConfiguration(evaluators, DefaultIgnoredResources()), nil
 }
 
 // ignoredResources are ignored by quota by default

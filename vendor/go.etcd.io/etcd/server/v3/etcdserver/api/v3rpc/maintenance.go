@@ -32,6 +32,7 @@ import (
 	"go.etcd.io/etcd/server/v3/etcdserver/apply"
 	"go.etcd.io/etcd/server/v3/etcdserver/errors"
 	serverversion "go.etcd.io/etcd/server/v3/etcdserver/version"
+	"go.etcd.io/etcd/server/v3/storage"
 	"go.etcd.io/etcd/server/v3/storage/backend"
 	"go.etcd.io/etcd/server/v3/storage/mvcc"
 	"go.etcd.io/etcd/server/v3/storage/schema"
@@ -44,6 +45,10 @@ type KVGetter interface {
 
 type BackendGetter interface {
 	Backend() backend.Backend
+}
+
+type Defrager interface {
+	Defragment() error
 }
 
 type Alarmer interface {
@@ -74,6 +79,7 @@ type maintenanceServer struct {
 	rg     apply.RaftStatusGetter
 	hasher mvcc.HashStorage
 	bg     BackendGetter
+	defrag Defrager
 	a      Alarmer
 	lt     LeaderTransferrer
 	hdr    header
@@ -91,6 +97,7 @@ func NewMaintenanceServer(s *etcdserver.EtcdServer, healthNotifier notifier) pb.
 		rg:             s,
 		hasher:         s.KV().HashStorage(),
 		bg:             s,
+		defrag:         s,
 		a:              s,
 		lt:             s,
 		hdr:            newHeader(s),
@@ -110,7 +117,7 @@ func (ms *maintenanceServer) Defragment(ctx context.Context, sr *pb.DefragmentRe
 	ms.lg.Info("starting defragment")
 	ms.healthNotifier.defragStarted()
 	defer ms.healthNotifier.defragFinished()
-	err := ms.bg.Backend().Defrag()
+	err := ms.defrag.Defragment()
 	if err != nil {
 		ms.lg.Warn("failed to defragment", zap.Error(err))
 		return nil, togRPCError(err)
@@ -263,6 +270,9 @@ func (ms *maintenanceServer) Status(ctx context.Context, ar *pb.StatusRequest) (
 		IsLearner:        ms.cs.IsLearner(),
 		DbSizeQuota:      ms.cg.Config().QuotaBackendBytes,
 		DowngradeInfo:    &pb.DowngradeInfo{Enabled: false},
+	}
+	if resp.DbSizeQuota == 0 {
+		resp.DbSizeQuota = storage.DefaultQuotaBytes
 	}
 	if storageVersion := ms.vs.GetStorageVersion(); storageVersion != nil {
 		resp.StorageVersion = storageVersion.String()

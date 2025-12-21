@@ -69,6 +69,7 @@ type event struct {
 type QuotaMonitor struct {
 	// each monitor list/watches a resource and determines if we should replenish quota
 	monitors    monitors
+	monitorWG   sync.WaitGroup
 	monitorLock sync.RWMutex
 	// informersStarted is closed after all the controllers have been initialized and are running.
 	// After that it is safe to start them here, before that it is not.
@@ -267,7 +268,7 @@ func (qm *QuotaMonitor) StartMonitors(ctx context.Context) {
 		if monitor.stopCh == nil {
 			monitor.stopCh = make(chan struct{})
 			qm.informerFactory.Start(qm.stopCh)
-			go monitor.Run()
+			qm.monitorWG.Go(monitor.Run)
 			started++
 		}
 	}
@@ -301,12 +302,10 @@ func (qm *QuotaMonitor) IsSynced(ctx context.Context) bool {
 // Run sets the stop channel and starts monitor execution until stopCh is
 // closed. Any running monitors will be stopped before Run returns.
 func (qm *QuotaMonitor) Run(ctx context.Context) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
-
 	logger.Info("QuotaMonitor running")
-	defer logger.Info("QuotaMonitor stopping")
 
 	// Set up the stop channel.
 	qm.monitorLock.Lock()
@@ -314,19 +313,22 @@ func (qm *QuotaMonitor) Run(ctx context.Context) {
 	qm.running = true
 	qm.monitorLock.Unlock()
 
-	// Start monitors and begin change processing until the stop channel is
-	// closed.
+	// Start monitors and begin change processing until the stop channel is closed.
 	qm.StartMonitors(ctx)
 
-	// The following workers are hanging forever until the queue is
-	// shutted down, so we need to shut it down in a separate goroutine.
-	go func() {
-		defer utilruntime.HandleCrash()
-		defer qm.resourceChanges.ShutDown()
-
-		<-ctx.Done()
+	var wg sync.WaitGroup
+	defer func() {
+		logger.Info("QuotaMonitor stopping")
+		qm.resourceChanges.ShutDown()
+		wg.Wait()
 	}()
-	wait.UntilWithContext(ctx, qm.runProcessResourceChanges, 1*time.Second)
+
+	wg.Go(func() {
+		wait.UntilWithContext(ctx, qm.runProcessResourceChanges, 1*time.Second)
+	})
+
+	// Keep running until cancelled.
+	<-ctx.Done()
 
 	// Stop any running monitors.
 	qm.monitorLock.Lock()
@@ -339,6 +341,7 @@ func (qm *QuotaMonitor) Run(ctx context.Context) {
 			close(monitor.stopCh)
 		}
 	}
+	qm.monitorWG.Wait()
 	logger.Info("QuotaMonitor stopped monitors", "stopped", stopped, "total", len(monitors))
 }
 
@@ -358,7 +361,7 @@ func (qm *QuotaMonitor) processResourceChanges(ctx context.Context) bool {
 	obj := event.obj
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("cannot access obj: %v", err))
+		utilruntime.HandleErrorWithContext(ctx, err, "Cannot access object")
 		return true
 	}
 	klog.FromContext(ctx).V(4).Info("QuotaMonitor process object",

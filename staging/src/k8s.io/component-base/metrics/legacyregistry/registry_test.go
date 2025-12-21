@@ -21,23 +21,34 @@ import (
 	"net/http/httptest"
 	"strconv"
 	"testing"
-	"time"
 )
 
 const (
 	processStartTimeHeader = "Process-Start-Time-Unix"
 )
 
+var (
+	processStartTestCopy = &processStart
+)
+
 func TestProcessStartTimeHeader(t *testing.T) {
-	now := time.Now()
+	now := GetProcessStart()
 	handler := Handler()
 
-	request, _ := http.NewRequest("GET", "/", nil)
+	request, _ := http.NewRequest(http.MethodGet, "/", nil)
 	writer := httptest.NewRecorder()
 	handler.ServeHTTP(writer, request)
 	got := writer.Header().Get(processStartTimeHeader)
 	gotInt, _ := strconv.ParseInt(got, 10, 64)
 	if gotInt != now.Unix() {
 		t.Errorf("got %d, wanted %d", gotInt, now.Unix())
+	}
+}
+
+// processStart must never be reassigned after init.
+// This test ensures processStart doesn't change across calls
+func TestProcessStartImmutable(t *testing.T) {
+	if *processStartTestCopy != processStart {
+		t.Errorf("processStart test values differ: %v != %v", processStartTestCopy, processStart)
 	}
 }

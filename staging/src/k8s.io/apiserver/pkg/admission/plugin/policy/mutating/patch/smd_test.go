@@ -18,10 +18,11 @@ package patch
 
 import (
 	"context"
-	"github.com/google/go-cmp/cmp"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/google/go-cmp/cmp"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -232,9 +233,110 @@ func TestApplyConfiguration(t *testing.T) {
 			object:      &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Replicas: ptr.To[int32](1)}},
 			expectedErr: "must evaluate to Object but got Object.spec.metadata",
 		},
+		{
+			name: "apply configuration with duplicate env vars in original object",
+			expression: `Object{
+					spec: Object.spec{
+						replicas: 3
+					}
+				}`,
+			gvr: deploymentGVR,
+			object: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Replicas: ptr.To[int32](1),
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{{
+								Name: "nginx",
+								Env: []corev1.EnvVar{
+									{Name: "test", Value: "a"},
+									{Name: "test", Value: "b"},
+								},
+							}},
+						},
+					},
+				},
+			},
+			expectedResult: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Replicas: ptr.To[int32](3),
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{{
+								Name: "nginx",
+								Env: []corev1.EnvVar{
+									{Name: "test", Value: "a"},
+									{Name: "test", Value: "b"},
+								},
+							}},
+						},
+					},
+				},
+			},
+		},
+		// This test verifies that modifying an existing environment variable works correctly,
+		// even if the original object contains duplicates.
+		// Because 'env' is defined with `listType=map` and `listMapKey=name` in the schema,
+		// Structured Merge Diff (SMD) treats 'name' as the unique key.
+		// When the patch updates the entry with name="test", SMD merges the changes.
+		// As a side effect of the merge process on a map-type list, duplicate entries for the
+		// same key in the original object are consolidated into a single entry in the result.
+		// This matches the behavior of Server-Side Apply (SSA) and kubectl apply.
+		{
+			name: "apply configuration modify existing env variable",
+			expression: `Object{
+					spec: Object.spec{
+						template: Object.spec.template{
+							spec: Object.spec.template.spec{
+								containers: [Object.spec.template.spec.containers{
+									name: "nginx",
+									env: [Object.spec.template.spec.containers.env{
+										name: "test",
+										value: "c"
+									}]
+								}]
+							}
+						}
+					}
+				}`,
+			gvr: deploymentGVR,
+			object: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Replicas: ptr.To[int32](1),
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{{
+								Name: "nginx",
+								Env: []corev1.EnvVar{
+									{Name: "test", Value: "a"},
+									{Name: "test", Value: "b"},
+									{Name: "foo", Value: "bar"},
+								},
+							}},
+						},
+					},
+				},
+			},
+			expectedResult: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Replicas: ptr.To[int32](1),
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{{
+								Name: "nginx",
+								Env: []corev1.EnvVar{
+									{Name: "test", Value: "c"},
+									{Name: "foo", Value: "bar"},
+								},
+							}},
+						},
+					},
+				},
+			},
+		},
 	}
 
-	compiler, err := cel.NewCompositedCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true))
+	compiler, err := cel.NewCompositedCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -255,7 +357,7 @@ func TestApplyConfiguration(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			accessor := &ApplyConfigurationCondition{Expression: tc.expression}
-			compileResult := compiler.CompileMutatingEvaluator(accessor, cel.OptionalVariableDeclarations{StrictCost: true, HasPatchTypes: true}, environment.StoredExpressions)
+			compileResult := compiler.CompileMutatingEvaluator(accessor, cel.OptionalVariableDeclarations{HasPatchTypes: true}, environment.StoredExpressions)
 
 			patcher := applyConfigPatcher{expressionEvaluator: compileResult}
 

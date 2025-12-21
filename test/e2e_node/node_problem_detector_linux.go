@@ -1,5 +1,4 @@
 //go:build cgo && linux
-// +build cgo,linux
 
 /*
 Copyright 2016 The Kubernetes Authors.

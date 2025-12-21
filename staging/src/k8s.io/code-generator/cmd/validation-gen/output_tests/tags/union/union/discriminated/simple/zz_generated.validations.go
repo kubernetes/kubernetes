@@ -75,31 +75,39 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 
 	// field Struct.M1
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *M1) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *M1, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call field-attached validations
+			earlyReturn := false
 			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
 				return // do not proceed
 			}
 			return
-		}(fldPath.Child("m1"), obj.M1, safe.Field(oldObj, func(oldObj *Struct) *M1 { return oldObj.M1 }))...)
+		}(fldPath.Child("m1"), obj.M1, safe.Field(oldObj, func(oldObj *Struct) *M1 { return oldObj.M1 }), oldObj != nil)...)
 
 	// field Struct.M2
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *M2) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *M2, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call field-attached validations
+			earlyReturn := false
 			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
 				return // do not proceed
 			}
 			return
-		}(fldPath.Child("m2"), obj.M2, safe.Field(oldObj, func(oldObj *Struct) *M2 { return oldObj.M2 }))...)
+		}(fldPath.Child("m2"), obj.M2, safe.Field(oldObj, func(oldObj *Struct) *M2 { return oldObj.M2 }), oldObj != nil)...)
 
 	return errs
 }

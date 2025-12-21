@@ -103,9 +103,9 @@ func retrieveValidatedConfigInfo(client clientset.Interface, cfg *kubeadmapi.Dis
 		return nil, errors.Wrapf(err, "couldn't parse the kubeconfig file in the %s ConfigMap", bootstrapapi.ConfigMapClusterInfo)
 	}
 
-	// The ConfigMap should contain a single cluster
-	if len(insecureConfig.Clusters) != 1 {
-		return nil, errors.Errorf("expected the kubeconfig file in the %s ConfigMap to have a single cluster, but it had %d", bootstrapapi.ConfigMapClusterInfo, len(insecureConfig.Clusters))
+	_, _, err = kubeconfigutil.GetClusterFromKubeConfig(insecureConfig)
+	if err != nil {
+		return nil, errors.Wrapf(err, "malformed kubeconfig in the %s ConfigMap", bootstrapapi.ConfigMapClusterInfo)
 	}
 
 	// If no TLS root CA pinning was specified, we're done

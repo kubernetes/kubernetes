@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	field "k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/utils/ptr"
 )
 
 func TestUniqueness(t *testing.T) {
@@ -106,24 +107,24 @@ func TestUpdateCorrelation(t *testing.T) {
 	st.Value(&structA2).OldValue(&structA1).ExpectValid()
 
 	st.Value(&structA1).OldValue(&structB).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
-		field.Forbidden(field.NewPath("listField").Index(0), "immutable"),
-		field.Forbidden(field.NewPath("listField").Index(1), "immutable"),
-		field.Forbidden(field.NewPath("listTypedefField").Index(0), "immutable"),
-		field.Forbidden(field.NewPath("listTypedefField").Index(1), "immutable"),
-		field.Forbidden(field.NewPath("typedefField").Index(0), "immutable"),
-		field.Forbidden(field.NewPath("typedefField").Index(1), "immutable"),
+		field.Invalid(field.NewPath("listField").Index(0), nil, "immutable").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("listField").Index(1), nil, "immutable").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("listTypedefField").Index(0), nil, "immutable").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("listTypedefField").Index(1), nil, "immutable").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("typedefField").Index(0), nil, "immutable").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("typedefField").Index(1), nil, "immutable").WithOrigin("immutable"),
 	})
 
 	st.Value(&structB).OldValue(&structA1).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
-		field.Forbidden(field.NewPath("listField").Index(0), "immutable"),
-		field.Forbidden(field.NewPath("listField").Index(1), "immutable"),
-		field.Forbidden(field.NewPath("listField").Index(2), "immutable"),
-		field.Forbidden(field.NewPath("listTypedefField").Index(0), "immutable"),
-		field.Forbidden(field.NewPath("listTypedefField").Index(1), "immutable"),
-		field.Forbidden(field.NewPath("listTypedefField").Index(2), "immutable"),
-		field.Forbidden(field.NewPath("typedefField").Index(0), "immutable"),
-		field.Forbidden(field.NewPath("typedefField").Index(1), "immutable"),
-		field.Forbidden(field.NewPath("typedefField").Index(2), "immutable"),
+		field.Invalid(field.NewPath("listField").Index(0), nil, "immutable").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("listField").Index(1), nil, "immutable").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("listField").Index(2), nil, "immutable").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("listTypedefField").Index(0), nil, "immutable").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("listTypedefField").Index(1), nil, "immutable").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("listTypedefField").Index(2), nil, "immutable").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("typedefField").Index(0), nil, "immutable").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("typedefField").Index(1), nil, "immutable").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("typedefField").Index(2), nil, "immutable").WithOrigin("immutable"),
 	})
 }
 
@@ -161,4 +162,40 @@ func TestRatcheting(t *testing.T) {
 	})
 	st.Value(&struct1).OldValue(&struct2).ExpectValid()
 	st.Value(&struct2).OldValue(&struct1).ExpectValid()
+}
+
+func TestItemWithPtrKey(t *testing.T) {
+	st := localSchemeBuilder.Test(t)
+
+	st.Value(&Struct{
+		ListPtrKeyField: []PtrKeyStruct{
+			{Key1Field: ptr.To("target-ptr"), Key2Field: 42, DataField: "match"},
+			{Key1Field: ptr.To("target-ptr"), Key2Field: 99, DataField: "no match, int differs"},
+			{Key1Field: ptr.To("other"), Key2Field: 42, DataField: "no match, string differs"},
+			{Key1Field: nil, Key2Field: 42, DataField: "no match, nil string"},
+		},
+	}).ExpectValidateFalseByPath(map[string][]string{
+		`listPtrKeyField[0]`: {
+			"item ListPtrKeyField[key1Field=target-ptr,key2Field=42]",
+		},
+	})
+
+	st.Value(&Struct{
+		ListPtrKeyField: []PtrKeyStruct{
+			{Key1Field: ptr.To("other"), Key2Field: 42, DataField: "d1"},
+			{Key1Field: nil, Key2Field: 99, DataField: "d2"},
+		},
+	}).ExpectValid()
+
+	st.Value(&Struct{
+		ListMixedPtrKeyField: []MixedPtrKeyStruct{
+			{StringPtrKey: ptr.To("target-ptr"), StringKey: "target", DataField: "match"},
+			{StringPtrKey: ptr.To("target-ptr"), StringKey: "other", DataField: "no match"},
+			{StringPtrKey: nil, StringKey: "target", DataField: "no match"},
+		},
+	}).ExpectValidateFalseByPath(map[string][]string{
+		`listMixedPtrKeyField[0]`: {
+			"item ListMixedPtrKeyField",
+		},
+	})
 }

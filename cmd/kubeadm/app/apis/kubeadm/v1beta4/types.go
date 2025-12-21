@@ -172,6 +172,7 @@ type ControlPlaneComponent struct {
 	// An argument name in this list is the flag name as it appears on the
 	// command line except without leading dash(es). Extra arguments will override existing
 	// default arguments. Duplicate extra arguments are allowed.
+	// The default arguments are sorted alpha-numerically but the extra arguments are not.
 	// +optional
 	ExtraArgs []Arg `json:"extraArgs,omitempty"`
 
@@ -262,6 +263,7 @@ type NodeRegistrationOptions struct {
 	// Flags have higher priority when parsing. These values are local and specific to the node kubeadm is executing on.
 	// An argument name in this list is the flag name as it appears on the command line except without leading dash(es).
 	// Extra arguments will override existing default arguments. Duplicate extra arguments are allowed.
+	// The default arguments are sorted alpha-numerically but the extra arguments are not.
 	// +optional
 	KubeletExtraArgs []Arg `json:"kubeletExtraArgs,omitempty"`
 
@@ -324,6 +326,7 @@ type LocalEtcd struct {
 	// An argument name in this list is the flag name as it appears on the
 	// command line except without leading dash(es). Extra arguments will override existing
 	// default arguments. Duplicate extra arguments are allowed.
+	// The default arguments are sorted alpha-numerically but the extra arguments are not.
 	// +optional
 	ExtraArgs []Arg `json:"extraArgs,omitempty"`
 
@@ -343,8 +346,22 @@ type LocalEtcd struct {
 // ExternalEtcd describes an external etcd cluster.
 // Kubeadm has no knowledge of where certificate files live and they must be supplied.
 type ExternalEtcd struct {
-	// Endpoints of etcd members. Required for ExternalEtcd.
+	// Endpoints of etcd members. Required when using external etcd.
+	// Specifies the client URLs (usually gRPC endpoints) for etcd communication.
+	// By default, these endpoints handle both gRPC traffic (primary etcd protocol)
+	// and HTTP traffic (metrics, health checks). However, if HTTPEndpoints is configured,
+	// the gRPC and HTTP traffic can be separated for better security and performance.
+	// Corresponds to etcd's --listen-client-urls configuration.
 	Endpoints []string `json:"endpoints"`
+
+	// HTTPEndpoints are the dedicated HTTP endpoints for etcd communication.
+	// When configured, HTTP traffic (such as /metrics and /health endpoints) is separated
+	// from the gRPC traffic handled by Endpoints. This separation allows for better access
+	// control, as HTTP endpoints can be exposed without exposing the primary gRPC interface.
+	// Corresponds to etcd's --listen-client-http-urls configuration.
+	// If not provided, Endpoints will be used for both gRPC and HTTP traffic.
+	// +optional
+	HTTPEndpoints []string `json:"httpEndpoints,omitempty"`
 
 	// CAFile is an SSL Certificate Authority file used to secure etcd communication.
 	// Required if using a TLS connection.

@@ -22,11 +22,13 @@ import (
 	"strings"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -58,7 +60,9 @@ func (resourceSliceStrategy) PrepareForCreate(ctx context.Context, obj runtime.O
 
 func (resourceSliceStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	slice := obj.(*resource.ResourceSlice)
-	return validation.ValidateResourceSlice(slice)
+	errorList := validation.ValidateResourceSlice(slice)
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, slice, nil, errorList, operation.Create, rest.WithNormalizationRules(validation.ResourceNormalizationRules))
+
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -94,7 +98,8 @@ func (resourceSliceStrategy) PrepareForUpdate(ctx context.Context, obj, old runt
 }
 
 func (resourceSliceStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidateResourceSliceUpdate(obj.(*resource.ResourceSlice), old.(*resource.ResourceSlice))
+	errorList := validation.ValidateResourceSliceUpdate(obj.(*resource.ResourceSlice), old.(*resource.ResourceSlice))
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, obj, old, errorList, operation.Update, rest.WithNormalizationRules(validation.ResourceNormalizationRules))
 }
 
 // WarningsOnUpdate returns warnings for the given update.

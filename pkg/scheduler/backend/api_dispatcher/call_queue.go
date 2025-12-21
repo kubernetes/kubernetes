@@ -122,12 +122,14 @@ func (cq *callQueue) merge(oldAPICall, apiCall *queuedAPICall) error {
 		return err
 	}
 	if oldAPICall.CallType() != apiCall.CallType() {
+		if cq.inFlightEntities.Has(oldAPICall.UID()) {
+			// Old API call is in-flight. The new call needs to wait for the old one to finish.
+			return nil
+		}
 		// API call types don't match, so we overwrite the old one.
 		// Update the pending calls metric if the old call is not in-flight.
-		if !cq.inFlightEntities.Has(oldAPICall.UID()) {
-			metrics.AsyncAPIPendingCalls.WithLabelValues(string(oldAPICall.CallType())).Dec()
-			metrics.AsyncAPIPendingCalls.WithLabelValues(string(apiCall.CallType())).Inc()
-		}
+		metrics.AsyncAPIPendingCalls.WithLabelValues(string(oldAPICall.CallType())).Dec()
+		metrics.AsyncAPIPendingCalls.WithLabelValues(string(apiCall.CallType())).Inc()
 		oldAPICall.sendOnFinish(fmt.Errorf("a more relevant call was enqueued for this object: %w", fwk.ErrCallOverwritten))
 		return nil
 	}

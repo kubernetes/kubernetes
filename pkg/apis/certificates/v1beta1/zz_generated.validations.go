@@ -67,9 +67,9 @@ func Validate_CertificateSigningRequest(ctx context.Context, op operation.Operat
 
 	// field certificatesv1beta1.CertificateSigningRequest.Status
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *certificatesv1beta1.CertificateSigningRequestStatus) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *certificatesv1beta1.CertificateSigningRequestStatus, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// call the type's validation function
@@ -77,7 +77,7 @@ func Validate_CertificateSigningRequest(ctx context.Context, op operation.Operat
 			return
 		}(fldPath.Child("status"), &obj.Status, safe.Field(oldObj, func(oldObj *certificatesv1beta1.CertificateSigningRequest) *certificatesv1beta1.CertificateSigningRequestStatus {
 			return &oldObj.Status
-		}))...)
+		}), oldObj != nil)...)
 
 	return errs
 }
@@ -90,9 +90,9 @@ func Validate_CertificateSigningRequestList(ctx context.Context, op operation.Op
 
 	// field certificatesv1beta1.CertificateSigningRequestList.Items
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []certificatesv1beta1.CertificateSigningRequest) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj []certificatesv1beta1.CertificateSigningRequest, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// iterate the list and call the type's validation function
@@ -100,7 +100,7 @@ func Validate_CertificateSigningRequestList(ctx context.Context, op operation.Op
 			return
 		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *certificatesv1beta1.CertificateSigningRequestList) []certificatesv1beta1.CertificateSigningRequest {
 			return oldObj.Items
-		}))...)
+		}), oldObj != nil)...)
 
 	return errs
 }
@@ -112,14 +112,18 @@ var zeroOrOneOfMembershipFor_k8s_io_api_certificates_v1beta1_CertificateSigningR
 func Validate_CertificateSigningRequestStatus(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *certificatesv1beta1.CertificateSigningRequestStatus) (errs field.ErrorList) {
 	// field certificatesv1beta1.CertificateSigningRequestStatus.Conditions
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []certificatesv1beta1.CertificateSigningRequestCondition) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj []certificatesv1beta1.CertificateSigningRequestCondition, oldValueCorrelated bool) (errs field.ErrorList) {
 			// Uniqueness validation is implemented via custom, handwritten validation
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// call field-attached validations
+			earlyReturn := false
 			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
 				return // do not proceed
 			}
 			errs = append(errs, validate.ZeroOrOneOfUnion(ctx, op, fldPath, obj, oldObj, zeroOrOneOfMembershipFor_k8s_io_api_certificates_v1beta1_CertificateSigningRequestStatus_conditions_, func(list []certificatesv1beta1.CertificateSigningRequestCondition) bool {
@@ -140,7 +144,7 @@ func Validate_CertificateSigningRequestStatus(ctx context.Context, op operation.
 			return
 		}(fldPath.Child("conditions"), obj.Conditions, safe.Field(oldObj, func(oldObj *certificatesv1beta1.CertificateSigningRequestStatus) []certificatesv1beta1.CertificateSigningRequestCondition {
 			return oldObj.Conditions
-		}))...)
+		}), oldObj != nil)...)
 
 	// field certificatesv1beta1.CertificateSigningRequestStatus.Certificate has no validation
 	return errs

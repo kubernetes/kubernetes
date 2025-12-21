@@ -119,7 +119,7 @@ var map_DeploymentStatus = map[string]string{
 	"readyReplicas":       "Total number of non-terminating pods targeted by this Deployment with a Ready Condition.",
 	"availableReplicas":   "Total number of available non-terminating pods (ready for at least minReadySeconds) targeted by this deployment.",
 	"unavailableReplicas": "Total number of unavailable pods targeted by this deployment. This is the total number of pods that are still required for the deployment to have 100% available capacity. They may either be pods that are running but not yet available or pods that still have not been created.",
-	"terminatingReplicas": "Total number of terminating pods targeted by this deployment. Terminating pods have a non-null .metadata.deletionTimestamp and have not yet reached the Failed or Succeeded .status.phase.\n\nThis is an alpha field. Enable DeploymentReplicaSetTerminatingReplicas to be able to use this field.",
+	"terminatingReplicas": "Total number of terminating pods targeted by this deployment. Terminating pods have a non-null .metadata.deletionTimestamp and have not yet reached the Failed or Succeeded .status.phase.\n\nThis is a beta field and requires enabling DeploymentReplicaSetTerminatingReplicas feature (enabled by default).",
 	"conditions":          "Represents the latest available observations of a deployment's current state.",
 	"collisionCount":      "collisionCount is the count of hash collisions for the Deployment. The Deployment controller uses this field as a collision avoidance mechanism when it needs to create the name for the newest ReplicaSet.",
 }
@@ -160,7 +160,7 @@ func (RollingUpdateDeployment) SwaggerDoc() map[string]string {
 var map_RollingUpdateStatefulSetStrategy = map[string]string{
 	"":               "RollingUpdateStatefulSetStrategy is used to communicate parameter for RollingUpdateStatefulSetStrategyType.",
 	"partition":      "Partition indicates the ordinal at which the StatefulSet should be partitioned for updates. During a rolling update, all pods from ordinal Replicas-1 to Partition are updated. All pods from ordinal Partition-1 to 0 remain untouched. This is helpful in being able to do a canary based deployment. The default value is 0.",
-	"maxUnavailable": "maxUnavailable is the maximum number of pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). Absolute number is calculated from percentage by rounding up. This can not be 0. Defaults to 1. This field is alpha-level and is only honored by servers that enable the MaxUnavailableStatefulSet feature. The field applies to all pods in the range 0 to Replicas-1. That means if there is any unavailable pod in the range 0 to Replicas-1, it will be counted towards MaxUnavailable.",
+	"maxUnavailable": "maxUnavailable is the maximum number of pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). Absolute number is calculated from percentage by rounding up. This can not be 0. Defaults to 1. This field is beta-level and is enabled by default. The field applies to all pods in the range 0 to Replicas-1. That means if there is any unavailable pod in the range 0 to Replicas-1, it will be counted towards MaxUnavailable. This setting might not be effective for the OrderedReady podManagementPolicy. That policy ensures pods are created and become ready one at a time.",
 }
 
 func (RollingUpdateStatefulSetStrategy) SwaggerDoc() map[string]string {

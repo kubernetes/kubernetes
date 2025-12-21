@@ -53,7 +53,7 @@ func TestEnableDisableServiceCIDR(t *testing.T) {
 			"--service-cluster-ip-range=10.0.0.0/24",
 			"--disable-admission-plugins=ServiceAccount",
 			"--emulated-version=1.33",
-			fmt.Sprintf("--feature-gates=%s=false", features.MultiCIDRServiceAllocator)},
+			fmt.Sprintf("--feature-gates=%s=false,%s=false", features.MultiCIDRServiceAllocator, features.DisableAllocatorDualWrite)},
 		etcdOptions)
 
 	client1, err := clientset.NewForConfig(s1.ClientConfig)
@@ -115,7 +115,7 @@ func TestEnableDisableServiceCIDR(t *testing.T) {
 			"--service-cluster-ip-range=10.0.0.0/24",
 			"--disable-admission-plugins=ServiceAccount",
 			"--emulated-version=1.33",
-			fmt.Sprintf("--feature-gates=%s=false", features.MultiCIDRServiceAllocator)},
+			fmt.Sprintf("--feature-gates=%s=false,%s=false", features.MultiCIDRServiceAllocator, features.DisableAllocatorDualWrite)},
 		etcdOptions)
 	defer s3.TearDownFn()
 

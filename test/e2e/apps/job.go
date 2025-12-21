@@ -252,7 +252,8 @@ var _ = SIGDescribe("Job", func() {
 					Namespace: pod.Namespace,
 				},
 			}
-			err = f.ClientSet.CoreV1().Pods(pod.Namespace).EvictV1(ctx, evictTarget)
+			// use new variable explicitly here, to ensure it doesn't escape the scope of goroutines
+			err := f.ClientSet.CoreV1().Pods(pod.Namespace).EvictV1(ctx, evictTarget)
 			framework.ExpectNoError(err, "failed to evict the pod: %s/%s", pod.Name, pod.Namespace)
 
 			ginkgo.By(fmt.Sprintf("Awaiting for the pod: %s/%s to be deleted", pod.Name, pod.Namespace))

@@ -52,6 +52,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
+	testutils "k8s.io/kubernetes/test/utils"
 )
 
 var (
@@ -691,7 +692,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			}
 		})
 
-		f.It("Can schedule a pod with a restartable init container", feature.SidecarContainers, func(ctx context.Context) {
+		f.It("Can schedule a pod with a restartable init container", framework.WithNodeConformance(), func(ctx context.Context) {
 			podRECMD := "devs=$(ls /tmp/ | egrep '^Dev-[0-9]+$') && echo stub devices: $devs && sleep %s"
 			sleepOneSecond := "1s"
 			rl := v1.ResourceList{v1.ResourceName(SampleDeviceResourceName): *resource.NewQuantity(1, resource.DecimalSI)}
@@ -867,6 +868,13 @@ func testDevicePluginNodeReboot(f *framework.Framework, pluginSockDir string) {
 
 			devicePluginPod = e2epod.NewPodClient(f).CreateSync(ctx, dp)
 
+			framework.Logf("Waiting for device plugin pod to be Running")
+			err = e2epod.WaitForPodCondition(ctx, f.ClientSet, devicePluginPod.Namespace, devicePluginPod.Name, "Ready", 2*time.Minute, testutils.PodRunningReady)
+			if err != nil {
+				framework.Logf("Sample Device Pod %v took too long to enter running/ready: %v", dp.Name, err)
+			}
+			framework.ExpectNoError(err, "WaitForPodCondition() failed err: %v", err)
+
 			go func() {
 				// Since autoregistration is disabled for the device plugin (as REGISTER_CONTROL_FILE
 				// environment variable is specified), device plugin registration needs to be triggerred
@@ -893,7 +901,7 @@ func testDevicePluginNodeReboot(f *framework.Framework, pluginSockDir string) {
 				return ready &&
 					CountSampleDeviceCapacity(node) == expectedSampleDevsAmount &&
 					CountSampleDeviceAllocatable(node) == expectedSampleDevsAmount
-			}, 30*time.Second, framework.Poll).Should(gomega.BeTrueBecause("expected resource to be available on local node"))
+			}, 2*time.Minute, framework.Poll).Should(gomega.BeTrueBecause("expected resource exported by the sample device plugin to be available on local node"))
 		})
 
 		ginkgo.AfterEach(func(ctx context.Context) {
@@ -981,17 +989,14 @@ func testDevicePluginNodeReboot(f *framework.Framework, pluginSockDir string) {
 				return err
 			}, 30*time.Second, framework.Poll).ShouldNot(gomega.HaveOccurred(), "cannot fetch the compute resource assignment after kubelet restart")
 
-			// if we got this far, podresources API will now report 2 entries:
-			// - sample device plugin pod, running and doing fine
-			// - our test pod, in failed state. Pods in terminal state will still be reported, see https://github.com/kubernetes/kubernetes/issues/119423
-			// so we care about our test pod, and it will be present in the returned list till 119423 is fixed, but since it failed admission it must not have
-			// any device allocated to it, hence we check for empty device set in the podresources response. So, we check that
-			// A. our test pod must be present in the list response *and*
-			// B. it has no devices assigned to it.
-			// anything else is unexpected and thus makes the test fail. Once 119423 is fixed, a better, simpler and more intuitive check will be for the
-			// test pod to not be present in the podresources list response, but till that time we're stuck with this approach.
+			// if we got this far, podresources API will now report only the sample device plugin pod,
+			// because pods that failed admission are no longer reported in the list
+			// (see https://github.com/kubernetes/kubernetes/pull/132028).
+			// Hence, we verify that our test pod is NOT present in the podresources response.
+
 			_, found := checkPodResourcesAssignment(v1PodResources, pod1.Namespace, pod1.Name, pod1.Spec.Containers[0].Name, SampleDeviceResourceName, []string{})
-			gomega.Expect(found).To(gomega.BeTrueBecause("%s/%s/%s failed admission, should not have devices registered", pod1.Namespace, pod1.Name, pod1.Spec.Containers[0].Name))
+			framework.ExpectNoError(err, "unexpected device assignment mismatch for %s/%s", pod1.Namespace, pod1.Name)
+			gomega.Expect(found).To(gomega.BeFalseBecause("%s/%s/%s failed admission, so it must not appear in podresources list", pod1.Namespace, pod1.Name, pod1.Spec.Containers[0].Name))
 		})
 	})
 }

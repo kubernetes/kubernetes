@@ -62,7 +62,9 @@ type ResourceSliceSpecApplyConfiguration struct {
 	AllNodes *bool `json:"allNodes,omitempty"`
 	// Devices lists some or all of the devices in this pool.
 	//
-	// Must not have more than 128 entries.
+	// Must not have more than 128 entries. If any device uses taints or consumes counters the limit is 64.
+	//
+	// Only one of Devices and SharedCounters can be set in a ResourceSlice.
 	Devices []DeviceApplyConfiguration `json:"devices,omitempty"`
 	// PerDeviceNodeSelection defines whether the access from nodes to
 	// resources in the pool is set on the ResourceSlice level or on each
@@ -74,9 +76,11 @@ type ResourceSliceSpecApplyConfiguration struct {
 	// SharedCounters defines a list of counter sets, each of which
 	// has a name and a list of counters available.
 	//
-	// The names of the SharedCounters must be unique in the ResourceSlice.
+	// The names of the counter sets must be unique in the ResourcePool.
 	//
-	// The maximum number of counters in all sets is 32.
+	// Only one of Devices and SharedCounters can be set in a ResourceSlice.
+	//
+	// The maximum number of counter sets is 8.
 	SharedCounters []CounterSetApplyConfiguration `json:"sharedCounters,omitempty"`
 }
 

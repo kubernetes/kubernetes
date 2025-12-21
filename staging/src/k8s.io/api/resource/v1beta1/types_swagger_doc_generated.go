@@ -57,11 +57,11 @@ var map_BasicDevice = map[string]string{
 	"":                         "BasicDevice defines one device instance.",
 	"attributes":               "Attributes defines the set of attributes for this device. The name of each attribute must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
 	"capacity":                 "Capacity defines the set of capacities for this device. The name of each capacity must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
-	"consumesCounters":         "ConsumesCounters defines a list of references to sharedCounters and the set of counters that the device will consume from those counter sets.\n\nThere can only be a single entry per counterSet.\n\nThe total number of device counter consumption entries must be <= 32. In addition, the total number in the entire ResourceSlice must be <= 1024 (for example, 64 devices with 16 counters each).",
+	"consumesCounters":         "ConsumesCounters defines a list of references to sharedCounters and the set of counters that the device will consume from those counter sets.\n\nThere can only be a single entry per counterSet.\n\nThe maximum number of device counter consumptions per device is 2.",
 	"nodeName":                 "NodeName identifies the node where the device is available.\n\nMust only be set if Spec.PerDeviceNodeSelection is set to true. At most one of NodeName, NodeSelector and AllNodes can be set.",
 	"nodeSelector":             "NodeSelector defines the nodes where the device is available.\n\nMust use exactly one term.\n\nMust only be set if Spec.PerDeviceNodeSelection is set to true. At most one of NodeName, NodeSelector and AllNodes can be set.",
 	"allNodes":                 "AllNodes indicates that all nodes have access to the device.\n\nMust only be set if Spec.PerDeviceNodeSelection is set to true. At most one of NodeName, NodeSelector and AllNodes can be set.",
-	"taints":                   "If specified, these are the driver-defined taints.\n\nThe maximum number of taints is 4.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
+	"taints":                   "If specified, these are the driver-defined taints.\n\nThe maximum number of taints is 16. If taints are set for any device in a ResourceSlice, then the maximum number of allowed devices per ResourceSlice is 64 instead of 128.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
 	"bindsToNode":              "BindsToNode indicates if the usage of an allocation involving this device has to be limited to exactly the node that was chosen when allocating the claim. If set to true, the scheduler will set the ResourceClaim.Status.Allocation.NodeSelector to match the node where the allocation was made.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
 	"bindingConditions":        "BindingConditions defines the conditions for proceeding with binding. All of these conditions must be set in the per-device status conditions with a value of True to proceed with binding the pod to the node while scheduling the pod.\n\nThe maximum number of binding conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
 	"bindingFailureConditions": "BindingFailureConditions defines the conditions for binding failure. They may be set in the per-device status conditions. If any is true, a binding failure occurred.\n\nThe maximum number of binding failure conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
@@ -122,7 +122,7 @@ func (Counter) SwaggerDoc() map[string]string {
 }
 
 var map_CounterSet = map[string]string{
-	"":         "CounterSet defines a named set of counters that are available to be used by devices defined in the ResourceSlice.\n\nThe counters are not allocatable by themselves, but can be referenced by devices. When a device is allocated, the portion of counters it uses will no longer be available for use by other devices.",
+	"":         "CounterSet defines a named set of counters that are available to be used by devices defined in the ResourcePool.\n\nThe counters are not allocatable by themselves, but can be referenced by devices. When a device is allocated, the portion of counters it uses will no longer be available for use by other devices.",
 	"name":     "Name defines the name of the counter set. It must be a DNS label.",
 	"counters": "Counters defines the set of counters for this CounterSet The name of each counter must be unique in that set and must be a DNS label.\n\nThe maximum number of counters is 32.",
 }
@@ -265,7 +265,7 @@ func (DeviceConstraint) SwaggerDoc() map[string]string {
 var map_DeviceCounterConsumption = map[string]string{
 	"":           "DeviceCounterConsumption defines a set of counters that a device will consume from a CounterSet.",
 	"counterSet": "CounterSet is the name of the set from which the counters defined will be consumed.",
-	"counters":   "Counters defines the counters that will be consumed by the device.\n\nThe maximum number counters in a device is 32. In addition, the maximum number of all counters in all devices is 1024 (for example, 64 devices with 16 counters each).",
+	"counters":   "Counters defines the counters that will be consumed by the device.\n\nThe maximum number of counters is 32.",
 }
 
 func (DeviceCounterConsumption) SwaggerDoc() map[string]string {
@@ -335,7 +335,7 @@ var map_DeviceTaint = map[string]string{
 	"":          "The device this taint is attached to has the \"effect\" on any claim which does not tolerate the taint and, through the claim, to pods using the claim.",
 	"key":       "The taint key to be applied to a device. Must be a label name.",
 	"value":     "The taint value corresponding to the taint key. Must be a label value.",
-	"effect":    "The effect of the taint on claims that do not tolerate the taint and through such claims on the pods using them. Valid effects are NoSchedule and NoExecute. PreferNoSchedule as used for nodes is not valid here.",
+	"effect":    "The effect of the taint on claims that do not tolerate the taint and through such claims on the pods using them.\n\nValid effects are None, NoSchedule and NoExecute. PreferNoSchedule as used for nodes is not valid here. More effects may get added in the future. Consumers must treat unknown effects like None.",
 	"timeAdded": "TimeAdded represents the time at which the taint was added. Added automatically during create or update if not set.",
 }
 
@@ -498,9 +498,9 @@ var map_ResourceSliceSpec = map[string]string{
 	"nodeName":               "NodeName identifies the node which provides the resources in this pool. A field selector can be used to list only ResourceSlice objects belonging to a certain node.\n\nThis field can be used to limit access from nodes to ResourceSlices with the same node name. It also indicates to autoscalers that adding new nodes of the same type as some old node might also make new resources available.\n\nExactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection must be set. This field is immutable.",
 	"nodeSelector":           "NodeSelector defines which nodes have access to the resources in the pool, when that pool is not limited to a single node.\n\nMust use exactly one term.\n\nExactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection must be set.",
 	"allNodes":               "AllNodes indicates that all nodes have access to the resources in the pool.\n\nExactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection must be set.",
-	"devices":                "Devices lists some or all of the devices in this pool.\n\nMust not have more than 128 entries.",
+	"devices":                "Devices lists some or all of the devices in this pool.\n\nMust not have more than 128 entries. If any device uses taints or consumes counters the limit is 64.\n\nOnly one of Devices and SharedCounters can be set in a ResourceSlice.",
 	"perDeviceNodeSelection": "PerDeviceNodeSelection defines whether the access from nodes to resources in the pool is set on the ResourceSlice level or on each device. If it is set to true, every device defined the ResourceSlice must specify this individually.\n\nExactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection must be set.",
-	"sharedCounters":         "SharedCounters defines a list of counter sets, each of which has a name and a list of counters available.\n\nThe names of the SharedCounters must be unique in the ResourceSlice.\n\nThe maximum number of SharedCounters is 32.",
+	"sharedCounters":         "SharedCounters defines a list of counter sets, each of which has a name and a list of counters available.\n\nThe names of the counter sets must be unique in the ResourcePool.\n\nOnly one of Devices and SharedCounters can be set in a ResourceSlice.\n\nThe maximum number of counter sets is 8.",
 }
 
 func (ResourceSliceSpec) SwaggerDoc() map[string]string {

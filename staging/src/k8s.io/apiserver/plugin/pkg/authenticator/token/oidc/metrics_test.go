@@ -29,7 +29,9 @@ import (
 )
 
 const (
-	testIssuer = "testIssuer"
+	testIssuer      = "testIssuer"
+	testAPIServerID = "testAPIServerID"
+	testKeySet      = `{"keys":[{"kty":"RSA","use":"sig","kid":"test"}]}`
 )
 
 func TestRecordAuthenticationLatency(t *testing.T) {
@@ -130,4 +132,126 @@ func (d dummyClock) Now() time.Time {
 
 func (d dummyClock) Since(t time.Time) time.Duration {
 	return time.Duration(1)
+}
+
+func TestRecordJWKSFetchKeySetSuccess(t *testing.T) {
+	expectedValue := `
+	# HELP apiserver_authentication_jwt_authenticator_jwks_fetch_last_key_set_info [ALPHA] Information about the last JWKS fetched by the JWT authenticator with hash as label, split by api server identity and jwt issuer.
+	# TYPE apiserver_authentication_jwt_authenticator_jwks_fetch_last_key_set_info gauge
+	apiserver_authentication_jwt_authenticator_jwks_fetch_last_key_set_info{apiserver_id_hash="sha256:14f9d63e669337ac6bfda2e2162915ee6a6067743eddd4e5c374b572f951ff37",hash="sha256:d132d414ef2da3d863abd7bf0165c00403ef1d3510faf8fdf1d7cf335c888e53",jwt_issuer_hash="sha256:29b34beedc55b972f2428f21bc588f9d38e5e8f7a7af825486e7bb4fd9caa2ad"} 1
+	`
+
+	metrics := []string{
+		namespace + "_" + subsystem + "_jwt_authenticator_jwks_fetch_last_key_set_info",
+	}
+
+	ResetMetrics()
+	RegisterMetrics()
+
+	recordJWKSFetchKeySetSuccess(testIssuer, testAPIServerID, testKeySet)
+
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expectedValue), metrics...); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestRecordJWKSFetchKeySetFailure(t *testing.T) {
+	ResetMetrics()
+	RegisterMetrics()
+
+	recordJWKSFetchKeySetFailure(testIssuer, testAPIServerID)
+
+	metrics, err := legacyregistry.DefaultGatherer.Gather()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	found := false
+	for _, m := range metrics {
+		if m.GetName() == namespace+"_"+subsystem+"_jwt_authenticator_jwks_fetch_last_timestamp_seconds" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("Expected jwt_authenticator_jwks_fetch_last_timestamp_seconds metric to be present")
+	}
+}
+
+func TestJWKSHashCollector_MultipleAuthenticators(t *testing.T) {
+	expectedValue := `
+	# HELP apiserver_authentication_jwt_authenticator_jwks_fetch_last_key_set_info [ALPHA] Information about the last JWKS fetched by the JWT authenticator with hash as label, split by api server identity and jwt issuer.
+	# TYPE apiserver_authentication_jwt_authenticator_jwks_fetch_last_key_set_info gauge
+	apiserver_authentication_jwt_authenticator_jwks_fetch_last_key_set_info{apiserver_id_hash="sha256:14f9d63e669337ac6bfda2e2162915ee6a6067743eddd4e5c374b572f951ff37",hash="sha256:d132d414ef2da3d863abd7bf0165c00403ef1d3510faf8fdf1d7cf335c888e53",jwt_issuer_hash="sha256:29b34beedc55b972f2428f21bc588f9d38e5e8f7a7af825486e7bb4fd9caa2ad"} 1
+	apiserver_authentication_jwt_authenticator_jwks_fetch_last_key_set_info{apiserver_id_hash="sha256:14f9d63e669337ac6bfda2e2162915ee6a6067743eddd4e5c374b572f951ff37",hash="sha256:1b5293c65ffc96e13f2d6fefae782190aec8cfb89957a3109419d4f47b80e3e8",jwt_issuer_hash="sha256:f10ab1bafaa1a8628d0fae41ee554948912b01957e4a2db1698fc1c3e4451682"} 1
+	`
+
+	metrics := []string{
+		namespace + "_" + subsystem + "_jwt_authenticator_jwks_fetch_last_key_set_info",
+	}
+
+	ResetMetrics()
+	RegisterMetrics()
+
+	recordJWKSFetchKeySetSuccess(testIssuer, testAPIServerID, testKeySet)
+
+	secondIssuer := "https://another-issuer.example.com"
+	secondKeySet := `{"keys":[{"kty":"EC","use":"sig","kid":"test2"}]}`
+	recordJWKSFetchKeySetSuccess(secondIssuer, testAPIServerID, secondKeySet)
+
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expectedValue), metrics...); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestJWKSHashCollector_UpdateExistingHash(t *testing.T) {
+	expectedValue := `
+	# HELP apiserver_authentication_jwt_authenticator_jwks_fetch_last_key_set_info [ALPHA] Information about the last JWKS fetched by the JWT authenticator with hash as label, split by api server identity and jwt issuer.
+	# TYPE apiserver_authentication_jwt_authenticator_jwks_fetch_last_key_set_info gauge
+	apiserver_authentication_jwt_authenticator_jwks_fetch_last_key_set_info{apiserver_id_hash="sha256:14f9d63e669337ac6bfda2e2162915ee6a6067743eddd4e5c374b572f951ff37",hash="sha256:1b5293c65ffc96e13f2d6fefae782190aec8cfb89957a3109419d4f47b80e3e8",jwt_issuer_hash="sha256:29b34beedc55b972f2428f21bc588f9d38e5e8f7a7af825486e7bb4fd9caa2ad"} 1
+	`
+
+	metrics := []string{
+		namespace + "_" + subsystem + "_jwt_authenticator_jwks_fetch_last_key_set_info",
+	}
+
+	ResetMetrics()
+	RegisterMetrics()
+
+	recordJWKSFetchKeySetSuccess(testIssuer, testAPIServerID, testKeySet)
+
+	// Update with new JWKS - should replace old hash with new one
+	updatedKeySet := `{"keys":[{"kty":"EC","use":"sig","kid":"test2"}]}`
+	recordJWKSFetchKeySetSuccess(testIssuer, testAPIServerID, updatedKeySet)
+
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expectedValue), metrics...); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestJWKSHashCollector_DeleteHash(t *testing.T) {
+	ResetMetrics()
+	RegisterMetrics()
+
+	recordJWKSFetchKeySetSuccess(testIssuer, testAPIServerID, testKeySet)
+	secondIssuer := "https://another-issuer.example.com"
+	secondKeySet := `{"keys":[{"kty":"EC","use":"sig","kid":"test2"}]}`
+	recordJWKSFetchKeySetSuccess(secondIssuer, testAPIServerID, secondKeySet)
+
+	// Delete first authenticator's metrics and verify only second authenticator's hash remains
+	DeleteJWKSFetchMetrics(testIssuer, testAPIServerID)
+
+	expectedValue := `
+	# HELP apiserver_authentication_jwt_authenticator_jwks_fetch_last_key_set_info [ALPHA] Information about the last JWKS fetched by the JWT authenticator with hash as label, split by api server identity and jwt issuer.
+	# TYPE apiserver_authentication_jwt_authenticator_jwks_fetch_last_key_set_info gauge
+	apiserver_authentication_jwt_authenticator_jwks_fetch_last_key_set_info{apiserver_id_hash="sha256:14f9d63e669337ac6bfda2e2162915ee6a6067743eddd4e5c374b572f951ff37",hash="sha256:1b5293c65ffc96e13f2d6fefae782190aec8cfb89957a3109419d4f47b80e3e8",jwt_issuer_hash="sha256:f10ab1bafaa1a8628d0fae41ee554948912b01957e4a2db1698fc1c3e4451682"} 1
+	`
+
+	metrics := []string{
+		namespace + "_" + subsystem + "_jwt_authenticator_jwks_fetch_last_key_set_info",
+	}
+
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expectedValue), metrics...); err != nil {
+		t.Fatal(err)
+	}
 }

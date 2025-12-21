@@ -631,7 +631,7 @@ func createSecretMap(spec *volume.Spec, plugin *iscsiPlugin, namespace string) (
 		}
 
 		if len(secretName) > 0 && len(secretNamespace) > 0 {
-			// if secret is provideded, retrieve it
+			// if secret is provided, retrieve it
 			kubeClient := plugin.host.GetKubeClient()
 			if kubeClient == nil {
 				return nil, fmt.Errorf("cannot get kube client")

@@ -76,7 +76,7 @@ var _ = SIGDescribe("Sysctls [LinuxOnly]", framework.WithNodeConformance(), func
 	  [LinuxOnly]: This test is marked as LinuxOnly since Windows does not support sysctls
 	  [Environment:NotInUserNS]: The test fails in UserNS (as expected): `open /proc/sys/kernel/shm_rmid_forced: permission denied`
 	*/
-	framework.ConformanceIt("should support sysctls [MinimumKubeletVersion:1.21]", environment.NotInUserNS, func(ctx context.Context) {
+	framework.ConformanceIt("should support sysctls", environment.NotInUserNS, func(ctx context.Context) {
 		pod := testPod()
 		pod.Spec.SecurityContext = &v1.PodSecurityContext{
 			Sysctls: []v1.Sysctl{
@@ -122,7 +122,7 @@ var _ = SIGDescribe("Sysctls [LinuxOnly]", framework.WithNodeConformance(), func
 	  Description: Pod is created with one valid and two invalid sysctls. Pod should not apply invalid sysctls.
 	  [LinuxOnly]: This test is marked as LinuxOnly since Windows does not support sysctls
 	*/
-	framework.ConformanceIt("should reject invalid sysctls [MinimumKubeletVersion:1.21]", func(ctx context.Context) {
+	framework.ConformanceIt("should reject invalid sysctls", func(ctx context.Context) {
 		pod := testPod()
 		pod.Spec.SecurityContext = &v1.PodSecurityContext{
 			Sysctls: []v1.Sysctl{
@@ -159,7 +159,7 @@ var _ = SIGDescribe("Sysctls [LinuxOnly]", framework.WithNodeConformance(), func
 	})
 
 	// Pod is created with kernel.msgmax, an unsafe sysctl.
-	ginkgo.It("should not launch unsafe, but not explicitly enabled sysctls on the node [MinimumKubeletVersion:1.21]", func(ctx context.Context) {
+	ginkgo.It("should not launch unsafe, but not explicitly enabled sysctls on the node", func(ctx context.Context) {
 		pod := testPod()
 		pod.Spec.SecurityContext = &v1.PodSecurityContext{
 			Sysctls: []v1.Sysctl{
@@ -186,7 +186,7 @@ var _ = SIGDescribe("Sysctls [LinuxOnly]", framework.WithNodeConformance(), func
 	  [LinuxOnly]: This test is marked as LinuxOnly since Windows does not support sysctls
 	  [Environment:NotInUserNS]: The test fails in UserNS (as expected): `open /proc/sys/kernel/shm_rmid_forced: permission denied`
 	*/
-	f.It("should support sysctls with slashes as separator [MinimumKubeletVersion:1.23]", environment.NotInUserNS, func(ctx context.Context) {
+	f.It("should support sysctls with slashes as separator", environment.NotInUserNS, func(ctx context.Context) {
 		pod := testPod()
 		pod.Spec.SecurityContext = &v1.PodSecurityContext{
 			Sysctls: []v1.Sysctl{

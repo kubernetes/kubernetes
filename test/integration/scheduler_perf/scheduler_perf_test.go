@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/component-base/featuregate"
 	testutils "k8s.io/kubernetes/test/utils"
 	ktesting "k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
@@ -415,4 +416,83 @@ func createObjTemplateFile(t *testing.T, obj any) *string {
 		t.Fatalf("Unsupported object type for template file: %T", obj)
 	}
 	return &templateFile
+}
+
+func TestFeatureGatesMerge(t *testing.T) {
+	const (
+		FeatureA featuregate.Feature = "FeatureA"
+		FeatureB featuregate.Feature = "FeatureB"
+		FeatureC featuregate.Feature = "FeatureC"
+	)
+
+	tests := []struct {
+		name      string
+		src       map[featuregate.Feature]bool
+		overrides map[featuregate.Feature]bool
+		want      map[featuregate.Feature]bool
+	}{
+		{
+			name:      "both nil, return empty map",
+			src:       nil,
+			overrides: nil,
+			want:      map[featuregate.Feature]bool{},
+		},
+		{
+			name:      "both empty, return empty map",
+			src:       map[featuregate.Feature]bool{},
+			overrides: map[featuregate.Feature]bool{},
+			want:      map[featuregate.Feature]bool{},
+		},
+		{
+			name:      "nil src, valid overrides",
+			src:       nil,
+			overrides: map[featuregate.Feature]bool{FeatureA: true},
+			want:      map[featuregate.Feature]bool{FeatureA: true},
+		},
+		{
+			name:      "valid src, nil overrides",
+			src:       map[featuregate.Feature]bool{FeatureA: true},
+			overrides: nil,
+			want:      map[featuregate.Feature]bool{FeatureA: true},
+		},
+		{
+			name:      "distinct features merged",
+			src:       map[featuregate.Feature]bool{FeatureA: true},
+			overrides: map[featuregate.Feature]bool{FeatureB: false},
+			want:      map[featuregate.Feature]bool{FeatureA: true, FeatureB: false},
+		},
+		{
+			name:      "overlap with the same value",
+			src:       map[featuregate.Feature]bool{FeatureA: true, FeatureB: true},
+			overrides: map[featuregate.Feature]bool{FeatureB: true},
+			want:      map[featuregate.Feature]bool{FeatureA: true, FeatureB: true},
+		},
+		{
+			name:      "overlap with override (true to false)",
+			src:       map[featuregate.Feature]bool{FeatureA: true},
+			overrides: map[featuregate.Feature]bool{FeatureA: false},
+			want:      map[featuregate.Feature]bool{FeatureA: false},
+		},
+		{
+			name:      "overlap with override (false to true)",
+			src:       map[featuregate.Feature]bool{FeatureA: false},
+			overrides: map[featuregate.Feature]bool{FeatureA: true},
+			want:      map[featuregate.Feature]bool{FeatureA: true},
+		},
+		{
+			name:      "mixed distinct and overlap",
+			src:       map[featuregate.Feature]bool{FeatureA: true, FeatureB: true},
+			overrides: map[featuregate.Feature]bool{FeatureB: false, FeatureC: true},
+			want:      map[featuregate.Feature]bool{FeatureA: true, FeatureB: false, FeatureC: true},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := featureGatesMerge(tt.src, tt.overrides)
+			if diff := cmp.Diff(tt.want, got); diff != "" {
+				t.Errorf("Unexpected featureGatesMerge result (-want,+got):\n%s", diff)
+			}
+		})
+	}
 }

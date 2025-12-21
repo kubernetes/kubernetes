@@ -367,6 +367,33 @@ Usage:
         [--retry_time <seconds>] [--break_on_expected_content <true_or_false>]
 ```
 
+### mtlsclient
+
+```console
+    kubectl run test-agnhost \
+      --generator=run-pod/v1 \
+      --image=registry.k8s.io/e2e-test-images/agnhost:2.58 \
+      --restart=Always \
+      -- \
+      mtlsclient \
+      --fetch-url=<server-address> \ 
+      --server-trust-bundle=<server-trust-bundle.pem> \ 
+      --client-cred-bundle=<client-cred-bundle.pem>
+```
+
+### mtlsserver
+
+```console
+    kubectl run test-agnhost \
+      --generator=run-pod/v1 \
+      --image=registry.k8s.io/e2e-test-images/agnhost:2.58 \
+      --restart=Always \
+      -- \
+      mtlsserver \
+      --listen=<0.0.0.0:443> \
+      --server-creds=<server-cred-bundle.pem> \ 
+      --spiffe-trust-bundle=<spiffe-trust-bundle.pem> 
+```
 
 ### net
 

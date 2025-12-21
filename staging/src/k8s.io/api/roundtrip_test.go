@@ -37,8 +37,6 @@ import (
 	authorizationv1beta1 "k8s.io/api/authorization/v1beta1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
-	autoscalingv2beta1 "k8s.io/api/autoscaling/v2beta1"
-	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	certificatesv1 "k8s.io/api/certificates/v1"
@@ -78,7 +76,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
-	svmv1alpha1 "k8s.io/api/storagemigration/v1alpha1"
+	svmv1beta1 "k8s.io/api/storagemigration/v1beta1"
 
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	"k8s.io/apimachinery/pkg/api/apitesting/roundtrip"
@@ -105,8 +103,6 @@ var groups = []runtime.SchemeBuilder{
 	authorizationv1.SchemeBuilder,
 	autoscalingv1.SchemeBuilder,
 	autoscalingv2.SchemeBuilder,
-	autoscalingv2beta1.SchemeBuilder,
-	autoscalingv2beta2.SchemeBuilder,
 	batchv1beta1.SchemeBuilder,
 	batchv1.SchemeBuilder,
 	certificatesv1.SchemeBuilder,
@@ -146,7 +142,7 @@ var groups = []runtime.SchemeBuilder{
 	storagev1alpha1.SchemeBuilder,
 	storagev1beta1.SchemeBuilder,
 	storagev1.SchemeBuilder,
-	svmv1alpha1.SchemeBuilder,
+	svmv1beta1.SchemeBuilder,
 }
 
 func TestRoundTripExternalTypes(t *testing.T) {

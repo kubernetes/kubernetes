@@ -57,7 +57,7 @@ func NewLeaseCandidateInformer(client kubernetes.Interface, namespace string, re
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredLeaseCandidateInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
+		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
@@ -82,7 +82,7 @@ func NewFilteredLeaseCandidateInformer(client kubernetes.Interface, namespace st
 				}
 				return client.CoordinationV1beta1().LeaseCandidates(namespace).Watch(ctx, options)
 			},
-		},
+		}, client),
 		&apicoordinationv1beta1.LeaseCandidate{},
 		resyncPeriod,
 		indexers,

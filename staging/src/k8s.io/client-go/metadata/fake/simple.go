@@ -109,6 +109,10 @@ func (c *FakeMetadataClient) Resource(resource schema.GroupVersionResource) meta
 	return &metadataResourceClient{client: c, resource: resource}
 }
 
+func (c *FakeMetadataClient) IsWatchListSemanticsUnSupported() bool {
+	return true
+}
+
 // Namespace returns an interface for accessing the current resource in the specified
 // namespace.
 func (c *metadataResourceClient) Namespace(ns string) metadata.ResourceInterface {

@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/netip"
+	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -125,24 +126,30 @@ type Controller struct {
 
 // Run will not return until stopCh is closed.
 func (c *Controller) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
-	defer c.queue.ShutDown()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	c.eventBroadcaster.StartStructuredLogging(3)
 	c.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: c.client.CoreV1().Events("")})
 	defer c.eventBroadcaster.Shutdown()
 
 	logger := klog.FromContext(ctx)
-
 	logger.Info("Starting", "controller", controllerName)
-	defer logger.Info("Shutting down", "controller", controllerName)
+
+	var wg sync.WaitGroup
+	defer func() {
+		logger.Info("Shutting down", "controller", controllerName)
+		c.queue.ShutDown()
+		wg.Wait()
+	}()
 
 	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.serviceCIDRsSynced, c.ipAddressSynced) {
 		return
 	}
 
 	for i := 0; i < workers; i++ {
-		go wait.UntilWithContext(ctx, c.worker, c.workerLoopPeriod)
+		wg.Go(func() {
+			wait.UntilWithContext(ctx, c.worker, c.workerLoopPeriod)
+		})
 	}
 	<-ctx.Done()
 }
@@ -270,7 +277,7 @@ func (c *Controller) processNext(ctx context.Context) bool {
 	} else {
 		logger.Info("Dropping ServiceCIDR out of the queue", "ServiceCIDR", key, "err", err)
 		c.queue.Forget(key)
-		utilruntime.HandleError(err)
+		utilruntime.HandleErrorWithContext(ctx, err, "ServiceCIDR sync failed after max retries")
 	}
 	return true
 }

@@ -422,6 +422,11 @@ func (in ImageVolumeSource) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in ImageVolumeStatus) OpenAPIModelName() string {
+	return "io.k8s.api.core.v1.ImageVolumeStatus"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in KeyToPath) OpenAPIModelName() string {
 	return "io.k8s.api.core.v1.KeyToPath"
 }
@@ -1192,6 +1197,11 @@ func (in VolumeSource) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in VolumeStatus) OpenAPIModelName() string {
+	return "io.k8s.api.core.v1.VolumeStatus"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in VsphereVirtualDiskVolumeSource) OpenAPIModelName() string {
 	return "io.k8s.api.core.v1.VsphereVirtualDiskVolumeSource"
 }
@@ -1204,4 +1214,9 @@ func (in WeightedPodAffinityTerm) OpenAPIModelName() string {
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in WindowsSecurityContextOptions) OpenAPIModelName() string {
 	return "io.k8s.api.core.v1.WindowsSecurityContextOptions"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in WorkloadReference) OpenAPIModelName() string {
+	return "io.k8s.api.core.v1.WorkloadReference"
 }

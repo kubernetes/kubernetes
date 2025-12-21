@@ -24,284 +24,28 @@ import (
 
 	io "io"
 
-	proto "github.com/gogo/protobuf/proto"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	math "math"
 	math_bits "math/bits"
 	reflect "reflect"
 	strings "strings"
 )
 
-// Reference imports to suppress errors if they are not otherwise used.
-var _ = proto.Marshal
-var _ = fmt.Errorf
-var _ = math.Inf
+func (m *CELDeviceSelector) Reset() { *m = CELDeviceSelector{} }
 
-// This is a compile-time assertion to ensure that this generated file
-// is compatible with the proto package it is being compiled against.
-// A compilation error at this line likely means your copy of the
-// proto package needs to be updated.
-const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
+func (m *DeviceSelector) Reset() { *m = DeviceSelector{} }
 
-func (m *CELDeviceSelector) Reset()      { *m = CELDeviceSelector{} }
-func (*CELDeviceSelector) ProtoMessage() {}
-func (*CELDeviceSelector) Descriptor() ([]byte, []int) {
-	return fileDescriptor_66649ee9bbcd89d2, []int{0}
-}
-func (m *CELDeviceSelector) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *CELDeviceSelector) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *CELDeviceSelector) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_CELDeviceSelector.Merge(m, src)
-}
-func (m *CELDeviceSelector) XXX_Size() int {
-	return m.Size()
-}
-func (m *CELDeviceSelector) XXX_DiscardUnknown() {
-	xxx_messageInfo_CELDeviceSelector.DiscardUnknown(m)
-}
+func (m *DeviceTaint) Reset() { *m = DeviceTaint{} }
 
-var xxx_messageInfo_CELDeviceSelector proto.InternalMessageInfo
+func (m *DeviceTaintRule) Reset() { *m = DeviceTaintRule{} }
 
-func (m *DeviceSelector) Reset()      { *m = DeviceSelector{} }
-func (*DeviceSelector) ProtoMessage() {}
-func (*DeviceSelector) Descriptor() ([]byte, []int) {
-	return fileDescriptor_66649ee9bbcd89d2, []int{1}
-}
-func (m *DeviceSelector) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *DeviceSelector) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *DeviceSelector) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_DeviceSelector.Merge(m, src)
-}
-func (m *DeviceSelector) XXX_Size() int {
-	return m.Size()
-}
-func (m *DeviceSelector) XXX_DiscardUnknown() {
-	xxx_messageInfo_DeviceSelector.DiscardUnknown(m)
-}
+func (m *DeviceTaintRuleList) Reset() { *m = DeviceTaintRuleList{} }
 
-var xxx_messageInfo_DeviceSelector proto.InternalMessageInfo
+func (m *DeviceTaintRuleSpec) Reset() { *m = DeviceTaintRuleSpec{} }
 
-func (m *DeviceTaint) Reset()      { *m = DeviceTaint{} }
-func (*DeviceTaint) ProtoMessage() {}
-func (*DeviceTaint) Descriptor() ([]byte, []int) {
-	return fileDescriptor_66649ee9bbcd89d2, []int{2}
-}
-func (m *DeviceTaint) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *DeviceTaint) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *DeviceTaint) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_DeviceTaint.Merge(m, src)
-}
-func (m *DeviceTaint) XXX_Size() int {
-	return m.Size()
-}
-func (m *DeviceTaint) XXX_DiscardUnknown() {
-	xxx_messageInfo_DeviceTaint.DiscardUnknown(m)
-}
+func (m *DeviceTaintRuleStatus) Reset() { *m = DeviceTaintRuleStatus{} }
 
-var xxx_messageInfo_DeviceTaint proto.InternalMessageInfo
-
-func (m *DeviceTaintRule) Reset()      { *m = DeviceTaintRule{} }
-func (*DeviceTaintRule) ProtoMessage() {}
-func (*DeviceTaintRule) Descriptor() ([]byte, []int) {
-	return fileDescriptor_66649ee9bbcd89d2, []int{3}
-}
-func (m *DeviceTaintRule) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *DeviceTaintRule) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *DeviceTaintRule) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_DeviceTaintRule.Merge(m, src)
-}
-func (m *DeviceTaintRule) XXX_Size() int {
-	return m.Size()
-}
-func (m *DeviceTaintRule) XXX_DiscardUnknown() {
-	xxx_messageInfo_DeviceTaintRule.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_DeviceTaintRule proto.InternalMessageInfo
-
-func (m *DeviceTaintRuleList) Reset()      { *m = DeviceTaintRuleList{} }
-func (*DeviceTaintRuleList) ProtoMessage() {}
-func (*DeviceTaintRuleList) Descriptor() ([]byte, []int) {
-	return fileDescriptor_66649ee9bbcd89d2, []int{4}
-}
-func (m *DeviceTaintRuleList) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *DeviceTaintRuleList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *DeviceTaintRuleList) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_DeviceTaintRuleList.Merge(m, src)
-}
-func (m *DeviceTaintRuleList) XXX_Size() int {
-	return m.Size()
-}
-func (m *DeviceTaintRuleList) XXX_DiscardUnknown() {
-	xxx_messageInfo_DeviceTaintRuleList.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_DeviceTaintRuleList proto.InternalMessageInfo
-
-func (m *DeviceTaintRuleSpec) Reset()      { *m = DeviceTaintRuleSpec{} }
-func (*DeviceTaintRuleSpec) ProtoMessage() {}
-func (*DeviceTaintRuleSpec) Descriptor() ([]byte, []int) {
-	return fileDescriptor_66649ee9bbcd89d2, []int{5}
-}
-func (m *DeviceTaintRuleSpec) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *DeviceTaintRuleSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *DeviceTaintRuleSpec) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_DeviceTaintRuleSpec.Merge(m, src)
-}
-func (m *DeviceTaintRuleSpec) XXX_Size() int {
-	return m.Size()
-}
-func (m *DeviceTaintRuleSpec) XXX_DiscardUnknown() {
-	xxx_messageInfo_DeviceTaintRuleSpec.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_DeviceTaintRuleSpec proto.InternalMessageInfo
-
-func (m *DeviceTaintSelector) Reset()      { *m = DeviceTaintSelector{} }
-func (*DeviceTaintSelector) ProtoMessage() {}
-func (*DeviceTaintSelector) Descriptor() ([]byte, []int) {
-	return fileDescriptor_66649ee9bbcd89d2, []int{6}
-}
-func (m *DeviceTaintSelector) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *DeviceTaintSelector) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *DeviceTaintSelector) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_DeviceTaintSelector.Merge(m, src)
-}
-func (m *DeviceTaintSelector) XXX_Size() int {
-	return m.Size()
-}
-func (m *DeviceTaintSelector) XXX_DiscardUnknown() {
-	xxx_messageInfo_DeviceTaintSelector.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_DeviceTaintSelector proto.InternalMessageInfo
-
-func init() {
-	proto.RegisterType((*CELDeviceSelector)(nil), "k8s.io.api.resource.v1alpha3.CELDeviceSelector")
-	proto.RegisterType((*DeviceSelector)(nil), "k8s.io.api.resource.v1alpha3.DeviceSelector")
-	proto.RegisterType((*DeviceTaint)(nil), "k8s.io.api.resource.v1alpha3.DeviceTaint")
-	proto.RegisterType((*DeviceTaintRule)(nil), "k8s.io.api.resource.v1alpha3.DeviceTaintRule")
-	proto.RegisterType((*DeviceTaintRuleList)(nil), "k8s.io.api.resource.v1alpha3.DeviceTaintRuleList")
-	proto.RegisterType((*DeviceTaintRuleSpec)(nil), "k8s.io.api.resource.v1alpha3.DeviceTaintRuleSpec")
-	proto.RegisterType((*DeviceTaintSelector)(nil), "k8s.io.api.resource.v1alpha3.DeviceTaintSelector")
-}
-
-func init() {
-	proto.RegisterFile("k8s.io/api/resource/v1alpha3/generated.proto", fileDescriptor_66649ee9bbcd89d2)
-}
-
-var fileDescriptor_66649ee9bbcd89d2 = []byte{
-	// 716 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x94, 0x55, 0xbf, 0x6f, 0xd3, 0x40,
-	0x14, 0x8e, 0x9b, 0xa4, 0x24, 0x17, 0xda, 0xd2, 0xeb, 0x12, 0x55, 0xc5, 0xae, 0xdc, 0xa5, 0xa0,
-	0xd6, 0x26, 0x01, 0x21, 0x04, 0x62, 0x20, 0x6d, 0x84, 0x80, 0x52, 0xd0, 0xb5, 0x02, 0x09, 0x15,
-	0x89, 0xab, 0xf3, 0x9a, 0x98, 0xd8, 0xb1, 0xe5, 0x73, 0x22, 0xba, 0xf5, 0x4f, 0x60, 0x84, 0x8d,
-	0xff, 0x86, 0x8c, 0x1d, 0x18, 0x3a, 0xa0, 0x88, 0x9a, 0xbf, 0x80, 0x95, 0x09, 0xdd, 0xf9, 0x12,
-	0xa7, 0x8e, 0x28, 0x61, 0x8b, 0xbf, 0xfb, 0xde, 0xf7, 0xde, 0xf7, 0x7e, 0x28, 0x68, 0xa3, 0x7d,
-	0x8f, 0x19, 0xb6, 0x67, 0x52, 0xdf, 0x36, 0x03, 0x60, 0x5e, 0x37, 0xb0, 0xc0, 0xec, 0x55, 0xa8,
-	0xe3, 0xb7, 0xe8, 0x6d, 0xb3, 0x09, 0x1d, 0x08, 0x68, 0x08, 0x0d, 0xc3, 0x0f, 0xbc, 0xd0, 0xc3,
-	0x2b, 0x31, 0xdb, 0xa0, 0xbe, 0x6d, 0x0c, 0xd9, 0xc6, 0x90, 0xbd, 0xbc, 0xd9, 0xb4, 0xc3, 0x56,
-	0xf7, 0xd0, 0xb0, 0x3c, 0xd7, 0x6c, 0x7a, 0x4d, 0xcf, 0x14, 0x41, 0x87, 0xdd, 0x23, 0xf1, 0x25,
-	0x3e, 0xc4, 0xaf, 0x58, 0x6c, 0xf9, 0x4e, 0x92, 0xda, 0xa5, 0x56, 0xcb, 0xee, 0x40, 0x70, 0x6c,
-	0xfa, 0xed, 0x26, 0x07, 0x98, 0xe9, 0x42, 0x48, 0xcd, 0x5e, 0x25, 0x5d, 0xc2, 0xb2, 0xf9, 0xb7,
-	0xa8, 0xa0, 0xdb, 0x09, 0x6d, 0x17, 0x26, 0x02, 0xee, 0xfe, 0x2b, 0x80, 0x59, 0x2d, 0x70, 0x69,
-	0x3a, 0x4e, 0x7f, 0x8c, 0x16, 0xb7, 0xea, 0x3b, 0xdb, 0xd0, 0xb3, 0x2d, 0xd8, 0x03, 0x07, 0xac,
-	0xd0, 0x0b, 0x70, 0x15, 0x21, 0xf8, 0xe0, 0x07, 0xc0, 0x98, 0xed, 0x75, 0xca, 0xca, 0xaa, 0xb2,
-	0x5e, 0xac, 0xe1, 0xfe, 0x40, 0xcb, 0x44, 0x03, 0x0d, 0xd5, 0x47, 0x2f, 0x64, 0x8c, 0xa5, 0x1f,
-	0xa0, 0xf9, 0x94, 0xca, 0x53, 0x94, 0xb5, 0xc0, 0x11, 0xe1, 0xa5, 0xaa, 0x69, 0x5c, 0xd6, 0x54,
-	0x63, 0xa2, 0x86, 0xda, 0x95, 0x68, 0xa0, 0x65, 0xb7, 0xea, 0x3b, 0x84, 0x8b, 0xe8, 0xbf, 0x14,
-	0x54, 0x8a, 0x09, 0xfb, 0xd4, 0xee, 0x84, 0xf8, 0x3a, 0xca, 0xb6, 0xe1, 0x58, 0x96, 0x56, 0x92,
-	0xa5, 0x65, 0x9f, 0xc1, 0x31, 0xe1, 0x38, 0x5e, 0x43, 0xf9, 0x1e, 0x75, 0xba, 0x50, 0x9e, 0x11,
-	0x84, 0x39, 0x49, 0xc8, 0xbf, 0xe2, 0x20, 0x89, 0xdf, 0xf0, 0x03, 0x34, 0x0b, 0x47, 0x47, 0x60,
-	0x85, 0xe5, 0xac, 0x60, 0xad, 0x49, 0xd6, 0x6c, 0x5d, 0xa0, 0xbf, 0x07, 0xda, 0xe2, 0x58, 0xca,
-	0x18, 0x24, 0x32, 0x04, 0xbf, 0x46, 0x45, 0xde, 0xd6, 0x47, 0x8d, 0x06, 0x34, 0xca, 0x39, 0x61,
-	0xf1, 0xe6, 0x98, 0xc5, 0xd1, 0x0c, 0x0c, 0xbf, 0xdd, 0xe4, 0x00, 0x33, 0xf8, 0xa8, 0x8d, 0x5e,
-	0xc5, 0xd8, 0xb7, 0x5d, 0xa8, 0xcd, 0x45, 0x03, 0xad, 0xb8, 0x3f, 0x14, 0x20, 0x89, 0xd6, 0xfd,
-	0xc2, 0xa7, 0x2f, 0x5a, 0xe6, 0xe4, 0xfb, 0x6a, 0x46, 0xef, 0x2b, 0x68, 0x61, 0xac, 0x00, 0xd2,
-	0x75, 0x00, 0xbf, 0x43, 0x05, 0xae, 0xd3, 0xa0, 0x21, 0x95, 0x8d, 0xbd, 0x35, 0x5d, 0xd6, 0x17,
-	0x87, 0xef, 0xc1, 0x0a, 0x9f, 0x43, 0x48, 0x93, 0x49, 0x26, 0x18, 0x19, 0xa9, 0xe2, 0x3d, 0x94,
-	0x63, 0x3e, 0x58, 0xa2, 0x73, 0xa5, 0x6a, 0xe5, 0xf2, 0xb1, 0xa5, 0xca, 0xdb, 0xf3, 0xc1, 0xaa,
-	0x5d, 0x95, 0xf2, 0x39, 0xfe, 0x45, 0x84, 0x98, 0xfe, 0x55, 0x41, 0x4b, 0x29, 0xee, 0x8e, 0xcd,
-	0x42, 0x7c, 0x30, 0x61, 0xc7, 0x98, 0xce, 0x0e, 0x8f, 0x16, 0x66, 0xae, 0xc9, 0x6c, 0x85, 0x21,
-	0x32, 0x66, 0x85, 0xa0, 0xbc, 0x1d, 0x82, 0xcb, 0xca, 0x33, 0xab, 0xd9, 0xf5, 0x52, 0x75, 0xf3,
-	0xbf, 0xbc, 0x24, 0x4b, 0xf3, 0x84, 0x6b, 0x90, 0x58, 0x4a, 0xff, 0x36, 0xe9, 0x84, 0xfb, 0xc4,
-	0x2e, 0x9a, 0x6f, 0x5c, 0x58, 0x60, 0xe9, 0x67, 0xfa, 0x06, 0x8e, 0x36, 0x1f, 0x47, 0x03, 0x2d,
-	0x75, 0x4b, 0x24, 0x25, 0x8e, 0x77, 0x51, 0x3e, 0xe4, 0x41, 0x72, 0x4c, 0x37, 0xa6, 0xce, 0x92,
-	0xd8, 0x8a, 0xeb, 0x8f, 0x65, 0xf4, 0xcf, 0x33, 0x17, 0x6c, 0x8d, 0xf2, 0x3c, 0x44, 0x0b, 0x71,
-	0xe6, 0x2d, 0x87, 0x32, 0xb6, 0x4b, 0x5d, 0x90, 0x37, 0xb7, 0x14, 0x0d, 0x34, 0xb9, 0x9d, 0xa3,
-	0x27, 0x92, 0xe6, 0x62, 0x1d, 0xcd, 0x36, 0x02, 0xbb, 0x07, 0x81, 0x3c, 0x44, 0xc4, 0xcf, 0x6b,
-	0x5b, 0x20, 0x44, 0xbe, 0xe0, 0x15, 0x94, 0xf3, 0x3d, 0xcf, 0x91, 0x47, 0x58, 0xe0, 0x9b, 0xf3,
-	0xd2, 0xf3, 0x1c, 0x22, 0x50, 0xa1, 0x20, 0x44, 0xc5, 0x91, 0x0d, 0x15, 0x04, 0x42, 0xe4, 0x0b,
-	0x7e, 0x8b, 0x8a, 0x4c, 0x16, 0xcc, 0xca, 0x79, 0x31, 0xeb, 0x8d, 0x69, 0x1a, 0x32, 0xea, 0xf8,
-	0xa2, 0xec, 0x49, 0x71, 0x88, 0x30, 0x92, 0x28, 0xd6, 0x6a, 0xfd, 0x73, 0x35, 0x73, 0x7a, 0xae,
-	0x66, 0xce, 0xce, 0xd5, 0xcc, 0x49, 0xa4, 0x2a, 0xfd, 0x48, 0x55, 0x4e, 0x23, 0x55, 0x39, 0x8b,
-	0x54, 0xe5, 0x47, 0xa4, 0x2a, 0x1f, 0x7f, 0xaa, 0x99, 0x37, 0x2b, 0x97, 0xfd, 0xc5, 0xfc, 0x09,
-	0x00, 0x00, 0xff, 0xff, 0x7e, 0xb1, 0x06, 0x7b, 0x81, 0x06, 0x00, 0x00,
-}
+func (m *DeviceTaintSelector) Reset() { *m = DeviceTaintSelector{} }
 
 func (m *CELDeviceSelector) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
@@ -437,6 +181,16 @@ func (m *DeviceTaintRule) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	var l int
 	_ = l
 	{
+		size, err := m.Status.MarshalToSizedBuffer(dAtA[:i])
+		if err != nil {
+			return 0, err
+		}
+		i -= size
+		i = encodeVarintGenerated(dAtA, i, uint64(size))
+	}
+	i--
+	dAtA[i] = 0x1a
+	{
 		size, err := m.Spec.MarshalToSizedBuffer(dAtA[:i])
 		if err != nil {
 			return 0, err
@@ -551,6 +305,43 @@ func (m *DeviceTaintRuleSpec) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
+func (m *DeviceTaintRuleStatus) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *DeviceTaintRuleStatus) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *DeviceTaintRuleStatus) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.Conditions) > 0 {
+		for iNdEx := len(m.Conditions) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.Conditions[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenerated(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0xa
+		}
+	}
+	return len(dAtA) - i, nil
+}
+
 func (m *DeviceTaintSelector) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -571,20 +362,6 @@ func (m *DeviceTaintSelector) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if len(m.Selectors) > 0 {
-		for iNdEx := len(m.Selectors) - 1; iNdEx >= 0; iNdEx-- {
-			{
-				size, err := m.Selectors[iNdEx].MarshalToSizedBuffer(dAtA[:i])
-				if err != nil {
-					return 0, err
-				}
-				i -= size
-				i = encodeVarintGenerated(dAtA, i, uint64(size))
-			}
-			i--
-			dAtA[i] = 0x2a
-		}
-	}
 	if m.Device != nil {
 		i -= len(*m.Device)
 		copy(dAtA[i:], *m.Device)
@@ -605,13 +382,6 @@ func (m *DeviceTaintSelector) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		i = encodeVarintGenerated(dAtA, i, uint64(len(*m.Driver)))
 		i--
 		dAtA[i] = 0x12
-	}
-	if m.DeviceClassName != nil {
-		i -= len(*m.DeviceClassName)
-		copy(dAtA[i:], *m.DeviceClassName)
-		i = encodeVarintGenerated(dAtA, i, uint64(len(*m.DeviceClassName)))
-		i--
-		dAtA[i] = 0xa
 	}
 	return len(dAtA) - i, nil
 }
@@ -680,6 +450,8 @@ func (m *DeviceTaintRule) Size() (n int) {
 	n += 1 + l + sovGenerated(uint64(l))
 	l = m.Spec.Size()
 	n += 1 + l + sovGenerated(uint64(l))
+	l = m.Status.Size()
+	n += 1 + l + sovGenerated(uint64(l))
 	return n
 }
 
@@ -715,16 +487,27 @@ func (m *DeviceTaintRuleSpec) Size() (n int) {
 	return n
 }
 
+func (m *DeviceTaintRuleStatus) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if len(m.Conditions) > 0 {
+		for _, e := range m.Conditions {
+			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	return n
+}
+
 func (m *DeviceTaintSelector) Size() (n int) {
 	if m == nil {
 		return 0
 	}
 	var l int
 	_ = l
-	if m.DeviceClassName != nil {
-		l = len(*m.DeviceClassName)
-		n += 1 + l + sovGenerated(uint64(l))
-	}
 	if m.Driver != nil {
 		l = len(*m.Driver)
 		n += 1 + l + sovGenerated(uint64(l))
@@ -736,12 +519,6 @@ func (m *DeviceTaintSelector) Size() (n int) {
 	if m.Device != nil {
 		l = len(*m.Device)
 		n += 1 + l + sovGenerated(uint64(l))
-	}
-	if len(m.Selectors) > 0 {
-		for _, e := range m.Selectors {
-			l = e.Size()
-			n += 1 + l + sovGenerated(uint64(l))
-		}
 	}
 	return n
 }
@@ -779,6 +556,7 @@ func (this *DeviceTaintRule) String() string {
 	s := strings.Join([]string{`&DeviceTaintRule{`,
 		`ObjectMeta:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ObjectMeta), "ObjectMeta", "v1.ObjectMeta", 1), `&`, ``, 1) + `,`,
 		`Spec:` + strings.Replace(strings.Replace(this.Spec.String(), "DeviceTaintRuleSpec", "DeviceTaintRuleSpec", 1), `&`, ``, 1) + `,`,
+		`Status:` + strings.Replace(strings.Replace(this.Status.String(), "DeviceTaintRuleStatus", "DeviceTaintRuleStatus", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -810,21 +588,29 @@ func (this *DeviceTaintRuleSpec) String() string {
 	}, "")
 	return s
 }
+func (this *DeviceTaintRuleStatus) String() string {
+	if this == nil {
+		return "nil"
+	}
+	repeatedStringForConditions := "[]Condition{"
+	for _, f := range this.Conditions {
+		repeatedStringForConditions += fmt.Sprintf("%v", f) + ","
+	}
+	repeatedStringForConditions += "}"
+	s := strings.Join([]string{`&DeviceTaintRuleStatus{`,
+		`Conditions:` + repeatedStringForConditions + `,`,
+		`}`,
+	}, "")
+	return s
+}
 func (this *DeviceTaintSelector) String() string {
 	if this == nil {
 		return "nil"
 	}
-	repeatedStringForSelectors := "[]DeviceSelector{"
-	for _, f := range this.Selectors {
-		repeatedStringForSelectors += strings.Replace(strings.Replace(f.String(), "DeviceSelector", "DeviceSelector", 1), `&`, ``, 1) + ","
-	}
-	repeatedStringForSelectors += "}"
 	s := strings.Join([]string{`&DeviceTaintSelector{`,
-		`DeviceClassName:` + valueToStringGenerated(this.DeviceClassName) + `,`,
 		`Driver:` + valueToStringGenerated(this.Driver) + `,`,
 		`Pool:` + valueToStringGenerated(this.Pool) + `,`,
 		`Device:` + valueToStringGenerated(this.Device) + `,`,
-		`Selectors:` + repeatedStringForSelectors + `,`,
 		`}`,
 	}, "")
 	return s
@@ -1282,6 +1068,39 @@ func (m *DeviceTaintRule) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Status", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.Status.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
@@ -1539,6 +1358,90 @@ func (m *DeviceTaintRuleSpec) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+func (m *DeviceTaintRuleStatus) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: DeviceTaintRuleStatus: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: DeviceTaintRuleStatus: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Conditions", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Conditions = append(m.Conditions, v1.Condition{})
+			if err := m.Conditions[len(m.Conditions)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
 func (m *DeviceTaintSelector) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -1568,39 +1471,6 @@ func (m *DeviceTaintSelector) Unmarshal(dAtA []byte) error {
 			return fmt.Errorf("proto: DeviceTaintSelector: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
-		case 1:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field DeviceClassName", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowGenerated
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				stringLen |= uint64(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			s := string(dAtA[iNdEx:postIndex])
-			m.DeviceClassName = &s
-			iNdEx = postIndex
 		case 2:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Driver", wireType)
@@ -1699,40 +1569,6 @@ func (m *DeviceTaintSelector) Unmarshal(dAtA []byte) error {
 			}
 			s := string(dAtA[iNdEx:postIndex])
 			m.Device = &s
-			iNdEx = postIndex
-		case 5:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Selectors", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowGenerated
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= int(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			postIndex := iNdEx + msglen
-			if postIndex < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Selectors = append(m.Selectors, DeviceSelector{})
-			if err := m.Selectors[len(m.Selectors)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

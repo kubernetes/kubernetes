@@ -104,7 +104,7 @@ func (sc *SemanticConventions) NetAttributesFromHTTPRequest(
 // It handles both IPv4 and IPv6 addresses. If the host portion is not recognized
 // as a valid IPv4 or IPv6 address, the `ip` result will be empty and the
 // host portion will instead be returned in `name`.
-func hostIPNamePort(hostWithPort string) (ip string, name string, port int) {
+func hostIPNamePort(hostWithPort string) (ip, name string, port int) {
 	var (
 		hostPart, portPart string
 		parsedPort         uint64

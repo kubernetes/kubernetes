@@ -26,6 +26,31 @@ import (
 	utiltrace "k8s.io/utils/trace"
 )
 
+// RealFIFOOptions is the configuration parameters for RealFIFO.
+type RealFIFOOptions struct {
+	// KeyFunction is used to figure out what key an object should have. (It's
+	// exposed in the returned RealFIFO's keyOf() method, with additional
+	// handling around deleted objects and queue state).
+	// Optional, the default is MetaNamespaceKeyFunc.
+	KeyFunction KeyFunc
+
+	// KnownObjects is expected to return a list of keys that the consumer of
+	// this queue "knows about". It is used to decide which items are missing
+	// when Replace() is called; 'Deleted' deltas are produced for the missing items.
+	// KnownObjects is required.
+	KnownObjects KeyListerGetter
+
+	// If set, will be called for objects before enqueueing them. Please
+	// see the comment on TransformFunc for details.
+	Transformer TransformFunc
+}
+
+const (
+	defaultBatchSize = 1000
+)
+
+var _ QueueWithBatch = &RealFIFO{}
+
 // RealFIFO is a Queue in which every notification from the Reflector is passed
 // in order to the Queue via Pop.
 // This means that it
@@ -58,10 +83,14 @@ type RealFIFO struct {
 
 	// Called with every object if non-nil.
 	transformer TransformFunc
+
+	// batchSize determines the maximum number of objects we can combine into a batch.
+	batchSize int
 }
 
 var (
-	_ = Queue(&RealFIFO{}) // RealFIFO is a Queue
+	_ = Queue(&RealFIFO{})             // RealFIFO is a Queue
+	_ = TransformingStore(&RealFIFO{}) // RealFIFO implements TransformingStore to allow memory optimizations
 )
 
 // Close the queue.
@@ -235,6 +264,74 @@ func (f *RealFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 	return Deltas{item}, err
 }
 
+func (f *RealFIFO) PopBatch(process ProcessBatchFunc) error {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
+	for len(f.items) == 0 {
+		// When the queue is empty, invocation of Pop() is blocked until new item is enqueued.
+		// When Close() is called, the f.closed is set and the condition is broadcasted.
+		// Which causes this loop to continue and return from the Pop().
+		if f.closed {
+			return ErrFIFOClosed
+		}
+
+		f.cond.Wait()
+	}
+
+	isInInitialList := !f.hasSynced_locked()
+	unique := sets.NewString()
+	deltas := make([]Delta, 0, min(len(f.items), f.batchSize))
+	// only bundle unique items into a batch
+	for i := 0; i < f.batchSize && i < len(f.items); i++ {
+		if f.initialPopulationCount > 0 && i >= f.initialPopulationCount {
+			break
+		}
+		item := f.items[i]
+		id, err := f.keyOf(item)
+		if err != nil {
+			// close the batch here if error happens
+			// TODO: log the error when RealFIFOOptions supports passing klog instance like deprecated DeltaFIFO
+			// still pop the broken item out of queue to be compatible with the non-batch behavior it should be safe
+			// when 1st element is broken, however for Nth broken element, there's possible risk that broken item
+			// still can be processed and broke the uniqueness of the batch unexpectedly.
+			deltas = append(deltas, item)
+			// The underlying array still exists and references this object, so the object will not be garbage collected unless we zero the reference.
+			f.items[i] = Delta{}
+			break
+		}
+		if unique.Has(id) {
+			break
+		}
+		unique.Insert(id)
+		deltas = append(deltas, item)
+		// The underlying array still exists and references this object, so the object will not be garbage collected unless we zero the reference.
+		f.items[i] = Delta{}
+	}
+	if f.initialPopulationCount > 0 {
+		f.initialPopulationCount -= len(deltas)
+	}
+	f.items = f.items[len(deltas):]
+
+	// Only log traces if the queue depth is greater than 10 and it takes more than
+	// 100 milliseconds to process one item from the queue (with a max of 1 second for the whole batch)
+	// Queue depth never goes high because processing an item is locking the queue,
+	// and new items can't be added until processing finish.
+	// https://github.com/kubernetes/kubernetes/issues/103789
+	if len(f.items) > 10 {
+		id, _ := f.keyOf(deltas[0])
+		trace := utiltrace.New("RealFIFO PopBatch Process",
+			utiltrace.Field{Key: "ID", Value: id},
+			utiltrace.Field{Key: "Depth", Value: len(f.items)},
+			utiltrace.Field{Key: "Reason", Value: "slow event handlers blocking the queue"},
+			utiltrace.Field{Key: "BatchSize", Value: len(deltas)})
+		defer trace.LogIfLong(min(100*time.Millisecond*time.Duration(len(deltas)), time.Second))
+	}
+
+	err := process(deltas, isInInitialList)
+	return err
+}
+
 // Replace
 // 1. finds those items in f.items that are not in newItems and creates synthetic deletes for them
 // 2. finds items in knownObjects that are not in newItems and creates synthetic deletes for them
@@ -398,16 +495,32 @@ func (f *RealFIFO) Transformer() TransformFunc {
 // NewRealFIFO returns a Store which can be used to queue up items to
 // process.
 func NewRealFIFO(keyFunc KeyFunc, knownObjects KeyListerGetter, transformer TransformFunc) *RealFIFO {
-	if knownObjects == nil {
+	return NewRealFIFOWithOptions(RealFIFOOptions{
+		KeyFunction:  keyFunc,
+		KnownObjects: knownObjects,
+		Transformer:  transformer,
+	})
+}
+
+// NewRealFIFOWithOptions returns a Queue which can be used to process changes to
+// items. See also the comment on RealFIFO.
+func NewRealFIFOWithOptions(opts RealFIFOOptions) *RealFIFO {
+	if opts.KeyFunction == nil {
+		opts.KeyFunction = MetaNamespaceKeyFunc
+	}
+
+	if opts.KnownObjects == nil {
 		panic("coding error: knownObjects must be provided")
 	}
 
 	f := &RealFIFO{
 		items:        make([]Delta, 0, 10),
-		keyFunc:      keyFunc,
-		knownObjects: knownObjects,
-		transformer:  transformer,
+		keyFunc:      opts.KeyFunction,
+		knownObjects: opts.KnownObjects,
+		transformer:  opts.Transformer,
+		batchSize:    defaultBatchSize,
 	}
+
 	f.cond.L = &f.lock
 	return f
 }

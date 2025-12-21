@@ -19,6 +19,7 @@ package serving
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -28,6 +29,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	flagzv1alpha1 "k8s.io/apiserver/pkg/server/flagz/api/v1alpha1"
+	"k8s.io/apiserver/pkg/server/statusz/api/v1alpha1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/util/retry"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -39,9 +44,6 @@ import (
 )
 
 func TestEndpointHandlers(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ComponentFlagz, true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ComponentStatusz, true)
-
 	server, configStr, _, err := startTestAPIServer(t)
 	if err != nil {
 		t.Fatalf("Failed to start kube-apiserver server: %v", err)
@@ -121,27 +123,6 @@ func TestEndpointHandlers(t *testing.T) {
 			useBrokenConfig:  true,
 			wantResponseCode: http.StatusInternalServerError,
 		},
-		{
-			name:             "/flagz",
-			path:             "/flagz",
-			requestHeader:    map[string]string{"Accept": "text/plain"},
-			wantResponseCode: http.StatusOK,
-			wantResponseBodyRegx: `^\n` +
-				`kube-scheduler flags\n` +
-				`Warning: This endpoint is not meant to be machine parseable, ` +
-				`has no formatting compatibility guarantees and is for debugging purposes only.`,
-		},
-		{
-			name:             "/statusz",
-			path:             "/statusz",
-			requestHeader:    map[string]string{"Accept": "text/plain"},
-			wantResponseCode: http.StatusOK,
-			wantResponseBodyRegx: `(?s)^\n` +
-				`kube-scheduler statusz\n` +
-				`Warning: This endpoint is not meant to be machine parseable, ` +
-				`has no formatting compatibility guarantees and is for debugging purposes only.+` +
-				`Paths([:=\s]+)/configz /flagz /healthz /livez /metrics /readyz\n$`,
-		},
 	}
 
 	for _, tt := range tests {
@@ -154,7 +135,7 @@ func TestEndpointHandlers(t *testing.T) {
 				configFile = brokenConfig.Name()
 			}
 			result, err := kubeschedulertesting.StartTestServer(
-				ctx,
+				t, ctx,
 				[]string{"--kubeconfig", configFile, "--leader-elect=false", "--authorization-always-allow-paths", tt.path})
 
 			if err != nil {
@@ -168,7 +149,7 @@ func TestEndpointHandlers(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to get client from test server: %v", err)
 			}
-			req, err := http.NewRequest("GET", base+tt.path, nil)
+			req, err := http.NewRequest(http.MethodGet, base+tt.path, nil)
 			if err != nil {
 				t.Fatalf("failed to request: %v", err)
 			}
@@ -218,6 +199,279 @@ func TestEndpointHandlers(t *testing.T) {
 			)
 			if err != nil {
 				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestSchedulerZPages(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.ComponentStatusz: true,
+		features.ComponentFlagz:   true,
+	})
+
+	server, configStr, _, err := startTestAPIServer(t)
+	if err != nil {
+		t.Fatalf("Failed to start kube-apiserver server: %v", err)
+	}
+	defer server.TearDownFn()
+
+	apiserverConfig, err := os.CreateTemp("", "kubeconfig")
+	if err != nil {
+		t.Fatalf("Failed to create config file: %v", err)
+	}
+	defer func() {
+		_ = os.Remove(apiserverConfig.Name())
+	}()
+	if _, err = apiserverConfig.WriteString(configStr); err != nil {
+		t.Fatalf("Failed to write config file: %v", err)
+	}
+
+	_, ctx := ktesting.NewTestContext(t)
+	result, err := kubeschedulertesting.StartTestServer(
+		t, ctx,
+		[]string{"--kubeconfig", apiserverConfig.Name(), "--leader-elect=false", "--authorization-always-allow-paths=/statusz,/flagz"},
+	)
+	if err != nil {
+		t.Fatalf("Failed to start kube-scheduler server: %v", err)
+	}
+	if result.TearDownFn != nil {
+		defer result.TearDownFn()
+	}
+
+	client, base, err := clientAndURLFromTestServer(result)
+	if err != nil {
+		t.Fatalf("Failed to get client from test server: %v", err)
+	}
+
+	statuszWantBodyStr := "kube-scheduler statusz\nWarning: This endpoint is not meant to be machine parseable"
+	statuszWantBodyJSON := &v1alpha1.Statusz{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Statusz",
+			APIVersion: "config.k8s.io/v1alpha1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "kube-scheduler",
+		},
+		Paths: []string{"/configz", "/flagz", "/healthz", "/livez", "/metrics", "/readyz"},
+	}
+
+	flagzWantBodyStr := "kube-scheduler flagz\nWarning: This endpoint is not meant to be machine parseable"
+	flagzWantBodyJSON := &flagzv1alpha1.Flagz{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Flagz",
+			APIVersion: "config.k8s.io/v1alpha1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "kube-scheduler",
+		},
+	}
+
+	statuszTestCases := []struct {
+		name         string
+		acceptHeader string
+		wantStatus   int
+		wantBodySub  string            // for text/plain
+		wantJSON     *v1alpha1.Statusz // for application/json
+	}{
+		{
+			name:         "text plain response",
+			acceptHeader: "text/plain",
+			wantStatus:   http.StatusOK,
+			wantBodySub:  statuszWantBodyStr,
+		},
+		{
+			name:         "structured json response",
+			acceptHeader: "application/json;v=v1alpha1;g=config.k8s.io;as=Statusz",
+			wantStatus:   http.StatusOK,
+			wantJSON:     statuszWantBodyJSON,
+		},
+		{
+			name:         "no accept header (defaults to text)",
+			acceptHeader: "",
+			wantStatus:   http.StatusOK,
+			wantBodySub:  statuszWantBodyStr,
+		},
+		{
+			name:         "invalid accept header",
+			acceptHeader: "application/xml",
+			wantStatus:   http.StatusNotAcceptable,
+		},
+		{
+			name:         "application/json without params",
+			acceptHeader: "application/json",
+			wantStatus:   http.StatusNotAcceptable,
+		},
+		{
+			name:         "application/json with missing as",
+			acceptHeader: "application/json;v=v1alpha1;g=config.k8s.io",
+			wantStatus:   http.StatusNotAcceptable,
+		},
+		{
+			name:         "wildcard accept header",
+			acceptHeader: "*/*",
+			wantStatus:   http.StatusOK,
+			wantBodySub:  statuszWantBodyStr,
+		},
+		{
+			name:         "bad json header fall back wildcard",
+			acceptHeader: "application/json;v=foo;g=config.k8s.io;as=Statusz,*/*",
+			wantStatus:   http.StatusOK,
+			wantBodySub:  statuszWantBodyStr,
+		},
+	}
+
+	flagzTestCases := []struct {
+		name         string
+		acceptHeader string
+		wantStatus   int
+		wantBodySub  string               // for text/plain
+		wantJSON     *flagzv1alpha1.Flagz // for structured json
+	}{
+		{
+			name:         "text plain response",
+			acceptHeader: "text/plain",
+			wantStatus:   http.StatusOK,
+			wantBodySub:  flagzWantBodyStr,
+		},
+		{
+			name:         "structured json response",
+			acceptHeader: "application/json;v=v1alpha1;g=config.k8s.io;as=Flagz",
+			wantStatus:   http.StatusOK,
+			wantJSON:     flagzWantBodyJSON,
+		},
+		{
+			name:         "no accept header (defaults to text)",
+			acceptHeader: "",
+			wantStatus:   http.StatusOK,
+			wantBodySub:  flagzWantBodyStr,
+		},
+		{
+			name:         "invalid accept header",
+			acceptHeader: "application/xml",
+			wantStatus:   http.StatusNotAcceptable,
+		},
+		{
+			name:         "application/json without params",
+			acceptHeader: "application/json",
+			wantStatus:   http.StatusNotAcceptable,
+		},
+		{
+			name:         "application/json with missing as",
+			acceptHeader: "application/json;v=v1alpha1;g=config.k8s.io",
+			wantStatus:   http.StatusNotAcceptable,
+		},
+		{
+			name:         "wildcard accept header",
+			acceptHeader: "*/*",
+			wantStatus:   http.StatusOK,
+			wantBodySub:  flagzWantBodyStr,
+		},
+		{
+			name:         "bad json header fall back wildcard",
+			acceptHeader: "application/json;v=foo;g=config.k8s.io;as=Flagz,*/*",
+			wantStatus:   http.StatusOK,
+			wantBodySub:  flagzWantBodyStr,
+		},
+	}
+
+	for _, tc := range statuszTestCases {
+		t.Run("statusz_"+tc.name, func(t *testing.T) {
+			req, err := http.NewRequest(http.MethodGet, base+"/statusz", nil)
+			if err != nil {
+				t.Fatalf("failed to request: %v", err)
+			}
+
+			req.Header.Set("Accept", tc.acceptHeader)
+			r, err := client.Do(req)
+			if err != nil {
+				t.Fatalf("failed to GET /statusz: %v", err)
+			}
+
+			body, err := io.ReadAll(r.Body)
+			if err != nil {
+				t.Fatalf("failed to read response body: %v", err)
+			}
+
+			if err = r.Body.Close(); err != nil {
+				t.Fatalf("failed to close response body: %v", err)
+			}
+
+			if r.StatusCode != tc.wantStatus {
+				t.Fatalf("want status %d, got %d", tc.wantStatus, r.StatusCode)
+			}
+
+			if tc.wantStatus == http.StatusOK {
+				if tc.wantBodySub != "" {
+					if !strings.Contains(string(body), tc.wantBodySub) {
+						t.Errorf("body missing expected substring: %q\nGot:\n%s", tc.wantBodySub, string(body))
+					}
+				}
+				if tc.wantJSON != nil {
+					var got v1alpha1.Statusz
+					if err := json.Unmarshal(body, &got); err != nil {
+						t.Fatalf("error unmarshalling JSON: %v", err)
+					}
+					// Only check static fields, since others are dynamic
+					if got.TypeMeta != tc.wantJSON.TypeMeta {
+						t.Errorf("TypeMeta mismatch: want %+v, got %+v", tc.wantJSON.TypeMeta, got.TypeMeta)
+					}
+					if got.ObjectMeta.Name != tc.wantJSON.ObjectMeta.Name {
+						t.Errorf("ObjectMeta.Name mismatch: want %q, got %q", tc.wantJSON.ObjectMeta.Name, got.ObjectMeta.Name)
+					}
+					if diff := cmp.Diff(tc.wantJSON.Paths, got.Paths); diff != "" {
+						t.Errorf("Paths mismatch (-want,+got):\n%s", diff)
+					}
+				}
+			}
+		})
+	}
+
+	for _, tc := range flagzTestCases {
+		t.Run("flagz_"+tc.name, func(t *testing.T) {
+			req, err := http.NewRequest(http.MethodGet, base+"/flagz", nil)
+			if err != nil {
+				t.Fatalf("failed to request: %v", err)
+			}
+
+			req.Header.Set("Accept", tc.acceptHeader)
+			r, err := client.Do(req)
+			if err != nil {
+				t.Fatalf("failed to GET /flagz: %v", err)
+			}
+
+			body, err := io.ReadAll(r.Body)
+			if err != nil {
+				t.Fatalf("failed to read response body: %v", err)
+			}
+
+			if err = r.Body.Close(); err != nil {
+				t.Fatalf("failed to close response body: %v", err)
+			}
+
+			if r.StatusCode != tc.wantStatus {
+				t.Fatalf("want status %d, got %d", tc.wantStatus, r.StatusCode)
+			}
+
+			if tc.wantStatus == http.StatusOK {
+				if tc.wantBodySub != "" {
+					if !strings.Contains(string(body), tc.wantBodySub) {
+						t.Errorf("body missing expected substring: %q\nGot:\n%s", tc.wantBodySub, string(body))
+					}
+				}
+				if tc.wantJSON != nil {
+					var got flagzv1alpha1.Flagz
+					if err := json.Unmarshal(body, &got); err != nil {
+						t.Fatalf("error unmarshalling JSON: %v", err)
+					}
+					// Only check static fields, since others are dynamic
+					if got.TypeMeta != tc.wantJSON.TypeMeta {
+						t.Errorf("TypeMeta mismatch: want %+v, got %+v", tc.wantJSON.TypeMeta, got.TypeMeta)
+					}
+					if got.ObjectMeta.Name != tc.wantJSON.ObjectMeta.Name {
+						t.Errorf("ObjectMeta.Name mismatch: want %q, got %q", tc.wantJSON.ObjectMeta.Name, got.ObjectMeta.Name)
+					}
+				}
 			}
 		})
 	}

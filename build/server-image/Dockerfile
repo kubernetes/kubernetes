@@ -19,4 +19,4 @@ ARG BINARY
 
 
 FROM "${BASEIMAGE}"
-COPY ${BINARY} /usr/local/bin/${BINARY}
+COPY --chmod=755 ${BINARY} /usr/local/bin/${BINARY}

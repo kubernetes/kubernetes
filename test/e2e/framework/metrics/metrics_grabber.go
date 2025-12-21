@@ -29,6 +29,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	k8snet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -94,7 +95,6 @@ type Grabber struct {
 // support it. If disabled for a component, the corresponding Grab function
 // will immediately return an error derived from MetricsGrabbingDisabledError.
 func NewMetricsGrabber(ctx context.Context, c clientset.Interface, ec clientset.Interface, config *rest.Config, kubelets bool, scheduler bool, controllers bool, apiServer bool, clusterAutoscaler bool, snapshotController bool) (*Grabber, error) {
-
 	kubeScheduler := ""
 	kubeControllerManager := ""
 	snapshotControllerManager := ""
@@ -213,28 +213,29 @@ func (g *Grabber) grabFromKubeletInternal(ctx context.Context, nodeName string, 
 }
 
 func (g *Grabber) getMetricsFromNode(ctx context.Context, nodeName string, kubeletPort int, pathSuffix string) (string, error) {
-	// There's a problem with timing out during proxy. Wrapping this in a goroutine to prevent deadlock.
-	finished := make(chan struct{}, 1)
+	// There's a problem with timing out during proxy. We are going to set a 45 second client timeout, and issue a retry.
 	var err error
-	var rawOutput []byte
-	go func() {
-		rawOutput, err = g.client.CoreV1().RESTClient().Get().
+	var output []byte
+	err = wait.PollUntilContextTimeout(ctx, 15*time.Second, 2*time.Minute, true, func(ctx context.Context) (done bool, retErr error) {
+		rawOutput, err := g.client.CoreV1().RESTClient().Get().
 			Resource("nodes").
 			SubResource("proxy").
 			Name(fmt.Sprintf("%v:%v", nodeName, kubeletPort)).
 			Suffix(pathSuffix).
+			Timeout(45 * time.Second).
 			Do(ctx).Raw()
-		finished <- struct{}{}
-	}()
-	select {
-	case <-time.After(proxyTimeout):
-		return "", fmt.Errorf("Timed out when waiting for proxy to gather metrics from %v", nodeName)
-	case <-finished:
 		if err != nil {
-			return "", err
+			if k8snet.IsTimeout(err) {
+				klog.Warningf("Metrics rest call timed out")
+				return false, nil
+			}
+			klog.Warningf("Metrics rest call errored: %v", err)
+			return false, nil
 		}
-		return string(rawOutput), nil
-	}
+		output = rawOutput
+		return true, nil
+	})
+	return string(output), err
 }
 
 // GrabFromKubeProxy returns metrics from kube-proxy

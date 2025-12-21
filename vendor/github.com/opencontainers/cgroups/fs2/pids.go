@@ -4,6 +4,7 @@ import (
 	"errors"
 	"math"
 	"os"
+	"strconv"
 	"strings"
 
 	"golang.org/x/sys/unix"
@@ -13,19 +14,26 @@ import (
 )
 
 func isPidsSet(r *cgroups.Resources) bool {
-	return r.PidsLimit != 0
+	return r.PidsLimit != nil
 }
 
 func setPids(dirPath string, r *cgroups.Resources) error {
 	if !isPidsSet(r) {
 		return nil
 	}
-	if val := numToStr(r.PidsLimit); val != "" {
-		if err := cgroups.WriteFile(dirPath, "pids.max", val); err != nil {
-			return err
-		}
+	val := "max"
+	if limit := *r.PidsLimit; limit > 0 {
+		val = strconv.FormatInt(limit, 10)
+	} else if limit == 0 {
+		// systemd doesn't support setting pids.max to "0", so when setting
+		// TasksMax we need to remap it to "1". We do the same thing here to
+		// avoid flip-flop behaviour between the fs and systemd drivers. In
+		// practice, the pids cgroup behaviour is basically identical.
+		val = "1"
 	}
-
+	if err := cgroups.WriteFile(dirPath, "pids.max", val); err != nil {
+		return err
+	}
 	return nil
 }
 

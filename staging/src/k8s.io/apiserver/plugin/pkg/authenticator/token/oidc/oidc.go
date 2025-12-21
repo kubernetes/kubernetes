@@ -27,6 +27,7 @@ oidc implements the authenticator.Token interface using the OpenID Connect proto
 package oidc
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
@@ -34,6 +35,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"net/url"
 	"strings"
@@ -46,6 +48,7 @@ import (
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/common/types/traits"
+	jose "gopkg.in/go-jose/go-jose.v2"
 
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -58,7 +61,9 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/lazy"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server/egressselector"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/klog/v2"
 )
@@ -79,6 +84,10 @@ type Options struct {
 
 	// Optional KeySet to allow for synchronous initialization instead of fetching from the remote issuer.
 	// Mutually exclusive with JWTAuthenticator.Issuer.DiscoveryURL.
+	//
+	// The following API server metrics for fetching JWKS and provider status will not be recorded if this is set.
+	//  - apiserver_authentication_jwt_authenticator_jwks_fetch_last_timestamp_seconds
+	//  - apiserver_authentication_jwt_authenticator_jwks_fetch_last_key_set_info
 	KeySet oidc.KeySet
 
 	// PEM encoded root certificate contents of the provider.  Mutually exclusive with Client.
@@ -108,6 +117,10 @@ type Options struct {
 	SupportedSigningAlgs []string
 
 	DisallowedIssuers []string
+
+	// APIServerID is the ID of the API server
+	// This is used in metrics to identify the API server
+	APIServerID string
 
 	// now is used for testing. It defaults to time.Now.
 	now func() time.Time
@@ -264,6 +277,7 @@ func New(lifecycleCtx context.Context, opts Options) (AuthenticatorTokenWithHeal
 		return nil, err
 	}
 
+	RegisterMetrics()
 	supportedSigningAlgs := opts.SupportedSigningAlgs
 	if len(supportedSigningAlgs) == 0 {
 		// RS256 is the default recommended by OpenID Connect and an 'alg' value
@@ -421,6 +435,31 @@ func New(lifecycleCtx context.Context, opts Options) (AuthenticatorTokenWithHeal
 					return false, nil
 				}
 
+				if utilfeature.DefaultFeatureGate.Enabled(features.StructuredAuthenticationConfigurationJWKSMetrics) {
+					providerJSON := &struct {
+						JWKSURL string `json:"jwks_uri"`
+					}{}
+
+					if err := provider.Claims(providerJSON); err != nil {
+						klog.Errorf("oidc authenticator: error getting JWKS URL: %v", err)
+						authn.healthCheck.Store(&errorHolder{err: err})
+						return false, nil
+					}
+					if len(providerJSON.JWKSURL) == 0 {
+						klog.Errorf("provider did not return JWKS URL")
+						authn.healthCheck.Store(&errorHolder{err: fmt.Errorf("provider did not return JWKS URL")})
+						return false, nil
+					}
+
+					clientWithJWKSMetrics := *client
+					clientWithJWKSMetrics.Transport = withMetricsRoundTripper(client.Transport, providerJSON.JWKSURL, issuerURL, opts.APIServerID, lifecycleCtx)
+					client = &clientWithJWKSMetrics
+
+					remoteKeySet := oidc.NewRemoteKeySet(oidc.ClientContext(lifecycleCtx, client), providerJSON.JWKSURL)
+					authn.setVerifier(&idTokenVerifier{oidc.NewVerifier(issuerURL, remoteKeySet, verifierConfig), audiences})
+					return true, nil
+				}
+
 				verifier := provider.Verifier(verifierConfig)
 				authn.setVerifier(&idTokenVerifier{verifier, audiences})
 				return true, nil
@@ -449,6 +488,100 @@ func egressLookupForType(egressLookup egressselector.Lookup, egressSelector egre
 
 type errorHolder struct {
 	err error
+}
+
+// metricsRoundTripper is a http.RoundTripper that records metrics for JWKS fetches.
+type metricsRoundTripper struct {
+	base    http.RoundTripper
+	jwksURL string
+
+	jwtIssuer        string
+	apiServerID      string
+	shouldRecordFunc func() bool
+}
+
+// shouldRecordMetrics returns true if metrics should be recorded.
+// This is used to avoid recording metrics after the lifecycle context is done.
+func (m *metricsRoundTripper) shouldRecordMetrics() bool {
+	return m.shouldRecordFunc()
+}
+
+func (m *metricsRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	if req.URL.String() != m.jwksURL || !m.shouldRecordMetrics() {
+		return m.base.RoundTrip(req)
+	}
+
+	resp, err := m.base.RoundTrip(req)
+	if err != nil || resp.StatusCode != http.StatusOK || resp.Body == nil {
+		if m.shouldRecordMetrics() {
+			recordJWKSFetchKeySetFailure(m.jwtIssuer, m.apiServerID)
+		}
+		return resp, err
+	}
+
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		if m.shouldRecordMetrics() {
+			recordJWKSFetchKeySetFailure(m.jwtIssuer, m.apiServerID)
+		}
+		return resp, fmt.Errorf("error reading JWKS response: %w", err)
+	}
+
+	// This check has been copied from https://github.com/coreos/go-oidc/blob/0fe98873951208147e6d412602432038c91cda54/oidc/jwks.go#L263-L267
+	// to validate the key set before setting the metrics to avoid recording invalid key sets.
+	var keySet jose.JSONWebKeySet
+	if m.shouldRecordMetrics() {
+		if unmarshalErr := unmarshalResp(resp, body, &keySet); unmarshalErr != nil {
+			recordJWKSFetchKeySetFailure(m.jwtIssuer, m.apiServerID)
+		} else {
+			recordJWKSFetchKeySetSuccess(m.jwtIssuer, m.apiServerID, string(body))
+		}
+	}
+
+	newResp := &http.Response{}
+	*newResp = *resp
+	newResp.Body = io.NopCloser(bytes.NewBuffer(body))
+
+	return newResp, nil
+}
+
+// This function is copied from https://github.com/coreos/go-oidc/blob/0fe98873951208147e6d412602432038c91cda54/oidc/oidc.go#L543-L554
+// to validate the key set before setting the metrics to avoid recording invalid key sets.
+func unmarshalResp(r *http.Response, body []byte, v interface{}) error {
+	err := json.Unmarshal(body, &v)
+	if err == nil {
+		return nil
+	}
+	ct := r.Header.Get("Content-Type")
+	mediaType, _, parseErr := mime.ParseMediaType(ct)
+	if parseErr == nil && mediaType == "application/json" {
+		return fmt.Errorf("got Content-Type = application/json, but could not unmarshal as JSON: %w", err)
+	}
+	return fmt.Errorf("expected Content-Type = application/json, got %q: %w", ct, err)
+}
+
+// withMetricsRoundTripper returns a new http.RoundTripper that records metrics for JWKS fetches.
+func withMetricsRoundTripper(base http.RoundTripper, jwksURL, jwtIssuer, apiServerID string, lifecycleCtx context.Context) http.RoundTripper {
+	if base == nil {
+		base = http.DefaultTransport
+	}
+	return &metricsRoundTripper{
+		base:        base,
+		jwksURL:     jwksURL,
+		jwtIssuer:   jwtIssuer,
+		apiServerID: apiServerID,
+		shouldRecordFunc: func() bool {
+			select {
+			case <-lifecycleCtx.Done():
+				return false
+			default:
+				return true
+			}
+		},
+	}
 }
 
 // discoveryURLRoundTripper is a http.RoundTripper that rewrites the

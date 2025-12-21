@@ -39,24 +39,19 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
-	clientfeatures "k8s.io/client-go/features"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/metadata/metadatainformer"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/watchlist"
-	"k8s.io/component-base/featuregate"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
-var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(features.WatchList), framework.WithSerial(), func() {
+var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(features.WatchList), func() {
 	f := framework.NewDefaultFramework("watchlist")
 	ginkgo.It("should be requested by informers when WatchListClient is enabled", func(ctx context.Context) {
-		featuregatetesting.SetFeatureGateDuringTest(ginkgo.GinkgoTB(), utilfeature.DefaultFeatureGate, featuregate.Feature(clientfeatures.WatchListClient), true)
 		stopCh := make(chan struct{})
 		defer close(stopCh)
 
@@ -100,8 +95,6 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(
 		verifyStoreFor(ctx, verifyStoreForMetaObject(expectedSecrets, secretInformer.GetStore()))
 	})
 	ginkgo.It("should be requested by metadatainformer when WatchListClient is enabled", func(ctx context.Context) {
-		featuregatetesting.SetFeatureGateDuringTest(ginkgo.GinkgoTB(), utilfeature.DefaultFeatureGate, featuregate.Feature(clientfeatures.WatchListClient), true)
-
 		metadataClient, err := metadata.NewForConfig(f.ClientConfig())
 		framework.ExpectNoError(err)
 		secretMetaInformer := metadatainformer.NewFilteredMetadataInformer(
@@ -143,8 +136,6 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(
 		verifyStoreFor(ctx, verifyPartialObjectMetadataStore(toPointerSlice(expectedSecrets.Items), secretMetaInformer.Informer().GetStore()))
 	})
 	ginkgo.It("should NOT be requested by client-go's List method when WatchListClient is enabled", func(ctx context.Context) {
-		featuregatetesting.SetFeatureGateDuringTest(ginkgo.GinkgoTB(), utilfeature.DefaultFeatureGate, featuregate.Feature(clientfeatures.WatchListClient), true)
-
 		expectedSecrets := addWellKnownSecrets(ctx, f)
 
 		rt, clientConfig := clientConfigWithRoundTripper(f)
@@ -164,8 +155,6 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(
 		gomega.Expect(rt.actualRequests).To(gomega.Equal(expectedRequestsMadeByKubeClient))
 	})
 	ginkgo.It("should NOT be requested by dynamic client's List method when WatchListClient is enabled", func(ctx context.Context) {
-		featuregatetesting.SetFeatureGateDuringTest(ginkgo.GinkgoTB(), utilfeature.DefaultFeatureGate, featuregate.Feature(clientfeatures.WatchListClient), true)
-
 		ginkgo.By(fmt.Sprintf("Adding 5 secrets to %s namespace", f.Namespace.Name))
 		expectedSecrets := addWellKnownUnstructuredSecrets(ctx, f)
 
@@ -187,8 +176,6 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(
 		gomega.Expect(rt.actualRequests).To(gomega.Equal(expectedRequestsMadeByDynamicClient))
 	})
 	ginkgo.It("should NOT be requested by metadata client's List method when WatchListClient is enabled", func(ctx context.Context) {
-		featuregatetesting.SetFeatureGateDuringTest(ginkgo.GinkgoTB(), utilfeature.DefaultFeatureGate, featuregate.Feature(clientfeatures.WatchListClient), true)
-
 		metaClient, err := metadata.NewForConfig(f.ClientConfig())
 		framework.ExpectNoError(err)
 		expectedMetaSecrets := []metav1.PartialObjectMetadata{}
@@ -216,8 +203,6 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(
 	})
 
 	ginkgo.It("server supports sending resources in Table format", func(ctx context.Context) {
-		featuregatetesting.SetFeatureGateDuringTest(ginkgo.GinkgoTB(), utilfeature.DefaultFeatureGate, featuregate.Feature(clientfeatures.WatchListClient), true)
-
 		modifiedClientConfig := dynamic.ConfigFor(f.ClientConfig())
 		modifiedClientConfig.AcceptContentTypes = strings.Join([]string{
 			fmt.Sprintf("application/json;as=Table;v=%s;g=%s", metav1.SchemeGroupVersion.Version, metav1.GroupName),
@@ -271,8 +256,6 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(
 	})
 
 	ginkgo.It("reflector doesn't support receiving resources as Tables", func(ctx context.Context) {
-		featuregatetesting.SetFeatureGateDuringTest(ginkgo.GinkgoTB(), utilfeature.DefaultFeatureGate, featuregate.Feature(clientfeatures.WatchListClient), true)
-
 		modifiedClientConfig := dynamic.ConfigFor(f.ClientConfig())
 		modifiedClientConfig.AcceptContentTypes = strings.Join([]string{
 			fmt.Sprintf("application/json;as=Table;v=%s;g=%s", metav1.SchemeGroupVersion.Version, metav1.GroupName),

@@ -30,8 +30,9 @@ set -x
 KUBE_CACHE_MUTATION_DETECTOR="${KUBE_CACHE_MUTATION_DETECTOR:-true}"
 export KUBE_CACHE_MUTATION_DETECTOR
 
-# panic the server on watch decode errors since they are considered coder mistakes
-KUBE_PANIC_WATCH_DECODE_ERROR="${KUBE_PANIC_WATCH_DECODE_ERROR:-true}"
+# default set to "false" to avoid panic on decode errors.
+# integration tests intentionally insert data that cannot be decoded.
+KUBE_PANIC_WATCH_DECODE_ERROR="${KUBE_PANIC_WATCH_DECODE_ERROR:-false}"
 export KUBE_PANIC_WATCH_DECODE_ERROR
 
 KUBE_INTEGRATION_TEST_MAX_CONCURRENCY=${KUBE_INTEGRATION_TEST_MAX_CONCURRENCY:-"-1"}

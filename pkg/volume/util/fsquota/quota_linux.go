@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2018 The Kubernetes Authors.
@@ -156,6 +155,12 @@ func clearMountpoint(path string) {
 	mountpointLock.Lock()
 	defer mountpointLock.Unlock()
 	delete(mountpointMap, path)
+}
+
+func clearSupportsQuotas(path string) {
+	supportsQuotasLock.Lock()
+	defer supportsQuotasLock.Unlock()
+	delete(supportsQuotasMap, path)
 }
 
 // getFSInfo Returns mountpoint and backing device
@@ -430,7 +435,7 @@ func ClearQuota(m mount.Interface, path string, userNamespacesEnabled bool) erro
 		// stale directory, so if we find a quota, just remove it.
 		// The process of clearing the quota requires that an applier
 		// be found, which needs to be cleaned up.
-		defer delete(supportsQuotasMap, path)
+		defer clearSupportsQuotas(path)
 		defer clearApplier(path)
 		return clearQuotaOnDir(m, path, userNamespacesEnabled)
 	}
@@ -467,7 +472,7 @@ func ClearQuota(m mount.Interface, path string, userNamespacesEnabled bool) erro
 	}
 	delete(dirPodMap, path)
 	delete(dirQuotaMap, path)
-	delete(supportsQuotasMap, path)
+	clearSupportsQuotas(path)
 	clearApplier(path)
 	if err != nil {
 		return fmt.Errorf("unable to clear quota for %s: %v", path, err)

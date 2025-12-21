@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2018 The Kubernetes Authors.
@@ -415,9 +414,7 @@ func toKubeContainerResources(statusResources *runtimeapi.ContainerResources) *k
 // Note: this function variable is being added here so it would be possible to mock
 // the cgroup version for unit tests by assigning a new mocked function into it. Without it,
 // the cgroup version would solely depend on the environment running the test.
-var isCgroup2UnifiedMode = func() bool {
-	return libcontainercgroups.IsCgroup2UnifiedMode()
-}
+var isCgroup2UnifiedMode = libcontainercgroups.IsCgroup2UnifiedMode
 
 // checkSwapControllerAvailability checks if swap controller is available.
 // It returns true if the swap controller is available, false otherwise.

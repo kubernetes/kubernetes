@@ -3205,7 +3205,7 @@ spec:
   - name: vol
   containers:
   - name: pv-recycler
-    image: registry.k8s.io/build-image/debian-base:bookworm-v1.0.4
+    image: registry.k8s.io/build-image/debian-base:bookworm-v1.0.6
     command:
     - /bin/sh
     args:

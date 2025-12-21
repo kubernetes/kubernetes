@@ -18,16 +18,18 @@ package serviceaccount
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestServiceAccountCreation(t *testing.T) {
@@ -152,86 +154,98 @@ func TestServiceAccountCreation(t *testing.T) {
 	}
 
 	for k, tc := range testcases {
-		client := fake.NewSimpleClientset(defaultServiceAccount, managedServiceAccount)
-		informers := informers.NewSharedInformerFactory(fake.NewSimpleClientset(), controller.NoResyncPeriodFunc())
-		options := DefaultServiceAccountsControllerOptions()
-		options.ServiceAccounts = []v1.ServiceAccount{
-			{ObjectMeta: metav1.ObjectMeta{Name: defaultName}},
-			{ObjectMeta: metav1.ObjectMeta{Name: managedName}},
-		}
-		saInformer := informers.Core().V1().ServiceAccounts()
-		nsInformer := informers.Core().V1().Namespaces()
-		controller, err := NewServiceAccountsController(
-			saInformer,
-			nsInformer,
-			client,
-			options,
-		)
-		if err != nil {
-			t.Fatalf("error creating ServiceAccounts controller: %v", err)
-		}
-		controller.saListerSynced = alwaysReady
-		controller.nsListerSynced = alwaysReady
+		t.Run(k, func(t *testing.T) {
+			client := fake.NewClientset(defaultServiceAccount, managedServiceAccount)
+			informers := informers.NewSharedInformerFactory(fake.NewClientset(), controller.NoResyncPeriodFunc())
+			options := DefaultServiceAccountsControllerOptions()
+			options.ServiceAccounts = []v1.ServiceAccount{
+				{ObjectMeta: metav1.ObjectMeta{Name: defaultName}},
+				{ObjectMeta: metav1.ObjectMeta{Name: managedName}},
+			}
+			saInformer := informers.Core().V1().ServiceAccounts()
+			nsInformer := informers.Core().V1().Namespaces()
 
-		saStore := saInformer.Informer().GetStore()
-		nsStore := nsInformer.Informer().GetStore()
+			var wg sync.WaitGroup
+			defer wg.Wait()
 
-		syncCalls := make(chan struct{}, 1)
-		controller.syncHandler = func(ctx context.Context, key string) error {
-			err := controller.syncNamespace(ctx, key)
+			logger, ctx := ktesting.NewTestContext(t)
+			defer ctx.Cancel("test case terminating")
+
+			controller, err := NewServiceAccountsController(
+				logger,
+				saInformer,
+				nsInformer,
+				client,
+				options,
+			)
 			if err != nil {
-				t.Logf("%s: %v", k, err)
+				t.Fatalf("error creating ServiceAccounts controller: %v", err)
+			}
+			controller.saListerSynced = alwaysReady
+			controller.nsListerSynced = alwaysReady
+
+			saStore := saInformer.Informer().GetStore()
+			nsStore := nsInformer.Informer().GetStore()
+
+			syncCalls := make(chan struct{}, 1)
+			controller.syncHandler = func(ctx context.Context, key string) error {
+				err := controller.syncNamespace(ctx, key)
+				if err != nil {
+					t.Logf("%s: %v", k, err)
+				}
+
+				syncCalls <- struct{}{}
+				return err
+			}
+			stopCh := make(chan struct{})
+			defer close(stopCh)
+			wg.Go(func() {
+				controller.Run(ctx, 1)
+			})
+
+			if tc.ExistingNamespace != nil {
+				nsStore.Add(tc.ExistingNamespace) //nolint:errcheck
+			}
+			for _, s := range tc.ExistingServiceAccounts {
+				saStore.Add(s) //nolint:errcheck
 			}
 
-			syncCalls <- struct{}{}
-			return err
-		}
-		stopCh := make(chan struct{})
-		defer close(stopCh)
-		go controller.Run(context.TODO(), 1)
-
-		if tc.ExistingNamespace != nil {
-			nsStore.Add(tc.ExistingNamespace)
-		}
-		for _, s := range tc.ExistingServiceAccounts {
-			saStore.Add(s)
-		}
-
-		if tc.AddedNamespace != nil {
-			nsStore.Add(tc.AddedNamespace)
-			controller.namespaceAdded(tc.AddedNamespace)
-		}
-		if tc.UpdatedNamespace != nil {
-			nsStore.Add(tc.UpdatedNamespace)
-			controller.namespaceUpdated(nil, tc.UpdatedNamespace)
-		}
-		if tc.DeletedServiceAccount != nil {
-			controller.serviceAccountDeleted(tc.DeletedServiceAccount)
-		}
-
-		// wait to be called
-		select {
-		case <-syncCalls:
-		case <-time.After(10 * time.Second):
-			t.Errorf("%s: took too long", k)
-		}
-
-		actions := client.Actions()
-		if len(tc.ExpectCreatedServiceAccounts) != len(actions) {
-			t.Errorf("%s: Expected to create accounts %#v. Actual actions were: %#v", k, tc.ExpectCreatedServiceAccounts, actions)
-			continue
-		}
-		for i, expectedName := range tc.ExpectCreatedServiceAccounts {
-			action := actions[i]
-			if !action.Matches("create", "serviceaccounts") {
-				t.Errorf("%s: Unexpected action %s", k, action)
-				break
+			if tc.AddedNamespace != nil {
+				nsStore.Add(tc.AddedNamespace) //nolint:errcheck
+				controller.namespaceAdded(tc.AddedNamespace)
 			}
-			createdAccount := action.(core.CreateAction).GetObject().(*v1.ServiceAccount)
-			if createdAccount.Name != expectedName {
-				t.Errorf("%s: Expected %s to be created, got %s", k, expectedName, createdAccount.Name)
+			if tc.UpdatedNamespace != nil {
+				nsStore.Add(tc.UpdatedNamespace) //nolint:errcheck
+				controller.namespaceUpdated(nil, tc.UpdatedNamespace)
 			}
-		}
+			if tc.DeletedServiceAccount != nil {
+				controller.serviceAccountDeleted(logger, tc.DeletedServiceAccount)
+			}
+
+			// wait to be called
+			select {
+			case <-syncCalls:
+			case <-time.After(10 * time.Second):
+				t.Errorf("%s: took too long", k)
+			}
+
+			actions := client.Actions()
+			if len(tc.ExpectCreatedServiceAccounts) != len(actions) {
+				t.Errorf("%s: Expected to create accounts %#v. Actual actions were: %#v", k, tc.ExpectCreatedServiceAccounts, actions)
+				return
+			}
+			for i, expectedName := range tc.ExpectCreatedServiceAccounts {
+				action := actions[i]
+				if !action.Matches("create", "serviceaccounts") {
+					t.Errorf("%s: Unexpected action %s", k, action)
+					break
+				}
+				createdAccount := action.(core.CreateAction).GetObject().(*v1.ServiceAccount)
+				if createdAccount.Name != expectedName {
+					t.Errorf("%s: Expected %s to be created, got %s", k, expectedName, createdAccount.Name)
+				}
+			}
+		})
 	}
 }
 

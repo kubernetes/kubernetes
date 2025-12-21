@@ -491,16 +491,6 @@
             "version": "v2"
           },
           {
-            "group": "autoscaling",
-            "kind": "DeleteOptions",
-            "version": "v2beta1"
-          },
-          {
-            "group": "autoscaling",
-            "kind": "DeleteOptions",
-            "version": "v2beta2"
-          },
-          {
             "group": "batch",
             "kind": "DeleteOptions",
             "version": "v1"
@@ -698,7 +688,7 @@
           {
             "group": "storagemigration.k8s.io",
             "kind": "DeleteOptions",
-            "version": "v1alpha1"
+            "version": "v1beta1"
           }
         ]
       },
@@ -1184,16 +1174,6 @@
             "version": "v2"
           },
           {
-            "group": "autoscaling",
-            "kind": "WatchEvent",
-            "version": "v2beta1"
-          },
-          {
-            "group": "autoscaling",
-            "kind": "WatchEvent",
-            "version": "v2beta2"
-          },
-          {
             "group": "batch",
             "kind": "WatchEvent",
             "version": "v1"
@@ -1391,7 +1371,7 @@
           {
             "group": "storagemigration.k8s.io",
             "kind": "WatchEvent",
-            "version": "v1alpha1"
+            "version": "v1beta1"
           }
         ]
       },

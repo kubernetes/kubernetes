@@ -18,6 +18,7 @@ package options
 
 import (
 	"context"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"net/url"
@@ -50,6 +51,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	v1listers "k8s.io/client-go/listers/core/v1"
+	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/klog/v2"
@@ -293,11 +295,6 @@ func (o *BuiltInAuthenticationOptions) Validate() []error {
 		}
 	}
 
-	// verify that if ServiceAccountTokenNodeBinding is enabled, ServiceAccountTokenNodeBindingValidation is also enabled.
-	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountTokenNodeBinding) && !utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountTokenNodeBindingValidation) {
-		allErrors = append(allErrors, fmt.Errorf("the %q feature gate can only be enabled if the %q feature gate is also enabled", features.ServiceAccountTokenNodeBinding, features.ServiceAccountTokenNodeBindingValidation))
-	}
-
 	if o.WebHook != nil {
 		retryBackoff := o.WebHook.RetryBackoff
 		if retryBackoff != nil && retryBackoff.Steps <= 0 {
@@ -307,9 +304,37 @@ func (o *BuiltInAuthenticationOptions) Validate() []error {
 
 	if o.RequestHeader != nil {
 		allErrors = append(allErrors, o.RequestHeader.Validate()...)
+
+		if o.ClientCert != nil &&
+			len(o.ClientCert.ClientCA) > 0 &&
+			len(o.RequestHeader.ClientCAFile) > 0 &&
+			len(o.RequestHeader.AllowedNames) == 0 {
+			clientCACerts, err1 := certutil.CertsFromFile(o.ClientCert.ClientCA)
+			requestHeaderCACerts, err2 := certutil.CertsFromFile(o.RequestHeader.ClientCAFile)
+			if err1 == nil && err2 == nil {
+				if certificatesOverlap(clientCACerts, requestHeaderCACerts) {
+					allErrors = append(allErrors,
+						fmt.Errorf("--requestheader-client-ca-file and --client-ca-file contain overlapping certificates; --requestheader-allowed-names must be specified to ensure regular client certificates cannot set authenticating proxy headers for arbitrary users"))
+				}
+			}
+		}
+
 	}
 
 	return allErrors
+}
+
+// certificatesOverlap returns true when there's at least one identical
+// certificate in the two certificate bundles
+func certificatesOverlap(a, b []*x509.Certificate) bool {
+	for _, ca := range a {
+		for _, cb := range b {
+			if ca.Equal(cb) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // AddFlags returns flags of authentication for a API Server
@@ -718,6 +743,7 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(
 		authenticatorConfig.EgressLookup = egressSelector.Lookup
 	}
 
+	authenticatorConfig.APIServerID = apiServerID
 	// var openAPIV3SecuritySchemes spec3.SecuritySchemes
 	authenticator, updateAuthenticationConfig, openAPIV2SecurityDefinitions, openAPIV3SecuritySchemes, err := authenticatorConfig.New(ctx)
 	if err != nil {

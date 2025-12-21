@@ -2000,55 +2000,14 @@ func Test_mutateTopologySpreadConstraints(t *testing.T) {
 				},
 			},
 		},
-		{
-			name:                               "matchLabelKeys are not merged into labelSelector when MatchLabelKeysInPodTopologySpread is false and MatchLabelKeysInPodTopologySpreadSelectorMerge is true",
-			matchLabelKeysEnabled:              false,
-			matchLabelKeysSelectorMergeEnabled: true,
-			pod: &api.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"country": "Japan",
-						"city":    "Tokyo",
-					},
-				},
-				Spec: api.PodSpec{
-					TopologySpreadConstraints: []api.TopologySpreadConstraint{
-						{
-							MaxSkew:           1,
-							TopologyKey:       "kubernetes.io/hostname",
-							WhenUnsatisfiable: api.DoNotSchedule,
-							LabelSelector:     &metav1.LabelSelector{},
-							MatchLabelKeys:    []string{"country", "city"},
-						},
-					},
-				},
-			},
-			wantPod: &api.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"country": "Japan",
-						"city":    "Tokyo",
-					},
-				},
-				Spec: api.PodSpec{
-					TopologySpreadConstraints: []api.TopologySpreadConstraint{
-						{
-							MaxSkew:           1,
-							TopologyKey:       "kubernetes.io/hostname",
-							WhenUnsatisfiable: api.DoNotSchedule,
-							LabelSelector:     &metav1.LabelSelector{},
-							MatchLabelKeys:    []string{"country", "city"},
-						},
-					},
-				},
-			},
-		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodTopologySpread, tc.matchLabelKeysEnabled)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodTopologySpreadSelectorMerge, tc.matchLabelKeysSelectorMergeEnabled)
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.MatchLabelKeysInPodTopologySpread:              tc.matchLabelKeysEnabled,
+				features.MatchLabelKeysInPodTopologySpreadSelectorMerge: tc.matchLabelKeysSelectorMergeEnabled,
+			})
 
 			pod := tc.pod
 			mutateTopologySpreadConstraints(pod)
@@ -2233,8 +2192,10 @@ func TestUpdateLabelOnPodWithTopologySpreadConstraintsEnabled(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodTopologySpread, tc.matchLabelKeysEnabled)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodTopologySpreadSelectorMerge, tc.matchLabelKeysSelectorMergeEnabled)
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.MatchLabelKeysInPodTopologySpread:              tc.matchLabelKeysEnabled,
+				features.MatchLabelKeysInPodTopologySpreadSelectorMerge: tc.matchLabelKeysSelectorMergeEnabled,
+			})
 
 			Strategy.PrepareForCreate(genericapirequest.NewContext(), tc.pod)
 			if errs := Strategy.Validate(genericapirequest.NewContext(), tc.pod); len(errs) != 0 {
@@ -3516,8 +3477,10 @@ func TestPodResizePrepareForUpdate(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, true)
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.InPlacePodVerticalScaling: true,
+				features.SidecarContainers:         true,
+			})
 			ctx := context.Background()
 			ResizeStrategy.PrepareForUpdate(ctx, tc.newPod, tc.oldPod)
 			if !cmp.Equal(tc.expected, tc.newPod) {
@@ -4178,9 +4141,10 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			for f, v := range tc.features {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, f, v)
+			if draEnabled, draExists := tc.features[features.DynamicResourceAllocation]; draExists && !draEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
 			}
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, tc.features)
 			StatusStrategy.PrepareForUpdate(genericapirequest.NewContext(), tc.newPod, tc.oldPod)
 			if !cmp.Equal(tc.expected, tc.newPod) {
 				t.Errorf("StatusStrategy.PrepareForUpdate() diff = %v", cmp.Diff(tc.expected, tc.newPod))

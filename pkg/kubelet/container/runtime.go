@@ -100,7 +100,7 @@ type Runtime interface {
 	// TODO: Revisit this method and make it cleaner.
 	GarbageCollect(ctx context.Context, gcPolicy GCPolicy, allSourcesReady bool, evictNonDeletedPods bool) error
 	// SyncPod syncs the running pod into the desired pod.
-	SyncPod(ctx context.Context, pod *v1.Pod, podStatus *PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) PodSyncResult
+	SyncPod(ctx context.Context, pod *v1.Pod, podStatus *PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff, restartAllContainers bool) PodSyncResult
 	// KillPod kills all the containers of a pod. Pod may be nil, running pod must not be.
 	// TODO(random-liu): Return PodSyncResult in KillPod.
 	// gracePeriodOverride if specified allows the caller to override the pod default grace period.
@@ -145,6 +145,8 @@ type Runtime interface {
 	// IsPodResizeInProgress checks whether the given pod is in the process of resizing
 	// (allocated resources != actuated resources).
 	IsPodResizeInProgress(allocatedPod *v1.Pod, podStatus *PodStatus) bool
+	// UpdateActuatedPodLevelResources updates pod-level resources in actuatedState
+	UpdateActuatedPodLevelResources(actuatedPod *v1.Pod) error
 }
 
 // StreamingRuntime is the interface implemented by runtimes that handle the serving of the

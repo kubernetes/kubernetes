@@ -62,6 +62,7 @@ var ExtensionPoints = []string{
 	Reserve,
 	Unreserve,
 	Permit,
+	Sign,
 }
 
 const (
@@ -80,6 +81,7 @@ const (
 	Reserve                     = "Reserve"
 	Unreserve                   = "Unreserve"
 	Permit                      = "Permit"
+	Sign                        = "Sign"
 )
 
 const (
@@ -92,20 +94,44 @@ const (
 	PodPoppedInFlightEvent = "PodPopped"
 )
 
+// Possible batch attempt results
+const (
+	BatchAttemptNoHint      = "no_hint"
+	BatchAttemptHintUsed    = "hint_used"
+	BatchAttemptHintNotUsed = "hint_not_used"
+)
+
+// Possible batch cache flush reasons
+const (
+	BatchFlushPodFailed       = "pod_failed"
+	BatchFlushPodSkipped      = "pod_skipped"
+	BatchFlushNodeMissing     = "node_missing"
+	BatchFlushNodeNotFull     = "node_not_full"
+	BatchFlushEmptyList       = "empty_list"
+	BatchFlushExpired         = "expired"
+	BatchFlushPodIncompatible = "pod_incompatible"
+	BatchFlushPodNotBatchable = "pod_not_batchable"
+)
+
 // All the histogram based metrics have 1ms as size for the smallest bucket.
 var (
-	scheduleAttempts           *metrics.CounterVec
-	EventHandlingLatency       *metrics.HistogramVec
-	schedulingLatency          *metrics.HistogramVec
-	SchedulingAlgorithmLatency *metrics.Histogram
-	PreemptionVictims          *metrics.Histogram
-	PreemptionAttempts         *metrics.Counter
-	pendingPods                *metrics.GaugeVec
-	InFlightEvents             *metrics.GaugeVec
-	Goroutines                 *metrics.GaugeVec
+	scheduleAttempts             *metrics.CounterVec
+	EventHandlingLatency         *metrics.HistogramVec
+	schedulingLatency            *metrics.HistogramVec
+	SchedulingAlgorithmLatency   *metrics.Histogram
+	PreemptionVictims            *metrics.Histogram
+	PreemptionAttempts           *metrics.Counter
+	pendingPods                  *metrics.GaugeVec
+	InFlightEvents               *metrics.GaugeVec
+	Goroutines                   *metrics.GaugeVec
+	BatchAttemptStats            *metrics.CounterVec
+	BatchCacheFlushed            *metrics.CounterVec
+	GetNodeHintDuration          *metrics.HistogramVec
+	StoreScheduleResultsDuration *metrics.HistogramVec
 
 	PodSchedulingSLIDuration        *metrics.HistogramVec
 	PodSchedulingAttempts           *metrics.Histogram
+	PodScheduledAfterFlush          *metrics.Counter
 	FrameworkExtensionPointDuration *metrics.HistogramVec
 	PluginExecutionDuration         *metrics.HistogramVec
 
@@ -126,6 +152,9 @@ var (
 	AsyncAPICallsTotal   *metrics.CounterVec
 	AsyncAPICallDuration *metrics.HistogramVec
 	AsyncAPIPendingCalls *metrics.GaugeVec
+
+	// The below is only available when the DRAExtendedResource feature gate is enabled.
+	ResourceClaimCreatesTotal *metrics.CounterVec
 
 	// metricsList is a list of all metrics that should be registered always, regardless of any feature gate's value.
 	metricsList []metrics.Registerable
@@ -153,6 +182,9 @@ func Register() {
 				AsyncAPICallDuration,
 				AsyncAPIPendingCalls,
 			)
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
+			RegisterMetrics(ResourceClaimCreatesTotal)
 		}
 	})
 }
@@ -230,6 +262,20 @@ func InitMetrics() {
 			Help:           "Number of running goroutines split by the work they do such as binding.",
 			StabilityLevel: metrics.ALPHA,
 		}, []string{"operation"})
+	BatchAttemptStats = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "batch_attempts_total",
+			Help:           "Counts of results when we attempt to use batching.",
+			StabilityLevel: metrics.ALPHA,
+		}, []string{"profile", "result"})
+	BatchCacheFlushed = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "batch_cache_flushed_total",
+			Help:           "Counts of cache flushes by reason.",
+			StabilityLevel: metrics.ALPHA,
+		}, []string{"profile", "reason"})
 
 	PodSchedulingSLIDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
@@ -249,6 +295,14 @@ func InitMetrics() {
 			Help:           "Number of attempts to successfully schedule a pod.",
 			Buckets:        metrics.ExponentialBuckets(1, 2, 5),
 			StabilityLevel: metrics.STABLE,
+		})
+
+	PodScheduledAfterFlush = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "pod_scheduled_after_flush_total",
+			Help:           "Number of pods that were successfully scheduled after being flushed from unschedulablePods due to timeout. This metric helps detect potential queueing hint misconfigurations or event handling issues.",
+			StabilityLevel: metrics.ALPHA,
 		})
 
 	FrameworkExtensionPointDuration = metrics.NewHistogramVec(
@@ -377,6 +431,37 @@ func InitMetrics() {
 		},
 		[]string{"call_type"})
 
+	ResourceClaimCreatesTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "resourceclaim_creates_total",
+			Help:           "Number of ResourceClaims creation requests within scheduler",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"status"})
+
+	GetNodeHintDuration = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem: SchedulerSubsystem,
+			Name:      "get_node_hint_duration_seconds",
+			Help:      "Latency for getting a node hint.",
+			// Start with 0.01ms with the last bucket being [~200ms, Inf)
+			Buckets:        metrics.ExponentialBuckets(0.00001, 2, 12),
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"hinted", "profile"})
+
+	StoreScheduleResultsDuration = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem: SchedulerSubsystem,
+			Name:      "store_schedule_results_duration_seconds",
+			Help:      "Latency for getting a no.",
+			// Start with 0.01ms with the last bucket being [~200ms, Inf)
+			Buckets:        metrics.ExponentialBuckets(0.00001, 2, 12),
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"profile"})
+
 	metricsList = []metrics.Registerable{
 		scheduleAttempts,
 		schedulingLatency,
@@ -387,6 +472,7 @@ func InitMetrics() {
 		pendingPods,
 		PodSchedulingSLIDuration,
 		PodSchedulingAttempts,
+		PodScheduledAfterFlush,
 		FrameworkExtensionPointDuration,
 		PluginExecutionDuration,
 		SchedulerQueueIncomingPods,
@@ -395,6 +481,10 @@ func InitMetrics() {
 		CacheSize,
 		unschedulableReasons,
 		PluginEvaluationTotal,
+		BatchAttemptStats,
+		BatchCacheFlushed,
+		GetNodeHintDuration,
+		StoreScheduleResultsDuration,
 	}
 }
 

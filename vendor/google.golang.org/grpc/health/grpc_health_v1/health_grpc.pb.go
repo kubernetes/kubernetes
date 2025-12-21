@@ -188,13 +188,13 @@ type HealthServer interface {
 type UnimplementedHealthServer struct{}
 
 func (UnimplementedHealthServer) Check(context.Context, *HealthCheckRequest) (*HealthCheckResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Check not implemented")
+	return nil, status.Error(codes.Unimplemented, "method Check not implemented")
 }
 func (UnimplementedHealthServer) List(context.Context, *HealthListRequest) (*HealthListResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method List not implemented")
+	return nil, status.Error(codes.Unimplemented, "method List not implemented")
 }
 func (UnimplementedHealthServer) Watch(*HealthCheckRequest, grpc.ServerStreamingServer[HealthCheckResponse]) error {
-	return status.Errorf(codes.Unimplemented, "method Watch not implemented")
+	return status.Error(codes.Unimplemented, "method Watch not implemented")
 }
 func (UnimplementedHealthServer) testEmbeddedByValue() {}
 

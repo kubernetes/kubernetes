@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eendpointslice "k8s.io/kubernetes/test/e2e/framework/endpointslice"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -239,7 +238,7 @@ var _ = common.SIGDescribe("Traffic Distribution", func() {
 	createService := func(ctx context.Context, trafficDist string) *v1.Service {
 		serviceName := "traffic-dist-test-service"
 		ginkgo.By(fmt.Sprintf("creating a service %q with trafficDistribution %q", serviceName, trafficDist))
-		return createServiceReportErr(ctx, c, f.Namespace.Name, &v1.Service{
+		svc := &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: serviceName,
 			},
@@ -254,7 +253,10 @@ var _ = common.SIGDescribe("Traffic Distribution", func() {
 					Protocol:   v1.ProtocolTCP,
 				}},
 			},
-		})
+		}
+		svc, err := c.CoreV1().Services(f.Namespace.Name).Create(ctx, svc, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "error creating Service")
+		return svc
 	}
 
 	// createPods creates endpoint pods for svc as described by serverPods, waits for
@@ -359,21 +361,21 @@ var _ = common.SIGDescribe("Traffic Distribution", func() {
 		checkTrafficDistribution(ctx, clientPods)
 	})
 
-	framework.It("should route traffic to an endpoint in the same zone when using PreferSameZone", framework.WithFeatureGate(features.PreferSameTrafficDistribution), func(ctx context.Context) {
+	framework.It("should route traffic to an endpoint in the same zone when using PreferSameZone", func(ctx context.Context) {
 		clientPods, serverPods := allocateClientsAndServers(ctx)
 		svc := createService(ctx, v1.ServiceTrafficDistributionPreferSameZone)
 		createPods(ctx, svc, clientPods, serverPods)
 		checkTrafficDistribution(ctx, clientPods)
 	})
 
-	framework.It("should route traffic correctly between pods on multiple nodes when using PreferSameZone", framework.WithFeatureGate(features.PreferSameTrafficDistribution), func(ctx context.Context) {
+	framework.It("should route traffic correctly between pods on multiple nodes when using PreferSameZone", func(ctx context.Context) {
 		clientPods, serverPods := allocateMultiNodeClientsAndServers(ctx)
 		svc := createService(ctx, v1.ServiceTrafficDistributionPreferSameZone)
 		createPods(ctx, svc, clientPods, serverPods)
 		checkTrafficDistribution(ctx, clientPods)
 	})
 
-	framework.It("should route traffic to an endpoint on the same node or fall back to same zone when using PreferSameNode", framework.WithFeatureGate(features.PreferSameTrafficDistribution), func(ctx context.Context) {
+	framework.It("should route traffic to an endpoint on the same node or fall back to same zone when using PreferSameNode", func(ctx context.Context) {
 		ginkgo.By("finding a set of nodes for the test")
 		zone1Nodes, zone2Nodes, zone3Nodes := getNodesForMultiNode(ctx)
 
@@ -425,7 +427,7 @@ var _ = common.SIGDescribe("Traffic Distribution", func() {
 		checkTrafficDistribution(ctx, clientPods)
 	})
 
-	framework.It("should route traffic to an endpoint on the same node when using PreferSameNode and fall back when the endpoint becomes unavailable", framework.WithFeatureGate(features.PreferSameTrafficDistribution), func(ctx context.Context) {
+	framework.It("should route traffic to an endpoint on the same node when using PreferSameNode and fall back when the endpoint becomes unavailable", func(ctx context.Context) {
 		ginkgo.By("finding a set of nodes for the test")
 		nodeList, err := e2enode.GetReadySchedulableNodes(ctx, c)
 		framework.ExpectNoError(err)

@@ -1,5 +1,4 @@
 //go:build !windows
-// +build !windows
 
 /*
 Copyright 2017 The Kubernetes Authors.
@@ -623,8 +622,10 @@ resources:
 	t.Run("encrypt all resources", func(t *testing.T) {
 		_ = mock.NewBase64Plugin(t, "@encrypt-all-kms-provider.sock")
 		// To ensure we are checking all REST resources
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllAlpha", true)
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllBeta", true)
+		featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+			"AllAlpha": true,
+			"AllBeta":  true,
+		})
 		// Need to enable this explicitly as the feature is deprecated
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv1, true)
 

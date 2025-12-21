@@ -43,6 +43,8 @@ type StorageClass struct {
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// provisioner indicates the type of the provisioner.
+	// +required
+	// +k8s:required
 	Provisioner string `json:"provisioner" protobuf:"bytes,2,opt,name=provisioner"`
 
 	// parameters holds the parameters for the provisioner that should
@@ -456,6 +458,30 @@ type CSIDriverSpec struct {
 	// +featureGate=MutableCSINodeAllocatableCount
 	// +optional
 	NodeAllocatableUpdatePeriodSeconds *int64 `json:"nodeAllocatableUpdatePeriodSeconds,omitempty" protobuf:"varint,9,opt,name=nodeAllocatableUpdatePeriodSeconds"`
+
+	// serviceAccountTokenInSecrets is an opt-in for CSI drivers to indicate that
+	// service account tokens should be passed via the Secrets field in NodePublishVolumeRequest
+	// instead of the VolumeContext field. The CSI specification provides a dedicated Secrets
+	// field for sensitive information like tokens, which is the appropriate mechanism for
+	// handling credentials. This addresses security concerns where sensitive tokens were being
+	// logged as part of volume context.
+	//
+	// When "true", kubelet will pass the tokens only in the Secrets field with the key
+	// "csi.storage.k8s.io/serviceAccount.tokens". The CSI driver must be updated to read
+	// tokens from the Secrets field instead of VolumeContext.
+	//
+	// When "false" or not set, kubelet will pass the tokens in VolumeContext with the key
+	// "csi.storage.k8s.io/serviceAccount.tokens" (existing behavior). This maintains backward
+	// compatibility with existing CSI drivers.
+	//
+	// This field can only be set when TokenRequests is configured. The API server will reject
+	// CSIDriver specs that set this field without TokenRequests.
+	//
+	// Default behavior if unset is to pass tokens in the VolumeContext field.
+	//
+	// +featureGate=CSIServiceAccountTokenSecrets
+	// +optional
+	ServiceAccountTokenInSecrets *bool `json:"serviceAccountTokenInSecrets,omitempty" protobuf:"varint,10,opt,name=serviceAccountTokenInSecrets"`
 }
 
 // FSGroupPolicy specifies if a CSI Driver supports modifying

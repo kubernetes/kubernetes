@@ -31,6 +31,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -723,16 +724,6 @@ var _ = common.SIGDescribe("Services", func() {
 	})
 
 	// TODO: We get coverage of TCP/UDP and multi-port services through the DNS test. We should have a simpler test for multi-port TCP here.
-
-	/*
-		Release: v1.9
-		Testname: Kubernetes Service
-		Description: By default when a kubernetes cluster is running there MUST be a 'kubernetes' service running in the cluster.
-	*/
-	framework.ConformanceIt("should provide secure master service", func(ctx context.Context) {
-		_, err := cs.CoreV1().Services(metav1.NamespaceDefault).Get(ctx, "kubernetes", metav1.GetOptions{})
-		framework.ExpectNoError(err, "failed to fetch the service object for the service named kubernetes")
-	})
 
 	/*
 		Release: v1.9
@@ -2352,55 +2343,77 @@ var _ = common.SIGDescribe("Services", func() {
 	})
 
 	ginkgo.It("should implement service.kubernetes.io/headless", func(ctx context.Context) {
+		var err error
+
+		ginkgo.By("Creating a Service with no selector and no endpoints")
 		ns := f.Namespace.Name
-		numPods, servicePort := 3, defaultServeHostnameServicePort
-		serviceHeadlessLabels := map[string]string{v1.IsHeadlessService: ""}
+		servicePort := 80
+		svc := &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "example-custom-endpoints",
+			},
+			Spec: v1.ServiceSpec{
+				Ports: []v1.ServicePort{{
+					Name:     "port80",
+					Port:     int32(servicePort),
+					Protocol: v1.ProtocolTCP,
+				}},
+			},
+		}
+		svc, err = cs.CoreV1().Services(f.Namespace.Name).Create(ctx, svc, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "error creating Service")
+		svcIP := svc.Spec.ClusterIP
 
-		// We will create 2 services to test creating services in both states and also dynamic updates
-		// svcHeadless: Created with the label, will always be disabled. We create this early and
-		//              test again late to make sure it never becomes available.
-		// svcHeadlessToggled: Created without the label then the label is toggled verifying reachability at each step.
+		ginkgo.By("Creating a Pod to handle HTTP requests")
+		podName := "pod-handle-http-request"
+		serverPod := e2epod.NewAgnhostPodFromContainers(
+			"", podName, nil,
+			e2epod.NewAgnhostContainer("container-handle-8090-request", nil, []v1.ContainerPort{{ContainerPort: 8090, Protocol: v1.ProtocolTCP}}, "serve-hostname", "--port", "8090"),
+		)
+		pod := e2epod.NewPodClient(f).CreateSync(ctx, serverPod)
 
-		ginkgo.By("creating service-headless in namespace " + ns)
-		svcHeadless := getServeHostnameService("service-headless")
-		svcHeadless.ObjectMeta.Labels = serviceHeadlessLabels
-		// This should be improved, as we do not want a Headlesss Service to contain an IP...
-		_, svcHeadlessIP, err := StartServeHostnameService(ctx, cs, svcHeadless, ns, numPods)
-		framework.ExpectNoError(err, "failed to create deployment with headless service: %s in the namespace: %s", svcHeadlessIP, ns)
+		addressType := discoveryv1.AddressTypeIPv4
+		if framework.TestContext.ClusterIsIPv6() {
+			addressType = discoveryv1.AddressTypeIPv6
+		}
 
-		ginkgo.By("creating service in namespace " + ns)
-		svcHeadlessToggled := getServeHostnameService("service-headless-toggled")
-		podHeadlessToggledNames, svcHeadlessToggledIP, err := StartServeHostnameService(ctx, cs, svcHeadlessToggled, ns, numPods)
-		framework.ExpectNoError(err, "failed to create deployment with service: %s in the namespace: %s", svcHeadlessToggledIP, ns)
+		ginkgo.By("Creating an EndpointSlice without headless label")
+		eps := &discoveryv1.EndpointSlice{
+			ObjectMeta: metav1.ObjectMeta{GenerateName: "e2e-custom-slice",
+				Labels: map[string]string{
+					discoveryv1.LabelServiceName: svc.Name,
+					discoveryv1.LabelManagedBy:   "e2e-test" + ns,
+				}},
+			AddressType: addressType,
+			Endpoints: []discoveryv1.Endpoint{{
+				Addresses:  []string{pod.Status.PodIP},
+				Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+			}},
+			Ports: []discoveryv1.EndpointPort{{
+				Name:     ptr.To("port80"),
+				Port:     ptr.To[int32](8090),
+				Protocol: ptr.To(v1.ProtocolTCP),
+			}},
+		}
 
-		jig := e2eservice.NewTestJig(cs, ns, svcHeadlessToggled.ObjectMeta.Name)
-
-		ginkgo.By("verifying service is up")
-		framework.ExpectNoError(verifyServeHostnameServiceUp(ctx, cs, ns, podHeadlessToggledNames, svcHeadlessToggledIP, servicePort))
-
-		ginkgo.By("verifying service-headless is not up")
-		framework.ExpectNoError(verifyServeHostnameServiceDown(ctx, cs, ns, svcHeadlessIP, servicePort))
-
-		ginkgo.By("adding service.kubernetes.io/headless label")
-		_, err = jig.UpdateService(ctx, func(svc *v1.Service) {
-			svc.ObjectMeta.Labels = serviceHeadlessLabels
-		})
+		eps, err = f.ClientSet.DiscoveryV1().EndpointSlices(ns).Create(ctx, eps, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
-		ginkgo.By("verifying service is not up")
-		framework.ExpectNoError(verifyServeHostnameServiceDown(ctx, cs, ns, svcHeadlessToggledIP, servicePort))
+		// connect to the service must work
+		ginkgo.By("Creating a client pod that will try to connect to the webserver")
+		clientPod := e2epod.NewAgnhostPod(ns, "client-pod", nil, nil, nil)
+		e2epod.NewPodClient(f).CreateSync(ctx, clientPod)
 
-		ginkgo.By("removing service.kubernetes.io/headless annotation")
-		_, err = jig.UpdateService(ctx, func(svc *v1.Service) {
-			svc.ObjectMeta.Labels = nil
-		})
+		ginkgo.By("Test connection to the webserver")
+		framework.ExpectNoError(verifyServeHostnameServiceUp(ctx, cs, ns, []string{podName}, svcIP, servicePort))
+
+		ginkgo.By("Updating the EndpointSlice to include headless label")
+		eps.ObjectMeta.Labels[v1.IsHeadlessService] = ""
+		_, err = f.ClientSet.DiscoveryV1().EndpointSlices(ns).Update(ctx, eps, metav1.UpdateOptions{})
 		framework.ExpectNoError(err)
 
-		ginkgo.By("verifying service is up")
-		framework.ExpectNoError(verifyServeHostnameServiceUp(ctx, cs, ns, podHeadlessToggledNames, svcHeadlessToggledIP, servicePort))
-
-		ginkgo.By("verifying service-headless is still not up")
-		framework.ExpectNoError(verifyServeHostnameServiceDown(ctx, cs, ns, svcHeadlessIP, servicePort))
+		ginkgo.By("Verify that service is no longer reachable")
+		framework.ExpectNoError(verifyServeHostnameServiceDown(ctx, cs, ns, svcIP, servicePort))
 	})
 
 	ginkgo.It("should be rejected when no endpoints exist", func(ctx context.Context) {
@@ -3242,192 +3255,6 @@ var _ = common.SIGDescribe("Services", func() {
 		if !foundSvc {
 			framework.Fail("could not find service 'kubernetes' in service list in all namespaces")
 		}
-	})
-
-	/*
-	   Release: v1.19
-	   Testname: Endpoint resource lifecycle
-	   Description: Create an endpoint, the endpoint MUST exist.
-	   The endpoint is updated with a new label, a check after the update MUST find the changes.
-	   The endpoint is then patched with a new IPv4 address and port, a check after the patch MUST the changes.
-	   The endpoint is deleted by it's label, a watch listens for the deleted watch event.
-	*/
-	framework.ConformanceIt("should test the lifecycle of an Endpoint", func(ctx context.Context) {
-		testNamespaceName := f.Namespace.Name
-		testEndpointName := "testservice"
-		testEndpoints := v1.Endpoints{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: testEndpointName,
-				Labels: map[string]string{
-					"test-endpoint-static": "true",
-				},
-			},
-			Subsets: []v1.EndpointSubset{{
-				Addresses: []v1.EndpointAddress{{
-					IP: "10.0.0.24",
-				}},
-				Ports: []v1.EndpointPort{{
-					Name:     "http",
-					Port:     80,
-					Protocol: v1.ProtocolTCP,
-				}},
-			}},
-		}
-		w := &cache.ListWatch{
-			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				options.LabelSelector = "test-endpoint-static=true"
-				return f.ClientSet.CoreV1().Endpoints(testNamespaceName).Watch(ctx, options)
-			},
-		}
-		endpointsList, err := f.ClientSet.CoreV1().Endpoints("").List(ctx, metav1.ListOptions{LabelSelector: "test-endpoint-static=true"})
-		framework.ExpectNoError(err, "failed to list Endpoints")
-
-		ginkgo.By("creating an Endpoint")
-		createdEP, err := f.ClientSet.CoreV1().Endpoints(testNamespaceName).Create(ctx, &testEndpoints, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create Endpoint")
-		gomega.Expect(createdEP).To(apimachineryutils.HaveValidResourceVersion())
-		ginkgo.By("waiting for available Endpoint")
-		ctxUntil, cancel := context.WithTimeout(ctx, 30*time.Second)
-		defer cancel()
-		_, err = watchtools.Until(ctxUntil, endpointsList.ResourceVersion, w, func(event watch.Event) (bool, error) {
-			switch event.Type {
-			case watch.Added:
-				if endpoints, ok := event.Object.(*v1.Endpoints); ok {
-					found := endpoints.ObjectMeta.Name == endpoints.Name &&
-						endpoints.Labels["test-endpoint-static"] == "true"
-					return found, nil
-				}
-			default:
-				framework.Logf("observed event type %v", event.Type)
-			}
-			return false, nil
-		})
-		framework.ExpectNoError(err, "failed to see %v event", watch.Added)
-
-		ginkgo.By("listing all Endpoints")
-		endpointsList, err = f.ClientSet.CoreV1().Endpoints("").List(ctx, metav1.ListOptions{LabelSelector: "test-endpoint-static=true"})
-		framework.ExpectNoError(err, "failed to list Endpoints")
-		eventFound := false
-		var foundEndpoint v1.Endpoints
-		for _, endpoint := range endpointsList.Items {
-			if endpoint.ObjectMeta.Name == testEndpointName && endpoint.ObjectMeta.Namespace == testNamespaceName {
-				eventFound = true
-				foundEndpoint = endpoint
-				break
-			}
-		}
-		if !eventFound {
-			framework.Fail("unable to find Endpoint Service in list of Endpoints")
-		}
-
-		ginkgo.By("updating the Endpoint")
-		foundEndpoint.ObjectMeta.Labels["test-service"] = "updated"
-		_, err = f.ClientSet.CoreV1().Endpoints(testNamespaceName).Update(ctx, &foundEndpoint, metav1.UpdateOptions{})
-		framework.ExpectNoError(err, "failed to update Endpoint with new label")
-
-		ctxUntil, cancel = context.WithTimeout(ctx, 30*time.Second)
-		defer cancel()
-		_, err = watchtools.Until(ctxUntil, endpointsList.ResourceVersion, w, func(event watch.Event) (bool, error) {
-			switch event.Type {
-			case watch.Modified:
-				if endpoints, ok := event.Object.(*v1.Endpoints); ok {
-					found := endpoints.ObjectMeta.Name == endpoints.Name &&
-						endpoints.Labels["test-endpoint-static"] == "true"
-					return found, nil
-				}
-			default:
-				framework.Logf("observed event type %v", event.Type)
-			}
-			return false, nil
-		})
-		framework.ExpectNoError(err, "failed to see %v event", watch.Modified)
-
-		ginkgo.By("fetching the Endpoint")
-		endpoints, err := f.ClientSet.CoreV1().Endpoints(testNamespaceName).Get(ctx, testEndpointName, metav1.GetOptions{})
-		framework.ExpectNoError(err, "failed to fetch Endpoint")
-		gomega.Expect(foundEndpoint.ObjectMeta.Labels).To(gomega.HaveKeyWithValue("test-service", "updated"), "failed to update Endpoint %v in namespace %v label not updated", testEndpointName, testNamespaceName)
-
-		endpointPatch, err := json.Marshal(map[string]interface{}{
-			"metadata": map[string]interface{}{
-				"labels": map[string]string{
-					"test-service": "patched",
-				},
-			},
-			"subsets": []map[string]interface{}{
-				{
-					"addresses": []map[string]string{
-						{
-							"ip": "10.0.0.25",
-						},
-					},
-					"ports": []map[string]interface{}{
-						{
-							"name": "http-test",
-							"port": int32(8080),
-						},
-					},
-				},
-			},
-		})
-		framework.ExpectNoError(err, "failed to marshal JSON for WatchEvent patch")
-		ginkgo.By("patching the Endpoint")
-		patchedEP, err := f.ClientSet.CoreV1().Endpoints(testNamespaceName).Patch(ctx, testEndpointName, types.StrategicMergePatchType, []byte(endpointPatch), metav1.PatchOptions{})
-		framework.ExpectNoError(err, "failed to patch Endpoint")
-		gomega.Expect(resourceversion.CompareResourceVersion(createdEP.ResourceVersion, patchedEP.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
-
-		ctxUntil, cancel = context.WithTimeout(ctx, 30*time.Second)
-		defer cancel()
-		_, err = watchtools.Until(ctxUntil, endpoints.ResourceVersion, w, func(event watch.Event) (bool, error) {
-			switch event.Type {
-			case watch.Modified:
-				if endpoints, ok := event.Object.(*v1.Endpoints); ok {
-					found := endpoints.ObjectMeta.Name == endpoints.Name &&
-						endpoints.Labels["test-endpoint-static"] == "true"
-					return found, nil
-				}
-			default:
-				framework.Logf("observed event type %v", event.Type)
-			}
-			return false, nil
-		})
-		framework.ExpectNoError(err, "failed to see %v event", watch.Modified)
-
-		ginkgo.By("fetching the Endpoint")
-		endpoints, err = f.ClientSet.CoreV1().Endpoints(testNamespaceName).Get(ctx, testEndpointName, metav1.GetOptions{})
-		framework.ExpectNoError(err, "failed to fetch Endpoint")
-		gomega.Expect(endpoints.ObjectMeta.Labels).To(gomega.HaveKeyWithValue("test-service", "patched"), "failed to patch Endpoint with Label")
-		endpointSubsetOne := endpoints.Subsets[0]
-		endpointSubsetOneAddresses := endpointSubsetOne.Addresses[0]
-		endpointSubsetOnePorts := endpointSubsetOne.Ports[0]
-		gomega.Expect(endpointSubsetOneAddresses.IP).To(gomega.Equal("10.0.0.25"), "failed to patch Endpoint")
-		gomega.Expect(endpointSubsetOnePorts.Name).To(gomega.Equal("http-test"), "failed to patch Endpoint")
-		gomega.Expect(endpointSubsetOnePorts.Port).To(gomega.Equal(int32(8080)), "failed to patch Endpoint")
-
-		ginkgo.By("deleting the Endpoint by Collection")
-		err = f.ClientSet.CoreV1().Endpoints(testNamespaceName).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "test-endpoint-static=true"})
-		framework.ExpectNoError(err, "failed to delete Endpoint by Collection")
-
-		ginkgo.By("waiting for Endpoint deletion")
-		ctxUntil, cancel = context.WithTimeout(ctx, 30*time.Second)
-		defer cancel()
-		_, err = watchtools.Until(ctxUntil, endpoints.ResourceVersion, w, func(event watch.Event) (bool, error) {
-			switch event.Type {
-			case watch.Deleted:
-				if endpoints, ok := event.Object.(*v1.Endpoints); ok {
-					found := endpoints.ObjectMeta.Name == endpoints.Name &&
-						endpoints.Labels["test-endpoint-static"] == "true"
-					return found, nil
-				}
-			default:
-				framework.Logf("observed event type %v", event.Type)
-			}
-			return false, nil
-		})
-		framework.ExpectNoError(err, "failed to see %v event", watch.Deleted)
-
-		ginkgo.By("fetching the Endpoint")
-		_, err = f.ClientSet.CoreV1().Endpoints(testNamespaceName).Get(ctx, testEndpointName, metav1.GetOptions{})
-		gomega.Expect(err).To(gomega.HaveOccurred(), "should not be able to fetch Endpoint")
 	})
 
 	/*

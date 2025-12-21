@@ -1,5 +1,4 @@
 //go:build !linux && !windows
-// +build !linux,!windows
 
 /*
 Copyright 2019 The Kubernetes Authors.
@@ -58,4 +57,10 @@ func addCRIPodProcessStats(ps *statsapi.PodStats, criPodStat *runtimeapi.PodSand
 }
 
 func addCRIPodIOStats(ps *statsapi.PodStats, criPodStat *runtimeapi.PodSandboxStats) {
+}
+
+func (p *criStatsProvider) addCRIPodContainerCPUAndMemoryStats(
+	*runtimeapi.PodSandboxStats,
+	*statsapi.PodStats,
+	map[string]*runtimeapi.Container) {
 }

@@ -121,7 +121,7 @@
         "description": "EndpointHints provides hints describing how an endpoint should be consumed.",
         "properties": {
           "forNodes": {
-            "description": "forNodes indicates the node(s) this endpoint should be consumed by when using topology aware routing. May contain a maximum of 8 entries. This is an Alpha feature and is only used when the PreferSameTrafficDistribution feature gate is enabled.",
+            "description": "forNodes indicates the node(s) this endpoint should be consumed by when using topology aware routing. May contain a maximum of 8 entries.",
             "items": {
               "allOf": [
                 {
@@ -574,16 +574,6 @@
             "version": "v2"
           },
           {
-            "group": "autoscaling",
-            "kind": "DeleteOptions",
-            "version": "v2beta1"
-          },
-          {
-            "group": "autoscaling",
-            "kind": "DeleteOptions",
-            "version": "v2beta2"
-          },
-          {
             "group": "batch",
             "kind": "DeleteOptions",
             "version": "v1"
@@ -781,7 +771,7 @@
           {
             "group": "storagemigration.k8s.io",
             "kind": "DeleteOptions",
-            "version": "v1alpha1"
+            "version": "v1beta1"
           }
         ]
       },
@@ -1267,16 +1257,6 @@
             "version": "v2"
           },
           {
-            "group": "autoscaling",
-            "kind": "WatchEvent",
-            "version": "v2beta1"
-          },
-          {
-            "group": "autoscaling",
-            "kind": "WatchEvent",
-            "version": "v2beta2"
-          },
-          {
             "group": "batch",
             "kind": "WatchEvent",
             "version": "v1"
@@ -1474,7 +1454,7 @@
           {
             "group": "storagemigration.k8s.io",
             "kind": "WatchEvent",
-            "version": "v1alpha1"
+            "version": "v1beta1"
           }
         ]
       },

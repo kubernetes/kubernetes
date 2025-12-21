@@ -27,11 +27,38 @@ CurrentSpecReport returns information about the current running spec.
 The returned object is a types.SpecReport which includes helper methods
 to make extracting information about the spec easier.
 
+During construction of the test tree the result is empty.
+
 You can learn more about SpecReport here: https://pkg.go.dev/github.com/onsi/ginkgo/types#SpecReport
 You can learn more about CurrentSpecReport() here: https://onsi.github.io/ginkgo/#getting-a-report-for-the-current-spec
 */
 func CurrentSpecReport() SpecReport {
 	return global.Suite.CurrentSpecReport()
+}
+
+/*
+ConstructionNodeReport describes the container nodes during construction of
+the spec tree. It provides a subset of the information that is provided
+by SpecReport at runtime.
+
+It is documented here: [types.ConstructionNodeReport]
+*/
+type ConstructionNodeReport = types.ConstructionNodeReport
+
+/*
+CurrentConstructionNodeReport returns information about the current container nodes
+that are leading to the current path in the spec tree.
+The returned object is a types.ConstructionNodeReport which includes helper methods
+to make extracting information about the spec easier.
+
+May only be called during construction of the spec tree. It panics when
+called while tests are running. Use CurrentSpecReport instead in that
+phase.
+
+You can learn more about ConstructionNodeReport here: [types.ConstructionNodeReport]
+*/
+func CurrentTreeConstructionNodeReport() ConstructionNodeReport {
+	return global.Suite.CurrentConstructionNodeReport()
 }
 
 /*
@@ -60,7 +87,7 @@ AddReportEntry() must be called within a Subject or Setup node - not in a Contai
 
 You can learn more about Report Entries here: https://onsi.github.io/ginkgo/#attaching-data-to-reports
 */
-func AddReportEntry(name string, args ...interface{}) {
+func AddReportEntry(name string, args ...any) {
 	cl := types.NewCodeLocation(1)
 	reportEntry, err := internal.NewReportEntry(name, cl, args...)
 	if err != nil {
@@ -89,10 +116,10 @@ You can learn more about ReportBeforeEach here: https://onsi.github.io/ginkgo/#g
 You can learn about interruptible nodes here: https://onsi.github.io/ginkgo/#spec-timeouts-and-interruptible-nodes
 */
 func ReportBeforeEach(body any, args ...any) bool {
-	combinedArgs := []interface{}{body}
+	combinedArgs := []any{body}
 	combinedArgs = append(combinedArgs, args...)
 
-	return pushNode(internal.NewNode(deprecationTracker, types.NodeTypeReportBeforeEach, "", combinedArgs...))
+	return pushNode(internal.NewNode(internal.TransformNewNodeArgs(exitIfErrors, deprecationTracker, types.NodeTypeReportBeforeEach, "", combinedArgs...)))
 }
 
 /*
@@ -113,10 +140,10 @@ You can learn more about ReportAfterEach here: https://onsi.github.io/ginkgo/#ge
 You can learn about interruptible nodes here: https://onsi.github.io/ginkgo/#spec-timeouts-and-interruptible-nodes
 */
 func ReportAfterEach(body any, args ...any) bool {
-	combinedArgs := []interface{}{body}
+	combinedArgs := []any{body}
 	combinedArgs = append(combinedArgs, args...)
 
-	return pushNode(internal.NewNode(deprecationTracker, types.NodeTypeReportAfterEach, "", combinedArgs...))
+	return pushNode(internal.NewNode(internal.TransformNewNodeArgs(exitIfErrors, deprecationTracker, types.NodeTypeReportAfterEach, "", combinedArgs...)))
 }
 
 /*
@@ -143,9 +170,9 @@ You can learn more about Ginkgo's reporting infrastructure, including generating
 You can learn about interruptible nodes here: https://onsi.github.io/ginkgo/#spec-timeouts-and-interruptible-nodes
 */
 func ReportBeforeSuite(body any, args ...any) bool {
-	combinedArgs := []interface{}{body}
+	combinedArgs := []any{body}
 	combinedArgs = append(combinedArgs, args...)
-	return pushNode(internal.NewNode(deprecationTracker, types.NodeTypeReportBeforeSuite, "", combinedArgs...))
+	return pushNode(internal.NewNode(internal.TransformNewNodeArgs(exitIfErrors, deprecationTracker, types.NodeTypeReportBeforeSuite, "", combinedArgs...)))
 }
 
 /*
@@ -165,7 +192,7 @@ ReportAfterSuite nodes must be created at the top-level (i.e. not nested in a Co
 When running in parallel, Ginkgo ensures that only one of the parallel nodes runs the ReportAfterSuite and that it is passed a report that is aggregated across
 all parallel nodes
 
-In addition to using ReportAfterSuite to programmatically generate suite reports, you can also generate JSON, JUnit, and Teamcity formatted reports using the --json-report, --junit-report, and --teamcity-report ginkgo CLI flags.
+In addition to using ReportAfterSuite to programmatically generate suite reports, you can also generate JSON, GoJSON, JUnit, and Teamcity formatted reports using the --json-report, --gojson-report, --junit-report, and --teamcity-report ginkgo CLI flags.
 
 You cannot nest any other Ginkgo nodes within a ReportAfterSuite node's closure.
 You can learn more about ReportAfterSuite here: https://onsi.github.io/ginkgo/#generating-reports-programmatically
@@ -174,10 +201,10 @@ You can learn more about Ginkgo's reporting infrastructure, including generating
 
 You can learn about interruptible nodes here: https://onsi.github.io/ginkgo/#spec-timeouts-and-interruptible-nodes
 */
-func ReportAfterSuite(text string, body any, args ...interface{}) bool {
-	combinedArgs := []interface{}{body}
+func ReportAfterSuite(text string, body any, args ...any) bool {
+	combinedArgs := []any{body}
 	combinedArgs = append(combinedArgs, args...)
-	return pushNode(internal.NewNode(deprecationTracker, types.NodeTypeReportAfterSuite, text, combinedArgs...))
+	return pushNode(internal.NewNode(internal.TransformNewNodeArgs(exitIfErrors, deprecationTracker, types.NodeTypeReportAfterSuite, text, combinedArgs...)))
 }
 
 func registerReportAfterSuiteNodeForAutogeneratedReports(reporterConfig types.ReporterConfig) {
@@ -186,6 +213,12 @@ func registerReportAfterSuiteNodeForAutogeneratedReports(reporterConfig types.Re
 			err := reporters.GenerateJSONReport(report, reporterConfig.JSONReport)
 			if err != nil {
 				Fail(fmt.Sprintf("Failed to generate JSON report:\n%s", err.Error()))
+			}
+		}
+		if reporterConfig.GoJSONReport != "" {
+			err := reporters.GenerateGoTestJSONReport(report, reporterConfig.GoJSONReport)
+			if err != nil {
+				Fail(fmt.Sprintf("Failed to generate Go JSON report:\n%s", err.Error()))
 			}
 		}
 		if reporterConfig.JUnitReport != "" {
@@ -206,6 +239,9 @@ func registerReportAfterSuiteNodeForAutogeneratedReports(reporterConfig types.Re
 	if reporterConfig.JSONReport != "" {
 		flags = append(flags, "--json-report")
 	}
+	if reporterConfig.GoJSONReport != "" {
+		flags = append(flags, "--gojson-report")
+	}
 	if reporterConfig.JUnitReport != "" {
 		flags = append(flags, "--junit-report")
 	}
@@ -213,9 +249,11 @@ func registerReportAfterSuiteNodeForAutogeneratedReports(reporterConfig types.Re
 		flags = append(flags, "--teamcity-report")
 	}
 	pushNode(internal.NewNode(
-		deprecationTracker, types.NodeTypeReportAfterSuite,
-		fmt.Sprintf("Autogenerated ReportAfterSuite for %s", strings.Join(flags, " ")),
-		body,
-		types.NewCustomCodeLocation("autogenerated by Ginkgo"),
+		internal.TransformNewNodeArgs(
+			exitIfErrors, deprecationTracker, types.NodeTypeReportAfterSuite,
+			fmt.Sprintf("Autogenerated ReportAfterSuite for %s", strings.Join(flags, " ")),
+			body,
+			types.NewCustomCodeLocation("autogenerated by Ginkgo"),
+		),
 	))
 }

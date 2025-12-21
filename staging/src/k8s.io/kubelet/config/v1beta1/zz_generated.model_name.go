@@ -42,6 +42,31 @@ func (in ExecEnvVar) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in ImagePullCredentials) OpenAPIModelName() string {
+	return "io.k8s.kubelet.config.v1beta1.ImagePullCredentials"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in ImagePullIntent) OpenAPIModelName() string {
+	return "io.k8s.kubelet.config.v1beta1.ImagePullIntent"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in ImagePullSecret) OpenAPIModelName() string {
+	return "io.k8s.kubelet.config.v1beta1.ImagePullSecret"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in ImagePullServiceAccount) OpenAPIModelName() string {
+	return "io.k8s.kubelet.config.v1beta1.ImagePullServiceAccount"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in ImagePulledRecord) OpenAPIModelName() string {
+	return "io.k8s.kubelet.config.v1beta1.ImagePulledRecord"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in KubeletAnonymousAuthentication) OpenAPIModelName() string {
 	return "io.k8s.kubelet.config.v1beta1.KubeletAnonymousAuthentication"
 }

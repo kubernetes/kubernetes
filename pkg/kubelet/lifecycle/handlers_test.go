@@ -29,58 +29,23 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
+	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
+	ndftesting "k8s.io/component-helpers/nodedeclaredfeatures/testing"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
-
-func TestResolvePort(t *testing.T) {
-	for _, testCase := range []struct {
-		container  *v1.Container
-		stringPort string
-		expected   int
-	}{
-		{
-			stringPort: "foo",
-			container: &v1.Container{
-				Ports: []v1.ContainerPort{{Name: "foo", ContainerPort: int32(80)}},
-			},
-			expected: 80,
-		},
-		{
-			container:  &v1.Container{},
-			stringPort: "80",
-			expected:   80,
-		},
-		{
-			container: &v1.Container{
-				Ports: []v1.ContainerPort{
-					{Name: "bar", ContainerPort: int32(80)},
-				},
-			},
-			stringPort: "foo",
-			expected:   -1,
-		},
-	} {
-		port, err := resolvePort(intstr.FromString(testCase.stringPort), testCase.container)
-		if testCase.expected != -1 && err != nil {
-			t.Fatalf("unexpected error while resolving port: %s", err)
-		}
-		if testCase.expected == -1 && err == nil {
-			t.Errorf("expected error when a port fails to resolve")
-		}
-		if testCase.expected != port {
-			t.Errorf("failed to resolve port, expected %d, got %d", testCase.expected, port)
-		}
-	}
-}
 
 type fakeContainerCommandRunner struct {
 	Cmd []string
@@ -869,6 +834,91 @@ func TestRunSleepHandler(t *testing.T) {
 			}
 			if tt.expectErr && err.Error() != tt.expectedErr {
 				t.Errorf("%s: expected error want %s, got %s", tt.name, tt.expectedErr, err.Error())
+			}
+		})
+	}
+}
+
+func TestDeclaredFeaturesAdmitHandler(t *testing.T) {
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-pod",
+		},
+	}
+	createMockFeature := func(t *testing.T, name string, inferForSched bool, maxVersionStr string) *ndftesting.MockFeature {
+		m := ndftesting.NewMockFeature(t)
+		m.EXPECT().Name().Return(name).Maybe()
+		m.EXPECT().InferForScheduling(mock.Anything).Return(inferForSched).Maybe()
+		if maxVersionStr != "" {
+			maxVersionStr := version.MustParseSemantic(maxVersionStr)
+			m.EXPECT().MaxVersion().Return(maxVersionStr).Maybe()
+		} else {
+			m.EXPECT().MaxVersion().Return(nil).Maybe()
+		}
+		return m
+	}
+	testCases := []struct {
+		name                 string
+		nodeDeclaredFeatures []string
+		version              *version.Version
+		registeredFeatures   []ndf.Feature
+		expectedAdmit        bool
+		expectedReason       string
+		expectedMessage      string
+	}{
+		{
+			name:                 "Admit: no requirements",
+			nodeDeclaredFeatures: []string{"FeatureA"},
+			version:              version.MustParseSemantic("1.30.0"),
+			registeredFeatures: []ndf.Feature{
+				createMockFeature(t, "FeatureA", true, ""),
+			},
+			expectedAdmit: true,
+		},
+		{
+			name:                 "Admit: requirements met",
+			nodeDeclaredFeatures: []string{"FeatureA"},
+			version:              version.MustParseSemantic("1.30.0"),
+			registeredFeatures: []ndf.Feature{
+				createMockFeature(t, "FeatureA", true, ""),
+			},
+			expectedAdmit: true,
+		},
+		{
+			name:                 "Reject: requirements not met",
+			nodeDeclaredFeatures: []string{},
+			version:              version.MustParseSemantic("1.30.0"),
+			registeredFeatures: []ndf.Feature{
+				createMockFeature(t, "FeatureA", true, ""),
+			},
+			expectedAdmit:   false,
+			expectedReason:  PodFeatureUnsupported,
+			expectedMessage: "Pod requires node features that are not available: FeatureA",
+		},
+		{
+			name:                 "Admit without feature declared - feature generally available",
+			nodeDeclaredFeatures: []string{},
+			version:              version.MustParseSemantic("1.35.0"),
+			registeredFeatures: []ndf.Feature{
+				createMockFeature(t, "FeatureA", true, "1.34.0"),
+			},
+			expectedAdmit: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			framework, err := ndf.New(tc.registeredFeatures)
+			require.NoError(t, err)
+			handler := NewDeclaredFeaturesAdmitHandler(framework, ndf.NewFeatureSet(tc.nodeDeclaredFeatures...), tc.version)
+			attrs := &PodAdmitAttributes{Pod: pod}
+
+			result := handler.Admit(attrs)
+
+			require.Equal(t, tc.expectedAdmit, result.Admit)
+			if !result.Admit {
+				require.Equal(t, tc.expectedReason, result.Reason)
+				require.Contains(t, result.Message, tc.expectedMessage, "Expected message '%s' to contain '%s'", result.Message, tc.expectedMessage)
 			}
 		})
 	}

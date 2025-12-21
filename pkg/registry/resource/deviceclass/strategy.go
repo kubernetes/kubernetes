@@ -83,9 +83,7 @@ func (deviceClassStrategy) PrepareForUpdate(ctx context.Context, obj, old runtim
 func (deviceClassStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newClass := obj.(*resource.DeviceClass)
 	oldClass := old.(*resource.DeviceClass)
-
 	errorList := validation.ValidateDeviceClassUpdate(newClass, oldClass)
-
 	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newClass, oldClass, errorList, operation.Update)
 }
 

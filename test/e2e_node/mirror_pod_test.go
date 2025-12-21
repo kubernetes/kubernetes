@@ -32,8 +32,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/pkg/features"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"sigs.k8s.io/yaml"
@@ -41,6 +43,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/cli-runtime/pkg/printers"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 )
@@ -300,7 +303,7 @@ var _ = SIGDescribe("MirrorPod (Pod Generation)", func() {
 			}, 2*time.Minute, time.Second*4).Should(gomega.Succeed())
 		})
 
-		f.It("mirror pod: update activeDeadlineSeconds", func(ctx context.Context) {
+		f.It("mirror pod: update activeDeadlineSeconds", f.WithNodeConformance(), func(ctx context.Context) {
 			ginkgo.By("get mirror pod uid")
 			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
@@ -323,7 +326,7 @@ var _ = SIGDescribe("MirrorPod (Pod Generation)", func() {
 			gomega.Expect(pod.Status.ObservedGeneration).To(gomega.BeEquivalentTo(int64(0)))
 		})
 
-		f.It("mirror pod: update container image", func(ctx context.Context) {
+		f.It("mirror pod: update container image", f.WithNodeConformance(), func(ctx context.Context) {
 			ginkgo.By("get mirror pod uid")
 			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
@@ -346,7 +349,7 @@ var _ = SIGDescribe("MirrorPod (Pod Generation)", func() {
 			gomega.Expect(pod.Status.ObservedGeneration).To(gomega.BeEquivalentTo(int64(0)))
 		})
 
-		f.It("mirror pod: update initContainer image", func(ctx context.Context) {
+		f.It("mirror pod: update initContainer image", f.WithNodeConformance(), func(ctx context.Context) {
 			ginkgo.By("get mirror pod uid")
 			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
@@ -378,6 +381,103 @@ var _ = SIGDescribe("MirrorPod (Pod Generation)", func() {
 			gomega.Eventually(ctx, func(ctx context.Context) error {
 				return checkMirrorPodDisappear(ctx, f.ClientSet, mirrorPodName, ns)
 			}, 2*time.Minute, time.Second*4).Should(gomega.Succeed())
+		})
+	})
+})
+
+var _ = SIGDescribe("MirrorPod with EnvFiles", framework.WithNodeConformance(), framework.WithFeatureGate(features.EnvFiles), func() {
+	f := framework.NewDefaultFramework("mirror-pod-envfiles")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	var ns, podPath, staticPodName, mirrorPodName string
+
+	ginkgo.Context("when creating a static pod with EnvFiles", func() {
+		ginkgo.BeforeEach(func() {
+			ns = f.Namespace.Name
+			staticPodName = "static-pod-envfiles-" + string(uuid.NewUUID())
+			mirrorPodName = staticPodName + "-" + framework.TestContext.NodeName
+			podPath = kubeletCfg.StaticPodPath
+		})
+
+		ginkgo.AfterEach(func(ctx context.Context) {
+			ginkgo.By("delete the static pod")
+			err := deleteStaticPod(podPath, staticPodName, ns)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("wait for the mirror pod to disappear")
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				return checkMirrorPodDisappear(ctx, f.ClientSet, mirrorPodName, ns)
+			}, 2*time.Minute, time.Second*4).Should(gomega.Succeed())
+		})
+
+		ginkgo.It("should be able to consume variables from a file", func(ctx context.Context) {
+			podSpec := v1.PodSpec{
+				InitContainers: []v1.Container{
+					{
+						Name:    "setup-envfile",
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Command: []string{"sh", "-c", `echo CONFIG_1=\'value1\' > /data/config.env && echo CONFIG_2=\'value2\' >> /data/config.env`},
+						VolumeMounts: []v1.VolumeMount{
+							{
+								Name:      "config",
+								MountPath: "/data",
+							},
+						},
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Name:    "use-envfile",
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Command: []string{"sh", "-c", "env | grep -E '(CONFIG_1|CONFIG_2)' | sort"},
+						Env: []v1.EnvVar{
+							{
+								Name: "CONFIG_1",
+								ValueFrom: &v1.EnvVarSource{
+									FileKeyRef: &v1.FileKeySelector{
+										VolumeName: "config",
+										Path:       "config.env",
+										Key:        "CONFIG_1",
+									},
+								},
+							},
+							{
+								Name: "CONFIG_2",
+								ValueFrom: &v1.EnvVarSource{
+									FileKeyRef: &v1.FileKeySelector{
+										VolumeName: "config",
+										Path:       "config.env",
+										Key:        "CONFIG_2",
+									},
+								},
+							},
+						},
+					},
+				},
+				RestartPolicy: v1.RestartPolicyNever,
+				Volumes: []v1.Volume{
+					{
+						Name: "config",
+						VolumeSource: v1.VolumeSource{
+							EmptyDir: &v1.EmptyDirVolumeSource{},
+						},
+					},
+				},
+			}
+
+			ginkgo.By("create the static pod with envfiles")
+			err := createStaticPodWithSpec(podPath, staticPodName, ns, podSpec)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("wait for the mirror pod to succeed")
+			err = e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, mirrorPodName, ns)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("checking the logs of the mirror pod")
+			logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, ns, mirrorPodName, "use-envfile")
+			framework.ExpectNoError(err)
+
+			gomega.Expect(logs).To(gomega.ContainSubstring("CONFIG_1=value1"))
+			gomega.Expect(logs).To(gomega.ContainSubstring("CONFIG_2=value2"))
 		})
 	})
 })
@@ -671,3 +771,169 @@ func checkMirrorPodRecreated(ctx context.Context, cl clientset.Interface, name, 
 	}
 	return nil
 }
+
+var _ = SIGDescribe("MirrorPod", framework.WithSerial(), func() {
+	f := framework.NewDefaultFramework("mirror-pod-serial")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	ginkgo.Context("when kubelet restarts", func() {
+		var ns, podPath, staticPodName, mirrorPodName string
+		ginkgo.BeforeEach(func(ctx context.Context) {
+			ns = f.Namespace.Name
+			staticPodName = "static-pod-" + string(uuid.NewUUID())
+			mirrorPodName = staticPodName + "-" + framework.TestContext.NodeName
+			podPath = kubeletCfg.StaticPodPath
+
+			ginkgo.By("create the static pod")
+			podSpec := v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:    "container",
+						Image:   defaultImage,
+						Command: []string{"sleep", "3600"},
+						StartupProbe: &v1.Probe{
+							ProbeHandler: v1.ProbeHandler{
+								Exec: &v1.ExecAction{
+									Command: []string{"/bin/true"},
+								},
+							},
+							InitialDelaySeconds: 1,
+							PeriodSeconds:       1,
+						},
+						ReadinessProbe: &v1.Probe{
+							ProbeHandler: v1.ProbeHandler{
+								Exec: &v1.ExecAction{
+									Command: []string{"/bin/true"},
+								},
+							},
+							InitialDelaySeconds: 1,
+							PeriodSeconds:       1,
+						},
+					},
+				},
+			}
+
+			err := createStaticPodWithSpec(podPath, staticPodName, ns, podSpec)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("wait for the mirror pod to be running")
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				return checkMirrorPodRunning(ctx, f.ClientSet, mirrorPodName, ns)
+			}, 2*time.Minute, time.Second*4).Should(gomega.Succeed())
+		})
+
+		ginkgo.AfterEach(func(ctx context.Context) {
+			ginkgo.By("delete the static pod")
+			err := deleteStaticPod(podPath, staticPodName, ns)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("wait for the mirror pod to disappear")
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				return checkMirrorPodDisappear(ctx, f.ClientSet, mirrorPodName, ns)
+			}, 2*time.Minute, time.Second*4).Should(gomega.Succeed())
+		})
+
+		f.It("should not change container status", f.WithNodeConformance(), func(ctx context.Context) {
+			ginkgo.By("Waiting for the pod to be running and ready")
+			err := e2epod.WaitForPodCondition(ctx, f.ClientSet, ns, mirrorPodName, "PodReady", f.Timeouts.PodStart,
+				func(p *v1.Pod) (bool, error) {
+					if p.Status.Phase != v1.PodRunning {
+						return false, nil
+					}
+					for _, cond := range p.Status.Conditions {
+						if cond.Type == v1.PodReady && cond.Status == v1.ConditionTrue {
+							return true, nil
+						}
+					}
+					return false, nil
+				})
+			framework.ExpectNoError(err)
+
+			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Double check the initial state before starting the concurrent check")
+			gomega.Expect(pod.Status.ContainerStatuses).ToNot(gomega.BeEmpty())
+			for _, status := range pod.Status.ContainerStatuses {
+				gomega.Expect(status.RestartCount).To(gomega.BeZero())
+				gomega.Expect(status.Started).ToNot(gomega.BeNil())
+				gomega.Expect(*status.Started).To(gomega.BeTrueBecause("The Started field should be set to true when a pod enters the Ready condition."))
+				gomega.Expect(status.Ready).To(gomega.BeTrueBecause("The Ready field should be set to true when a pod enters the Ready condition."))
+			}
+
+			// The grace period for kubelet startup is 10 seconds, so we wait here for 11 seconds.
+			time.Sleep(time.Second * 11)
+
+			stopCh := make(chan struct{})
+			errCh := make(chan error, 1)
+			go func() {
+				defer ginkgo.GinkgoRecover()
+				watcher, err := f.ClientSet.CoreV1().Pods(ns).Watch(ctx, metav1.ListOptions{
+					FieldSelector: "metadata.name=" + mirrorPodName,
+				})
+				if err != nil {
+					errCh <- fmt.Errorf("failed to watch pod: %w", err)
+					return
+				}
+				defer watcher.Stop()
+
+				for {
+					select {
+					case event, ok := <-watcher.ResultChan():
+						if !ok {
+							return
+						}
+						if event.Type != watch.Modified {
+							continue
+						}
+						p, ok := event.Object.(*v1.Pod)
+						if !ok {
+							continue
+						}
+
+						if p.Status.Phase != v1.PodRunning {
+							errCh <- fmt.Errorf("pod phase is %v, expected %v", p.Status.Phase, v1.PodRunning)
+							return
+						}
+						if len(p.Status.ContainerStatuses) < len(pod.Spec.Containers) {
+							continue
+						}
+						for _, containerStatus := range p.Status.ContainerStatuses {
+							if containerStatus.RestartCount > 0 {
+								errCh <- fmt.Errorf("container %q restarted %d times", containerStatus.Name, containerStatus.RestartCount)
+								return
+							}
+							if containerStatus.Started == nil || !*containerStatus.Started {
+								errCh <- fmt.Errorf("container %q started status is not true", containerStatus.Name)
+								return
+							}
+							if !containerStatus.Ready {
+								errCh <- fmt.Errorf("container %q ready status is not true", containerStatus.Name)
+								return
+							}
+						}
+					case <-stopCh:
+						close(errCh)
+						return
+					}
+				}
+			}()
+
+			ginkgo.By("restarting the kubelet")
+			restartKubelet := mustStopKubelet(ctx, f)
+			restartKubelet(ctx)
+
+			ginkgo.By("ensuring kubelet is healthy")
+			gomega.Eventually(ctx, func() bool {
+				return kubeletHealthCheck(kubeletHealthCheckURL)
+			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeTrueBecause("kubelet should be started"))
+
+			// Let the goroutine run for a few more seconds to catch any delayed changes
+			time.Sleep(5 * time.Second)
+			close(stopCh)
+
+			for err := range errCh {
+				framework.ExpectNoError(err, "pod status check failed during kubelet restart")
+			}
+		})
+	})
+})

@@ -39,9 +39,10 @@ var _ = utils.SIGDescribe("CSI Mock volume service account token", func() {
 			err error
 		)
 		tests := []struct {
-			desc                  string
-			deployCSIDriverObject bool
-			tokenRequests         []storagev1.TokenRequest
+			desc                         string
+			deployCSIDriverObject        bool
+			tokenRequests                []storagev1.TokenRequest
+			serviceAccountTokenInSecrets *bool
 		}{
 			{
 				desc:                  "token should not be plumbed down when csiServiceAccountTokenEnabled=false",
@@ -58,15 +59,22 @@ var _ = utils.SIGDescribe("CSI Mock volume service account token", func() {
 				deployCSIDriverObject: true,
 				tokenRequests:         []storagev1.TokenRequest{{ExpirationSeconds: ptr.To[int64](60 * 10)}},
 			},
+			{
+				desc:                         "token should be plumbed down only in secrets when serviceAccountTokenInSecrets=true",
+				deployCSIDriverObject:        true,
+				tokenRequests:                []storagev1.TokenRequest{{ExpirationSeconds: ptr.To[int64](60 * 10)}},
+				serviceAccountTokenInSecrets: ptr.To(true),
+			},
 		}
 		for _, test := range tests {
 			test := test
 			csiServiceAccountTokenEnabled := test.tokenRequests != nil
 			ginkgo.It(test.desc, func(ctx context.Context) {
 				m.init(ctx, testParameters{
-					registerDriver:    test.deployCSIDriverObject,
-					tokenRequests:     test.tokenRequests,
-					requiresRepublish: &csiServiceAccountTokenEnabled,
+					registerDriver:               test.deployCSIDriverObject,
+					tokenRequests:                test.tokenRequests,
+					requiresRepublish:            &csiServiceAccountTokenEnabled,
+					serviceAccountTokenInSecrets: test.serviceAccountTokenInSecrets,
 				})
 
 				ginkgo.DeferCleanup(m.cleanup)
@@ -88,7 +96,11 @@ var _ = utils.SIGDescribe("CSI Mock volume service account token", func() {
 				framework.ExpectNoError(err, "while deleting")
 
 				ginkgo.By("Checking CSI driver logs")
-				err = checkNodePublishVolume(ctx, m.driver.GetCalls, pod, false, false, false, test.deployCSIDriverObject && csiServiceAccountTokenEnabled)
+				var serviceAccountTokenInSecrets bool
+				if test.serviceAccountTokenInSecrets != nil {
+					serviceAccountTokenInSecrets = *test.serviceAccountTokenInSecrets
+				}
+				err = checkNodePublishVolume(ctx, m.driver.GetCalls, pod, false, false, false, test.deployCSIDriverObject && csiServiceAccountTokenEnabled, serviceAccountTokenInSecrets)
 				framework.ExpectNoError(err)
 			})
 		}

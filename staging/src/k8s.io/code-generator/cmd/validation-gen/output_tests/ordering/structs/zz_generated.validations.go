@@ -89,27 +89,27 @@ func Validate_T00(ctx context.Context, op operation.Operation, fldPath *field.Pa
 
 	// field T00.T
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *Tother) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *Tother, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_Tother(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("t"), &obj.T, safe.Field(oldObj, func(oldObj *T00) *Tother { return &oldObj.T }))...)
+		}(fldPath.Child("t"), &obj.T, safe.Field(oldObj, func(oldObj *T00) *Tother { return &oldObj.T }), oldObj != nil)...)
 
 	// field T00.PT
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *Tother) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *Tother, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_Tother(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("pt"), obj.PT, safe.Field(oldObj, func(oldObj *T00) *Tother { return oldObj.PT }))...)
+		}(fldPath.Child("pt"), obj.PT, safe.Field(oldObj, func(oldObj *T00) *Tother { return oldObj.PT }), oldObj != nil)...)
 
 	return errs
 }
@@ -123,33 +123,33 @@ func Validate_T01(ctx context.Context, op operation.Operation, fldPath *field.Pa
 
 	// field T01.S
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call field-attached validations
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "T01.S, no flags")...)
 			return
-		}(fldPath.Child("s"), &obj.S, safe.Field(oldObj, func(oldObj *T01) *string { return &oldObj.S }))...)
+		}(fldPath.Child("s"), &obj.S, safe.Field(oldObj, func(oldObj *T01) *string { return &oldObj.S }), oldObj != nil)...)
 
 	// field T01.PS
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call field-attached validations
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "T01.PS, no flags")...)
 			return
-		}(fldPath.Child("ps"), obj.PS, safe.Field(oldObj, func(oldObj *T01) *string { return oldObj.PS }))...)
+		}(fldPath.Child("ps"), obj.PS, safe.Field(oldObj, func(oldObj *T01) *string { return oldObj.PS }), oldObj != nil)...)
 
 	// field T01.T
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *Tother) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *Tother, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call field-attached validations
@@ -157,13 +157,13 @@ func Validate_T01(ctx context.Context, op operation.Operation, fldPath *field.Pa
 			// call the type's validation function
 			errs = append(errs, Validate_Tother(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("t"), &obj.T, safe.Field(oldObj, func(oldObj *T01) *Tother { return &oldObj.T }))...)
+		}(fldPath.Child("t"), &obj.T, safe.Field(oldObj, func(oldObj *T01) *Tother { return &oldObj.T }), oldObj != nil)...)
 
 	// field T01.PT
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *Tother) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *Tother, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call field-attached validations
@@ -171,7 +171,7 @@ func Validate_T01(ctx context.Context, op operation.Operation, fldPath *field.Pa
 			// call the type's validation function
 			errs = append(errs, Validate_Tother(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("pt"), obj.PT, safe.Field(oldObj, func(oldObj *T01) *Tother { return oldObj.PT }))...)
+		}(fldPath.Child("pt"), obj.PT, safe.Field(oldObj, func(oldObj *T01) *Tother { return oldObj.PT }), oldObj != nil)...)
 
 	return errs
 }
@@ -179,8 +179,12 @@ func Validate_T01(ctx context.Context, op operation.Operation, fldPath *field.Pa
 // Validate_T02 validates an instance of T02 according
 // to declarative validation rules in the API schema.
 func Validate_T02(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *T02) (errs field.ErrorList) {
+	earlyReturn := false
 	if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "T02, ShortCircuit"); len(e) != 0 {
 		errs = append(errs, e...)
+		earlyReturn = true
+	}
+	if earlyReturn {
 		return // do not proceed
 	}
 
@@ -188,67 +192,83 @@ func Validate_T02(ctx context.Context, op operation.Operation, fldPath *field.Pa
 
 	// field T02.S
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call field-attached validations
+			earlyReturn := false
 			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "T02.S, ShortCircuit"); len(e) != 0 {
 				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
 				return // do not proceed
 			}
 			return
-		}(fldPath.Child("s"), &obj.S, safe.Field(oldObj, func(oldObj *T02) *string { return &oldObj.S }))...)
+		}(fldPath.Child("s"), &obj.S, safe.Field(oldObj, func(oldObj *T02) *string { return &oldObj.S }), oldObj != nil)...)
 
 	// field T02.PS
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call field-attached validations
+			earlyReturn := false
 			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "T02.PS, ShortCircuit"); len(e) != 0 {
 				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
 				return // do not proceed
 			}
 			return
-		}(fldPath.Child("ps"), obj.PS, safe.Field(oldObj, func(oldObj *T02) *string { return oldObj.PS }))...)
+		}(fldPath.Child("ps"), obj.PS, safe.Field(oldObj, func(oldObj *T02) *string { return oldObj.PS }), oldObj != nil)...)
 
 	// field T02.T
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *Tother) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *Tother, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call field-attached validations
+			earlyReturn := false
 			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "T02.T, ShortCircuit"); len(e) != 0 {
 				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
 				return // do not proceed
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_Tother(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("t"), &obj.T, safe.Field(oldObj, func(oldObj *T02) *Tother { return &oldObj.T }))...)
+		}(fldPath.Child("t"), &obj.T, safe.Field(oldObj, func(oldObj *T02) *Tother { return &oldObj.T }), oldObj != nil)...)
 
 	// field T02.PT
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *Tother) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *Tother, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call field-attached validations
+			earlyReturn := false
 			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "T02.PT, ShortCircuit"); len(e) != 0 {
 				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
 				return // do not proceed
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_Tother(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("pt"), obj.PT, safe.Field(oldObj, func(oldObj *T02) *Tother { return oldObj.PT }))...)
+		}(fldPath.Child("pt"), obj.PT, safe.Field(oldObj, func(oldObj *T02) *Tother { return oldObj.PT }), oldObj != nil)...)
 
 	return errs
 }
@@ -256,8 +276,12 @@ func Validate_T02(ctx context.Context, op operation.Operation, fldPath *field.Pa
 // Validate_T03 validates an instance of T03 according
 // to declarative validation rules in the API schema.
 func Validate_T03(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *T03) (errs field.ErrorList) {
+	earlyReturn := false
 	if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "T03, ShortCircuit"); len(e) != 0 {
 		errs = append(errs, e...)
+		earlyReturn = true
+	}
+	if earlyReturn {
 		return // do not proceed
 	}
 	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "T03, no flags")...)
@@ -266,71 +290,87 @@ func Validate_T03(ctx context.Context, op operation.Operation, fldPath *field.Pa
 
 	// field T03.S
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call field-attached validations
+			earlyReturn := false
 			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "T03.S, ShortCircuit"); len(e) != 0 {
 				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
 				return // do not proceed
 			}
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "T03.S, no flags")...)
 			return
-		}(fldPath.Child("s"), &obj.S, safe.Field(oldObj, func(oldObj *T03) *string { return &oldObj.S }))...)
+		}(fldPath.Child("s"), &obj.S, safe.Field(oldObj, func(oldObj *T03) *string { return &oldObj.S }), oldObj != nil)...)
 
 	// field T03.PS
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call field-attached validations
+			earlyReturn := false
 			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "T03.PS, ShortCircuit"); len(e) != 0 {
 				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
 				return // do not proceed
 			}
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "T03.PS, no flags")...)
 			return
-		}(fldPath.Child("ps"), obj.PS, safe.Field(oldObj, func(oldObj *T03) *string { return oldObj.PS }))...)
+		}(fldPath.Child("ps"), obj.PS, safe.Field(oldObj, func(oldObj *T03) *string { return oldObj.PS }), oldObj != nil)...)
 
 	// field T03.T
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *Tother) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *Tother, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call field-attached validations
+			earlyReturn := false
 			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "T03.T, ShortCircuit"); len(e) != 0 {
 				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
 				return // do not proceed
 			}
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "T03.T, no flags")...)
 			// call the type's validation function
 			errs = append(errs, Validate_Tother(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("t"), &obj.T, safe.Field(oldObj, func(oldObj *T03) *Tother { return &oldObj.T }))...)
+		}(fldPath.Child("t"), &obj.T, safe.Field(oldObj, func(oldObj *T03) *Tother { return &oldObj.T }), oldObj != nil)...)
 
 	// field T03.PT
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *Tother) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *Tother, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call field-attached validations
+			earlyReturn := false
 			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "T03.PT, ShortCircuit"); len(e) != 0 {
 				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
 				return // do not proceed
 			}
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "T03.PT, no flags")...)
 			// call the type's validation function
 			errs = append(errs, Validate_Tother(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("pt"), obj.PT, safe.Field(oldObj, func(oldObj *T03) *Tother { return oldObj.PT }))...)
+		}(fldPath.Child("pt"), obj.PT, safe.Field(oldObj, func(oldObj *T03) *Tother { return oldObj.PT }), oldObj != nil)...)
 
 	return errs
 }
@@ -338,12 +378,16 @@ func Validate_T03(ctx context.Context, op operation.Operation, fldPath *field.Pa
 // Validate_TMultiple validates an instance of TMultiple according
 // to declarative validation rules in the API schema.
 func Validate_TMultiple(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *TMultiple) (errs field.ErrorList) {
+	earlyReturn := false
 	if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "TMultiple, ShortCircuit 1"); len(e) != 0 {
 		errs = append(errs, e...)
-		return // do not proceed
+		earlyReturn = true
 	}
 	if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "TMultiple, ShortCircuit 2"); len(e) != 0 {
 		errs = append(errs, e...)
+		earlyReturn = true
+	}
+	if earlyReturn {
 		return // do not proceed
 	}
 	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "TMultiple, no flags 1")...)
@@ -354,62 +398,74 @@ func Validate_TMultiple(ctx context.Context, op operation.Operation, fldPath *fi
 
 	// field TMultiple.S
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call field-attached validations
+			earlyReturn := false
 			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "TMultiple.S, ShortCircuit 1"); len(e) != 0 {
 				errs = append(errs, e...)
-				return // do not proceed
+				earlyReturn = true
 			}
 			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "TMultiple.S, ShortCircuit 2"); len(e) != 0 {
 				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
 				return // do not proceed
 			}
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "TMultiple.S, no flags 1")...)
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "T0, string payload")...)
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "TMultiple.S, no flags 2")...)
 			return
-		}(fldPath.Child("s"), &obj.S, safe.Field(oldObj, func(oldObj *TMultiple) *string { return &oldObj.S }))...)
+		}(fldPath.Child("s"), &obj.S, safe.Field(oldObj, func(oldObj *TMultiple) *string { return &oldObj.S }), oldObj != nil)...)
 
 	// field TMultiple.PS
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call field-attached validations
+			earlyReturn := false
 			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "TMultiple.PS, ShortCircuit 1"); len(e) != 0 {
 				errs = append(errs, e...)
-				return // do not proceed
+				earlyReturn = true
 			}
 			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "TMultiple.PS, ShortCircuit 2"); len(e) != 0 {
 				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
 				return // do not proceed
 			}
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "TMultiple.PS, no flags 1")...)
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "T0, string payload")...)
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "TMultiple.PS, no flags 2")...)
 			return
-		}(fldPath.Child("ps"), obj.PS, safe.Field(oldObj, func(oldObj *TMultiple) *string { return oldObj.PS }))...)
+		}(fldPath.Child("ps"), obj.PS, safe.Field(oldObj, func(oldObj *TMultiple) *string { return oldObj.PS }), oldObj != nil)...)
 
 	// field TMultiple.T
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *Tother) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *Tother, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call field-attached validations
+			earlyReturn := false
 			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "TMultiple.T, ShortCircuit 1"); len(e) != 0 {
 				errs = append(errs, e...)
-				return // do not proceed
+				earlyReturn = true
 			}
 			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "TMultiple.T, ShortCircuit 2"); len(e) != 0 {
 				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
 				return // do not proceed
 			}
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "TMultiple.T, no flags 1")...)
@@ -418,22 +474,26 @@ func Validate_TMultiple(ctx context.Context, op operation.Operation, fldPath *fi
 			// call the type's validation function
 			errs = append(errs, Validate_Tother(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("t"), &obj.T, safe.Field(oldObj, func(oldObj *TMultiple) *Tother { return &oldObj.T }))...)
+		}(fldPath.Child("t"), &obj.T, safe.Field(oldObj, func(oldObj *TMultiple) *Tother { return &oldObj.T }), oldObj != nil)...)
 
 	// field TMultiple.PT
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *Tother) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *Tother, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call field-attached validations
+			earlyReturn := false
 			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "TMultiple.PT, ShortCircuit 1"); len(e) != 0 {
 				errs = append(errs, e...)
-				return // do not proceed
+				earlyReturn = true
 			}
 			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "TMultiple.PT, ShortCircuit 2"); len(e) != 0 {
 				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
 				return // do not proceed
 			}
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "TMultiple.PT, no flags 1")...)
@@ -442,7 +502,7 @@ func Validate_TMultiple(ctx context.Context, op operation.Operation, fldPath *fi
 			// call the type's validation function
 			errs = append(errs, Validate_Tother(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("pt"), obj.PT, safe.Field(oldObj, func(oldObj *TMultiple) *Tother { return oldObj.PT }))...)
+		}(fldPath.Child("pt"), obj.PT, safe.Field(oldObj, func(oldObj *TMultiple) *Tother { return oldObj.PT }), oldObj != nil)...)
 
 	return errs
 }
@@ -452,15 +512,15 @@ func Validate_TMultiple(ctx context.Context, op operation.Operation, fldPath *fi
 func Validate_Tother(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Tother) (errs field.ErrorList) {
 	// field Tother.OS
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call field-attached validations
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "Tother, no flags")...)
 			return
-		}(fldPath.Child("os"), &obj.OS, safe.Field(oldObj, func(oldObj *Tother) *string { return &oldObj.OS }))...)
+		}(fldPath.Child("os"), &obj.OS, safe.Field(oldObj, func(oldObj *Tother) *string { return &oldObj.OS }), oldObj != nil)...)
 
 	return errs
 }
