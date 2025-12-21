@@ -800,6 +800,14 @@ items:
     - patch
     - watch
   - apiGroups:
+    - scheduling.k8s.io
+    resources:
+    - workloads
+    verbs:
+    - create
+    - delete
+    - get
+  - apiGroups:
     - ""
     - events.k8s.io
     resources:

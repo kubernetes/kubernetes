@@ -29,6 +29,8 @@ func (*CronJobSpec) ProtoMessage() {}
 
 func (*CronJobStatus) ProtoMessage() {}
 
+func (*GangPolicy) ProtoMessage() {}
+
 func (*Job) ProtoMessage() {}
 
 func (*JobCondition) ProtoMessage() {}
