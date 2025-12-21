@@ -438,6 +438,11 @@ const (
 	// Allows users to specify counting of failed pods per index.
 	JobBackoffLimitPerIndex featuregate.Feature = "JobBackoffLimitPerIndex"
 
+	// owner: @kannon92
+	// kep : tbd
+	// Allow users to specify gang scheduling policy on Job creation
+	JobGangPolicy featuregate.Feature = "JobGangPolicy"
+
 	// owner: @mimowo
 	// kep: https://kep.k8s.io/4368
 	//
@@ -1400,6 +1405,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.36
 	},
 
+	JobGangPolicy: {
+		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	JobManagedBy: {
 		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
@@ -2265,6 +2274,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	InTreePluginPortworxUnregister: {},
 
 	JobBackoffLimitPerIndex: {},
+
+	JobGangPolicy: {GangScheduling, GenericWorkload},
 
 	JobManagedBy: {},
 

@@ -3367,6 +3367,12 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: lastSuccessfulTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
+- name: io.k8s.api.batch.v1.GangPolicy
+  map:
+    fields:
+    - name: policy
+      type:
+        scalar: string
 - name: io.k8s.api.batch.v1.Job
   map:
     fields:
@@ -3429,6 +3435,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: completions
       type:
         scalar: numeric
+    - name: gangPolicy
+      type:
+        namedType: io.k8s.api.batch.v1.GangPolicy
     - name: managedBy
       type:
         scalar: string

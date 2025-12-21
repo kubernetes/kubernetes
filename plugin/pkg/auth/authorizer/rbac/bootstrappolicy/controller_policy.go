@@ -267,16 +267,27 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			eventsRule(),
 		},
 	})
-	addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
-		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "job-controller"},
-		Rules: []rbacv1.PolicyRule{
-			rbacv1helpers.NewRule("get", "list", "watch", "update", "patch").Groups(batchGroup).Resources("jobs").RuleOrDie(),
-			rbacv1helpers.NewRule("update").Groups(batchGroup).Resources("jobs/status").RuleOrDie(),
-			rbacv1helpers.NewRule("update").Groups(batchGroup).Resources("jobs/finalizers").RuleOrDie(),
-			rbacv1helpers.NewRule("list", "watch", "create", "delete", "patch").Groups(legacyGroup).Resources("pods").RuleOrDie(),
-			eventsRule(),
-		},
-	})
+	addControllerRole(&controllerRoles, &controllerRoleBindings, func() rbacv1.ClusterRole {
+		role := rbacv1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "job-controller"},
+			Rules: []rbacv1.PolicyRule{
+				rbacv1helpers.NewRule("get", "list", "watch", "update", "patch").Groups(batchGroup).Resources("jobs").RuleOrDie(),
+				rbacv1helpers.NewRule("update").Groups(batchGroup).Resources("jobs/status").RuleOrDie(),
+				rbacv1helpers.NewRule("update").Groups(batchGroup).Resources("jobs/finalizers").RuleOrDie(),
+				rbacv1helpers.NewRule("list", "watch", "create", "delete", "patch").Groups(legacyGroup).Resources("pods").RuleOrDie(),
+				eventsRule(),
+			},
+		}
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.JobGangPolicy) {
+			role.Rules = append(
+				role.Rules,
+				rbacv1helpers.NewRule("get", "create", "delete").Groups(schedulingGroup).Resources("workloads").RuleOrDie(),
+			)
+		}
+
+		return role
+	}())
 	addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "namespace-controller"},
 		Rules: []rbacv1.PolicyRule{

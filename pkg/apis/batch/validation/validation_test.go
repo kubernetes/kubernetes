@@ -111,6 +111,32 @@ func TestValidateJob(t *testing.T) {
 		opts JobValidationOptions
 		job  batch.Job
 	}{
+		"valid gang policy with NoGang": {
+			opts: JobValidationOptions{RequirePrefixedLabels: true},
+			job: batch.Job{
+				ObjectMeta: validJobObjectMeta,
+				Spec: batch.JobSpec{
+					Selector: validGeneratedSelector,
+					Template: validPodTemplateSpecForGenerated,
+					GangPolicy: &batch.GangPolicy{
+						Policy: batch.NoGang,
+					},
+				},
+			},
+		},
+		"valid gang policy with JobAsGang": {
+			opts: JobValidationOptions{RequirePrefixedLabels: true},
+			job: batch.Job{
+				ObjectMeta: validJobObjectMeta,
+				Spec: batch.JobSpec{
+					Selector: validGeneratedSelector,
+					Template: validPodTemplateSpecForGenerated,
+					GangPolicy: &batch.GangPolicy{
+						Policy: batch.JobAsGang,
+					},
+				},
+			},
+		},
 		"valid success policy": {
 			opts: JobValidationOptions{RequirePrefixedLabels: true},
 			job: batch.Job{
@@ -436,6 +462,32 @@ func TestValidateJob(t *testing.T) {
 		opts JobValidationOptions
 		job  batch.Job
 	}{
+		`spec.gangPolicy.policy: Required value: valid values: ["NoGang" "JobAsGang"]`: {
+			opts: JobValidationOptions{RequirePrefixedLabels: true},
+			job: batch.Job{
+				ObjectMeta: validJobObjectMeta,
+				Spec: batch.JobSpec{
+					Selector: validGeneratedSelector,
+					Template: validPodTemplateSpecForGenerated,
+					GangPolicy: &batch.GangPolicy{
+						Policy: "",
+					},
+				},
+			},
+		},
+		`spec.gangPolicy.policy: Unsupported value: "InvalidPolicy": supported values: "NoGang", "JobAsGang"`: {
+			opts: JobValidationOptions{RequirePrefixedLabels: true},
+			job: batch.Job{
+				ObjectMeta: validJobObjectMeta,
+				Spec: batch.JobSpec{
+					Selector: validGeneratedSelector,
+					Template: validPodTemplateSpecForGenerated,
+					GangPolicy: &batch.GangPolicy{
+						Policy: "InvalidPolicy",
+					},
+				},
+			},
+		},
 		`spec.managedBy: Too long: may not be more than 63 bytes`: {
 			opts: JobValidationOptions{RequirePrefixedLabels: true},
 			job: batch.Job{
@@ -1513,6 +1565,62 @@ func TestValidateJobUpdate(t *testing.T) {
 		opts   JobValidationOptions
 		err    *field.Error
 	}{
+		"add gang policy": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Selector: validGeneratedSelector,
+					Template: validPodTemplateSpecForGenerated,
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.GangPolicy = &batch.GangPolicy{
+					Policy: batch.JobAsGang,
+				}
+			},
+			err: &field.Error{
+				Type:  field.ErrorTypeInvalid,
+				Field: "spec.gangPolicy",
+			},
+		},
+		"update gang policy": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Selector: validGeneratedSelector,
+					Template: validPodTemplateSpecForGenerated,
+					GangPolicy: &batch.GangPolicy{
+						Policy: batch.NoGang,
+					},
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.GangPolicy.Policy = batch.JobAsGang
+			},
+			err: &field.Error{
+				Type:  field.ErrorTypeInvalid,
+				Field: "spec.gangPolicy",
+			},
+		},
+		"remove gang policy": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Selector: validGeneratedSelector,
+					Template: validPodTemplateSpecForGenerated,
+					GangPolicy: &batch.GangPolicy{
+						Policy: batch.JobAsGang,
+					},
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.GangPolicy = nil
+			},
+			err: &field.Error{
+				Type:  field.ErrorTypeInvalid,
+				Field: "spec.gangPolicy",
+			},
+		},
 		"mutable fields": {
 			old: batch.Job{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},

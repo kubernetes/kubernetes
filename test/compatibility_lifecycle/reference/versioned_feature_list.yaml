@@ -787,6 +787,12 @@
     lockToDefault: true
     preRelease: GA
     version: "1.33"
+- name: JobGangPolicy
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.35"
 - name: JobManagedBy
   versionedSpecs:
   - default: false

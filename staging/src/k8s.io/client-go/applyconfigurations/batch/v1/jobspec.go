@@ -160,6 +160,13 @@ type JobSpecApplyConfiguration struct {
 	// characters as defined by RFC 3986. The value cannot exceed 63 characters.
 	// This field is immutable.
 	ManagedBy *string `json:"managedBy,omitempty"`
+	// GangPolicy specifies the gang scheduling configuration for this Job.
+	// When set, all pods in the Job are scheduled as a group according to the specified policy.
+	// NOTE: This feature requires a gang scheduler that supports the Workload API
+	// (scheduling.k8s.io/v1alpha1) to be running in the cluster.
+	// The feature gates GenericWorkload, GangScheduling and JobGangPolicy are required
+	// to use this feature.
+	GangPolicy *GangPolicyApplyConfiguration `json:"gangPolicy,omitempty"`
 }
 
 // JobSpecApplyConfiguration constructs a declarative configuration of the JobSpec type for use with
@@ -293,5 +300,13 @@ func (b *JobSpecApplyConfiguration) WithPodReplacementPolicy(value batchv1.PodRe
 // If called multiple times, the ManagedBy field is set to the value of the last call.
 func (b *JobSpecApplyConfiguration) WithManagedBy(value string) *JobSpecApplyConfiguration {
 	b.ManagedBy = &value
+	return b
+}
+
+// WithGangPolicy sets the GangPolicy field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the GangPolicy field is set to the value of the last call.
+func (b *JobSpecApplyConfiguration) WithGangPolicy(value *GangPolicyApplyConfiguration) *JobSpecApplyConfiguration {
+	b.GangPolicy = value
 	return b
 }

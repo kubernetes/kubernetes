@@ -531,6 +531,129 @@ func TestSetDefaultJob(t *testing.T) {
 	}
 }
 
+func TestSetDefaultJob_GangScheduling(t *testing.T) {
+	defaultLabels := map[string]string{"default": "default"}
+	validPodTemplateSpec := v1.PodTemplateSpec{
+		ObjectMeta: metav1.ObjectMeta{Labels: defaultLabels},
+	}
+
+	tests := map[string]struct {
+		original             *batchv1.Job
+		expected             *batchv1.Job
+		enableGangScheduling bool
+	}{
+		"GangPolicy unspecified with feature gate enabled -> defaults to NoGang": {
+			original: &batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Template: validPodTemplateSpec,
+				},
+			},
+			expected: &batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Completions:    ptr.To[int32](1),
+					Parallelism:    ptr.To[int32](1),
+					BackoffLimit:   ptr.To[int32](6),
+					CompletionMode: ptr.To(batchv1.NonIndexedCompletion),
+					Suspend:        ptr.To(false),
+					ManualSelector: ptr.To(false),
+					GangPolicy:     &batchv1.GangPolicy{Policy: batchv1.NoGang},
+				},
+			},
+			enableGangScheduling: true,
+		},
+		"GangPolicy unspecified with feature gate disabled -> GangPolicy remains nil": {
+			original: &batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Template: validPodTemplateSpec,
+				},
+			},
+			expected: &batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Completions:    ptr.To[int32](1),
+					Parallelism:    ptr.To[int32](1),
+					BackoffLimit:   ptr.To[int32](6),
+					CompletionMode: ptr.To(batchv1.NonIndexedCompletion),
+					Suspend:        ptr.To(false),
+					ManualSelector: ptr.To(false),
+					GangPolicy:     nil,
+				},
+			},
+			enableGangScheduling: false,
+		},
+		"GangPolicy explicitly set to JobAsGang with feature gate enabled -> no change": {
+			original: &batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Template:   validPodTemplateSpec,
+					GangPolicy: &batchv1.GangPolicy{Policy: batchv1.JobAsGang},
+				},
+			},
+			expected: &batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Completions:    ptr.To[int32](1),
+					Parallelism:    ptr.To[int32](1),
+					BackoffLimit:   ptr.To[int32](6),
+					CompletionMode: ptr.To(batchv1.NonIndexedCompletion),
+					Suspend:        ptr.To(false),
+					ManualSelector: ptr.To(false),
+					GangPolicy:     &batchv1.GangPolicy{Policy: batchv1.JobAsGang},
+				},
+			},
+			enableGangScheduling: true,
+		},
+		"GangPolicy explicitly set to NoGang with feature gate enabled -> no change": {
+			original: &batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Template:   validPodTemplateSpec,
+					GangPolicy: &batchv1.GangPolicy{Policy: batchv1.NoGang},
+				},
+			},
+			expected: &batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Completions:    ptr.To[int32](1),
+					Parallelism:    ptr.To[int32](1),
+					BackoffLimit:   ptr.To[int32](6),
+					CompletionMode: ptr.To(batchv1.NonIndexedCompletion),
+					Suspend:        ptr.To(false),
+					ManualSelector: ptr.To(false),
+					GangPolicy:     &batchv1.GangPolicy{Policy: batchv1.NoGang},
+				},
+			},
+			enableGangScheduling: true,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, test.enableGangScheduling)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GangScheduling, test.enableGangScheduling)
+			original := test.original
+			expected := test.expected
+			obj2 := roundTrip(t, runtime.Object(original))
+			actual, ok := obj2.(*batchv1.Job)
+			if !ok {
+				t.Fatalf("Unexpected object: %v", actual)
+			}
+
+			if diff := cmp.Diff(expected.Spec.Suspend, actual.Spec.Suspend); diff != "" {
+				t.Errorf(".spec.suspend does not match; -want,+got:\n%s", diff)
+			}
+			validateDefaultInt32(t, "Completions", actual.Spec.Completions, expected.Spec.Completions)
+			validateDefaultInt32(t, "Parallelism", actual.Spec.Parallelism, expected.Spec.Parallelism)
+			validateDefaultInt32(t, "BackoffLimit", actual.Spec.BackoffLimit, expected.Spec.BackoffLimit)
+
+			if diff := cmp.Diff(expected.Spec.CompletionMode, actual.Spec.CompletionMode); diff != "" {
+				t.Errorf("Unexpected CompletionMode (-want,+got):\n%s", diff)
+			}
+			if diff := cmp.Diff(expected.Spec.ManualSelector, actual.Spec.ManualSelector); diff != "" {
+				t.Errorf("Unexpected ManualSelector (-want,+got):\n%s", diff)
+			}
+			if diff := cmp.Diff(expected.Spec.GangPolicy, actual.Spec.GangPolicy); diff != "" {
+				t.Errorf("Unexpected GangPolicy (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func validateDefaultInt32(t *testing.T, field string, actual *int32, expected *int32) {
 	if (actual == nil) != (expected == nil) {
 		t.Errorf("Got different *%s than expected: %v %v", field, actual, expected)

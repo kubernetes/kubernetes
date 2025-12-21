@@ -406,6 +406,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		batchv1.CronJobList{}.OpenAPIModelName():                                                                        schema_k8sio_api_batch_v1_CronJobList(ref),
 		batchv1.CronJobSpec{}.OpenAPIModelName():                                                                        schema_k8sio_api_batch_v1_CronJobSpec(ref),
 		batchv1.CronJobStatus{}.OpenAPIModelName():                                                                      schema_k8sio_api_batch_v1_CronJobStatus(ref),
+		batchv1.GangPolicy{}.OpenAPIModelName():                                                                         schema_k8sio_api_batch_v1_GangPolicy(ref),
 		batchv1.Job{}.OpenAPIModelName():                                                                                schema_k8sio_api_batch_v1_Job(ref),
 		batchv1.JobCondition{}.OpenAPIModelName():                                                                       schema_k8sio_api_batch_v1_JobCondition(ref),
 		batchv1.JobList{}.OpenAPIModelName():                                                                            schema_k8sio_api_batch_v1_JobList(ref),
@@ -16267,6 +16268,27 @@ func schema_k8sio_api_batch_v1_CronJobStatus(ref common.ReferenceCallback) commo
 	}
 }
 
+func schema_k8sio_api_batch_v1_GangPolicy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "GangPolicy defines the gang scheduling configuration for a Job.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"policy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Policy specifies the gang scheduling mode.\n\nPossible enum values:\n - `\"JobAsGang\"` means that all pods in the Job are scheduled as a gang.\n - `\"NoGang\"` means that the Job does not use gang scheduling.",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"JobAsGang", "NoGang"},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 func schema_k8sio_api_batch_v1_Job(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -16544,12 +16566,18 @@ func schema_k8sio_api_batch_v1_JobSpec(ref common.ReferenceCallback) common.Open
 							Format:      "",
 						},
 					},
+					"gangPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "GangPolicy specifies the gang scheduling configuration for this Job. When set, all pods in the Job are scheduled as a group according to the specified policy. NOTE: This feature requires a gang scheduler that supports the Workload API (scheduling.k8s.io/v1alpha1) to be running in the cluster. The feature gates GenericWorkload, GangScheduling and JobGangPolicy are required to use this feature.",
+							Ref:         ref(batchv1.GangPolicy{}.OpenAPIModelName()),
+						},
+					},
 				},
 				Required: []string{"template"},
 			},
 		},
 		Dependencies: []string{
-			batchv1.PodFailurePolicy{}.OpenAPIModelName(), batchv1.SuccessPolicy{}.OpenAPIModelName(), corev1.PodTemplateSpec{}.OpenAPIModelName(), metav1.LabelSelector{}.OpenAPIModelName()},
+			batchv1.GangPolicy{}.OpenAPIModelName(), batchv1.PodFailurePolicy{}.OpenAPIModelName(), batchv1.SuccessPolicy{}.OpenAPIModelName(), corev1.PodTemplateSpec{}.OpenAPIModelName(), metav1.LabelSelector{}.OpenAPIModelName()},
 	}
 }
 

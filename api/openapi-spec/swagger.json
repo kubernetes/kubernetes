@@ -4457,6 +4457,16 @@
       },
       "type": "object"
     },
+    "io.k8s.api.batch.v1.GangPolicy": {
+      "description": "GangPolicy defines the gang scheduling configuration for a Job.",
+      "properties": {
+        "policy": {
+          "description": "Policy specifies the gang scheduling mode.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
     "io.k8s.api.batch.v1.Job": {
       "description": "Job represents the configuration of a single job.",
       "properties": {
@@ -4585,6 +4595,10 @@
           "description": "Specifies the desired number of successfully finished pods the job should be run with.  Setting to null means that the success of any pod signals the success of all pods, and allows parallelism to have any positive value.  Setting to 1 means that parallelism is limited to 1 and the success of that pod signals the success of the job. More info: https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/",
           "format": "int32",
           "type": "integer"
+        },
+        "gangPolicy": {
+          "$ref": "#/definitions/io.k8s.api.batch.v1.GangPolicy",
+          "description": "GangPolicy specifies the gang scheduling configuration for this Job. When set, all pods in the Job are scheduled as a group according to the specified policy. NOTE: This feature requires a gang scheduler that supports the Workload API (scheduling.k8s.io/v1alpha1) to be running in the cluster. The feature gates GenericWorkload, GangScheduling and JobGangPolicy are required to use this feature."
         },
         "managedBy": {
           "description": "ManagedBy field indicates the controller that manages a Job. The k8s Job controller reconciles jobs which don't have this field at all or the field value is the reserved string `kubernetes.io/job-controller`, but skips reconciling Jobs with a custom value for this field. The value must be a valid domain-prefixed path (e.g. acme.io/foo) - all characters before the first \"/\" must be a valid subdomain as defined by RFC 1123. All characters trailing the first \"/\" must be valid HTTP Path characters as defined by RFC 3986. The value cannot exceed 63 characters. This field is immutable.",

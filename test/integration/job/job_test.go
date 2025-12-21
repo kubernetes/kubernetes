@@ -33,9 +33,11 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	eventsv1 "k8s.io/api/events/v1"
+	schedulingv1alpha1 "k8s.io/api/scheduling/v1alpha1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
@@ -4717,6 +4719,528 @@ func TestMutableSchedulingDirectivesForSuspendedJobs(t *testing.T) {
 	}
 }
 
+// TestElasticIndexedJobGangSchedulingWorkloadUpdated verifies that when an Elastic Indexed Job
+// scales its parallelism/completions, the Workload object's MinCount is updated to reflect
+// the new values. The old Workload is deleted and a new one is created with the updated minCount.
+func TestElasticIndexedJobGangSchedulingWorkloadUpdated(t *testing.T) {
+	testCases := []struct {
+		name               string
+		initialParallelism int32
+		scaledParallelism  int32
+		isScaleDown        bool
+	}{
+		{
+			name:               "scale up parallelism",
+			initialParallelism: 3,
+			scaledParallelism:  5,
+			isScaleDown:        false,
+		},
+		{
+			name:               "scale down parallelism",
+			initialParallelism: 5,
+			scaledParallelism:  2,
+			isScaleDown:        true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Enable feature gates with their dependencies
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.GenericWorkload, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.GangScheduling, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobGangPolicy, true)
+
+			// Enable the scheduling.k8s.io/v1alpha1 API for workload support
+			closeFn, restConfig, clientSet, ns := setupWithRuntimeConfig(t, "gang-elastic", map[schema.GroupVersion]bool{
+				schedulingv1alpha1.SchemeGroupVersion: true,
+			})
+			t.Cleanup(closeFn)
+			ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
+			t.Cleanup(cancel)
+
+			mode := batchv1.IndexedCompletion
+
+			// Create an Elastic Indexed Job with gang scheduling
+			jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Parallelism:    ptr.To(tc.initialParallelism),
+					Completions:    ptr.To(tc.initialParallelism),
+					CompletionMode: &mode,
+					GangPolicy: &batchv1.GangPolicy{
+						Policy: batchv1.JobAsGang,
+					},
+				},
+			})
+			if err != nil {
+				t.Fatalf("Failed to create Job: %v", err)
+			}
+
+			// Wait for the Workload to be created
+			var workload *schedulingv1alpha1.Workload
+			err = wait.PollUntilContextTimeout(ctx, waitInterval, 10*time.Second, true, func(ctx context.Context) (bool, error) {
+				workload, err = clientSet.SchedulingV1alpha1().Workloads(ns.Name).Get(ctx, jobObj.Name, metav1.GetOptions{})
+				if err != nil {
+					if apierrors.IsNotFound(err) {
+						return false, nil
+					}
+					return false, err
+				}
+				return true, nil
+			})
+			if err != nil {
+				t.Fatalf("Failed to wait for Workload to be created: %v", err)
+			}
+
+			// Verify initial Workload MinCount matches initial parallelism
+			if len(workload.Spec.PodGroups) == 0 {
+				t.Fatalf("Workload has no PodGroups")
+			}
+			if workload.Spec.PodGroups[0].Policy.Gang == nil {
+				t.Fatalf("Workload PodGroup has no Gang policy")
+			}
+			initialMinCount := workload.Spec.PodGroups[0].Policy.Gang.MinCount
+			if initialMinCount != tc.initialParallelism {
+				t.Errorf("Expected initial Workload MinCount to be %d, got %d", tc.initialParallelism, initialMinCount)
+			}
+
+			// Wait for pods to be created
+			err = wait.PollUntilContextTimeout(ctx, waitInterval, 10*time.Second, true, func(ctx context.Context) (bool, error) {
+				pods, err := clientSet.CoreV1().Pods(ns.Name).List(ctx, metav1.ListOptions{})
+				if err != nil {
+					return false, err
+				}
+				return len(pods.Items) == int(tc.initialParallelism), nil
+			})
+			if err != nil {
+				t.Fatalf("Failed to wait for initial pods to be created: %v", err)
+			}
+
+			// For scale down, succeed some pods first to allow the scale down
+			if tc.isScaleDown {
+				podsToSucceed := int(tc.initialParallelism - tc.scaledParallelism)
+				for i := 0; i < podsToSucceed; i++ {
+					if err := setJobPhaseForIndex(ctx, clientSet, jobObj, v1.PodSucceeded, i); err != nil {
+						t.Fatalf("Failed to succeed pod at index %d: %v", i, err)
+					}
+				}
+			}
+
+			// Scale the job's parallelism and completions
+			jobClient := clientSet.BatchV1().Jobs(jobObj.Namespace)
+			if _, err = updateJob(ctx, jobClient, jobObj.Name, func(j *batchv1.Job) {
+				j.Spec.Completions = ptr.To(tc.scaledParallelism)
+				j.Spec.Parallelism = ptr.To(tc.scaledParallelism)
+			}); err != nil {
+				t.Fatalf("Failed to scale Job: %v", err)
+			}
+
+			// Wait for pods to reflect the scaling
+			if tc.isScaleDown {
+				// For scale down, just wait for the controller to process
+				time.Sleep(sleepDurationForControllerLatency)
+			} else {
+				// For scale up, wait for new pods to be created
+				err = wait.PollUntilContextTimeout(ctx, waitInterval, 10*time.Second, true, func(ctx context.Context) (bool, error) {
+					pods, err := clientSet.CoreV1().Pods(ns.Name).List(ctx, metav1.ListOptions{})
+					if err != nil {
+						return false, err
+					}
+					return len(pods.Items) == int(tc.scaledParallelism), nil
+				})
+				if err != nil {
+					t.Fatalf("Failed to wait for scaled pods to be created: %v", err)
+				}
+			}
+
+			// Wait for the Workload to be recreated with the updated minCount
+			// The controller deletes the old workload and creates a new one
+			err = wait.PollUntilContextTimeout(ctx, waitInterval, 10*time.Second, true, func(ctx context.Context) (bool, error) {
+				workload, err = clientSet.SchedulingV1alpha1().Workloads(ns.Name).Get(ctx, jobObj.Name, metav1.GetOptions{})
+				if err != nil {
+					if apierrors.IsNotFound(err) {
+						// Workload is being recreated
+						return false, nil
+					}
+					return false, err
+				}
+				// Check if the workload has been updated with the new minCount
+				if len(workload.Spec.PodGroups) > 0 &&
+					workload.Spec.PodGroups[0].Policy.Gang != nil &&
+					workload.Spec.PodGroups[0].Policy.Gang.MinCount == tc.scaledParallelism {
+					return true, nil
+				}
+				return false, nil
+			})
+			if err != nil {
+				t.Fatalf("Failed to wait for Workload to be updated with new minCount: %v", err)
+			}
+
+			// Verify the Workload MinCount is updated to match the new parallelism
+			updatedMinCount := workload.Spec.PodGroups[0].Policy.Gang.MinCount
+			if updatedMinCount != tc.scaledParallelism {
+				t.Errorf("Expected Workload MinCount to be updated to %d, got %d", tc.scaledParallelism, updatedMinCount)
+			} else {
+				t.Logf("Workload MinCount was correctly updated from %d to %d after scaling", tc.initialParallelism, tc.scaledParallelism)
+			}
+
+			// Verify the Job itself was scaled correctly
+			job, err := jobClient.Get(ctx, jobObj.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("Failed to get Job: %v", err)
+			}
+			if *job.Spec.Parallelism != tc.scaledParallelism {
+				t.Errorf("Job parallelism should be %d, got %d", tc.scaledParallelism, *job.Spec.Parallelism)
+			}
+			if *job.Spec.Completions != tc.scaledParallelism {
+				t.Errorf("Job completions should be %d, got %d", tc.scaledParallelism, *job.Spec.Completions)
+			}
+		})
+	}
+}
+
+func TestGangScheduling(t *testing.T) {
+	testCases := []struct {
+		name               string
+		featureGateEnabled bool
+		gangPolicy         *batchv1.GangPolicy
+		parallelism        int32
+		completions        int32
+		expectWorkloadRef  bool
+		expectedActivePods int
+	}{
+		{
+			name:               "NoGang policy with feature gate enabled - pods have no workloadRef",
+			featureGateEnabled: true,
+			gangPolicy: &batchv1.GangPolicy{
+				Policy: batchv1.NoGang,
+			},
+			parallelism:        3,
+			completions:        6,
+			expectWorkloadRef:  false,
+			expectedActivePods: 3,
+		},
+		{
+			name:               "JobAsGang policy with feature gate enabled - pods have workloadRef",
+			featureGateEnabled: true,
+			gangPolicy: &batchv1.GangPolicy{
+				Policy: batchv1.JobAsGang,
+			},
+			parallelism:        5,
+			completions:        10,
+			expectWorkloadRef:  true,
+			expectedActivePods: 5,
+		},
+		{
+			name:               "JobAsGang policy with feature gate disabled - pods have no workloadRef",
+			featureGateEnabled: false,
+			gangPolicy: &batchv1.GangPolicy{
+				Policy: batchv1.JobAsGang,
+			},
+			parallelism:        5,
+			completions:        10,
+			expectWorkloadRef:  false,
+			expectedActivePods: 5,
+		},
+		{
+			name:               "NoGang policy with feature gate disabled - pods have no workloadRef",
+			featureGateEnabled: false,
+			gangPolicy: &batchv1.GangPolicy{
+				Policy: batchv1.NoGang,
+			},
+			parallelism:        3,
+			completions:        6,
+			expectWorkloadRef:  false,
+			expectedActivePods: 3,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.featureGateEnabled {
+				// Enable feature gates with their dependencies
+				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.GenericWorkload, true)
+				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.GangScheduling, true)
+				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobGangPolicy, true)
+			} else {
+				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobGangPolicy, false)
+			}
+
+			// Enable the scheduling.k8s.io/v1alpha1 API for workload support
+			closeFn, restConfig, clientSet, ns := setupWithRuntimeConfig(t, "gang-scheduling", map[schema.GroupVersion]bool{
+				schedulingv1alpha1.SchemeGroupVersion: true,
+			})
+			t.Cleanup(closeFn)
+			ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
+			t.Cleanup(cancel)
+
+			job, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Parallelism: ptr.To(tc.parallelism),
+					Completions: ptr.To(tc.completions),
+					GangPolicy:  tc.gangPolicy,
+				},
+			})
+			if err != nil {
+				t.Fatalf("Failed to create Job: %v", err)
+			}
+
+			// Wait a moment for the controller to process the Job
+			time.Sleep(sleepDurationForControllerLatency)
+
+			// When workloadRef is set, pods may not become "Active" without a gang scheduler
+			// So for JobAsGang, just verify pods are created (any phase)
+			// For NoGang or feature gate off, verify normal active pod behavior
+			if tc.expectWorkloadRef {
+				// Wait for pods to be created (they won't be scheduled without gang scheduler)
+				var pods *v1.PodList
+				err = wait.PollUntilContextTimeout(ctx, waitInterval, 10*time.Second, true, func(ctx context.Context) (bool, error) {
+					pods, err = clientSet.CoreV1().Pods(ns.Name).List(ctx, metav1.ListOptions{})
+					if err != nil {
+						return false, err
+					}
+					return len(pods.Items) == tc.expectedActivePods, nil
+				})
+				if err != nil {
+					t.Fatalf("Failed to wait for pods to be created: %v", err)
+				}
+			} else {
+				// For NoGang or feature gate off, verify normal active pod behavior
+				validateJobsPodsStatusOnly(ctx, t, clientSet, job, podsByStatus{
+					Active:      tc.expectedActivePods,
+					Ready:       ptr.To[int32](0),
+					Terminating: ptr.To[int32](0),
+				})
+			}
+
+			// Verify workloadRef on pods
+			pods, err := clientSet.CoreV1().Pods(ns.Name).List(ctx, metav1.ListOptions{})
+			if err != nil {
+				t.Fatalf("Failed to list pods: %v", err)
+			}
+
+			if tc.expectWorkloadRef {
+				// For JobAsGang policy with feature gate enabled, verify pods have workloadRef
+				for _, pod := range pods.Items {
+					if pod.Spec.WorkloadRef == nil {
+						t.Errorf("Expected pod %s to have workloadRef set for JobAsGang policy, but it was nil", pod.Name)
+					} else {
+						if pod.Spec.WorkloadRef.Name != job.Name {
+							t.Errorf("Expected pod %s workloadRef.Name to be %q, got %q", pod.Name, job.Name, pod.Spec.WorkloadRef.Name)
+						}
+						if pod.Spec.WorkloadRef.PodGroup != job.Name {
+							t.Errorf("Expected pod %s workloadRef.PodGroup to be %q, got %q", pod.Name, job.Name, pod.Spec.WorkloadRef.PodGroup)
+						}
+					}
+				}
+			} else {
+				// For NoGang policy or feature gate disabled, verify pods do NOT have workloadRef
+				for _, pod := range pods.Items {
+					if pod.Spec.WorkloadRef != nil {
+						t.Errorf("Expected pod %s to NOT have workloadRef set, but it was: %+v", pod.Name, pod.Spec.WorkloadRef)
+					}
+				}
+			}
+		})
+	}
+}
+
+// TestGangSchedulingWorkloadLifecycleWithSuspend verifies that:
+// 1. Workloads are not created when a job is created in suspended state
+// 2. Workloads are created when the job is resumed (unsuspended)
+// 3. Workloads are deleted when a running job is suspended
+// 4. Workloads are recreated when the job is resumed again
+func TestGangSchedulingWorkloadLifecycleWithSuspend(t *testing.T) {
+	testCases := []struct {
+		name             string
+		startSuspended   bool
+		parallelism      int32
+		completions      int32
+		expectedMinCount int32
+	}{
+		{
+			name:             "job created not suspended - workload exists",
+			startSuspended:   false,
+			parallelism:      3,
+			completions:      3,
+			expectedMinCount: 3,
+		},
+		{
+			name:             "job created suspended - no workload",
+			startSuspended:   true,
+			parallelism:      3,
+			completions:      3,
+			expectedMinCount: 3,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Enable feature gates with their dependencies
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.GenericWorkload, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.GangScheduling, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobGangPolicy, true)
+
+			// Enable the scheduling.k8s.io/v1alpha1 API for workload support
+			closeFn, restConfig, clientSet, ns := setupWithRuntimeConfig(t, "gang-suspend", map[schema.GroupVersion]bool{
+				schedulingv1alpha1.SchemeGroupVersion: true,
+			})
+			t.Cleanup(closeFn)
+			ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
+			t.Cleanup(cancel)
+
+			// Create a job with gang scheduling
+			job, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Parallelism: ptr.To(tc.parallelism),
+					Completions: ptr.To(tc.completions),
+					Suspend:     ptr.To(tc.startSuspended),
+					GangPolicy: &batchv1.GangPolicy{
+						Policy: batchv1.JobAsGang,
+					},
+				},
+			})
+			if err != nil {
+				t.Fatalf("Failed to create Job: %v", err)
+			}
+
+			// Wait for the controller to process the Job
+			time.Sleep(sleepDurationForControllerLatency)
+
+			if tc.startSuspended {
+				// Verify NO workload was created for suspended job
+				_, err := clientSet.SchedulingV1alpha1().Workloads(ns.Name).Get(ctx, job.Name, metav1.GetOptions{})
+				if !apierrors.IsNotFound(err) {
+					t.Errorf("Expected workload to NOT exist for suspended job, but got: %v", err)
+				}
+
+				// Resume the job
+				jobClient := clientSet.BatchV1().Jobs(job.Namespace)
+				if _, err = updateJob(ctx, jobClient, job.Name, func(j *batchv1.Job) {
+					j.Spec.Suspend = ptr.To(false)
+				}); err != nil {
+					t.Fatalf("Failed to resume Job: %v", err)
+				}
+
+				// Wait for the workload to be created
+				err = wait.PollUntilContextTimeout(ctx, waitInterval, 10*time.Second, true, func(ctx context.Context) (bool, error) {
+					workload, err := clientSet.SchedulingV1alpha1().Workloads(ns.Name).Get(ctx, job.Name, metav1.GetOptions{})
+					if err != nil {
+						if apierrors.IsNotFound(err) {
+							return false, nil
+						}
+						return false, err
+					}
+					if len(workload.Spec.PodGroups) > 0 &&
+						workload.Spec.PodGroups[0].Policy.Gang != nil &&
+						workload.Spec.PodGroups[0].Policy.Gang.MinCount == tc.expectedMinCount {
+						return true, nil
+					}
+					return false, nil
+				})
+				if err != nil {
+					t.Fatalf("Failed to wait for workload to be created after resume: %v", err)
+				}
+
+				// Now suspend the job again and verify workload is deleted
+				if _, err = updateJob(ctx, jobClient, job.Name, func(j *batchv1.Job) {
+					j.Spec.Suspend = ptr.To(true)
+				}); err != nil {
+					t.Fatalf("Failed to suspend Job again: %v", err)
+				}
+
+				// Wait for the workload to be deleted
+				err = wait.PollUntilContextTimeout(ctx, waitInterval, 10*time.Second, true, func(ctx context.Context) (bool, error) {
+					_, err := clientSet.SchedulingV1alpha1().Workloads(ns.Name).Get(ctx, job.Name, metav1.GetOptions{})
+					if apierrors.IsNotFound(err) {
+						return true, nil
+					}
+					if err != nil {
+						return false, err
+					}
+					return false, nil // Workload still exists
+				})
+				if err != nil {
+					t.Fatalf("Failed to wait for workload to be deleted after suspend: %v", err)
+				}
+			} else {
+				// Verify workload was created for non-suspended job
+				var workload *schedulingv1alpha1.Workload
+				err = wait.PollUntilContextTimeout(ctx, waitInterval, 10*time.Second, true, func(ctx context.Context) (bool, error) {
+					workload, err = clientSet.SchedulingV1alpha1().Workloads(ns.Name).Get(ctx, job.Name, metav1.GetOptions{})
+					if err != nil {
+						if apierrors.IsNotFound(err) {
+							return false, nil
+						}
+						return false, err
+					}
+					return true, nil
+				})
+				if err != nil {
+					t.Fatalf("Failed to wait for workload to be created: %v", err)
+				}
+
+				// Verify workload has correct minCount
+				if len(workload.Spec.PodGroups) == 0 ||
+					workload.Spec.PodGroups[0].Policy.Gang == nil ||
+					workload.Spec.PodGroups[0].Policy.Gang.MinCount != tc.expectedMinCount {
+					t.Errorf("Expected workload MinCount to be %d, got %d",
+						tc.expectedMinCount, workload.Spec.PodGroups[0].Policy.Gang.MinCount)
+				}
+
+				// Suspend the job
+				jobClient := clientSet.BatchV1().Jobs(job.Namespace)
+				if _, err = updateJob(ctx, jobClient, job.Name, func(j *batchv1.Job) {
+					j.Spec.Suspend = ptr.To(true)
+				}); err != nil {
+					t.Fatalf("Failed to suspend Job: %v", err)
+				}
+
+				// Wait for the workload to be deleted
+				err = wait.PollUntilContextTimeout(ctx, waitInterval, 10*time.Second, true, func(ctx context.Context) (bool, error) {
+					_, err := clientSet.SchedulingV1alpha1().Workloads(ns.Name).Get(ctx, job.Name, metav1.GetOptions{})
+					if apierrors.IsNotFound(err) {
+						return true, nil
+					}
+					if err != nil {
+						return false, err
+					}
+					return false, nil // Workload still exists
+				})
+				if err != nil {
+					t.Fatalf("Failed to wait for workload to be deleted after suspend: %v", err)
+				}
+
+				// Resume the job and verify workload is recreated
+				if _, err = updateJob(ctx, jobClient, job.Name, func(j *batchv1.Job) {
+					j.Spec.Suspend = ptr.To(false)
+				}); err != nil {
+					t.Fatalf("Failed to resume Job: %v", err)
+				}
+
+				// Wait for the workload to be recreated
+				err = wait.PollUntilContextTimeout(ctx, waitInterval, 10*time.Second, true, func(ctx context.Context) (bool, error) {
+					workload, err := clientSet.SchedulingV1alpha1().Workloads(ns.Name).Get(ctx, job.Name, metav1.GetOptions{})
+					if err != nil {
+						if apierrors.IsNotFound(err) {
+							return false, nil
+						}
+						return false, err
+					}
+					if len(workload.Spec.PodGroups) > 0 &&
+						workload.Spec.PodGroups[0].Policy.Gang != nil &&
+						workload.Spec.PodGroups[0].Policy.Gang.MinCount == tc.expectedMinCount {
+						return true, nil
+					}
+					return false, nil
+				})
+				if err != nil {
+					t.Fatalf("Failed to wait for workload to be recreated after resume: %v", err)
+				}
+			}
+		})
+	}
+}
+
 type podsByStatus struct {
 	Active      int
 	Ready       *int32
@@ -5120,6 +5644,35 @@ func createJobWithDefaults(ctx context.Context, clientSet clientset.Interface, n
 func setup(t testing.TB, nsBaseName string) (framework.TearDownFunc, *restclient.Config, clientset.Interface, *v1.Namespace) {
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+
+	config := restclient.CopyConfig(server.ClientConfig)
+	config.QPS = restConfigQPS
+	config.Burst = restConfigBurst
+	config.Timeout = 0
+	clientSet, err := clientset.NewForConfig(config)
+	if err != nil {
+		t.Fatalf("Error creating clientset: %v", err)
+	}
+
+	ns := framework.CreateNamespaceOrDie(clientSet, nsBaseName, t)
+	closeFn := func() {
+		framework.DeleteNamespaceOrDie(clientSet, ns, t)
+		server.TearDownFn()
+	}
+	return closeFn, config, clientSet, ns
+}
+
+func setupWithRuntimeConfig(t testing.TB, nsBaseName string, apis map[schema.GroupVersion]bool) (framework.TearDownFunc, *restclient.Config, clientset.Interface, *v1.Namespace) {
+	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+	apiServerFlags := framework.DefaultTestServerFlags()
+	var runtimeConfigs []string
+	for key, value := range apis {
+		runtimeConfigs = append(runtimeConfigs, fmt.Sprintf("%s=%t", key, value))
+	}
+	if len(runtimeConfigs) > 0 {
+		apiServerFlags = append(apiServerFlags, "--runtime-config="+strings.Join(runtimeConfigs, ","))
+	}
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, apiServerFlags, framework.SharedEtcd())
 
 	config := restclient.CopyConfig(server.ClientConfig)
 	config.QPS = restConfigQPS

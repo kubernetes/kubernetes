@@ -221,6 +221,9 @@ func validateJobSpec(spec *batch.JobSpec, fldPath *field.Path, opts apivalidatio
 			allErrs = append(allErrs, field.TooLong(fldPath.Child("managedBy"), "" /*unused*/, maxManagedByLength))
 		}
 	}
+	if spec.GangPolicy != nil {
+		allErrs = append(allErrs, validateGangPolicy(spec.GangPolicy, fldPath.Child("gangPolicy"))...)
+	}
 	if spec.CompletionMode != nil {
 		if *spec.CompletionMode != batch.NonIndexedCompletion && *spec.CompletionMode != batch.IndexedCompletion {
 			allErrs = append(allErrs, field.NotSupported(fldPath.Child("completionMode"), spec.CompletionMode, []batch.CompletionMode{batch.NonIndexedCompletion, batch.IndexedCompletion}))
@@ -288,6 +291,20 @@ func validateJobSpec(spec *batch.JobSpec, fldPath *field.Path, opts apivalidatio
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("template", "spec", "restartPolicy"),
 			spec.Template.Spec.RestartPolicy, fmt.Sprintf("only %q is supported when podFailurePolicy is specified", api.RestartPolicyNever)))
 	}
+	return allErrs
+}
+
+func validateGangPolicy(gangPolicy *batch.GangPolicy, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	validPolicies := []batch.GangSchedulingPolicy{batch.NoGang, batch.JobAsGang}
+
+	policyPath := fldPath.Child("policy")
+	if gangPolicy.Policy == "" {
+		allErrs = append(allErrs, field.Required(policyPath, fmt.Sprintf("valid values: %q", validPolicies)))
+	} else if gangPolicy.Policy != batch.NoGang && gangPolicy.Policy != batch.JobAsGang {
+		allErrs = append(allErrs, field.NotSupported(policyPath, gangPolicy.Policy, validPolicies))
+	}
+
 	return allErrs
 }
 
@@ -631,6 +648,7 @@ func ValidateJobSpecUpdate(spec, oldSpec batch.JobSpec, fldPath *field.Path, opt
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.BackoffLimitPerIndex, oldSpec.BackoffLimitPerIndex, fldPath.Child("backoffLimitPerIndex"))...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.ManagedBy, oldSpec.ManagedBy, fldPath.Child("managedBy"))...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.SuccessPolicy, oldSpec.SuccessPolicy, fldPath.Child("successPolicy"))...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.GangPolicy, oldSpec.GangPolicy, fldPath.Child("gangPolicy"))...)
 	return allErrs
 }
 
@@ -1067,6 +1085,8 @@ type JobValidationOptions struct {
 	RequirePrefixedLabels bool
 	// Allow mutable pod resources
 	AllowMutablePodResources bool
+	// GangScheduling Policy
+	AllowGangSchedulingPolicy bool
 }
 
 type JobStatusValidationOptions struct {

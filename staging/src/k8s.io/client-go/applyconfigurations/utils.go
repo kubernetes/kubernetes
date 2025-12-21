@@ -492,6 +492,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsbatchv1.CronJobSpecApplyConfiguration{}
 	case batchv1.SchemeGroupVersion.WithKind("CronJobStatus"):
 		return &applyconfigurationsbatchv1.CronJobStatusApplyConfiguration{}
+	case batchv1.SchemeGroupVersion.WithKind("GangPolicy"):
+		return &applyconfigurationsbatchv1.GangPolicyApplyConfiguration{}
 	case batchv1.SchemeGroupVersion.WithKind("Job"):
 		return &applyconfigurationsbatchv1.JobApplyConfiguration{}
 	case batchv1.SchemeGroupVersion.WithKind("JobCondition"):
