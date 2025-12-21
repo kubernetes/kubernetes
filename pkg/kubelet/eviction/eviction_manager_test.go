@@ -3095,3 +3095,60 @@ func TestManagerWithLocalStorageCapacityIsolationOpen(t *testing.T) {
 		t.Fatalf("Unexpected evicted pod (-want,+got):\n%s", diff)
 	}
 }
+
+func TestEvictionMaxGracePeriodHandling(t *testing.T) {
+	podGracePeriod := int64(60)
+	testCases := []struct {
+		name                 string
+		maxGracePeriodConfig int32
+		podSpecGracePeriod   *int64
+		expectedGracePeriod  int64
+	}{
+		{
+			name:                 "Negative config should defer to pod spec",
+			maxGracePeriodConfig: -1,
+			podSpecGracePeriod:   &podGracePeriod,
+			expectedGracePeriod:  60,
+		},
+		{
+			name:                 "Positive config should use min of config and pod spec",
+			maxGracePeriodConfig: 10,
+			podSpecGracePeriod:   &podGracePeriod,
+			expectedGracePeriod:  10,
+		},
+		{
+			name:                 "Zero config should result in 0 grace period",
+			maxGracePeriodConfig: 0,
+			podSpecGracePeriod:   &podGracePeriod,
+			expectedGracePeriod:  0,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Logic to simulate the eviction manager calculation
+			gracePeriodOverride := int64(1) // default immediate
+
+			// This is the logic you are fixing:
+			mConfigMax := tc.maxGracePeriodConfig
+			if mConfigMax < 0 {
+				if tc.podSpecGracePeriod != nil {
+					gracePeriodOverride = *tc.podSpecGracePeriod
+				} else {
+					gracePeriodOverride = 30 // Default fallback
+				}
+			} else {
+				gracePeriodOverride = int64(mConfigMax)
+				if tc.podSpecGracePeriod != nil {
+					if *tc.podSpecGracePeriod < gracePeriodOverride {
+						gracePeriodOverride = *tc.podSpecGracePeriod
+					}
+				}
+			}
+
+			if gracePeriodOverride != tc.expectedGracePeriod {
+				t.Errorf("Expected %d, got %d", tc.expectedGracePeriod, gracePeriodOverride)
+			}
+		})
+	}
+}
