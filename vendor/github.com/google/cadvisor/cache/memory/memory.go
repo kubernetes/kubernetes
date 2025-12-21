@@ -29,6 +29,38 @@ import (
 // ErrDataNotFound is the error resulting if failed to find a container in memory cache.
 var ErrDataNotFound = errors.New("unable to find data in memory cache")
 
+// containerCacheMap is a typed wrapper around sync.Map that eliminates the need
+// for type assertions at every call site. It stores container name strings
+// mapped to *containerCache values.
+type containerCacheMap struct {
+	m sync.Map
+}
+
+// Load retrieves a container cache by name. Returns nil, false if not found.
+func (c *containerCacheMap) Load(name string) (*containerCache, bool) {
+	v, ok := c.m.Load(name)
+	if !ok {
+		return nil, false
+	}
+	return v.(*containerCache), true
+}
+
+// Store saves a container cache with the given name.
+func (c *containerCacheMap) Store(name string, cache *containerCache) {
+	c.m.Store(name, cache)
+}
+
+// LoadOrStore returns the existing cache if present, otherwise stores and returns the given one.
+func (c *containerCacheMap) LoadOrStore(name string, cache *containerCache) (*containerCache, bool) {
+	v, loaded := c.m.LoadOrStore(name, cache)
+	return v.(*containerCache), loaded
+}
+
+// Delete removes a container cache by name.
+func (c *containerCacheMap) Delete(name string) {
+	c.m.Delete(name)
+}
+
 // TODO(vmarmol): See about refactoring this class, we have an unnecessary redirection of containerCache and InMemoryCache.
 // containerCache is used to store per-container information
 type containerCache struct {
@@ -67,24 +99,18 @@ func newContainerStore(ref info.ContainerReference, maxAge time.Duration) *conta
 }
 
 type InMemoryCache struct {
-	lock              sync.RWMutex
-	containerCacheMap map[string]*containerCache
+	containerCacheMap containerCacheMap
 	maxAge            time.Duration
 	backend           []storage.StorageDriver
 }
 
 func (c *InMemoryCache) AddStats(cInfo *info.ContainerInfo, stats *info.ContainerStats) error {
-	var cstore *containerCache
-	var ok bool
-
-	func() {
-		c.lock.Lock()
-		defer c.lock.Unlock()
-		if cstore, ok = c.containerCacheMap[cInfo.ContainerReference.Name]; !ok {
-			cstore = newContainerStore(cInfo.ContainerReference, c.maxAge)
-			c.containerCacheMap[cInfo.ContainerReference.Name] = cstore
-		}
-	}()
+	name := cInfo.ContainerReference.Name
+	cstore, ok := c.containerCacheMap.Load(name)
+	if !ok {
+		newStore := newContainerStore(cInfo.ContainerReference, c.maxAge)
+		cstore, _ = c.containerCacheMap.LoadOrStore(name, newStore)
+	}
 
 	for _, backend := range c.backend {
 		// TODO(monnand): To deal with long delay write operations, we
@@ -98,34 +124,20 @@ func (c *InMemoryCache) AddStats(cInfo *info.ContainerInfo, stats *info.Containe
 }
 
 func (c *InMemoryCache) RecentStats(name string, start, end time.Time, maxStats int) ([]*info.ContainerStats, error) {
-	var cstore *containerCache
-	var ok bool
-	err := func() error {
-		c.lock.RLock()
-		defer c.lock.RUnlock()
-		if cstore, ok = c.containerCacheMap[name]; !ok {
-			return ErrDataNotFound
-		}
-		return nil
-	}()
-	if err != nil {
-		return nil, err
+	cstore, ok := c.containerCacheMap.Load(name)
+	if !ok {
+		return nil, ErrDataNotFound
 	}
-
 	return cstore.RecentStats(start, end, maxStats)
 }
 
 func (c *InMemoryCache) Close() error {
-	c.lock.Lock()
-	c.containerCacheMap = make(map[string]*containerCache, 32)
-	c.lock.Unlock()
+	c.containerCacheMap = containerCacheMap{}
 	return nil
 }
 
 func (c *InMemoryCache) RemoveContainer(containerName string) error {
-	c.lock.Lock()
-	delete(c.containerCacheMap, containerName)
-	c.lock.Unlock()
+	c.containerCacheMap.Delete(containerName)
 	return nil
 }
 
@@ -133,10 +145,8 @@ func New(
 	maxAge time.Duration,
 	backend []storage.StorageDriver,
 ) *InMemoryCache {
-	ret := &InMemoryCache{
-		containerCacheMap: make(map[string]*containerCache, 32),
-		maxAge:            maxAge,
-		backend:           backend,
+	return &InMemoryCache{
+		maxAge:  maxAge,
+		backend: backend,
 	}
-	return ret
 }
