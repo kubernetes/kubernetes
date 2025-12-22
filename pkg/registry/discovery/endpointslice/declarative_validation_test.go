@@ -17,6 +17,7 @@ limitations under the License.
 package endpointslice
 
 import (
+	"fmt"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -60,8 +61,18 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				field.Required(field.NewPath("endpoints").Index(0).Child("addresses"), ""),
 			},
 		},
+		"invalid too many endpoint addresses": {
+			input: mkValidEndpointSlice(func(obj *discovery.EndpointSlice) {
+				obj.Endpoints[0].Addresses = make([]string, 101)
+				for i := range obj.Endpoints[0].Addresses {
+					obj.Endpoints[0].Addresses[i] = fmt.Sprintf("10.0.0.%d", i%255)
+				}
+			}),
+			expectedErrs: field.ErrorList{
+				field.TooMany(field.NewPath("endpoints").Index(0).Child("addresses"), 101, 100).WithOrigin("maxItems"),
+			},
+		},
 	}
-
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, Strategy.Validate, tc.expectedErrs)
@@ -84,17 +95,11 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		expectedErrs field.ErrorList
 	}{
 		"valid update": {
-			oldObj: mkValidEndpointSlice(func(obj *discovery.EndpointSlice) {
-				obj.ResourceVersion = "1"
-			}),
-			updateObj: mkValidEndpointSlice(func(obj *discovery.EndpointSlice) {
-				obj.ResourceVersion = "1"
-			}),
+			oldObj:    mkValidEndpointSlice(func(obj *discovery.EndpointSlice) { obj.ResourceVersion = "1" }),
+			updateObj: mkValidEndpointSlice(func(obj *discovery.EndpointSlice) { obj.ResourceVersion = "1" }),
 		},
 		"invalid update missing addresses": {
-			oldObj: mkValidEndpointSlice(func(obj *discovery.EndpointSlice) {
-				obj.ResourceVersion = "1"
-			}),
+			oldObj: mkValidEndpointSlice(func(obj *discovery.EndpointSlice) { obj.ResourceVersion = "1" }),
 			updateObj: mkValidEndpointSlice(func(obj *discovery.EndpointSlice) {
 				obj.ResourceVersion = "1"
 				obj.Endpoints[0].Addresses = nil
@@ -103,8 +108,20 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 				field.Required(field.NewPath("endpoints").Index(0).Child("addresses"), ""),
 			},
 		},
+		"invalid update too many addresses": {
+			oldObj: mkValidEndpointSlice(func(obj *discovery.EndpointSlice) { obj.ResourceVersion = "1" }),
+			updateObj: mkValidEndpointSlice(func(obj *discovery.EndpointSlice) {
+				obj.ResourceVersion = "1"
+				obj.Endpoints[0].Addresses = make([]string, 101)
+				for i := range obj.Endpoints[0].Addresses {
+					obj.Endpoints[0].Addresses[i] = fmt.Sprintf("10.1.2.%d", i%255)
+				}
+			}),
+			expectedErrs: field.ErrorList{
+				field.TooMany(field.NewPath("endpoints").Index(0).Child("addresses"), 101, 100).WithOrigin("maxItems"),
+			},
+		},
 	}
-
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
@@ -116,7 +133,6 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 				IsResourceRequest: true,
 				Verb:              "update",
 			})
-
 			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, Strategy.ValidateUpdate, tc.expectedErrs)
 		})
 	}
