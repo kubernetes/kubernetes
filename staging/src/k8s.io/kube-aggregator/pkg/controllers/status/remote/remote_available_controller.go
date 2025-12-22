@@ -174,35 +174,6 @@ func (c *AvailableConditionController) sync(key string) error {
 
 	apiService := originalAPIService.DeepCopy()
 
-	// if a particular transport was specified, use that otherwise build one
-	// construct an http client that will ignore TLS verification (if someone owns the network and messes with your status
-	// that's not so bad) and sets a very short timeout.  This is a best effort GET that provides no additional information
-	transportConfig := &transport.Config{
-		TLS: transport.TLSConfig{
-			Insecure: true,
-		},
-		DialHolder: c.proxyTransportDial,
-	}
-
-	if c.proxyCurrentCertKeyContent != nil {
-		proxyClientCert, proxyClientKey := c.proxyCurrentCertKeyContent()
-
-		transportConfig.TLS.CertData = proxyClientCert
-		transportConfig.TLS.KeyData = proxyClientKey
-	}
-	restTransport, err := transport.New(transportConfig)
-	if err != nil {
-		return err
-	}
-	discoveryClient := &http.Client{
-		Transport: restTransport,
-		// the request should happen quickly.
-		Timeout: 5 * time.Second,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
-	}
-
 	availableCondition := apiregistrationv1.APIServiceCondition{
 		Type:               apiregistrationv1.Available,
 		Status:             apiregistrationv1.ConditionTrue,
@@ -275,6 +246,35 @@ func (c *AvailableConditionController) sync(key string) error {
 	}
 	// actually try to hit the discovery endpoint when it isn't local and when we're routing as a service.
 	if apiService.Spec.Service != nil && c.serviceResolver != nil {
+		// if a particular transport was specified, use that otherwise build one
+		// construct an http client that will ignore TLS verification (if someone owns the network and messes with your status
+		// that's not so bad) and sets a very short timeout.  This is a best effort GET that provides no additional information
+		transportConfig := &transport.Config{
+			TLS: transport.TLSConfig{
+				Insecure: true,
+			},
+			DialHolder: c.proxyTransportDial,
+		}
+
+		if c.proxyCurrentCertKeyContent != nil {
+			proxyClientCert, proxyClientKey := c.proxyCurrentCertKeyContent()
+
+			transportConfig.TLS.CertData = proxyClientCert
+			transportConfig.TLS.KeyData = proxyClientKey
+		}
+		restTransport, err := transport.New(transportConfig)
+		if err != nil {
+			return err
+		}
+		discoveryClient := &http.Client{
+			Transport: restTransport,
+			// the request should happen quickly.
+			Timeout: 5 * time.Second,
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
+		}
+
 		attempts := 5
 		results := make(chan error, attempts)
 		for range attempts {
