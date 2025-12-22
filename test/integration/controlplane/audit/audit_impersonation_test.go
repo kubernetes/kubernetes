@@ -68,7 +68,7 @@ rules:
 	if err != nil {
 		t.Fatalf("Failed to create audit policy file: %v", err)
 	}
-	defer os.Remove(policyFile.Name())
+	defer func() { _ = os.Remove(policyFile.Name()) }()
 	if _, err := policyFile.Write([]byte(auditPolicy)); err != nil {
 		t.Fatalf("Failed to write audit policy file: %v", err)
 	}
@@ -150,9 +150,9 @@ rules:
 	if err := wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 30*time.Second, true, func(pollCtx context.Context) (bool, error) {
 		stream, err := os.Open(logFile.Name())
 		if err != nil {
-			return false, fmt.Errorf("failed to open audit log: %v", err)
+			return false, fmt.Errorf("failed to open audit log: %w", err)
 		}
-		defer stream.Close()
+		defer func() { _ = stream.Close() }()
 
 		scanner := bufio.NewScanner(stream)
 		for scanner.Scan() {
@@ -237,7 +237,7 @@ rules:
 	if err != nil {
 		t.Fatalf("Failed to create audit policy file: %v", err)
 	}
-	defer os.Remove(policyFile.Name())
+	defer func() { _ = os.Remove(policyFile.Name()) }()
 	if _, err := policyFile.Write([]byte(auditPolicy)); err != nil {
 		t.Fatalf("Failed to write audit policy file: %v", err)
 	}
@@ -317,9 +317,9 @@ rules:
 	err = wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 5*time.Second, true, func(pollCtx context.Context) (bool, error) {
 		stream, err := os.Open(logFile.Name())
 		if err != nil {
-			return false, fmt.Errorf("failed to open audit log: %v", err)
+			return false, fmt.Errorf("failed to open audit log: %w", err)
 		}
-		defer stream.Close()
+		defer func() { _ = stream.Close() }()
 
 		scanner := bufio.NewScanner(stream)
 		for scanner.Scan() {
