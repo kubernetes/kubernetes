@@ -1,4 +1,4 @@
-<!-- BEGIN MUNGE: GENERATED_TOC -->
+ <!-- BEGIN MUNGE: GENERATED_TOC -->
 
 - [v1.15.12](#v11512)
   - [Downloads for v1.15.12](#downloads-for-v11512)
