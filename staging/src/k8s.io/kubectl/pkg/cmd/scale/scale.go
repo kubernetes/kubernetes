@@ -24,6 +24,8 @@ import (
 	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
@@ -238,6 +240,10 @@ func (o *ScaleOptions) RunScale() error {
 	for _, info := range infos {
 		mapping := info.ResourceMapping()
 		if o.dryRunStrategy == cmdutil.DryRunClient {
+			// Update the object's replicas locally
+			if err := updateReplicas(info.Object, o.Replicas); err != nil {
+				return err
+			}
 			if err := o.PrintObj(info.Object, o.Out); err != nil {
 				return err
 			}
@@ -246,6 +252,16 @@ func (o *ScaleOptions) RunScale() error {
 
 		if err := o.scaler.Scale(info.Namespace, info.Name, uint(o.Replicas), precondition, retry, waitForReplicas, mapping.Resource, o.dryRunStrategy == cmdutil.DryRunServer); err != nil {
 			return err
+		}
+
+		if o.dryRunStrategy == cmdutil.DryRunServer {
+			if err := updateReplicas(info.Object, o.Replicas); err != nil {
+				return err
+			}
+		} else {
+			if err := info.Get(); err != nil {
+				return err
+			}
 		}
 
 		// if the recorder makes a change, compute and create another patch
@@ -278,4 +294,12 @@ func scaler(f cmdutil.Factory) (scale.Scaler, error) {
 	}
 
 	return scale.NewScaler(scalesGetter), nil
+}
+
+func updateReplicas(obj runtime.Object, replicas int) error {
+	unstructuredObj, ok := obj.(*unstructured.Unstructured)
+	if !ok {
+		return fmt.Errorf("unexpected object type: %T", obj)
+	}
+	return unstructured.SetNestedField(unstructuredObj.Object, int64(replicas), "spec", "replicas")
 }
