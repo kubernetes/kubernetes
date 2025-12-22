@@ -5153,24 +5153,23 @@ func TestDescribeEvents(t *testing.T) {
 
 	describerFor := func(name string, clientset *fake.Clientset) ResourceDescriber {
 		m := map[string]ResourceDescriber{
-			"DaemonSetDescriber": &DaemonSetDescriber{clientset},
-			"DeploymentDescriber": &DeploymentDescriber{clientset},
-			"EndpointsDescriber": &EndpointsDescriber{clientset},
-			"EndpointSliceDescriber": &EndpointSliceDescriber{clientset},
-			"JobDescriber": &JobDescriber{clientset},
-			"IngressDescriber": &IngressDescriber{clientset},
-			"NodeDescriber": &NodeDescriber{clientset},
-			"PersistentVolumeDescriber": &PersistentVolumeDescriber{clientset},
-			"PodDescriber": &PodDescriber{clientset},
-			"ReplicaSetDescriber": &ReplicaSetDescriber{clientset},
+			"DaemonSetDescriber":             &DaemonSetDescriber{clientset},
+			"DeploymentDescriber":            &DeploymentDescriber{clientset},
+			"EndpointsDescriber":             &EndpointsDescriber{clientset},
+			"EndpointSliceDescriber":         &EndpointSliceDescriber{clientset},
+			"JobDescriber":                   &JobDescriber{clientset},
+			"IngressDescriber":               &IngressDescriber{clientset},
+			"NodeDescriber":                  &NodeDescriber{clientset},
+			"PersistentVolumeDescriber":      &PersistentVolumeDescriber{clientset},
+			"PodDescriber":                   &PodDescriber{clientset},
+			"ReplicaSetDescriber":            &ReplicaSetDescriber{clientset},
 			"ReplicationControllerDescriber": &ReplicationControllerDescriber{clientset},
-			"Service": &ServiceDescriber{clientset},
-			"StorageClass": &StorageClassDescriber{clientset},
-			"HorizontalPodAutoscaler": &HorizontalPodAutoscalerDescriber{clientset},
-			"ConfigMap": &ConfigMapDescriber{clientset},
+			"Service":                        &ServiceDescriber{clientset},
+			"StorageClass":                   &StorageClassDescriber{clientset},
+			"HorizontalPodAutoscaler":        &HorizontalPodAutoscalerDescriber{clientset},
+			"ConfigMap":                      &ConfigMapDescriber{clientset},
 		}
-		d, _ := m[name]
-		return d
+		return m[name]
 	}
 
 	m := map[string]runtime.Object{
@@ -5277,7 +5276,7 @@ func TestDescribeEvents(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			clientset := fake.NewClientset(obj, events)
 			d := describerFor(name, clientset)
-			
+
 			out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
 			if err != nil {
 				t.Errorf("unexpected error for %q: %v", name, err)
