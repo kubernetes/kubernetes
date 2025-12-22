@@ -564,14 +564,16 @@ func (sysver SystemVerificationCheck) Check() (warnings, errorList []error) {
 	// as part of addOSValidator().
 	kubeletVersion, err := GetKubeletVersion(sysver.exec)
 	if err != nil {
-		return nil, []error{errors.Wrap(err, "couldn't get kubelet version")}
+		klog.Warningf("Warning: Couldn't get kubelet version: %v, continuing with the check", err)
+		validators = addOSValidator(validators, reporter, "")
+	} else {
+		// During upgrade we want to check the next kubelet MINOR version.
+		// The below approach does not support k8s MAJOR version bumps.
+		if sysver.isUpgrade {
+			kubeletVersion = kubeletVersion.WithMinor(kubeletVersion.Minor() + 1)
+		}
+		validators = addOSValidator(validators, reporter, kubeletVersion.String())
 	}
-	// During upgrade we want to check the next kubelet MINOR version.
-	// The below approach does not support k8s MAJOR version bumps.
-	if sysver.isUpgrade {
-		kubeletVersion = kubeletVersion.WithMinor(kubeletVersion.Minor() + 1)
-	}
-	validators = addOSValidator(validators, reporter, kubeletVersion.String())
 
 	// Run all validators
 	for _, v := range validators {
