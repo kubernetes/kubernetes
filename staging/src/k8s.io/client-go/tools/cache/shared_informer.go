@@ -177,6 +177,9 @@ type SharedInformer interface {
 	// its registration handle.
 	// This function is guaranteed to be idempotent, and thread-safe.
 	RemoveEventHandler(handle ResourceEventHandlerRegistration) error
+	// GetEventHandlers returns the registration handles of all currently registered
+	// event handlers. Thread-safe.
+	GetEventHandlers() []ResourceEventHandlerRegistration
 	// GetStore returns the informer's local cache as a Store.
 	GetStore() Store
 	// GetController is deprecated, it does nothing useful
@@ -1010,6 +1013,17 @@ func (s *sharedIndexInformer) RemoveEventHandler(handle ResourceEventHandlerRegi
 	return s.processor.removeListener(handle)
 }
 
+func (s *sharedIndexInformer) GetEventHandlers() []ResourceEventHandlerRegistration {
+	// Same locking logic as in RemoveEventHandler.
+	s.startedLock.Lock()
+	defer s.startedLock.Unlock()
+	s.blockDeltas.Lock()
+	defer s.blockDeltas.Unlock()
+
+	// TODO: unit tests
+	return s.processor.getListeners()
+}
+
 // sharedProcessor has a collection of processorListener and can
 // distribute a notification object to its listeners.  There are two
 // kinds of distribute operations.  The sync distributions go to a
@@ -1085,6 +1099,17 @@ func (p *sharedProcessor) removeListener(handle ResourceEventHandlerRegistration
 	}
 
 	return nil
+}
+
+func (p *sharedProcessor) getListeners() []ResourceEventHandlerRegistration {
+	p.listenersLock.Lock()
+	defer p.listenersLock.Unlock()
+
+	listeners := make([]ResourceEventHandlerRegistration, 0, len(p.listeners))
+	for listener := range p.listeners {
+		listeners = append(listeners, listener)
+	}
+	return listeners
 }
 
 func (p *sharedProcessor) distribute(obj interface{}, sync bool) {

@@ -271,6 +271,9 @@ func (f *sharedInformerFactory) WaitForCacheSyncWithContext(ctx context.Context)
 	cacheSyncs := make([]{{.cacheDoneChecker|raw}}, 0, len(informers))
 	for _, informer := range informers {
 		cacheSyncs = append(cacheSyncs, informer.HasSyncedChecker())
+		for _, handler := range informer.GetEventHandlers() {
+			cacheSyncs = append(cacheSyncs, handler.HasSyncedChecker())
+		}
 	}
 	{{.cacheWaitFor|raw}}(ctx, "" /* no logging */, cacheSyncs...)
 
