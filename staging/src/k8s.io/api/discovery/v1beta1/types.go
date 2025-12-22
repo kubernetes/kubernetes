@@ -85,6 +85,8 @@ type Endpoint struct {
 	// 100. These are all assumed to be fungible and clients may choose to only
 	// use the first element. Refer to: https://issue.k8s.io/106267
 	// +listType=set
+	// +required
+	// +k8s:required
 	Addresses []string `json:"addresses" protobuf:"bytes,1,rep,name=addresses"`
 
 	// conditions contains information about the current status of the endpoint.

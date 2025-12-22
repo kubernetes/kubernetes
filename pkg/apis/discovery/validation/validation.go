@@ -104,7 +104,7 @@ func validateEndpoints(endpoints []discovery.Endpoint, addrType discovery.Addres
 		addressPath := idxPath.Child("addresses")
 
 		if len(endpoint.Addresses) == 0 {
-			allErrs = append(allErrs, field.Required(addressPath, "must contain at least 1 address"))
+			allErrs = append(allErrs, field.Required(addressPath, "must contain at least 1 address").MarkCoveredByDeclarative())
 		} else if len(endpoint.Addresses) > maxAddresses {
 			allErrs = append(allErrs, field.TooMany(addressPath, len(endpoint.Addresses), maxAddresses))
 		}
