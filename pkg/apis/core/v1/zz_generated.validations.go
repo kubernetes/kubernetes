@@ -43,7 +43,7 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 	// type Namespace
 	scheme.AddValidationFunc((*corev1.Namespace)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
 		switch op.Request.SubresourcePath() {
-		case "/":
+		case "/", "/finalize", "/status":
 			return Validate_Namespace(ctx, op, nil /* fldPath */, obj.(*corev1.Namespace), safe.Cast[*corev1.Namespace](oldObj))
 		}
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}

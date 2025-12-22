@@ -7092,6 +7092,8 @@ type NamespaceCondition struct {
 // +genclient:skipVerbs=deleteCollection
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.0
+// +k8s:supportsSubresource=/finalize
+// +k8s:supportsSubresource=/status
 
 // Namespace provides a scope for Names.
 // Use of multiple namespaces is optional.
