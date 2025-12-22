@@ -17,21 +17,23 @@ limitations under the License.
 package validation
 
 import (
+	"regexp"
+
 	apivalidation "k8s.io/apimachinery/pkg/api/validation"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/apis/core"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/node"
-	"regexp"
 )
 
 // Define normalization rules to handle field name differences across API versions
 // v1alpha1 uses "spec.runtimeHandler" while v1/v1beta1 use "handler"
 var NodeNormalizationRules = []field.NormalizationRule{
 	{
-		Regexp:      regexp.MustCompile(`^spec\.runtimeHandler(.*)$`),
-		Replacement: "handler$1",
+		// Handle list items: items[0].spec.runtimeHandler -> items[0].handler
+		Regexp:      regexp.MustCompile(`^(items\[[0-9]+\]\.)?spec\.runtimeHandler(.*)$`),
+		Replacement: "${1}handler$2",
 	},
 }
 
