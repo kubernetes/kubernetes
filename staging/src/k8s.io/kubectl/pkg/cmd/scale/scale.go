@@ -131,7 +131,7 @@ func NewCmdScale(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra
 	cmd.Flags().StringVar(&o.ResourceVersion, "resource-version", o.ResourceVersion, i18n.T("Precondition for resource version. Requires that the current resource version match this value in order to scale."))
 	cmd.Flags().IntVar(&o.CurrentReplicas, "current-replicas", o.CurrentReplicas, "Precondition for current size. Requires that the current size of the resource match this value in order to scale. -1 (default) for no condition.")
 	cmd.Flags().IntVar(&o.Replicas, "replicas", o.Replicas, "The new desired number of replicas. Required.")
-	cmd.MarkFlagRequired("replicas")
+	cmdutil.CheckErr(cmd.MarkFlagRequired("replicas"))
 	cmd.Flags().DurationVar(&o.Timeout, "timeout", 0, "The length of time to wait before giving up on a scale operation, zero means don't wait. Any other values should contain a corresponding time unit (e.g. 1s, 2m, 3h).")
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, "identifying the resource to set a new size")
 	cmdutil.AddDryRunFlag(cmd)
@@ -141,7 +141,9 @@ func NewCmdScale(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra
 
 func (o *ScaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	var err error
-	o.RecordFlags.Complete(cmd)
+	if err := o.RecordFlags.Complete(cmd); err != nil {
+		return err
+	}
 	o.Recorder, err = o.RecordFlags.ToRecorder()
 	if err != nil {
 		return err
@@ -181,11 +183,11 @@ func (o *ScaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 
 func (o *ScaleOptions) Validate() error {
 	if o.Replicas < 0 {
-		return fmt.Errorf("The --replicas=COUNT flag is required, and COUNT must be greater than or equal to 0")
+		return fmt.Errorf("the --replicas=COUNT flag is required, and COUNT must be greater than or equal to 0")
 	}
 
 	if o.CurrentReplicas < -1 {
-		return fmt.Errorf("The --current-replicas must specify an integer of -1 or greater")
+		return fmt.Errorf("the --current-replicas must specify an integer of -1 or greater")
 	}
 
 	return nil
