@@ -87,6 +87,7 @@ type Endpoint struct {
 	// +listType=set
 	// +required
 	// +k8s:required
+	// +k8s:maxItems=100
 	Addresses []string `json:"addresses" protobuf:"bytes,1,rep,name=addresses"`
 
 	// conditions contains information about the current status of the endpoint.

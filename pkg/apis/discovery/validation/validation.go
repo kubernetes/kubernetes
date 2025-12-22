@@ -106,9 +106,8 @@ func validateEndpoints(endpoints []discovery.Endpoint, addrType discovery.Addres
 		if len(endpoint.Addresses) == 0 {
 			allErrs = append(allErrs, field.Required(addressPath, "must contain at least 1 address").MarkCoveredByDeclarative())
 		} else if len(endpoint.Addresses) > maxAddresses {
-			allErrs = append(allErrs, field.TooMany(addressPath, len(endpoint.Addresses), maxAddresses))
+			allErrs = append(allErrs, field.TooMany(addressPath, len(endpoint.Addresses), maxAddresses).WithOrigin("maxItems").MarkCoveredByDeclarative())
 		}
-
 		for i, address := range endpoint.Addresses {
 			// This validates known address types, unknown types fall through
 			// and do not get validated.

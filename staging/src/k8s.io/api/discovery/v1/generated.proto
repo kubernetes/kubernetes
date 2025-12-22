@@ -40,6 +40,7 @@ message Endpoint {
   // +listType=set
   // +required
   // +k8s:required
+  // +k8s:maxItems=100
   repeated string addresses = 1;
 
   // conditions contains information about the current status of the endpoint.
