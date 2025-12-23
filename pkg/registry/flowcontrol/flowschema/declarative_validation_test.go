@@ -1,5 +1,5 @@
 /*
-Copyright 2019 The Kubernetes Authors.
+Copyright 2025 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,13 +14,4 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +k8s:conversion-gen=k8s.io/kubernetes/pkg/apis/flowcontrol
-// +k8s:conversion-gen-external-types=k8s.io/api/flowcontrol/v1beta1
-// +k8s:defaulter-gen=TypeMeta
-// +k8s:defaulter-gen-input=k8s.io/api/flowcontrol/v1beta1
-// +k8s:validation-gen=TypeMeta
-// +k8s:validation-gen-input=k8s.io/api/flowcontrol/v1beta1
-
-// +groupName=flowcontrol.apiserver.k8s.io
-
-package v1beta1
+package flowschema
