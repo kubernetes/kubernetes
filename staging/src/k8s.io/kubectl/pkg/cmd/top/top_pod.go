@@ -20,15 +20,20 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"time"
 
+	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
+	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/client-go/discovery"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/metricsutil"
 	"k8s.io/kubectl/pkg/util/completion"
@@ -37,9 +42,6 @@ import (
 	metricsapi "k8s.io/metrics/pkg/apis/metrics"
 	metricsv1beta1api "k8s.io/metrics/pkg/apis/metrics/v1beta1"
 	metricsclientset "k8s.io/metrics/pkg/client/clientset/versioned"
-
-	"github.com/spf13/cobra"
-	"k8s.io/klog/v2"
 )
 
 type TopPodOptions struct {
@@ -54,6 +56,7 @@ type TopPodOptions struct {
 	UseProtocolBuffers bool
 	Sum                bool
 	ShowSwap           bool
+	Watch              bool
 
 	PodClient       corev1client.PodsGetter
 	Printer         *metricsutil.TopCmdPrinter
@@ -119,6 +122,7 @@ func NewCmdTopPod(f cmdutil.Factory, o *TopPodOptions, streams genericiooptions.
 	cmd.Flags().BoolVar(&o.UseProtocolBuffers, "use-protocol-buffers", o.UseProtocolBuffers, "Enables using protocol-buffers to access Metrics API.")
 	cmd.Flags().BoolVar(&o.Sum, "sum", o.Sum, "Print the sum of the resource usage")
 	cmd.Flags().BoolVar(&o.ShowSwap, "show-swap", o.ShowSwap, "Print pod resources related to swap memory.")
+	cmd.Flags().BoolVarP(&o.Watch, "watch", "w", o.Watch, "After listing the requested pods, watch for changes by polling the metrics API.")
 	return cmd
 }
 
@@ -197,6 +201,15 @@ func (o TopPodOptions) RunTopPod() error {
 	if !metricsAPIAvailable {
 		return errors.New("Metrics API not available")
 	}
+
+	if o.Watch {
+		return o.watchPodMetrics(labelSelector, fieldSelector)
+	}
+
+	return o.fetchAndPrintPodMetrics(labelSelector, fieldSelector)
+}
+
+func (o TopPodOptions) fetchAndPrintPodMetrics(labelSelector labels.Selector, fieldSelector fields.Selector) error {
 	metrics, err := getMetricsFromMetricsAPI(o.MetricsClient, o.Namespace, o.ResourceName, o.AllNamespaces, labelSelector, fieldSelector)
 	if err != nil {
 		return err
@@ -220,6 +233,214 @@ func (o TopPodOptions) RunTopPod() error {
 	}
 
 	return o.Printer.PrintPodMetrics(metrics.Items, o.PrintContainers, o.AllNamespaces, o.NoHeaders, o.SortBy, o.Sum)
+}
+
+func (o TopPodOptions) watchPodMetrics(labelSelector labels.Selector, fieldSelector fields.Selector) error {
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+
+	// Store previous metrics for delta calculation
+	previousMetrics := make(map[string]corev1.ResourceList)
+	var previousMetricsItems []metricsapi.PodMetrics
+
+	// Print initial metrics
+	metrics, err := getMetricsFromMetricsAPI(o.MetricsClient, o.Namespace, o.ResourceName, o.AllNamespaces, labelSelector, fieldSelector)
+	if err == nil && len(metrics.Items) > 0 {
+		if err := o.printPodMetricsWithDelta(metrics.Items, previousMetrics); err != nil {
+			return err
+		}
+		updatePreviousMetrics(metrics.Items, previousMetrics)
+		previousMetricsItems = metrics.Items
+	}
+
+	for range ticker.C {
+		metrics, err := getMetricsFromMetricsAPI(o.MetricsClient, o.Namespace, o.ResourceName, o.AllNamespaces, labelSelector, fieldSelector)
+		if err != nil {
+			fmt.Fprintf(o.ErrOut, "Error fetching metrics: %v\n", err)
+			continue
+		}
+
+		if len(metrics.Items) == 0 {
+			if o.AllNamespaces {
+				fmt.Fprintln(o.ErrOut, "No resources found")
+			} else {
+				fmt.Fprintf(o.ErrOut, "No resources found in %s namespace.\n", o.Namespace)
+			}
+			continue
+		}
+
+		// Only update display if metrics changed
+		if podMetricsChanged(metrics.Items, previousMetricsItems) {
+			// Clear screen using ANSI escape codes (move cursor to home, then clear screen)
+			fmt.Fprint(o.Out, "\033[H\033[2J")
+
+			if err := o.printPodMetricsWithDelta(metrics.Items, previousMetrics); err != nil {
+				fmt.Fprintf(o.ErrOut, "Error printing metrics: %v\n", err)
+			}
+			updatePreviousMetrics(metrics.Items, previousMetrics)
+			previousMetricsItems = metrics.Items
+		}
+	}
+
+	return nil
+}
+
+func (o TopPodOptions) printPodMetricsWithDelta(metrics []metricsapi.PodMetrics, previousMetrics map[string]corev1.ResourceList) error {
+	if len(metrics) == 0 {
+		return nil
+	}
+
+	// Sort metrics
+	if len(o.SortBy) > 0 {
+		sort.Sort(metricsutil.NewPodMetricsSorter(metrics, o.AllNamespaces, o.SortBy, []corev1.ResourceName{corev1.ResourceCPU, corev1.ResourceMemory}))
+	}
+
+	// Use TabWriter for proper column alignment
+	w := printers.GetNewTabWriter(o.Out)
+	defer w.Flush()
+
+	// Print header
+	if o.AllNamespaces {
+		fmt.Fprint(w, "NAMESPACE\t")
+	}
+	fmt.Fprint(w, "NAME\tCPU(cores)\tCPU(Δ)\tCPU(Δ%)\tMEMORY(bytes)\tMEMORY(Δ)\tMEMORY(Δ%)\n")
+
+	// Print each pod
+	for _, m := range metrics {
+		podMetrics := getPodMetrics(&m)
+		podKey := m.Namespace + "/" + m.Name
+
+		cpuQuantity := podMetrics[corev1.ResourceCPU]
+		memQuantity := podMetrics[corev1.ResourceMemory]
+
+		cpuAbsDelta := "-"
+		cpuPctDelta := "-"
+		memAbsDelta := "-"
+		memPctDelta := "-"
+
+		if prev, ok := previousMetrics[podKey]; ok {
+			prevCPU := prev[corev1.ResourceCPU]
+			prevMem := prev[corev1.ResourceMemory]
+
+			if !prevCPU.IsZero() {
+				cpuDiff := cpuQuantity.MilliValue() - prevCPU.MilliValue()
+				cpuPctChange := float64(cpuDiff) / float64(prevCPU.MilliValue()) * 100
+				cpuAbsDelta = formatAbsoluteDeltaCPU(cpuDiff)
+				cpuPctDelta = formatPercentDelta(cpuPctChange)
+			}
+
+			if !prevMem.IsZero() {
+				memDiff := memQuantity.Value() - prevMem.Value()
+				memPctChange := float64(memDiff) / float64(prevMem.Value()) * 100
+				memAbsDelta = formatAbsoluteDeltaMemory(memDiff)
+				memPctDelta = formatPercentDelta(memPctChange)
+			}
+		}
+
+		if o.AllNamespaces {
+			fmt.Fprintf(w, "%s\t", m.Namespace)
+		}
+		fmt.Fprintf(w, "%s\t%vm\t%s\t%s\t%vMi\t%s\t%s\n",
+			m.Name,
+			cpuQuantity.MilliValue(),
+			cpuAbsDelta,
+			cpuPctDelta,
+			memQuantity.Value()/(1024*1024),
+			memAbsDelta,
+			memPctDelta,
+		)
+	}
+
+	return nil
+}
+
+func getPodMetrics(m *metricsapi.PodMetrics) corev1.ResourceList {
+	podMetrics := make(corev1.ResourceList)
+	podMetrics[corev1.ResourceCPU] = *resource.NewMilliQuantity(0, resource.DecimalSI)
+	podMetrics[corev1.ResourceMemory] = *resource.NewQuantity(0, resource.BinarySI)
+
+	for _, c := range m.Containers {
+		cpuQuantity := podMetrics[corev1.ResourceCPU]
+		cpuQuantity.Add(c.Usage[corev1.ResourceCPU])
+		podMetrics[corev1.ResourceCPU] = cpuQuantity
+
+		memQuantity := podMetrics[corev1.ResourceMemory]
+		memQuantity.Add(c.Usage[corev1.ResourceMemory])
+		podMetrics[corev1.ResourceMemory] = memQuantity
+	}
+	return podMetrics
+}
+
+func updatePreviousMetrics(metrics []metricsapi.PodMetrics, previousMetrics map[string]corev1.ResourceList) {
+	for _, m := range metrics {
+		podKey := m.Namespace + "/" + m.Name
+		previousMetrics[podKey] = getPodMetrics(&m)
+	}
+}
+
+func formatPercentDelta(change float64) string {
+	if change == 0 {
+		return "-"
+	}
+	sign := ""
+	if change > 0 {
+		sign = "+"
+	}
+	return fmt.Sprintf("%s%.1f%%", sign, change)
+}
+
+func formatAbsoluteDeltaCPU(diffMillicores int64) string {
+	if diffMillicores == 0 {
+		return "-"
+	}
+	sign := ""
+	if diffMillicores > 0 {
+		sign = "+"
+	}
+	return fmt.Sprintf("%s%vm", sign, diffMillicores)
+}
+
+func formatAbsoluteDeltaMemory(diffBytes int64) string {
+	if diffBytes == 0 {
+		return "-"
+	}
+	sign := ""
+	if diffBytes > 0 {
+		sign = "+"
+	}
+	diffMi := diffBytes / (1024 * 1024)
+	return fmt.Sprintf("%s%vMi", sign, diffMi)
+}
+
+func podMetricsChanged(current, previous []metricsapi.PodMetrics) bool {
+	if len(current) != len(previous) {
+		return true
+	}
+
+	// Build a map of previous metrics for quick lookup
+	prevMap := make(map[string]corev1.ResourceList)
+	for _, p := range previous {
+		key := p.Namespace + "/" + p.Name
+		prevMap[key] = getPodMetrics(&p)
+	}
+
+	// Check if any metrics changed
+	for _, curr := range current {
+		key := curr.Namespace + "/" + curr.Name
+		prev, exists := prevMap[key]
+		if !exists {
+			return true // New pod
+		}
+
+		currMetrics := getPodMetrics(&curr)
+
+		if !currMetrics[corev1.ResourceCPU].Equal(prev[corev1.ResourceCPU]) ||
+		   !currMetrics[corev1.ResourceMemory].Equal(prev[corev1.ResourceMemory]) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func getMetricsFromMetricsAPI(metricsClient metricsclientset.Interface, namespace, resourceName string, allNamespaces bool, labelSelector labels.Selector, fieldSelector fields.Selector) (*metricsapi.PodMetricsList, error) {
