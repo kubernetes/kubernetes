@@ -623,10 +623,11 @@ Usage:
 
 ### porter
 
-Serves requested data on ports specified in environment variables of the form `SERVE_{PORT,TLS_PORT,SCTP_PORT}_[NNNN]`. eg:
-    - `SERVE_PORT_9001` - serve TCP connections on port 9001
+Serves requested data on ports specified in environment variables of the form `SERVE_{PORT,TLS_PORT,SCTP_PORT,UDP_PORT}_[NNNN]`. eg:
+    - `SERVE_PORT_9001` (or `SERVE_TCP_PORT_9001`) - serve TCP connections on port 9001
     - `SERVE_TLS_PORT_9002` - serve TLS-encrypted TCP connections on port 9002
     - `SERVE_SCTP_PORT_9003` - serve SCTP connections on port 9003
+    - `SERVE_UDP_PORT_9004` - serve UDP connections on port 9004
 
 The included `localhost.crt` is a PEM-encoded TLS cert with SAN IPs `127.0.0.1` and `[::1]`,
 expiring in January 2084, generated from `src/crypto/tls`:
