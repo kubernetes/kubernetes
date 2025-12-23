@@ -37,6 +37,7 @@
 - baseImportPath: "./staging/src/k8s.io/apimachinery"
   allowedImports:
   - k8s.io/apimachinery
+  - k8s.io/constants
   - k8s.io/kube-openapi
   - k8s.io/utils/clock
   - k8s.io/utils/net
@@ -48,6 +49,7 @@
   allowedImports:
   - k8s.io/api
   - k8s.io/apimachinery
+  - k8s.io/constants
   - k8s.io/klog
 
 - baseImportPath: "./staging/src/k8s.io/code-generator"
@@ -148,6 +150,7 @@
   - k8s.io/client-go
   - k8s.io/component-base
   - k8s.io/component-helpers
+  - k8s.io/constants
   - k8s.io/kubectl
   - k8s.io/kube-openapi
   - k8s.io/metrics

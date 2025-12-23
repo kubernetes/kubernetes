@@ -97,6 +97,8 @@ rules:
   branches:
   - name: master
     dependencies:
+    - repository: constants
+      branch: master
     - repository: apimachinery
       branch: master
     - repository: api
