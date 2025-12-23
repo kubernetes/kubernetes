@@ -4728,6 +4728,192 @@ func TestMutableSchedulingDirectivesForSuspendedJobs(t *testing.T) {
 	}
 }
 
+// TestElasticIndexedJobGangSchedulingWorkloadNotUpdated documents a known gap in the
+// gang scheduling implementation for Elastic Indexed Jobs.
+//
+// BUG: When an Elastic Indexed Job scales its parallelism/completions, the Workload
+// object's MinCount is NOT updated to reflect the new values. The Workload is created
+// once with the initial parallelism value, and subsequent scaling operations do not
+// update it.
+//
+// This test verifies the current (incorrect) behavior to document the gap. When this
+// issue is fixed, this test should be updated to verify the correct behavior where
+// the Workload's MinCount is updated when the Job's parallelism changes.
+//
+// Impact: Gang schedulers (like Kueue) that rely on the Workload's MinCount to determine
+// gang size will continue using the stale value after scaling, potentially causing:
+// - Under-scheduling if scaled up (MinCount < actual parallelism)
+// - Over-scheduling if scaled down (MinCount > actual parallelism)
+func TestElasticIndexedJobGangSchedulingWorkloadNotUpdated(t *testing.T) {
+	testCases := []struct {
+		name               string
+		initialParallelism int32
+		scaledParallelism  int32
+		isScaleDown        bool
+	}{
+		{
+			name:               "scale up parallelism",
+			initialParallelism: 3,
+			scaledParallelism:  5,
+			isScaleDown:        false,
+		},
+		{
+			name:               "scale down parallelism",
+			initialParallelism: 5,
+			scaledParallelism:  2,
+			isScaleDown:        true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Enable feature gates with their dependencies
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.GenericWorkload, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.GangScheduling, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobGangPolicy, true)
+
+			// Enable the scheduling.k8s.io/v1alpha1 API for workload support
+			closeFn, restConfig, clientSet, ns := setupWithRuntimeConfig(t, "gang-elastic", map[schema.GroupVersion]bool{
+				schedulingv1alpha1.SchemeGroupVersion: true,
+			})
+			t.Cleanup(closeFn)
+			ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
+			t.Cleanup(cancel)
+
+			mode := batchv1.IndexedCompletion
+
+			// Create an Elastic Indexed Job with gang scheduling
+			jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Parallelism:    ptr.To(tc.initialParallelism),
+					Completions:    ptr.To(tc.initialParallelism),
+					CompletionMode: &mode,
+					GangPolicy: &batchv1.GangPolicy{
+						Policy: batchv1.JobAsGang,
+					},
+				},
+			})
+			if err != nil {
+				t.Fatalf("Failed to create Job: %v", err)
+			}
+
+			// Wait for the Workload to be created
+			var workload *schedulingv1alpha1.Workload
+			err = wait.PollUntilContextTimeout(ctx, waitInterval, 10*time.Second, true, func(ctx context.Context) (bool, error) {
+				workload, err = clientSet.SchedulingV1alpha1().Workloads(ns.Name).Get(ctx, jobObj.Name, metav1.GetOptions{})
+				if err != nil {
+					if apierrors.IsNotFound(err) {
+						return false, nil
+					}
+					return false, err
+				}
+				return true, nil
+			})
+			if err != nil {
+				t.Fatalf("Failed to wait for Workload to be created: %v", err)
+			}
+
+			// Verify initial Workload MinCount matches initial parallelism
+			if len(workload.Spec.PodGroups) == 0 {
+				t.Fatalf("Workload has no PodGroups")
+			}
+			if workload.Spec.PodGroups[0].Policy.Gang == nil {
+				t.Fatalf("Workload PodGroup has no Gang policy")
+			}
+			initialMinCount := workload.Spec.PodGroups[0].Policy.Gang.MinCount
+			if initialMinCount != tc.initialParallelism {
+				t.Errorf("Expected initial Workload MinCount to be %d, got %d", tc.initialParallelism, initialMinCount)
+			}
+
+			// Wait for pods to be created
+			err = wait.PollUntilContextTimeout(ctx, waitInterval, 10*time.Second, true, func(ctx context.Context) (bool, error) {
+				pods, err := clientSet.CoreV1().Pods(ns.Name).List(ctx, metav1.ListOptions{})
+				if err != nil {
+					return false, err
+				}
+				return len(pods.Items) == int(tc.initialParallelism), nil
+			})
+			if err != nil {
+				t.Fatalf("Failed to wait for initial pods to be created: %v", err)
+			}
+
+			// For scale down, succeed some pods first to allow the scale down
+			if tc.isScaleDown {
+				podsToSucceed := int(tc.initialParallelism - tc.scaledParallelism)
+				for i := 0; i < podsToSucceed; i++ {
+					if err := setJobPhaseForIndex(ctx, clientSet, jobObj, v1.PodSucceeded, i); err != nil {
+						t.Fatalf("Failed to succeed pod at index %d: %v", i, err)
+					}
+				}
+			}
+
+			// Scale the job's parallelism and completions
+			jobClient := clientSet.BatchV1().Jobs(jobObj.Namespace)
+			if _, err = updateJob(ctx, jobClient, jobObj.Name, func(j *batchv1.Job) {
+				j.Spec.Completions = ptr.To(tc.scaledParallelism)
+				j.Spec.Parallelism = ptr.To(tc.scaledParallelism)
+			}); err != nil {
+				t.Fatalf("Failed to scale Job: %v", err)
+			}
+
+			// Wait for pods to reflect the scaling
+			if tc.isScaleDown {
+				// For scale down, just wait for the controller to process
+				time.Sleep(sleepDurationForControllerLatency)
+			} else {
+				// For scale up, wait for new pods to be created
+				err = wait.PollUntilContextTimeout(ctx, waitInterval, 10*time.Second, true, func(ctx context.Context) (bool, error) {
+					pods, err := clientSet.CoreV1().Pods(ns.Name).List(ctx, metav1.ListOptions{})
+					if err != nil {
+						return false, err
+					}
+					return len(pods.Items) == int(tc.scaledParallelism), nil
+				})
+				if err != nil {
+					t.Fatalf("Failed to wait for scaled pods to be created: %v", err)
+				}
+			}
+
+			// Re-fetch the Workload after scaling
+			workload, err = clientSet.SchedulingV1alpha1().Workloads(ns.Name).Get(ctx, jobObj.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("Failed to get Workload after scaling: %v", err)
+			}
+
+			// BUG DOCUMENTATION: Verify the Workload MinCount is NOT updated (current incorrect behavior)
+			// When this bug is fixed, this assertion should be changed to verify that MinCount IS updated.
+			updatedMinCount := workload.Spec.PodGroups[0].Policy.Gang.MinCount
+			if updatedMinCount != tc.initialParallelism {
+				// If this passes, the bug has been fixed! Update this test accordingly.
+				t.Errorf("BUG FIXED: Workload MinCount was updated from %d to %d. "+
+					"This test documents that Workload MinCount should NOT be updated when Job parallelism changes. "+
+					"If this is intentional, update this test to verify the correct behavior.", tc.initialParallelism, updatedMinCount)
+			} else {
+				// Document the known gap - Workload MinCount remains stale after scaling
+				if tc.isScaleDown {
+					t.Logf("KNOWN GAP DOCUMENTED: Workload MinCount (%d) was not updated when Job parallelism scaled down from %d to %d. "+
+						"Gang schedulers will require more pods than the Job actually needs.", updatedMinCount, tc.initialParallelism, tc.scaledParallelism)
+				} else {
+					t.Logf("KNOWN GAP DOCUMENTED: Workload MinCount (%d) was not updated when Job parallelism scaled up from %d to %d. "+
+						"Gang schedulers will continue using the stale MinCount value.", updatedMinCount, tc.initialParallelism, tc.scaledParallelism)
+				}
+			}
+
+			// Verify the Job itself was scaled correctly
+			job, err := jobClient.Get(ctx, jobObj.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("Failed to get Job: %v", err)
+			}
+			if *job.Spec.Parallelism != tc.scaledParallelism {
+				t.Errorf("Job parallelism should be %d, got %d", tc.scaledParallelism, *job.Spec.Parallelism)
+			}
+			if *job.Spec.Completions != tc.scaledParallelism {
+				t.Errorf("Job completions should be %d, got %d", tc.scaledParallelism, *job.Spec.Completions)
+			}
+		})
+	}
+}
+
 func TestGangScheduling(t *testing.T) {
 	testCases := []struct {
 		name               string
