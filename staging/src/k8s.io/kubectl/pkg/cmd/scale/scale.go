@@ -183,11 +183,11 @@ func (o *ScaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 
 func (o *ScaleOptions) Validate() error {
 	if o.Replicas < 0 {
-		return fmt.Errorf("the --replicas=COUNT flag is required, and COUNT must be greater than or equal to 0")
+		return fmt.Errorf("The --replicas=COUNT flag is required, and COUNT must be greater than or equal to 0")
 	}
 
 	if o.CurrentReplicas < -1 {
-		return fmt.Errorf("the --current-replicas must specify an integer of -1 or greater")
+		return fmt.Errorf("The --current-replicas must specify an integer of -1 or greater")
 	}
 
 	return nil
