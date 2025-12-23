@@ -1,4 +1,14 @@
 rules:
+# constants is published first as it has zero dependencies.
+# Other modules can depend on it for well-known Kubernetes constants.
+- destination: constants
+  branches:
+  - name: master
+    source:
+      branch: master
+      dirs:
+      - staging/src/k8s.io/constants
+  library: true
 - destination: apimachinery
   branches:
   - name: master
