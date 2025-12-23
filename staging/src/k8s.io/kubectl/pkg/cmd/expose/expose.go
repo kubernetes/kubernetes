@@ -32,8 +32,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/unstructuredscheme"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/constants/rfc"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
@@ -318,8 +318,8 @@ func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) erro
 		}
 
 		name := info.Name
-		if len(name) > validation.DNS1035LabelMaxLength {
-			name = name[:validation.DNS1035LabelMaxLength]
+		if len(name) > rfc.DNS1035LabelMaxLength {
+			name = name[:rfc.DNS1035LabelMaxLength]
 		}
 		o.DefaultName = name
 

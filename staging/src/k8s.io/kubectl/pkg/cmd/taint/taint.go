@@ -31,8 +31,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
-	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/constants/limits"
+	"k8s.io/constants/rfc"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
@@ -108,7 +109,7 @@ func NewCmdTaint(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.C
 		Use:                   "taint NODE NAME KEY_1=VAL_1:TAINT_EFFECT_1 ... KEY_N=VAL_N:TAINT_EFFECT_N",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Update the taints on one or more nodes"),
-		Long:                  fmt.Sprintf(taintLong, validation.DNS1123SubdomainMaxLength, validation.LabelValueMaxLength),
+		Long:                  fmt.Sprintf(taintLong, rfc.DNS1123SubdomainMaxLength, limits.LabelValueMaxLength),
 		Example:               taintExample,
 		ValidArgsFunction:     completion.SpecifiedResourceTypeAndNameCompletionFunc(f, validArgs),
 		Run: func(cmd *cobra.Command, args []string) {

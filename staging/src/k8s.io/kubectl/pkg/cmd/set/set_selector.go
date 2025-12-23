@@ -27,8 +27,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/constants/limits"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
@@ -102,7 +102,7 @@ func NewCmdSelector(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobr
 		Use:                   "selector (-f FILENAME | TYPE NAME) EXPRESSIONS [--resource-version=version]",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Set the selector on a resource"),
-		Long:                  fmt.Sprintf(selectorLong, validation.LabelValueMaxLength),
+		Long:                  fmt.Sprintf(selectorLong, limits.LabelValueMaxLength),
 		Example:               selectorExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))

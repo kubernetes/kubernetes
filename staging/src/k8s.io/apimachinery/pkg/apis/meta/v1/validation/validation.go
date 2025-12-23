@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/constants/limits"
 
 	"k8s.io/utils/ptr"
 )
@@ -206,7 +207,8 @@ func ValidatePatchOptions(options *metav1.PatchOptions, patchType types.PatchTyp
 	return allErrs
 }
 
-var FieldManagerMaxLength = 128
+// FieldManagerMaxLength is re-exported from k8s.io/constants/limits for backwards compatibility.
+var FieldManagerMaxLength = limits.FieldManagerMaxLength
 
 // ValidateFieldManager valides that the fieldManager is the proper length and
 // only has printable characters.
