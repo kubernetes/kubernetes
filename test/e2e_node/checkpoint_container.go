@@ -129,7 +129,7 @@ func getCheckpointContainerErrorMetric(ctx context.Context, f *framework.Framewo
 	return 0, nil
 }
 
-var _ = SIGDescribe("Checkpoint Container", framework.WithConformance(), func() {
+var _ = SIGDescribe("Checkpoint Container", framework.WithNodeConformance(), func() {
 	f := framework.NewDefaultFramework("checkpoint-container-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	ginkgo.It("will checkpoint a container out of a pod", func(ctx context.Context) {
