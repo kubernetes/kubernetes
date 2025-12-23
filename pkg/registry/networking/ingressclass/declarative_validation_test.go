@@ -28,7 +28,7 @@ import (
 
 var apiVersions = []string{"v1", "v1beta1"}
 
-func TestDeclarativeValidateParametersName(t *testing.T) {
+func TestDeclarativeValidateParameter(t *testing.T) {
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {
 			ctx := genericapirequest.WithRequestInfo(
@@ -49,14 +49,31 @@ func TestDeclarativeValidateParametersName(t *testing.T) {
 				"valid": {
 					input: mkValidIngressClass(),
 				},
-				"missing parameters.name": {
+				"nil parameters": {
+					input: mkValidIngressClass(func(obj *networking.IngressClass) {
+						obj.Spec.Parameters = nil
+					}),
+				},
+
+				"missing parameter name": {
 					input: mkValidIngressClass(func(obj *networking.IngressClass) {
 						obj.Spec.Parameters.Name = ""
 					}),
 					expectedErrs: field.ErrorList{
 						field.Required(
 							field.NewPath("spec", "parameters", "name"),
-							"name is required",
+							"",
+						),
+					},
+				},
+				"missing parameter kind": {
+					input: mkValidIngressClass(func(obj *networking.IngressClass) {
+						obj.Spec.Parameters.Kind = ""
+					}),
+					expectedErrs: field.ErrorList{
+						field.Required(
+							field.NewPath("spec", "parameters", "kind"),
+							"",
 						),
 					},
 				},
@@ -77,7 +94,7 @@ func TestDeclarativeValidateParametersName(t *testing.T) {
 	}
 }
 
-func TestDeclarativeValidateUpdateParametersName(t *testing.T) {
+func TestDeclarativeValidateUpdateParameters(t *testing.T) {
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {
 			testCases := map[string]struct {
@@ -93,7 +110,7 @@ func TestDeclarativeValidateUpdateParametersName(t *testing.T) {
 						obj.ResourceVersion = "1"
 					}),
 				},
-				"invalid update clears parameters.name": {
+				"invalid update clears parameters name": {
 					oldObj: mkValidIngressClass(func(obj *networking.IngressClass) {
 						obj.ResourceVersion = "1"
 					}),
@@ -104,7 +121,22 @@ func TestDeclarativeValidateUpdateParametersName(t *testing.T) {
 					expectedErrs: field.ErrorList{
 						field.Required(
 							field.NewPath("spec", "parameters", "name"),
-							"name is required",
+							"",
+						),
+					},
+				},
+				"invalid update clears parameters kind": {
+					oldObj: mkValidIngressClass(func(obj *networking.IngressClass) {
+						obj.ResourceVersion = "1"
+					}),
+					updateObj: mkValidIngressClass(func(obj *networking.IngressClass) {
+						obj.ResourceVersion = "1"
+						obj.Spec.Parameters.Kind = ""
+					}),
+					expectedErrs: field.ErrorList{
+						field.Required(
+							field.NewPath("spec", "parameters", "kind"),
+							"",
 						),
 					},
 				},
@@ -124,122 +156,6 @@ func TestDeclarativeValidateUpdateParametersName(t *testing.T) {
 							Verb:              "update",
 						},
 					)
-
-					apitesting.VerifyUpdateValidationEquivalence(
-						t,
-						ctx,
-						&tc.updateObj,
-						&tc.oldObj,
-						Strategy.ValidateUpdate,
-						tc.expectedErrs,
-					)
-				})
-			}
-		})
-	}
-}
-
-func TestDeclarativeValidateParametersKind(t *testing.T) {
-	apiVersions := []string{"v1", "v1beta1"}
-
-	for _, apiVersion := range apiVersions {
-		t.Run(apiVersion, func(t *testing.T) {
-			ctx := genericapirequest.WithRequestInfo(
-				genericapirequest.NewDefaultContext(),
-				&genericapirequest.RequestInfo{
-					APIGroup:          "networking.k8s.io",
-					APIVersion:        apiVersion,
-					Resource:          "ingressclasses",
-					IsResourceRequest: true,
-					Verb:              "create",
-				},
-			)
-
-			testCases := map[string]struct {
-				input        networking.IngressClass
-				expectedErrs field.ErrorList
-			}{
-				"valid": {
-					input: mkValidIngressClass(),
-				},
-				"missing parameters.kind": {
-					input: mkValidIngressClass(func(obj *networking.IngressClass) {
-						obj.Spec.Parameters.Kind = ""
-					}),
-					expectedErrs: field.ErrorList{
-						field.Required(
-							field.NewPath("spec", "parameters", "kind"),
-							"kind is required",
-						),
-					},
-				},
-			}
-
-			for name, tc := range testCases {
-				t.Run(name, func(t *testing.T) {
-					apitesting.VerifyValidationEquivalence(
-						t,
-						ctx,
-						&tc.input,
-						Strategy.Validate,
-						tc.expectedErrs,
-					)
-				})
-			}
-		})
-	}
-}
-
-func TestDeclarativeValidateUpdateParametersKind(t *testing.T) {
-	apiVersions := []string{"v1", "v1beta1"}
-
-	for _, apiVersion := range apiVersions {
-		t.Run(apiVersion, func(t *testing.T) {
-			testCases := map[string]struct {
-				oldObj       networking.IngressClass
-				updateObj    networking.IngressClass
-				expectedErrs field.ErrorList
-			}{
-				"valid update": {
-					oldObj: mkValidIngressClass(func(obj *networking.IngressClass) {
-						obj.ResourceVersion = "1"
-					}),
-					updateObj: mkValidIngressClass(func(obj *networking.IngressClass) {
-						obj.ResourceVersion = "1"
-					}),
-				},
-				"invalid update clears parameters.kind": {
-					oldObj: mkValidIngressClass(func(obj *networking.IngressClass) {
-						obj.ResourceVersion = "1"
-					}),
-					updateObj: mkValidIngressClass(func(obj *networking.IngressClass) {
-						obj.ResourceVersion = "1"
-						obj.Spec.Parameters.Kind = ""
-					}),
-					expectedErrs: field.ErrorList{
-						field.Required(
-							field.NewPath("spec", "parameters", "kind"),
-							"kind is required",
-						),
-					},
-				},
-			}
-
-			for name, tc := range testCases {
-				t.Run(name, func(t *testing.T) {
-					ctx := genericapirequest.WithRequestInfo(
-						genericapirequest.NewDefaultContext(),
-						&genericapirequest.RequestInfo{
-							APIPrefix:         "apis",
-							APIGroup:          "networking.k8s.io",
-							APIVersion:        apiVersion,
-							Resource:          "ingressclasses",
-							Name:              "valid-ingress-class",
-							IsResourceRequest: true,
-							Verb:              "update",
-						},
-					)
-
 					apitesting.VerifyUpdateValidationEquivalence(
 						t,
 						ctx,
