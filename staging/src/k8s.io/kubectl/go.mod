@@ -90,6 +90,7 @@ require (
 	google.golang.org/protobuf v1.36.8 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
+	k8s.io/constants v0.0.0 // indirect
 	sigs.k8s.io/kustomize/api v0.20.1 // indirect
 )
 
@@ -101,5 +102,6 @@ replace (
 	k8s.io/code-generator => ../code-generator
 	k8s.io/component-base => ../component-base
 	k8s.io/component-helpers => ../component-helpers
+	k8s.io/constants => ../constants
 	k8s.io/metrics => ../metrics
 )

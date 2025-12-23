@@ -1092,6 +1092,8 @@ gopkg.in/yaml.v3
 ## explicit; go 1.25.0
 # k8s.io/component-helpers v0.0.0 => ./staging/src/k8s.io/component-helpers
 ## explicit; go 1.25.0
+# k8s.io/constants v0.0.0 => ./staging/src/k8s.io/constants
+## explicit; go 1.25.0
 # k8s.io/controller-manager v0.0.0 => ./staging/src/k8s.io/controller-manager
 ## explicit; go 1.25.0
 # k8s.io/cri-api v0.0.0 => ./staging/src/k8s.io/cri-api

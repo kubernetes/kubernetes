@@ -8,6 +8,7 @@ godebug default=go1.25
 
 require (
 	k8s.io/apimachinery v0.0.0
+	k8s.io/constants v0.0.0
 	k8s.io/klog/v2 v2.130.1
 )
 
@@ -35,4 +36,7 @@ require (
 	sigs.k8s.io/yaml v1.6.0 // indirect
 )
 
-replace k8s.io/apimachinery => ../apimachinery
+replace (
+	k8s.io/apimachinery => ../apimachinery
+	k8s.io/constants => ../constants
+)

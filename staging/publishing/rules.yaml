@@ -12,6 +12,9 @@ rules:
 - destination: apimachinery
   branches:
   - name: master
+    dependencies:
+    - repository: constants
+      branch: master
     source:
       branch: master
       dirs:
@@ -45,6 +48,8 @@ rules:
   branches:
   - name: master
     dependencies:
+    - repository: constants
+      branch: master
     - repository: apimachinery
       branch: master
     source:
