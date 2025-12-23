@@ -190,8 +190,12 @@ linters:
       # specific field to avoid hiding new violations.
       
       ## For the "Extra" field, which is common across several auth-related APIs.
-      - text: "field (UserInfo|SubjectAccessReviewSpec|CertificateSigningRequestSpec).Extra should not use a map type, use a list type with a unique name/identifier instead"
-        path: "staging/src/k8s.io/api/(authentication|authorization|certificates)/(v1|v1beta1)/types.go"
+      - text: "field UserInfo.Extra should not use a map type, use a list type with a unique name/identifier instead"
+        path: "staging/src/k8s.io/api/authentication/(v1|v1beta1)/types.go"
+      - text: "field SubjectAccessReviewSpec.Extra should not use a map type, use a list type with a unique name/identifier instead"
+        path: "staging/src/k8s.io/api/authorization/(v1|v1beta1)/types.go"
+      - text: "field CertificateSigningRequestSpec.Extra should not use a map type, use a list type with a unique name/identifier instead"
+        path: "staging/src/k8s.io/api/certificates/(v1|v1beta1)/types.go"
       
       ## For ResourceList fields in the core API.
       - text: "field (PersistentVolumeSpec.Capacity|ContainerStatus.AllocatedResources|PodSpec.Overhead|ResourceQuotaSpec.Hard) type ResourceList should not use a map type, use a list type with a unique name/identifier instead"
@@ -212,8 +216,10 @@ linters:
       ## For map fields in the resource API (across all versions).
       - text: "field (CounterSet|DeviceCounterConsumption).Counters should not use a map type, use a list type with a unique name/identifier instead"
         path: "staging/src/k8s.io/api/resource/(v1|v1beta1|v1beta2)/types.go"
-      - text: "field (Device|BasicDevice).(Attributes|Capacity) should not use a map type, use a list type with a unique name/identifier instead"
-        path: "staging/src/k8s.io/api/resource/(v1|v1beta1|v1beta2)/types.go"
+      - text: "field BasicDevice.(Attributes|Capacity) should not use a map type, use a list type with a unique name/identifier instead"
+        path: "staging/src/k8s.io/api/resource/v1beta1/types.go"
+      - text: "field Device.(Attributes|Capacity) should not use a map type, use a list type with a unique name/identifier instead"
+        path: "staging/src/k8s.io/api/resource/(v1|v1beta2)/types.go"
       - text: "field (CapacityRequirements.Requests|DeviceRequestAllocationResult.ConsumedCapacity) should not use a map type, use a list type with a unique name/identifier instead"
         path: "staging/src/k8s.io/api/resource/(v1|v1beta1|v1beta2)/types.go"
 
