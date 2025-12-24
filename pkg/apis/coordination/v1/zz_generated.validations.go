@@ -66,15 +66,15 @@ func Validate_Lease(ctx context.Context, op operation.Operation, fldPath *field.
 
 	// field coordinationv1.Lease.Spec
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *coordinationv1.LeaseSpec) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *coordinationv1.LeaseSpec, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_LeaseSpec(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("spec"), &obj.Spec, safe.Field(oldObj, func(oldObj *coordinationv1.Lease) *coordinationv1.LeaseSpec { return &oldObj.Spec }))...)
+		}(fldPath.Child("spec"), &obj.Spec, safe.Field(oldObj, func(oldObj *coordinationv1.Lease) *coordinationv1.LeaseSpec { return &oldObj.Spec }), oldObj != nil)...)
 
 	return errs
 }
@@ -87,15 +87,15 @@ func Validate_LeaseList(ctx context.Context, op operation.Operation, fldPath *fi
 
 	// field coordinationv1.LeaseList.Items
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []coordinationv1.Lease) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj []coordinationv1.Lease, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// iterate the list and call the type's validation function
 			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_Lease)...)
 			return
-		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *coordinationv1.LeaseList) []coordinationv1.Lease { return oldObj.Items }))...)
+		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *coordinationv1.LeaseList) []coordinationv1.Lease { return oldObj.Items }), oldObj != nil)...)
 
 	return errs
 }
@@ -107,30 +107,30 @@ func Validate_LeaseSpec(ctx context.Context, op operation.Operation, fldPath *fi
 
 	// field coordinationv1.LeaseSpec.LeaseDurationSeconds
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *int32) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *int32, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call field-attached validations
 			errs = append(errs, validate.Minimum(ctx, op, fldPath, obj, oldObj, 1)...)
 			return
-		}(fldPath.Child("leaseDurationSeconds"), obj.LeaseDurationSeconds, safe.Field(oldObj, func(oldObj *coordinationv1.LeaseSpec) *int32 { return oldObj.LeaseDurationSeconds }))...)
+		}(fldPath.Child("leaseDurationSeconds"), obj.LeaseDurationSeconds, safe.Field(oldObj, func(oldObj *coordinationv1.LeaseSpec) *int32 { return oldObj.LeaseDurationSeconds }), oldObj != nil)...)
 
 	// field coordinationv1.LeaseSpec.AcquireTime has no validation
 	// field coordinationv1.LeaseSpec.RenewTime has no validation
 
 	// field coordinationv1.LeaseSpec.LeaseTransitions
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *int32) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *int32, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call field-attached validations
 			errs = append(errs, validate.Minimum(ctx, op, fldPath, obj, oldObj, 0)...)
 			return
-		}(fldPath.Child("leaseTransitions"), obj.LeaseTransitions, safe.Field(oldObj, func(oldObj *coordinationv1.LeaseSpec) *int32 { return oldObj.LeaseTransitions }))...)
+		}(fldPath.Child("leaseTransitions"), obj.LeaseTransitions, safe.Field(oldObj, func(oldObj *coordinationv1.LeaseSpec) *int32 { return oldObj.LeaseTransitions }), oldObj != nil)...)
 
 	// field coordinationv1.LeaseSpec.Strategy has no validation
 	// field coordinationv1.LeaseSpec.PreferredHolder has no validation
