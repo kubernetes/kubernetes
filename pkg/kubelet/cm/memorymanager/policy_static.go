@@ -55,6 +55,12 @@ type staticPolicy struct {
 	// Note that the restartable init container memory is not included here,
 	// because it is not reusable.
 	initContainersReusableMemory reusableMemory
+	// hugepagesReader reads hugepage availability from the OS (sysfs)
+	// This is used to verify that OS-reported free hugepages match what the
+	// memory manager expects, accounting for hugepage consumption by
+	// non-Guaranteed pods (Burstable/BestEffort) that are not tracked.
+	// See: https://github.com/kubernetes/kubernetes/issues/134395
+	hugepagesReader HugepagesReader
 }
 
 var _ Policy = &staticPolicy{}
@@ -79,7 +85,13 @@ func NewPolicyStatic(logger klog.Logger, machineInfo *cadvisorapi.MachineInfo, r
 		systemReserved:               reserved,
 		affinity:                     affinity,
 		initContainersReusableMemory: reusableMemory{},
+		hugepagesReader:              NewSysfsHugepagesReader(),
 	}, nil
+}
+
+// SetHugepagesReader sets a custom HugepagesReader (used for testing)
+func (p *staticPolicy) SetHugepagesReader(reader HugepagesReader) {
+	p.hugepagesReader = reader
 }
 
 func (p *staticPolicy) Name() string {
@@ -171,6 +183,14 @@ func (p *staticPolicy) Allocate(logger klog.Logger, s state.State, pod *v1.Pod, 
 		return fmt.Errorf("[memorymanager] preferred hint violates NUMA node allocation")
 	}
 
+	// Verify OS-reported free hugepages before proceeding with allocation.
+	// This catches cases where non-Guaranteed pods have consumed hugepages
+	// that the memory manager doesn't track.
+	// See: https://github.com/kubernetes/kubernetes/issues/134395
+	if err := p.verifyOSHugepagesAvailability(logger, bestHint.NUMANodeAffinity.GetBits(), requestedResources); err != nil {
+		return err
+	}
+
 	var containerBlocks []state.Block
 	maskBits := bestHint.NUMANodeAffinity.GetBits()
 	for resourceName, requestedSize := range requestedResources {
@@ -238,6 +258,75 @@ func (p *staticPolicy) updateMachineState(machineState state.NUMANodeMap, numaAf
 		nodeResourceMemoryState.Reserved += nodeResourceMemoryState.Free
 		nodeResourceMemoryState.Free = 0
 	}
+}
+
+// verifyOSHugepagesAvailability verifies that the OS-reported free hugepages
+// on the target NUMA nodes are sufficient to satisfy the requested hugepage resources.
+//
+// This addresses a gap where the memory manager only tracks hugepage allocations for
+// Guaranteed QoS pods, but Burstable and BestEffort pods can also consume hugepages
+// without being tracked. By checking the actual OS-reported free hugepages during
+// admission, we can reject pods that would fail at runtime due to insufficient hugepages.
+//
+// See: https://github.com/kubernetes/kubernetes/issues/134395
+func (p *staticPolicy) verifyOSHugepagesAvailability(logger klog.Logger, numaAffinity []int, requestedResources map[v1.ResourceName]uint64) error {
+	if p.hugepagesReader == nil {
+		// Skip verification if no reader is configured (e.g., non-Linux platforms)
+		return nil
+	}
+
+	for resourceName, requestedSize := range requestedResources {
+		// Only verify hugepage resources, skip regular memory
+		if !corehelper.IsHugePageResourceName(resourceName) {
+			continue
+		}
+
+		pageSize, err := resourceNameToPageSize(resourceName)
+		if err != nil {
+			logger.V(4).Info("Failed to extract page size from resource name, skipping OS verification",
+				"resourceName", resourceName, "error", err)
+			continue
+		}
+
+		// Calculate total free hugepages across the target NUMA nodes
+		var totalFreeBytes uint64
+		var anyReadSucceeded bool
+		for _, nodeID := range numaAffinity {
+			freePages, err := p.hugepagesReader.GetFreeHugepages(nodeID, pageSize)
+			if err != nil {
+				// Log and continue - sysfs might not be available in some environments
+				logger.V(4).Info("Failed to read OS free hugepages, skipping verification for NUMA node",
+					"numaNode", nodeID, "resourceName", resourceName, "error", err)
+				continue
+			}
+			anyReadSucceeded = true
+			totalFreeBytes += freePages * pageSize
+		}
+
+		// If we couldn't read from any NUMA node, skip the verification
+		// (this handles containerized/testing environments gracefully)
+		if !anyReadSucceeded {
+			logger.V(4).Info("Could not read OS free hugepages from any NUMA node, skipping verification",
+				"resourceName", resourceName, "numaNodes", numaAffinity)
+			continue
+		}
+
+		// Verify that OS-reported free hugepages are sufficient
+		if totalFreeBytes < requestedSize {
+			return fmt.Errorf("[memorymanager] insufficient OS-reported free hugepages on NUMA nodes %v for %s: "+
+				"requested %d bytes but only %d bytes available. "+
+				"This may be caused by hugepage consumption from non-Guaranteed pods (Burstable/BestEffort) "+
+				"that are not tracked by the memory manager. "+
+				"See https://github.com/kubernetes/kubernetes/issues/134395",
+				numaAffinity, resourceName, requestedSize, totalFreeBytes)
+		}
+
+		logger.V(4).Info("OS hugepages verification passed",
+			"resourceName", resourceName, "numaNodes", numaAffinity,
+			"requestedBytes", requestedSize, "osFreeBytes", totalFreeBytes)
+	}
+
+	return nil
 }
 
 func (p *staticPolicy) getPodReusableMemory(pod *v1.Pod, numaAffinity bitmask.BitMask, resourceName v1.ResourceName) uint64 {
