@@ -105,6 +105,8 @@ func (crc ContainerRuntimeCheck) Check() (warnings, errorList []error) {
 // ContainerRuntimeVersionCheck verifies the version compatibility between installed container runtime and kubelet.
 type ContainerRuntimeVersionCheck struct {
 	criSocket string
+	isUpgrade bool
+	exec      utilsexec.Interface
 
 	// stubbed out for testing
 	impl utilruntime.Impl
@@ -132,12 +134,28 @@ func (crvc ContainerRuntimeVersionCheck) Check() (warnings, errorList []error) {
 		return nil, []error{errors.Wrap(err, "could not check if the runtime config is available")}
 	}
 	if !ok {
-		// TODO: return an error once the kubelet version is 1.37 or higher.
-		// https://github.com/kubernetes/kubeadm/issues/3229
-		err := errors.New("You must update your container runtime to a version that supports the CRI method RuntimeConfig. " +
-			"Falling back to using cgroupDriver from kubelet config will be removed in 1.37. " +
+		// Get the kubelet version to determine if we need to error or just warn
+		kubeletVersion, err := GetKubeletVersion(crvc.exec)
+		if err != nil {
+			return nil, []error{errors.Wrap(err, "couldn't get kubelet version")}
+		}
+		// During upgrade we want to check the next kubelet MINOR version.
+		// The below approach does not support k8s MAJOR version bumps.
+		if crvc.isUpgrade {
+			kubeletVersion = kubeletVersion.WithMinor(kubeletVersion.Minor() + 1)
+		}
+
+		err = errors.New("You must update your container runtime to a version that supports the CRI method RuntimeConfig. " +
+			"Falling back to using cgroupDriver from kubelet config has been removed since 1.37. " +
 			"For more information, see https://git.k8s.io/enhancements/keps/sig-node/4033-group-driver-detection-over-cri")
-		warnings = append(warnings, err)
+
+		// TODO: Remove the version check and always return an error once 1.37 is the minimum supported version of kubelet.
+		// https://github.com/kubernetes/kubeadm/issues/3229
+		if kubeletVersion.Major() > 1 || kubeletVersion.Minor() >= 37 {
+			errorList = append(errorList, err)
+		} else {
+			warnings = append(warnings, err)
+		}
 	}
 
 	return warnings, errorList
@@ -1121,7 +1139,7 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfigura
 // kubeadm init and join commands
 func addCommonChecks(execer utilsexec.Interface, k8sVersion string, nodeReg *kubeadmapi.NodeRegistrationOptions, checks []Checker) []Checker {
 	checks = append(checks, ContainerRuntimeCheck{criSocket: nodeReg.CRISocket})
-	checks = append(checks, ContainerRuntimeVersionCheck{criSocket: nodeReg.CRISocket})
+	checks = append(checks, ContainerRuntimeVersionCheck{criSocket: nodeReg.CRISocket, exec: execer})
 
 	// non-windows checks
 	checks = addSwapCheck(checks)
@@ -1148,7 +1166,7 @@ func RunRootCheckOnly(ignorePreflightErrors sets.Set[string]) error {
 func RunUpgradeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguration, ignorePreflightErrors sets.Set[string]) error {
 	checks := []Checker{
 		SystemVerificationCheck{isUpgrade: true, exec: execer},
-		ContainerRuntimeVersionCheck{criSocket: cfg.NodeRegistration.CRISocket},
+		ContainerRuntimeVersionCheck{criSocket: cfg.NodeRegistration.CRISocket, isUpgrade: true, exec: execer},
 	}
 
 	return RunChecks(checks, os.Stderr, ignorePreflightErrors)

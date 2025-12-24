@@ -1066,25 +1066,53 @@ func TestContainerRuntimeVersionCheck(t *testing.T) {
 	tests := []struct {
 		name           string
 		prepare        func(*utilruntime.FakeImpl)
+		isUpgrade      bool
+		kubeletVersion string
 		expectErrors   int
 		expectWarnings int
 	}{
 		{
-			name: "ok",
+			name: "runtime config is implemented",
 		},
 		{
-			name: "runtime config not implemented",
-			prepare: func(mock *utilruntime.FakeImpl) {
-				mock.RuntimeConfigReturns(nil, status.New(codes.Unimplemented, "not implemented").Err())
-			},
-			expectWarnings: 1,
-		},
-		{
-			name: "call RuntimeConfig fails",
+			name: "call RuntimeConfig failed",
 			prepare: func(mock *utilruntime.FakeImpl) {
 				mock.RuntimeConfigReturns(nil, status.New(codes.DeadlineExceeded, "deadline exceeded").Err())
 			},
 			expectErrors: 1,
+		},
+		{
+			name: "runtime config is not implemented but kubelet version is compatible",
+			prepare: func(mock *utilruntime.FakeImpl) {
+				mock.RuntimeConfigReturns(nil, status.New(codes.Unimplemented, "not implemented").Err())
+			},
+			kubeletVersion: "v1.36.0",
+			expectWarnings: 1,
+		},
+		{
+			name: "runtime config is not implemented and kubelet version is not compatible during upgrade",
+			prepare: func(mock *utilruntime.FakeImpl) {
+				mock.RuntimeConfigReturns(nil, status.New(codes.Unimplemented, "not implemented").Err())
+			},
+			kubeletVersion: "v1.36.0",
+			isUpgrade:      true,
+			expectErrors:   1,
+		},
+		{
+			name: "runtime config is not implemented and kubelet version is not compatible",
+			prepare: func(mock *utilruntime.FakeImpl) {
+				mock.RuntimeConfigReturns(nil, status.New(codes.Unimplemented, "not implemented").Err())
+			},
+			kubeletVersion: "v1.37.0",
+			expectErrors:   1,
+		},
+		{
+			name: "runtime config is not implemented and pre-release kubelet version is not compatible",
+			prepare: func(mock *utilruntime.FakeImpl) {
+				mock.RuntimeConfigReturns(nil, status.New(codes.Unimplemented, "not implemented").Err())
+			},
+			kubeletVersion: "v1.37.0-alpha.1",
+			expectErrors:   1,
 		},
 	}
 
@@ -1095,7 +1123,18 @@ func TestContainerRuntimeVersionCheck(t *testing.T) {
 				test.prepare(mock)
 			}
 
-			warnings, errors := ContainerRuntimeVersionCheck{impl: mock}.Check()
+			fcmd := fakeexec.FakeCmd{
+				OutputScript: []fakeexec.FakeAction{
+					func() ([]byte, []byte, error) { return []byte("Kubernetes " + test.kubeletVersion), nil, nil },
+				},
+			}
+			fexec := &fakeexec.FakeExec{
+				CommandScript: []fakeexec.FakeCommandAction{
+					func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+				},
+			}
+
+			warnings, errors := ContainerRuntimeVersionCheck{impl: mock, isUpgrade: test.isUpgrade, exec: fexec}.Check()
 			if len(warnings) != test.expectWarnings {
 				t.Errorf("expected %d warning(s) but got %d: %q", test.expectWarnings, len(warnings), warnings)
 			}
