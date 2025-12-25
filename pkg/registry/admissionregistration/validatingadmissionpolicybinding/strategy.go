@@ -20,9 +20,11 @@ import (
 	"context"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
@@ -83,6 +85,7 @@ func (v *validatingAdmissionPolicyBindingStrategy) PrepareForUpdate(ctx context.
 // Validate validates a new ValidatingAdmissionPolicyBinding.
 func (v *validatingAdmissionPolicyBindingStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	errs := validation.ValidateValidatingAdmissionPolicyBinding(obj.(*admissionregistration.ValidatingAdmissionPolicyBinding))
+	errs = rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, obj, nil, errs, operation.Create)
 	if len(errs) == 0 {
 		// if the object is well-formed, also authorize the paramRef
 		if err := v.authorizeCreate(ctx, obj); err != nil {
@@ -109,6 +112,7 @@ func (v *validatingAdmissionPolicyBindingStrategy) AllowCreateOnUpdate() bool {
 // ValidateUpdate is the default update validation for an end user.
 func (v *validatingAdmissionPolicyBindingStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	errs := validation.ValidateValidatingAdmissionPolicyBindingUpdate(obj.(*admissionregistration.ValidatingAdmissionPolicyBinding), old.(*admissionregistration.ValidatingAdmissionPolicyBinding))
+	errs = rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, obj, old, errs, operation.Update)
 	if len(errs) == 0 {
 		// if the object is well-formed, also authorize the paramRef
 		if err := v.authorizeUpdate(ctx, obj, old); err != nil {
