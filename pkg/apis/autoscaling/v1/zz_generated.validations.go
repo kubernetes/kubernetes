@@ -26,6 +26,7 @@ import (
 	fmt "fmt"
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
+	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
@@ -38,6 +39,22 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *runtime.Scheme) error {
+	// type HorizontalPodAutoscaler
+	scheme.AddValidationFunc((*autoscalingv1.HorizontalPodAutoscaler)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_HorizontalPodAutoscaler(ctx, op, nil /* fldPath */, obj.(*autoscalingv1.HorizontalPodAutoscaler), safe.Cast[*autoscalingv1.HorizontalPodAutoscaler](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
+	// type HorizontalPodAutoscalerList
+	scheme.AddValidationFunc((*autoscalingv1.HorizontalPodAutoscalerList)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_HorizontalPodAutoscalerList(ctx, op, nil /* fldPath */, obj.(*autoscalingv1.HorizontalPodAutoscalerList), safe.Cast[*autoscalingv1.HorizontalPodAutoscalerList](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
 	// type Scale
 	scheme.AddValidationFunc((*autoscalingv1.Scale)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
 		switch op.Request.SubresourcePath() {
@@ -47,6 +64,121 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
 	return nil
+}
+
+// Validate_CrossVersionObjectReference validates an instance of CrossVersionObjectReference according
+// to declarative validation rules in the API schema.
+func Validate_CrossVersionObjectReference(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *autoscalingv1.CrossVersionObjectReference) (errs field.ErrorList) {
+	// field autoscalingv1.CrossVersionObjectReference.Kind
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("kind"), &obj.Kind, safe.Field(oldObj, func(oldObj *autoscalingv1.CrossVersionObjectReference) *string { return &oldObj.Kind }), oldObj != nil)...)
+
+	// field autoscalingv1.CrossVersionObjectReference.Name
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("name"), &obj.Name, safe.Field(oldObj, func(oldObj *autoscalingv1.CrossVersionObjectReference) *string { return &oldObj.Name }), oldObj != nil)...)
+
+	// field autoscalingv1.CrossVersionObjectReference.APIVersion has no validation
+	return errs
+}
+
+// Validate_HorizontalPodAutoscaler validates an instance of HorizontalPodAutoscaler according
+// to declarative validation rules in the API schema.
+func Validate_HorizontalPodAutoscaler(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *autoscalingv1.HorizontalPodAutoscaler) (errs field.ErrorList) {
+	// field autoscalingv1.HorizontalPodAutoscaler.TypeMeta has no validation
+	// field autoscalingv1.HorizontalPodAutoscaler.ObjectMeta has no validation
+
+	// field autoscalingv1.HorizontalPodAutoscaler.Spec
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *autoscalingv1.HorizontalPodAutoscalerSpec, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_HorizontalPodAutoscalerSpec(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("spec"), &obj.Spec, safe.Field(oldObj, func(oldObj *autoscalingv1.HorizontalPodAutoscaler) *autoscalingv1.HorizontalPodAutoscalerSpec {
+			return &oldObj.Spec
+		}), oldObj != nil)...)
+
+	// field autoscalingv1.HorizontalPodAutoscaler.Status has no validation
+	return errs
+}
+
+// Validate_HorizontalPodAutoscalerList validates an instance of HorizontalPodAutoscalerList according
+// to declarative validation rules in the API schema.
+func Validate_HorizontalPodAutoscalerList(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *autoscalingv1.HorizontalPodAutoscalerList) (errs field.ErrorList) {
+	// field autoscalingv1.HorizontalPodAutoscalerList.TypeMeta has no validation
+	// field autoscalingv1.HorizontalPodAutoscalerList.ListMeta has no validation
+
+	// field autoscalingv1.HorizontalPodAutoscalerList.Items
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []autoscalingv1.HorizontalPodAutoscaler, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// iterate the list and call the type's validation function
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_HorizontalPodAutoscaler)...)
+			return
+		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *autoscalingv1.HorizontalPodAutoscalerList) []autoscalingv1.HorizontalPodAutoscaler {
+			return oldObj.Items
+		}), oldObj != nil)...)
+
+	return errs
+}
+
+// Validate_HorizontalPodAutoscalerSpec validates an instance of HorizontalPodAutoscalerSpec according
+// to declarative validation rules in the API schema.
+func Validate_HorizontalPodAutoscalerSpec(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *autoscalingv1.HorizontalPodAutoscalerSpec) (errs field.ErrorList) {
+	// field autoscalingv1.HorizontalPodAutoscalerSpec.ScaleTargetRef
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *autoscalingv1.CrossVersionObjectReference, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_CrossVersionObjectReference(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("scaleTargetRef"), &obj.ScaleTargetRef, safe.Field(oldObj, func(oldObj *autoscalingv1.HorizontalPodAutoscalerSpec) *autoscalingv1.CrossVersionObjectReference {
+			return &oldObj.ScaleTargetRef
+		}), oldObj != nil)...)
+
+	// field autoscalingv1.HorizontalPodAutoscalerSpec.MinReplicas has no validation
+	// field autoscalingv1.HorizontalPodAutoscalerSpec.MaxReplicas has no validation
+	// field autoscalingv1.HorizontalPodAutoscalerSpec.TargetCPUUtilizationPercentage has no validation
+	return errs
 }
 
 // Validate_Scale validates an instance of Scale according

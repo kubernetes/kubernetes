@@ -126,6 +126,7 @@ message FlowSchemaSpec {
   // `priorityLevelConfiguration` should reference a PriorityLevelConfiguration in the cluster. If the reference cannot
   // be resolved, the FlowSchema will be ignored and marked as invalid in its status.
   // Required.
+  // +k8s:required
   optional PriorityLevelConfigurationReference priorityLevelConfiguration = 1;
 
   // `matchingPrecedence` is used to choose among the FlowSchemas that match a given request. The chosen
@@ -346,6 +347,7 @@ message PriorityLevelConfigurationList {
 message PriorityLevelConfigurationReference {
   // `name` is the name of the priority level configuration being referenced
   // Required.
+  // +k8s:required
   optional string name = 1;
 }
 

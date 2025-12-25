@@ -646,6 +646,7 @@ message ValidatingAdmissionPolicyBindingSpec {
   // PolicyName references a ValidatingAdmissionPolicy name which the ValidatingAdmissionPolicyBinding binds to.
   // If the referenced resource does not exist, this binding is considered invalid and will be ignored
   // Required.
+  // +k8s:required
   optional string policyName = 1;
 
   // paramRef specifies the parameter resource used to configure the admission control policy.
@@ -703,6 +704,7 @@ message ValidatingAdmissionPolicyBindingSpec {
   //
   // Required.
   // +listType=set
+  // +k8s:required
   repeated string validationActions = 4;
 }
 

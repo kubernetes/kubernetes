@@ -196,6 +196,7 @@ type FlowDistinguisherMethod struct {
 type PriorityLevelConfigurationReference struct {
 	// `name` is the name of the priority level configuration being referenced
 	// Required.
+	// +k8s:required
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 }
 
