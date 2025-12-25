@@ -175,11 +175,13 @@ linters:
       # optionalfields - Ignore optionalfields issues for existing API group
       # TODO: For each existing API group, we aim to remove it over time.
       - text: "optionalfields: field .* should (?:be a pointer|have the omitempty tag)\\."
-        path: "staging/src/k8s.io/api/(admission|admissionregistration|apps|authentication|authorization|autoscaling|batch|certificates|coordination|core|discovery|events|extensions|flowcontrol|imagepolicy|networking|policy|rbac|resource|scheduling|storage|storagemigration)"
+        path: "staging/src/k8s.io/api/(admission|admissionregistration|apps|authentication|authorization|autoscaling|batch|certificates|coordination|core|discovery|events|extensions|flowcontrol|networking|policy|rbac|resource|scheduling|storage|storagemigration)"
       - text: "optionalfields: field StorageVersionCondition.ObservedGeneration should be a pointer."
         path: "staging/src/k8s.io/api/apiserverinternal/v1alpha1/types.go"
       - text: "optionalfields: field Overhead.PodFixed should be a pointer.(Exception: ResourceList is a map type, pointer is redundant)."
         path: "staging/src/k8s.io/api/node/(v1|v1alpha1|v1beta1)/types.go"
+      - text: "optionalfields: field (ImageReview.Status|ImageReviewSpec.Namespace|ImageReviewContainerSpec.Image|ImageReviewStatus.Reason) should be a pointer."
+        path: "staging/src/k8s.io/api/imagepolicy/v1alpha1/types.go"
       
       # Pre-existing issues from the conflictmarkers linter
       # The Error field in some older API types is marked as both optional and required.
