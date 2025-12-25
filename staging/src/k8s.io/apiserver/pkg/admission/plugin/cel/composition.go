@@ -81,7 +81,7 @@ func NewCompositedCompilerFromTemplate(context *CompositionEnv) *CompositedCompi
 	// Create a NEW environment from the BASE environment.
 	// We cannot extend context.EnvSet because it already has 'variables' defined, which causes a conflict.
 	// Instead, we extend the original baseEnvSet with our NEW MapType.
-	newEnvSet, err := context.baseEnvSet.Extend(environment.VersionedOptions{
+	newEnvSet := mustExtend(context.baseEnvSet, environment.VersionedOptions{
 		IntroducedVersion: version.MajorMinor(1, 0),
 		EnvOptions: []cel.EnvOption{
 			cel.Variable("variables", newMapType.CelType()),
@@ -90,9 +90,6 @@ func NewCompositedCompilerFromTemplate(context *CompositionEnv) *CompositedCompi
 			&newMapType,
 		},
 	})
-	if err != nil {
-		panic(fmt.Errorf("failed to extend environment for composition: %w", err))
-	}
 
 	newContext := &CompositionEnv{
 		MapType:           &newMapType,
@@ -304,4 +301,15 @@ func convertCelTypeToDeclType(celType *cel.Type) *apiservercel.DeclType {
 		}
 		return apiservercel.DynType
 	}
+}
+
+// mustExtend extends an environment set with the given options.
+// This is a convenience wrapper that panics on error, making it clear
+// that this operation is expected to be infallible for valid inputs.
+func mustExtend(base *environment.EnvSet, opts environment.VersionedOptions) *environment.EnvSet {
+	newSet, err := base.Extend(opts)
+	if err != nil {
+		panic(fmt.Errorf("failed to extend environment for composition: %w", err))
+	}
+	return newSet
 }
