@@ -168,7 +168,7 @@ func validateVolumeAttachmentSpec(
 func validateAttacher(attacher string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(attacher) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath, attacher))
+		allErrs = append(allErrs, field.Required(fldPath, attacher)).MarkCoveredByDeclarative()
 	}
 	return allErrs
 }
