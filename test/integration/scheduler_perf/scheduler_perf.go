@@ -1148,8 +1148,12 @@ func setupTestCase(t testing.TB, tc *testCase, featureGates map[featuregate.Feat
 	// Only emulate v1.33 when QueueingHints is explicitly disabled.
 	if qhEnabled, exists := featureGates[features.SchedulerQueueingHints]; exists && !qhEnabled {
 		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
+	} else if _, found := featureGates[features.OpportunisticBatching]; !found {
+		if featureGates == nil {
+			featureGates = map[featuregate.Feature]bool{}
+		}
+		featureGates[features.OpportunisticBatching] = false
 	}
-
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featureGates)
 
 	// 30 minutes should be plenty enough even for the 5000-node tests.
@@ -1167,13 +1171,9 @@ func setupTestCase(t testing.TB, tc *testCase, featureGates map[featuregate.Feat
 }
 
 func featureGatesMerge(src map[featuregate.Feature]bool, overrides map[featuregate.Feature]bool) map[featuregate.Feature]bool {
-	if len(src) == 0 {
-		return maps.Clone(overrides)
-	}
-	result := maps.Clone(src)
-	for feature, enabled := range overrides {
-		result[feature] = enabled
-	}
+	result := make(map[featuregate.Feature]bool)
+	maps.Copy(result, src)
+	maps.Copy(result, overrides)
 	return result
 }
 

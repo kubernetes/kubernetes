@@ -196,6 +196,8 @@ func (m *ISCSIVolumeSource) Reset() { *m = ISCSIVolumeSource{} }
 
 func (m *ImageVolumeSource) Reset() { *m = ImageVolumeSource{} }
 
+func (m *ImageVolumeStatus) Reset() { *m = ImageVolumeStatus{} }
+
 func (m *KeyToPath) Reset() { *m = KeyToPath{} }
 
 func (m *Lifecycle) Reset() { *m = Lifecycle{} }
@@ -503,6 +505,8 @@ func (m *VolumeProjection) Reset() { *m = VolumeProjection{} }
 func (m *VolumeResourceRequirements) Reset() { *m = VolumeResourceRequirements{} }
 
 func (m *VolumeSource) Reset() { *m = VolumeSource{} }
+
+func (m *VolumeStatus) Reset() { *m = VolumeStatus{} }
 
 func (m *VsphereVirtualDiskVolumeSource) Reset() { *m = VsphereVirtualDiskVolumeSource{} }
 
@@ -5150,6 +5154,34 @@ func (m *ImageVolumeSource) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i -= len(m.Reference)
 	copy(dAtA[i:], m.Reference)
 	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Reference)))
+	i--
+	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
+func (m *ImageVolumeStatus) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *ImageVolumeStatus) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *ImageVolumeStatus) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	i -= len(m.ImageRef)
+	copy(dAtA[i:], m.ImageRef)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.ImageRef)))
 	i--
 	dAtA[i] = 0xa
 	return len(dAtA) - i, nil
@@ -10150,6 +10182,51 @@ func (m *PodStatus) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.Resources != nil {
+		{
+			size, err := m.Resources.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x1
+		i--
+		dAtA[i] = 0xa2
+	}
+	if len(m.AllocatedResources) > 0 {
+		keysForAllocatedResources := make([]string, 0, len(m.AllocatedResources))
+		for k := range m.AllocatedResources {
+			keysForAllocatedResources = append(keysForAllocatedResources, string(k))
+		}
+		sort.Strings(keysForAllocatedResources)
+		for iNdEx := len(keysForAllocatedResources) - 1; iNdEx >= 0; iNdEx-- {
+			v := m.AllocatedResources[ResourceName(keysForAllocatedResources[iNdEx])]
+			baseI := i
+			{
+				size, err := (&v).MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenerated(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x12
+			i -= len(keysForAllocatedResources[iNdEx])
+			copy(dAtA[i:], keysForAllocatedResources[iNdEx])
+			i = encodeVarintGenerated(dAtA, i, uint64(len(keysForAllocatedResources[iNdEx])))
+			i--
+			dAtA[i] = 0xa
+			i = encodeVarintGenerated(dAtA, i, uint64(baseI-i))
+			i--
+			dAtA[i] = 0x1
+			i--
+			dAtA[i] = 0x9a
+		}
+	}
 	if m.ExtendedResourceClaimStatus != nil {
 		{
 			size, err := m.ExtendedResourceClaimStatus.MarshalToSizedBuffer(dAtA[:i])
@@ -14104,6 +14181,16 @@ func (m *VolumeMountStatus) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	{
+		size, err := m.VolumeStatus.MarshalToSizedBuffer(dAtA[:i])
+		if err != nil {
+			return 0, err
+		}
+		i -= size
+		i = encodeVarintGenerated(dAtA, i, uint64(size))
+	}
+	i--
+	dAtA[i] = 0x2a
 	if m.RecursiveReadOnly != nil {
 		i -= len(*m.RecursiveReadOnly)
 		copy(dAtA[i:], *m.RecursiveReadOnly)
@@ -14744,6 +14831,41 @@ func (m *VolumeSource) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	if m.HostPath != nil {
 		{
 			size, err := m.HostPath.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *VolumeStatus) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *VolumeStatus) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *VolumeStatus) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.Image != nil {
+		{
+			size, err := m.Image.MarshalToSizedBuffer(dAtA[:i])
 			if err != nil {
 				return 0, err
 			}
@@ -16661,6 +16783,17 @@ func (m *ImageVolumeSource) Size() (n int) {
 	return n
 }
 
+func (m *ImageVolumeStatus) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.ImageRef)
+	n += 1 + l + sovGenerated(uint64(l))
+	return n
+}
+
 func (m *KeyToPath) Size() (n int) {
 	if m == nil {
 		return 0
@@ -18570,6 +18703,19 @@ func (m *PodStatus) Size() (n int) {
 		l = m.ExtendedResourceClaimStatus.Size()
 		n += 2 + l + sovGenerated(uint64(l))
 	}
+	if len(m.AllocatedResources) > 0 {
+		for k, v := range m.AllocatedResources {
+			_ = k
+			_ = v
+			l = v.Size()
+			mapEntrySize := 1 + len(k) + sovGenerated(uint64(len(k))) + 1 + l + sovGenerated(uint64(l))
+			n += mapEntrySize + 2 + sovGenerated(uint64(mapEntrySize))
+		}
+	}
+	if m.Resources != nil {
+		l = m.Resources.Size()
+		n += 2 + l + sovGenerated(uint64(l))
+	}
 	return n
 }
 
@@ -19983,6 +20129,8 @@ func (m *VolumeMountStatus) Size() (n int) {
 		l = len(*m.RecursiveReadOnly)
 		n += 1 + l + sovGenerated(uint64(l))
 	}
+	l = m.VolumeStatus.Size()
+	n += 1 + l + sovGenerated(uint64(l))
 	return n
 }
 
@@ -20184,6 +20332,19 @@ func (m *VolumeSource) Size() (n int) {
 	if m.Image != nil {
 		l = m.Image.Size()
 		n += 2 + l + sovGenerated(uint64(l))
+	}
+	return n
+}
+
+func (m *VolumeStatus) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.Image != nil {
+		l = m.Image.Size()
+		n += 1 + l + sovGenerated(uint64(l))
 	}
 	return n
 }
@@ -21533,6 +21694,16 @@ func (this *ImageVolumeSource) String() string {
 	s := strings.Join([]string{`&ImageVolumeSource{`,
 		`Reference:` + fmt.Sprintf("%v", this.Reference) + `,`,
 		`PullPolicy:` + fmt.Sprintf("%v", this.PullPolicy) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ImageVolumeStatus) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ImageVolumeStatus{`,
+		`ImageRef:` + fmt.Sprintf("%v", this.ImageRef) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -22944,6 +23115,16 @@ func (this *PodStatus) String() string {
 		repeatedStringForHostIPs += strings.Replace(strings.Replace(f.String(), "HostIP", "HostIP", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForHostIPs += "}"
+	keysForAllocatedResources := make([]string, 0, len(this.AllocatedResources))
+	for k := range this.AllocatedResources {
+		keysForAllocatedResources = append(keysForAllocatedResources, string(k))
+	}
+	sort.Strings(keysForAllocatedResources)
+	mapStringForAllocatedResources := "ResourceList{"
+	for _, k := range keysForAllocatedResources {
+		mapStringForAllocatedResources += fmt.Sprintf("%v: %v,", k, this.AllocatedResources[ResourceName(k)])
+	}
+	mapStringForAllocatedResources += "}"
 	s := strings.Join([]string{`&PodStatus{`,
 		`Phase:` + fmt.Sprintf("%v", this.Phase) + `,`,
 		`Conditions:` + repeatedStringForConditions + `,`,
@@ -22963,6 +23144,8 @@ func (this *PodStatus) String() string {
 		`HostIPs:` + repeatedStringForHostIPs + `,`,
 		`ObservedGeneration:` + fmt.Sprintf("%v", this.ObservedGeneration) + `,`,
 		`ExtendedResourceClaimStatus:` + strings.Replace(this.ExtendedResourceClaimStatus.String(), "PodExtendedResourceClaimStatus", "PodExtendedResourceClaimStatus", 1) + `,`,
+		`AllocatedResources:` + mapStringForAllocatedResources + `,`,
+		`Resources:` + strings.Replace(this.Resources.String(), "ResourceRequirements", "ResourceRequirements", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -24048,6 +24231,7 @@ func (this *VolumeMountStatus) String() string {
 		`MountPath:` + fmt.Sprintf("%v", this.MountPath) + `,`,
 		`ReadOnly:` + fmt.Sprintf("%v", this.ReadOnly) + `,`,
 		`RecursiveReadOnly:` + valueToStringGenerated(this.RecursiveReadOnly) + `,`,
+		`VolumeStatus:` + strings.Replace(strings.Replace(this.VolumeStatus.String(), "VolumeStatus", "VolumeStatus", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -24143,6 +24327,16 @@ func (this *VolumeSource) String() string {
 		`CSI:` + strings.Replace(this.CSI.String(), "CSIVolumeSource", "CSIVolumeSource", 1) + `,`,
 		`Ephemeral:` + strings.Replace(this.Ephemeral.String(), "EphemeralVolumeSource", "EphemeralVolumeSource", 1) + `,`,
 		`Image:` + strings.Replace(this.Image.String(), "ImageVolumeSource", "ImageVolumeSource", 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *VolumeStatus) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&VolumeStatus{`,
+		`Image:` + strings.Replace(this.Image.String(), "ImageVolumeStatus", "ImageVolumeStatus", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -39074,6 +39268,88 @@ func (m *ImageVolumeSource) Unmarshal(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.PullPolicy = PullPolicy(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *ImageVolumeStatus) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ImageVolumeStatus: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ImageVolumeStatus: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ImageRef", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ImageRef = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
@@ -55402,6 +55678,171 @@ func (m *PodStatus) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
+		case 19:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field AllocatedResources", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.AllocatedResources == nil {
+				m.AllocatedResources = make(ResourceList)
+			}
+			var mapkey ResourceName
+			mapvalue := &resource.Quantity{}
+			for iNdEx < postIndex {
+				entryPreIndex := iNdEx
+				var wire uint64
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflowGenerated
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					wire |= uint64(b&0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				fieldNum := int32(wire >> 3)
+				if fieldNum == 1 {
+					var stringLenmapkey uint64
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflowGenerated
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						stringLenmapkey |= uint64(b&0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					intStringLenmapkey := int(stringLenmapkey)
+					if intStringLenmapkey < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					postStringIndexmapkey := iNdEx + intStringLenmapkey
+					if postStringIndexmapkey < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					if postStringIndexmapkey > l {
+						return io.ErrUnexpectedEOF
+					}
+					mapkey = ResourceName(dAtA[iNdEx:postStringIndexmapkey])
+					iNdEx = postStringIndexmapkey
+				} else if fieldNum == 2 {
+					var mapmsglen int
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflowGenerated
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						mapmsglen |= int(b&0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					if mapmsglen < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					postmsgIndex := iNdEx + mapmsglen
+					if postmsgIndex < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					if postmsgIndex > l {
+						return io.ErrUnexpectedEOF
+					}
+					mapvalue = &resource.Quantity{}
+					if err := mapvalue.Unmarshal(dAtA[iNdEx:postmsgIndex]); err != nil {
+						return err
+					}
+					iNdEx = postmsgIndex
+				} else {
+					iNdEx = entryPreIndex
+					skippy, err := skipGenerated(dAtA[iNdEx:])
+					if err != nil {
+						return err
+					}
+					if (skippy < 0) || (iNdEx+skippy) < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					if (iNdEx + skippy) > postIndex {
+						return io.ErrUnexpectedEOF
+					}
+					iNdEx += skippy
+				}
+			}
+			m.AllocatedResources[ResourceName(mapkey)] = *mapvalue
+			iNdEx = postIndex
+		case 20:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Resources", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Resources == nil {
+				m.Resources = &ResourceRequirements{}
+			}
+			if err := m.Resources.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
@@ -67888,6 +68329,39 @@ func (m *VolumeMountStatus) Unmarshal(dAtA []byte) error {
 			s := RecursiveReadOnlyMode(dAtA[iNdEx:postIndex])
 			m.RecursiveReadOnly = &s
 			iNdEx = postIndex
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field VolumeStatus", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.VolumeStatus.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
@@ -69673,6 +70147,92 @@ func (m *VolumeSource) Unmarshal(dAtA []byte) error {
 			}
 			if m.Image == nil {
 				m.Image = &ImageVolumeSource{}
+			}
+			if err := m.Image.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *VolumeStatus) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: VolumeStatus: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: VolumeStatus: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Image", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Image == nil {
+				m.Image = &ImageVolumeStatus{}
 			}
 			if err := m.Image.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err

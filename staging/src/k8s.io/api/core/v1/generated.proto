@@ -2275,6 +2275,16 @@ message ImageVolumeSource {
   optional string pullPolicy = 2;
 }
 
+// ImageVolumeStatus represents the image-based volume status.
+message ImageVolumeStatus {
+  // ImageRef is the digest of the image used for this volume.
+  // It should have a value that's similar to the pod's status.containerStatuses[i].imageID.
+  // The ImageRef length should not exceed 256 characters.
+  // +kubebuilder:validation:MaxLength=256
+  // +required
+  optional string imageRef = 1;
+}
+
 // Maps a string key to a path within a volume.
 message KeyToPath {
   // key is the key to project.
@@ -4909,6 +4919,20 @@ message PodStatus {
   // +featureGate=DRAExtendedResource
   // +optional
   optional PodExtendedResourceClaimStatus extendedResourceClaimStatus = 18;
+
+  // AllocatedResources is the total requests allocated for this pod by the node.
+  // If pod-level requests are not set, this will be the total requests aggregated
+  // across containers in the pod.
+  // +featureGate=InPlacePodLevelResourcesVerticalScaling
+  // +optional
+  map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> allocatedResources = 19;
+
+  // Resources represents the compute resource requests and limits that have been
+  // applied at the pod level if pod-level requests or limits are set in
+  // PodSpec.Resources
+  // +featureGate=InPlacePodLevelResourcesVerticalScaling
+  // +optional
+  optional ResourceRequirements resources = 20;
 }
 
 // PodStatusResult is a wrapper for PodStatus returned by kubelet that can be encode/decoded
@@ -6550,9 +6574,10 @@ message Toleration {
   optional string key = 1;
 
   // Operator represents a key's relationship to the value.
-  // Valid operators are Exists and Equal. Defaults to Equal.
+  // Valid operators are Exists, Equal, Lt, and Gt. Defaults to Equal.
   // Exists is equivalent to wildcard for value, so that a pod can
   // tolerate all taints of a particular category.
+  // Lt and Gt perform numeric comparisons (requires feature gate TaintTolerationComparisonOperators).
   // +optional
   optional string operator = 2;
 
@@ -6870,6 +6895,11 @@ message VolumeMountStatus {
   // depending on the mount result.
   // +optional
   optional string recursiveReadOnly = 4;
+
+  // volumeStatus represents volume-type-specific status about the mounted
+  // volume.
+  // +optional
+  optional VolumeStatus volumeStatus = 5;
 }
 
 // VolumeNodeAffinity defines constraints that limit what nodes this volume can be accessed from.
@@ -7175,6 +7205,15 @@ message VolumeSource {
   // +featureGate=ImageVolume
   // +optional
   optional ImageVolumeSource image = 30;
+}
+
+// VolumeStatus represents the status of a mounted volume.
+// At most one of its members must be specified.
+message VolumeStatus {
+  // image represents an OCI object (a container image or artifact) pulled and mounted on the kubelet's host machine.
+  // +featureGate=ImageVolumeWithDigest
+  // +optional
+  optional ImageVolumeStatus image = 1;
 }
 
 // Represents a vSphere volume resource.

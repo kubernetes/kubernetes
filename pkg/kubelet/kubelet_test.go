@@ -3269,6 +3269,7 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 		ConfigMapAndSecretChangeDetectionStrategy: kubeletconfiginternal.WatchChangeDetectionStrategy,
 		ContainerLogMaxSize:                       "10Mi",
 		ContainerLogMaxFiles:                      5,
+		ImagePullCredentialsVerificationPolicy:    "NeverVerifyPreloadedImages",
 		MemoryThrottlingFactor:                    ptr.To[float64](0),
 		CrashLoopBackOff: kubeletconfiginternal.CrashLoopBackOffConfig{
 			MaxContainerRestartPeriod: &metav1.Duration{Duration: 5 * time.Minute},
@@ -3395,6 +3396,8 @@ func TestSyncPodSpans(t *testing.T) {
 		ContainerLogMaxSize:                       "10Mi",
 		ContainerLogMaxFiles:                      5,
 		MemoryThrottlingFactor:                    ptr.To[float64](0),
+		MaxPods:                                   110,
+		MaxParallelImagePulls:                     ptr.To[int32](5),
 	}
 
 	exp := tracetest.NewInMemoryExporter()

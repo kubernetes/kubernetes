@@ -256,7 +256,7 @@ func (le *LeaderElector) acquire(ctx context.Context) bool {
 	desc := le.config.Lock.Describe()
 	logger := klog.FromContext(ctx)
 	logger.Info("Attempting to acquire leader lease...", "lock", desc)
-	wait.JitterUntil(func() {
+	wait.JitterUntilWithContext(ctx, func(ctx context.Context) {
 		if !le.config.Coordinated {
 			succeeded = le.tryAcquireOrRenew(ctx)
 		} else {
@@ -271,7 +271,7 @@ func (le *LeaderElector) acquire(ctx context.Context) bool {
 		le.metrics.leaderOn(le.config.Name)
 		logger.Info("Successfully acquired lease", "lock", desc)
 		cancel()
-	}, le.config.RetryPeriod, JitterFactor, true, ctx.Done())
+	}, le.config.RetryPeriod, JitterFactor, true)
 	return succeeded
 }
 
@@ -281,7 +281,7 @@ func (le *LeaderElector) renew(ctx context.Context) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	logger := klog.FromContext(ctx)
-	wait.Until(func() {
+	wait.UntilWithContext(ctx, func(ctx context.Context) {
 		err := wait.PollUntilContextTimeout(ctx, le.config.RetryPeriod, le.config.RenewDeadline, true, func(ctx context.Context) (done bool, err error) {
 			if !le.config.Coordinated {
 				return le.tryAcquireOrRenew(ctx), nil
@@ -298,7 +298,7 @@ func (le *LeaderElector) renew(ctx context.Context) {
 		le.metrics.leaderOff(le.config.Name)
 		logger.Info("Failed to renew lease", "lock", desc, "err", err)
 		cancel()
-	}, le.config.RetryPeriod, ctx.Done())
+	}, le.config.RetryPeriod)
 
 	// if we hold the lease, give it up
 	if le.config.ReleaseOnCancel {

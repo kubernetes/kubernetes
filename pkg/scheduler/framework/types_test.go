@@ -1704,6 +1704,9 @@ func TestPodInfoCalculateResources(t *testing.T) {
 
 func TestCalculatePodResourcesWithResize(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, true)
+
 	testpod := v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "pod_resize_test",
@@ -1718,10 +1721,23 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 	restartAlways := v1.ContainerRestartPolicyAlways
 
 	preparePodInfo := func(pod v1.Pod,
+		podRequests, podStatusResources,
 		requests, statusResources,
 		initRequests, initStatusResources,
 		sidecarRequests, sidecarStatusResources *v1.ResourceList,
 		resizeStatus []*v1.PodCondition) PodInfo {
+
+		if podRequests != nil {
+			pod.Spec.Resources = &v1.ResourceRequirements{
+				Requests: *podRequests,
+			}
+		}
+
+		if podStatusResources != nil {
+			pod.Status.Resources = &v1.ResourceRequirements{
+				Requests: *podStatusResources,
+			}
+		}
 
 		if requests != nil {
 			pod.Spec.Containers = append(pod.Spec.Containers,
@@ -1785,15 +1801,17 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                   string
-		requests               v1.ResourceList
-		statusResources        v1.ResourceList
-		initRequests           *v1.ResourceList
-		initStatusResources    *v1.ResourceList
-		resizeStatus           []*v1.PodCondition
-		sidecarRequests        *v1.ResourceList
-		sidecarStatusResources *v1.ResourceList
-		expectedResource       fwk.PodResource
+		name                    string
+		podLevelRequests        *v1.ResourceList
+		requests                v1.ResourceList
+		statusResources         v1.ResourceList
+		podLevelStatusResources *v1.ResourceList
+		initRequests            *v1.ResourceList
+		initStatusResources     *v1.ResourceList
+		resizeStatus            []*v1.PodCondition
+		sidecarRequests         *v1.ResourceList
+		sidecarStatusResources  *v1.ResourceList
+		expectedResource        fwk.PodResource
 	}{
 		{
 			name:            "Pod with no pending resize",
@@ -1805,6 +1823,21 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 					Memory:   mem500M.Value(),
 				},
 				Non0CPU: cpu500m.MilliValue(),
+				Non0Mem: mem500M.Value(),
+			},
+		},
+		{
+			name:                    "Pod with pod-level resources no pending resize",
+			podLevelRequests:        &v1.ResourceList{v1.ResourceCPU: cpu700m, v1.ResourceMemory: mem500M},
+			requests:                v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			podLevelStatusResources: &v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			statusResources:         v1.ResourceList{v1.ResourceCPU: cpu700m, v1.ResourceMemory: mem500M},
+			expectedResource: fwk.PodResource{
+				Resource: &Resource{
+					MilliCPU: cpu700m.MilliValue(),
+					Memory:   mem500M.Value(),
+				},
+				Non0CPU: cpu700m.MilliValue(),
 				Non0Mem: mem500M.Value(),
 			},
 		},
@@ -1828,9 +1861,52 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 			},
 		},
 		{
+			name:                    "Pod with pod-level resources and resize in progress",
+			podLevelRequests:        &v1.ResourceList{v1.ResourceCPU: cpu700m, v1.ResourceMemory: mem500M},
+			requests:                v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			podLevelStatusResources: &v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			statusResources:         v1.ResourceList{v1.ResourceCPU: cpu700m, v1.ResourceMemory: mem500M},
+			resizeStatus: []*v1.PodCondition{
+				{
+					Type:   v1.PodResizeInProgress,
+					Status: v1.ConditionTrue,
+				},
+			},
+			expectedResource: fwk.PodResource{
+				Resource: &Resource{
+					MilliCPU: cpu700m.MilliValue(),
+					Memory:   mem500M.Value(),
+				},
+				Non0CPU: cpu700m.MilliValue(),
+				Non0Mem: mem500M.Value(),
+			},
+		},
+		{
 			name:            "Pod with deferred resize",
 			requests:        v1.ResourceList{v1.ResourceCPU: cpu700m, v1.ResourceMemory: mem800M},
 			statusResources: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			resizeStatus: []*v1.PodCondition{
+				{
+					Type:   v1.PodResizePending,
+					Status: v1.ConditionTrue,
+					Reason: v1.PodReasonDeferred,
+				},
+			},
+			expectedResource: fwk.PodResource{
+				Resource: &Resource{
+					MilliCPU: cpu700m.MilliValue(),
+					Memory:   mem800M.Value(),
+				},
+				Non0CPU: cpu700m.MilliValue(),
+				Non0Mem: mem800M.Value(),
+			},
+		},
+		{
+			name:                    "Pod with pod-level resources and with deferred resize",
+			podLevelRequests:        &v1.ResourceList{v1.ResourceCPU: cpu700m, v1.ResourceMemory: mem800M},
+			requests:                v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			podLevelStatusResources: &v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			statusResources:         v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
 			resizeStatus: []*v1.PodCondition{
 				{
 					Type:   v1.PodResizePending,
@@ -1904,6 +1980,7 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			podInfo := preparePodInfo(*testpod.DeepCopy(),
+				tt.podLevelRequests, tt.podLevelStatusResources,
 				&tt.requests, &tt.statusResources,
 				tt.initRequests, tt.initStatusResources,
 				tt.sidecarRequests, tt.sidecarStatusResources,

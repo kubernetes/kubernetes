@@ -460,7 +460,7 @@ func (tc *Controller) processPodOnNode(
 	if len(taints) == 0 {
 		tc.cancelWorkWithEvent(logger, podNamespacedName)
 	}
-	allTolerated, usedTolerations := v1helper.GetMatchingTolerations(taints, tolerations)
+	allTolerated, usedTolerations := v1helper.GetMatchingTolerations(logger, taints, tolerations)
 	if !allTolerated {
 		logger.V(2).Info("Not all taints are tolerated after update for pod on node", "pod", podNamespacedName.String(), "node", klog.KRef("", nodeName))
 		// We're canceling scheduled work (if any), as we're going to delete the Pod right away.

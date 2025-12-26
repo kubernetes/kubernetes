@@ -29,8 +29,12 @@ import (
 	"fmt"
 	"io"
 	"math/big"
+	mathrand "math/rand/v2"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"reflect"
 	"strconv"
 	"strings"
@@ -843,6 +847,354 @@ func TestRefreshCreds(t *testing.T) {
 			compJSON(t, stderr.Bytes(), []byte(test.wantInput))
 		})
 	}
+}
+
+type pluginPolicyTest struct {
+	name             string
+	wantErr          bool
+	wantErrSubstr    string
+	config           *api.ExecConfig
+	pluginExists     bool
+	entryExists      bool
+	usePluginAbsPath bool
+	useEntryAbsPath  bool
+	allowlistLength  int
+	policyType       api.PolicyType
+	allowlist        []api.AllowlistEntry
+}
+
+type dualBool struct{ plugin, entry bool }
+
+type pluginPolicyTestMatrix struct {
+	exists           []dualBool
+	absolute         []dualBool
+	allowlistLengths []int
+	policies         []api.PolicyType
+
+	// the logic of whether or not a given test configuration should produce an error
+	shouldErrFunc func(tt *pluginPolicyTest) (bool, string)
+}
+
+var allPermutations = []dualBool{
+	{plugin: false, entry: false},
+	{plugin: false, entry: true},
+	{plugin: true, entry: false},
+	{plugin: true, entry: true},
+}
+
+// TestPluginPolicy tests the functioning of various plugin policies, as well
+// as the the validity of a wide variety of policies.
+func TestPluginPolicy(t *testing.T) {
+	// this is inlined to make highly visible and explicit the logic of which
+	// test configurations should pass and which should fail
+	shouldErrFunc := func(test *pluginPolicyTest) (bool, string) {
+		switch test.policyType {
+		case "", api.PluginPolicyAllowAll:
+			if test.allowlist != nil { // invalid
+				return true, "allowlist is non-nil"
+			}
+
+			if test.pluginExists {
+				return false, ""
+			}
+
+			return true, "not found"
+		case api.PluginPolicyDenyAll:
+			if test.allowlist != nil { // invalid
+				return true, "allowlist is non-nil"
+			}
+
+			return true, `policy set to "DenyAll"`
+		case api.PluginPolicyAllowlist:
+			if test.allowlist == nil { // invalid
+				return true, "allowlist is unspecified"
+			}
+
+			if len(test.allowlist) == 0 { // invalid
+				return true, "allowlist is empty; use \"DenyAll\" policy instead"
+			}
+
+			switch {
+			case test.pluginExists && test.entryExists:
+				return false, ""
+			case test.pluginExists && !test.entryExists:
+				return true, "is not permitted by the credential plugin allowlist"
+			case !test.pluginExists && test.entryExists:
+				// error message varies depending on whether the paths are relative or absolute
+				// what is important is that an error arises here
+				return true, ""
+			case !test.pluginExists && !test.entryExists:
+				// error message varies depending on whether the paths are relative or absolute
+				// what is important is that an error arises here
+				return true, ""
+			}
+
+			panic("unreachable")
+		}
+
+		return true, "unknown plugin policy"
+	}
+
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("could not get working directory: %s", err)
+	}
+
+	testdataDir := filepath.Join(wd, "testdata")
+
+	path := os.Getenv("PATH")
+	defer func() {
+		if err = os.Setenv("PATH", path); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	matrix := pluginPolicyTestMatrix{
+		shouldErrFunc:    shouldErrFunc,
+		exists:           allPermutations,
+		absolute:         allPermutations,
+		allowlistLengths: []int{-1 /*nil*/, 0, 1, 3},
+		policies: []api.PolicyType{
+			"",
+			api.PluginPolicyAllowAll,
+			api.PluginPolicyDenyAll,
+			api.PluginPolicyAllowlist,
+			api.PolicyType("HIGHLYILLEGAL"),
+		},
+	}
+
+	tests := matrix.makeTests(t, testdataDir, path)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			c := test.config
+			a, err := newAuthenticator(newCache(), func(_ int) bool { return false }, c, &clientauthentication.Cluster{})
+			if err != nil {
+				if !test.wantErr {
+					t.Fatalf("unexpected validation error: %v", err)
+				} else if !strings.Contains(err.Error(), test.wantErrSubstr) {
+					t.Fatalf("expected error with substring '%v' got '%v'", test.wantErrSubstr, err.Error())
+				}
+
+				return
+			}
+
+			stderr := &bytes.Buffer{}
+			a.stderr = stderr
+			a.environ = func() []string { return nil }
+
+			if err := a.refreshCredsLocked(); err != nil {
+				if !test.wantErr {
+					t.Fatalf("unexpected allows plugin error: %v", err)
+				} else if !strings.Contains(err.Error(), test.wantErrSubstr) {
+					t.Fatalf("expected error with substring '%v' got '%v'", test.wantErrSubstr, err.Error())
+				}
+				return
+			}
+
+			if test.wantErr {
+				t.Fatal("expected allowlist error, but error was nil")
+			}
+		})
+	}
+}
+
+func (m *pluginPolicyTestMatrix) makeTests(t *testing.T, testdataDir, path string) []pluginPolicyTest {
+	const existingPluginInPATHBasename = "test-plugin.sh"
+	existingPluginInPATHAbsolutePath := filepath.Join(testdataDir, existingPluginInPATHBasename)
+
+	err := os.Setenv("PATH", fmt.Sprintf("%s:%s", testdataDir, path))
+	if err != nil {
+		t.Fatalf("error setting PATH: %s", err)
+	}
+
+	resolved, err := exec.LookPath(existingPluginInPATHBasename)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if existingPluginInPATHAbsolutePath != resolved {
+		t.Fatalf("test plugin basename resolved incorrectly: did not resolve to %s", existingPluginInPATHAbsolutePath)
+	}
+
+	resolvedAbs, err := exec.LookPath(existingPluginInPATHAbsolutePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if existingPluginInPATHAbsolutePath != resolvedAbs {
+		t.Fatalf("test plugin absolute path resolved incorrectly: did not resolve to %s", existingPluginInPATHAbsolutePath)
+	}
+
+	tests := make([]pluginPolicyTest, 0, len(m.exists)*2+len(m.absolute)*2+len(m.allowlistLengths)+len(m.policies))
+
+	var tt *pluginPolicyTest
+	for _, exists := range m.exists {
+		tt = new(pluginPolicyTest)
+
+		tt.setExists(exists)
+		for _, absolute := range m.absolute {
+			tt.setAbsolute(absolute)
+
+			for _, length := range m.allowlistLengths {
+				tt.setAllowlist(length, existingPluginInPATHAbsolutePath, existingPluginInPATHBasename)
+
+				for _, p := range m.policies {
+					tt.policyType = p
+					tt.setName()
+					tt.setExecConfig(existingPluginInPATHAbsolutePath, existingPluginInPATHBasename)
+					tt.setErrDetails(m)
+
+					tests = append(tests, *tt)
+				}
+			}
+		}
+	}
+
+	return tests
+}
+
+func (tt *pluginPolicyTest) setErrDetails(m *pluginPolicyTestMatrix) {
+	tt.wantErr, tt.wantErrSubstr = m.shouldErrFunc(tt)
+}
+
+func (tt *pluginPolicyTest) setAbsolute(absolute dualBool) {
+	tt.usePluginAbsPath = absolute.plugin
+	tt.useEntryAbsPath = absolute.entry
+}
+
+func (tt *pluginPolicyTest) setExists(exists dualBool) {
+	tt.pluginExists = exists.plugin
+	tt.entryExists = exists.entry
+}
+
+func (tt *pluginPolicyTest) setAllowlist(l int, existingPluginInPATHAbsolutePath string, existingPluginInPATHBasename string) {
+	tt.allowlistLength = l
+	if tt.allowlistLength >= 0 {
+		tt.allowlist = make([]api.AllowlistEntry, 0, tt.allowlistLength)
+	}
+
+	if tt.allowlistLength >= 1 {
+		entry := tt.makeAllowlistEntry(existingPluginInPATHAbsolutePath, existingPluginInPATHBasename)
+		tt.allowlist = append(tt.allowlist, entry)
+	}
+
+	for i := 1; i < tt.allowlistLength; i++ {
+		tt.allowlist = append(tt.allowlist, api.AllowlistEntry{Name: fmt.Sprintf("foo-%d", i)})
+	}
+
+	// shuffle the allowlist to guarantee ordering doesn't matter
+	for i := range tt.allowlist {
+		j := mathrand.IntN(i + 1)
+		tt.allowlist[i], tt.allowlist[j] = tt.allowlist[j], tt.allowlist[i]
+	}
+}
+
+func (tt *pluginPolicyTest) makeAllowlistEntry(existingPluginInPATHAbsolutePath string, existingPluginInPATHBasename string) api.AllowlistEntry {
+	var entry api.AllowlistEntry
+
+	switch {
+	case tt.entryExists && tt.useEntryAbsPath:
+		entry.Name = existingPluginInPATHAbsolutePath
+	case tt.entryExists && !tt.useEntryAbsPath:
+		entry.Name = existingPluginInPATHBasename
+	case !tt.entryExists && tt.useEntryAbsPath:
+		entry.Name = "/this/path/does/not/exist"
+	case !tt.entryExists && !tt.useEntryAbsPath:
+		entry.Name = "does not exist"
+	}
+
+	return entry
+}
+
+func (tt *pluginPolicyTest) setExecConfig(existingPluginInPATHAbsolutePath string, existingPluginInPATHBasename string) {
+	var cmd string
+
+	switch {
+	case tt.pluginExists && tt.usePluginAbsPath:
+		cmd = existingPluginInPATHAbsolutePath
+	case tt.pluginExists && !tt.usePluginAbsPath:
+		cmd = existingPluginInPATHBasename
+	case !tt.pluginExists && tt.usePluginAbsPath:
+		cmd = "/this/path/does/not/exist"
+	case !tt.pluginExists && !tt.usePluginAbsPath:
+		cmd = "does not exist"
+	default: // verifiably unreachable
+		cmd = "does not exist"
+	}
+
+	config := api.ExecConfig{}
+	if strings.HasSuffix(cmd, "test-plugin.sh") {
+		config.Env = append(config.Env, api.ExecEnvVar{
+			Name: "TEST_OUTPUT",
+			Value: `{
+				"kind": "ExecCredential",
+				"apiVersion": "client.authentication.k8s.io/v1",
+				"status": {
+					"token": "foo-bar"
+				}
+			}`,
+		})
+		config.Env = append(config.Env, api.ExecEnvVar{
+			Name:  "TEST_EXIT_CODE",
+			Value: strconv.Itoa(0),
+		})
+	}
+
+	config.APIVersion = "client.authentication.k8s.io/v1"
+	config.InteractiveMode = api.IfAvailableExecInteractiveMode
+	config.Command = cmd
+	config.PluginPolicy.PolicyType = tt.policyType
+	config.PluginPolicy.Allowlist = tt.allowlist
+
+	tt.config = &config
+}
+
+func makeExistsString(s string, t bool) string {
+	ne := "nonexistent"
+	if t {
+		ne = "existing"
+	}
+
+	return fmt.Sprintf("%s-%s-path", ne, s)
+}
+
+func makePathString(s string, t bool) string {
+	ba := "basename"
+	if t {
+		ba = "absolute-path"
+	}
+
+	return fmt.Sprintf("%s-%s", ba, s)
+}
+
+func (tt *pluginPolicyTest) setName() {
+	p := string(tt.policyType)
+	if string(tt.policyType) == "" {
+		p = "unspecified"
+	}
+	var lengthStr string
+	switch tt.allowlistLength {
+	case -1:
+		lengthStr = "nil-allowlist"
+	case 0:
+		lengthStr = "empty-allowlist"
+	case 1:
+		lengthStr = "single-entry-allowlist"
+	default:
+		lengthStr = "multiple-entry-allowlist"
+	}
+	pluginExistsString := makeExistsString("plugin", tt.pluginExists)
+	entryExistsString := makeExistsString("entry", tt.entryExists)
+	pluginPathString := makePathString("plugin", tt.usePluginAbsPath)
+	entryPathString := makePathString("entry", tt.useEntryAbsPath)
+	policyString := fmt.Sprintf("with-%s-policy", strings.ToLower(p))
+
+	tt.name = filepath.Join(
+		policyString,
+		lengthStr,
+		pluginExistsString,
+		entryExistsString,
+		pluginPathString,
+		entryPathString,
+	)
 }
 
 func TestRoundTripper(t *testing.T) {

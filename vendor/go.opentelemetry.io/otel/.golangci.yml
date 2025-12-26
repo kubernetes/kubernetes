@@ -10,6 +10,7 @@ linters:
     - depguard
     - errcheck
     - errorlint
+    - gocritic
     - godot
     - gosec
     - govet
@@ -66,8 +67,6 @@ linters:
               desc: Do not use cross-module internal packages.
             - pkg: go.opentelemetry.io/otel/internal/internaltest
               desc: Do not use cross-module internal packages.
-            - pkg: go.opentelemetry.io/otel/internal/matchers
-              desc: Do not use cross-module internal packages.
         otlp-internal:
           files:
             - '!**/exporters/otlp/internal/**/*.go'
@@ -88,6 +87,18 @@ linters:
           deny:
             - pkg: go.opentelemetry.io/otel/exporters/otlp/otlptrace/internal
               desc: Do not use cross-module internal packages.
+    gocritic:
+      disabled-checks:
+        - appendAssign
+        - commentedOutCode
+        - dupArg
+        - hugeParam
+        - importShadow
+        - preferDecodeRune
+        - rangeValCopy
+        - unnamedResult
+        - whyNoLint
+      enable-all: true
     godot:
       exclude:
         # Exclude links.
@@ -169,7 +180,10 @@ linters:
             - fmt.Print
             - fmt.Printf
             - fmt.Println
+        - name: unused-parameter
+        - name: unused-receiver
         - name: unnecessary-stmt
+        - name: use-any
         - name: useless-break
         - name: var-declaration
         - name: var-naming
@@ -190,6 +204,10 @@ linters:
       - legacy
       - std-error-handling
     rules:
+      - linters:
+          - revive
+        path: schema/v.*/types/.*
+        text: avoid meaningless package names
       # TODO: Having appropriate comments for exported objects helps development,
       # even for objects in internal packages. Appropriate comments for all
       # exported objects should be added and this exclusion removed.
@@ -222,10 +240,6 @@ linters:
       - linters:
           - gosec
         text: 'G402: TLS MinVersion too low.'
-    paths:
-      - third_party$
-      - builtin$
-      - examples$
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0
@@ -235,14 +249,12 @@ formatters:
     - goimports
     - golines
   settings:
+    gofumpt:
+      extra-rules: true
     goimports:
       local-prefixes:
-        - go.opentelemetry.io
+        - go.opentelemetry.io/otel
     golines:
       max-len: 120
   exclusions:
     generated: lax
-    paths:
-      - third_party$
-      - builtin$
-      - examples$

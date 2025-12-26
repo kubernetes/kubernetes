@@ -992,6 +992,15 @@ func (ImageVolumeSource) SwaggerDoc() map[string]string {
 	return map_ImageVolumeSource
 }
 
+var map_ImageVolumeStatus = map[string]string{
+	"":         "ImageVolumeStatus represents the image-based volume status.",
+	"imageRef": "ImageRef is the digest of the image used for this volume. It should have a value that's similar to the pod's status.containerStatuses[i].imageID. The ImageRef length should not exceed 256 characters.",
+}
+
+func (ImageVolumeStatus) SwaggerDoc() map[string]string {
+	return map_ImageVolumeStatus
+}
+
 var map_KeyToPath = map[string]string{
 	"":     "Maps a string key to a path within a volume.",
 	"key":  "key is the key to project.",
@@ -1951,6 +1960,8 @@ var map_PodStatus = map[string]string{
 	"resize":                      "Status of resources resize desired for pod's containers. It is empty if no resources resize is pending. Any changes to container resources will automatically set this to \"Proposed\" Deprecated: Resize status is moved to two pod conditions PodResizePending and PodResizeInProgress. PodResizePending will track states where the spec has been resized, but the Kubelet has not yet allocated the resources. PodResizeInProgress will track in-progress resizes, and should be present whenever allocated resources != acknowledged resources.",
 	"resourceClaimStatuses":       "Status of resource claims.",
 	"extendedResourceClaimStatus": "Status of extended resource claim backed by DRA.",
+	"allocatedResources":          "AllocatedResources is the total requests allocated for this pod by the node. If pod-level requests are not set, this will be the total requests aggregated across containers in the pod.",
+	"resources":                   "Resources represents the compute resource requests and limits that have been applied at the pod level if pod-level requests or limits are set in PodSpec.Resources",
 }
 
 func (PodStatus) SwaggerDoc() map[string]string {
@@ -2672,7 +2683,7 @@ func (Taint) SwaggerDoc() map[string]string {
 var map_Toleration = map[string]string{
 	"":                  "The pod this Toleration is attached to tolerates any taint that matches the triple <key,value,effect> using the matching operator <operator>.",
 	"key":               "Key is the taint key that the toleration applies to. Empty means match all taint keys. If the key is empty, operator must be Exists; this combination means to match all values and all keys.",
-	"operator":          "Operator represents a key's relationship to the value. Valid operators are Exists and Equal. Defaults to Equal. Exists is equivalent to wildcard for value, so that a pod can tolerate all taints of a particular category.",
+	"operator":          "Operator represents a key's relationship to the value. Valid operators are Exists, Equal, Lt, and Gt. Defaults to Equal. Exists is equivalent to wildcard for value, so that a pod can tolerate all taints of a particular category. Lt and Gt perform numeric comparisons (requires feature gate TaintTolerationComparisonOperators).",
 	"value":             "Value is the taint value the toleration matches to. If the operator is Exists, the value should be empty, otherwise just a regular string.",
 	"effect":            "Effect indicates the taint effect to match. Empty means match all taint effects. When specified, allowed values are NoSchedule, PreferNoSchedule and NoExecute.",
 	"tolerationSeconds": "TolerationSeconds represents the period of time the toleration (which must be of effect NoExecute, otherwise this field is ignored) tolerates the taint. By default, it is not set, which means tolerate the taint forever (do not evict). Zero and negative values will be treated as 0 (evict immediately) by the system.",
@@ -2780,6 +2791,7 @@ var map_VolumeMountStatus = map[string]string{
 	"mountPath":         "MountPath corresponds to the original VolumeMount.",
 	"readOnly":          "ReadOnly corresponds to the original VolumeMount.",
 	"recursiveReadOnly": "RecursiveReadOnly must be set to Disabled, Enabled, or unspecified (for non-readonly mounts). An IfPossible value in the original VolumeMount must be translated to Disabled or Enabled, depending on the mount result.",
+	"volumeStatus":      "volumeStatus represents volume-type-specific status about the mounted volume.",
 }
 
 func (VolumeMountStatus) SwaggerDoc() map[string]string {
@@ -2855,6 +2867,15 @@ var map_VolumeSource = map[string]string{
 
 func (VolumeSource) SwaggerDoc() map[string]string {
 	return map_VolumeSource
+}
+
+var map_VolumeStatus = map[string]string{
+	"":      "VolumeStatus represents the status of a mounted volume. At most one of its members must be specified.",
+	"image": "image represents an OCI object (a container image or artifact) pulled and mounted on the kubelet's host machine.",
+}
+
+func (VolumeStatus) SwaggerDoc() map[string]string {
+	return map_VolumeStatus
 }
 
 var map_VsphereVirtualDiskVolumeSource = map[string]string{

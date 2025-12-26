@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2023 The Kubernetes Authors.
@@ -22,7 +21,6 @@ package conntrack
 import (
 	"fmt"
 	"math/rand"
-	"net"
 	"sort"
 	"testing"
 
@@ -318,12 +316,15 @@ func TestCleanStaleEntries(t *testing.T) {
 	}
 
 	t.Logf("entries before cleanup %d after cleanup %d", len(entriesBeforeCleanup), len(entriesAfterCleanup))
-	fake := NewFake()
-	fake.entries = entriesBeforeCleanup
+	ct := newConntracker(
+		&fakeHandler{
+			entries: entriesBeforeCleanup,
+		},
+	)
 
 	legacyregistry.MustRegister(metrics.ReconcileConntrackFlowsDeletedEntriesTotal)
-	CleanStaleEntries(fake, testIPFamily, svcPortMap, endpointsMap)
-	actualEntries, _ := fake.ListEntries(ipFamilyMap[testIPFamily])
+	CleanStaleEntries(ct, testIPFamily, svcPortMap, endpointsMap)
+	actualEntries, _ := ct.ListEntries(ipFamilyMap[testIPFamily])
 
 	metricCount, err := testutil.GetCounterMetricValue(metrics.ReconcileConntrackFlowsDeletedEntriesTotal.WithLabelValues(string(testIPFamily)))
 	require.NoError(t, err)
@@ -408,12 +409,12 @@ func TestPerformanceCleanStaleEntries(t *testing.T) {
 	endpointsMap := make(proxy.EndpointsMap)
 	_ = endpointsMap.Update(ect)
 
-	fake := NewFake()
+	flows := []*netlink.ConntrackFlow{}
 	// 1 valid entry
-	fake.entries = append(fake.entries, generateConntrackEntry(testExternalIP, testServicePort, testServingEndpointIP, testEndpointPort, unix.IPPROTO_UDP))
+	flows = append(flows, generateConntrackEntry(testExternalIP, testServicePort, testServingEndpointIP, testEndpointPort, unix.IPPROTO_UDP))
 	expectedEntries := 1
 	// 1 stale entry
-	fake.entries = append(fake.entries, generateConntrackEntry(testExternalIP, testServicePort, testDeletedEndpointIP, testEndpointPort, unix.IPPROTO_UDP))
+	flows = append(flows, generateConntrackEntry(testExternalIP, testServicePort, testDeletedEndpointIP, testEndpointPort, unix.IPPROTO_UDP))
 	expectedDeleted := 1
 	// 1 M to the Service IP with random ports
 	for i := 0; i < 1000*1000; i++ {
@@ -423,11 +424,14 @@ func TestPerformanceCleanStaleEntries(t *testing.T) {
 		} else {
 			expectedEntries++
 		}
-		fake.entries = append(fake.entries, generateConntrackEntry(testExternalIP, port, testDeletedEndpointIP, testEndpointPort, unix.IPPROTO_UDP))
+		flows = append(flows, generateConntrackEntry(testExternalIP, port, testDeletedEndpointIP, testEndpointPort, unix.IPPROTO_UDP))
 	}
 
-	CleanStaleEntries(fake, testIPFamily, svcPortMap, endpointsMap)
-	actualEntries, _ := fake.ListEntries(ipFamilyMap[testIPFamily])
+	fake := &fakeHandler{entries: flows}
+	ct := newConntracker(fake)
+
+	CleanStaleEntries(ct, testIPFamily, svcPortMap, endpointsMap)
+	actualEntries, _ := ct.ListEntries(ipFamilyMap[testIPFamily])
 	if len(actualEntries) != expectedEntries {
 		t.Errorf("unexpected number of entries, got %d expected %d", len(actualEntries), expectedEntries)
 	}
@@ -503,103 +507,20 @@ func TestServiceWithoutEndpoints(t *testing.T) {
 	endpointsMap := make(proxy.EndpointsMap)
 	_ = endpointsMap.Update(ect)
 
-	fake := NewFake()
+	flows := []*netlink.ConntrackFlow{}
 	// 1 valid entry
-	fake.entries = append(fake.entries, generateConntrackEntry(testExternalIP, testServicePort, testServingEndpointIP, testEndpointPort, unix.IPPROTO_UDP))
+	flows = append(flows, generateConntrackEntry(testExternalIP, testServicePort, testServingEndpointIP, testEndpointPort, unix.IPPROTO_UDP))
 	// 1 stale entry
-	fake.entries = append(fake.entries, generateConntrackEntry(testExternalIP, testServicePort, testDeletedEndpointIP, testEndpointPort, unix.IPPROTO_UDP))
+	flows = append(flows, generateConntrackEntry(testExternalIP, testServicePort, testDeletedEndpointIP, testEndpointPort, unix.IPPROTO_UDP))
+	ct := newConntracker(
+		&fakeHandler{
+			entries: flows,
+		},
+	)
 
-	CleanStaleEntries(fake, testIPFamily, svcPortMap, endpointsMap)
-	actualEntries, _ := fake.ListEntries(ipFamilyMap[testIPFamily])
+	CleanStaleEntries(ct, testIPFamily, svcPortMap, endpointsMap)
+	actualEntries, _ := ct.ListEntries(ipFamilyMap[testIPFamily])
 	if len(actualEntries) != 2 {
 		t.Errorf("unexpected number of entries, got %d expected %d", len(actualEntries), 2)
-	}
-}
-
-func TestFilterForIPPortNAT(t *testing.T) {
-	testCases := []struct {
-		name           string
-		origDst        net.IP
-		origPortDst    uint16
-		replySrc       net.IP
-		replySrcPort   uint16
-		protocol       v1.Protocol
-		expectedFilter *conntrackFilter
-	}{
-		{
-			name:         "ipv4 + SCTP",
-			origDst:      netutils.ParseIPSloppy("10.96.0.10"),
-			origPortDst:  80,
-			replySrc:     netutils.ParseIPSloppy("10.244.0.3"),
-			replySrcPort: 3000,
-			protocol:     v1.ProtocolSCTP,
-			expectedFilter: &conntrackFilter{
-				protocol: 132,
-				original: &connectionTuple{dstIP: netutils.ParseIPSloppy("10.96.0.10"), dstPort: 80},
-				reply:    &connectionTuple{srcIP: netutils.ParseIPSloppy("10.244.0.3"), srcPort: 3000},
-			},
-		},
-		{
-			name:         "ipv6 + UDP",
-			origDst:      netutils.ParseIPSloppy("2001:db8:1::2"),
-			origPortDst:  443,
-			replySrc:     netutils.ParseIPSloppy("4001:ab8::2"),
-			replySrcPort: 5000,
-			protocol:     v1.ProtocolUDP,
-			expectedFilter: &conntrackFilter{
-				protocol: 17,
-				original: &connectionTuple{dstIP: netutils.ParseIPSloppy("2001:db8:1::2"), dstPort: 443},
-				reply:    &connectionTuple{srcIP: netutils.ParseIPSloppy("4001:ab8::2"), srcPort: 5000},
-			},
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			require.Equal(t, tc.expectedFilter, filterForIPPortNAT(tc.origDst, tc.origPortDst, tc.replySrc, tc.replySrcPort, tc.protocol))
-		})
-	}
-}
-
-func TestFilterForPortNAT(t *testing.T) {
-	testCases := []struct {
-		name           string
-		origPortDst    uint16
-		replySrc       net.IP
-		replySrcPort   uint16
-		protocol       v1.Protocol
-		expectedFamily netlink.InetFamily
-		expectedFilter *conntrackFilter
-	}{
-		{
-			name:         "ipv4 + TCP",
-			origPortDst:  80,
-			replySrc:     netutils.ParseIPSloppy("10.96.0.10"),
-			replySrcPort: 3000,
-			protocol:     v1.ProtocolTCP,
-			expectedFilter: &conntrackFilter{
-				protocol: 6,
-				original: &connectionTuple{dstPort: 80},
-				reply:    &connectionTuple{srcIP: netutils.ParseIPSloppy("10.96.0.10"), srcPort: 3000},
-			},
-		},
-		{
-			name:         "ipv6 + UDP",
-			origPortDst:  8000,
-			replySrc:     netutils.ParseIPSloppy("2001:db8:1::2"),
-			replySrcPort: 5000,
-			protocol:     v1.ProtocolUDP,
-			expectedFilter: &conntrackFilter{
-				protocol: 17,
-				original: &connectionTuple{dstPort: 8000},
-				reply:    &connectionTuple{srcIP: netutils.ParseIPSloppy("2001:db8:1::2"), srcPort: 5000},
-			},
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			require.Equal(t, tc.expectedFilter, filterForPortNAT(tc.origPortDst, tc.replySrc, tc.replySrcPort, tc.protocol))
-		})
 	}
 }

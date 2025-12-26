@@ -385,7 +385,7 @@ var _ = SIGDescribe("MirrorPod (Pod Generation)", func() {
 	})
 })
 
-var _ = SIGDescribe("MirrorPod with EnvFiles", framework.WithFeatureGate(features.EnvFiles), func() {
+var _ = SIGDescribe("MirrorPod with EnvFiles", framework.WithNodeConformance(), framework.WithFeatureGate(features.EnvFiles), func() {
 	f := framework.NewDefaultFramework("mirror-pod-envfiles")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var ns, podPath, staticPodName, mirrorPodName string
@@ -415,7 +415,7 @@ var _ = SIGDescribe("MirrorPod with EnvFiles", framework.WithFeatureGate(feature
 					{
 						Name:    "setup-envfile",
 						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
-						Command: []string{"sh", "-c", `echo CONFIG_1='value1' > /data/config.env && echo CONFIG_2=\'value2\' >> /data/config.env`},
+						Command: []string{"sh", "-c", `echo CONFIG_1=\'value1\' > /data/config.env && echo CONFIG_2=\'value2\' >> /data/config.env`},
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      "config",

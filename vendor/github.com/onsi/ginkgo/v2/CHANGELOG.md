@@ -1,3 +1,9 @@
+## 2.27.3
+
+### Fixes
+report exit result in case of failure [1c9f356]
+fix data race [ece19c8]
+
 ## 2.27.2
 
 ### Fixes

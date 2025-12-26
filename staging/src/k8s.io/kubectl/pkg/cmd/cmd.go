@@ -21,10 +21,13 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync/atomic"
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
+	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	cliflag "k8s.io/component-base/cli/flag"
@@ -52,6 +55,7 @@ import (
 	"k8s.io/kubectl/pkg/cmd/explain"
 	"k8s.io/kubectl/pkg/cmd/expose"
 	"k8s.io/kubectl/pkg/cmd/get"
+	"k8s.io/kubectl/pkg/cmd/kustomize"
 	"k8s.io/kubectl/pkg/cmd/label"
 	"k8s.io/kubectl/pkg/cmd/logs"
 	"k8s.io/kubectl/pkg/cmd/options"
@@ -73,10 +77,6 @@ import (
 	utilcomp "k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
-	"k8s.io/kubectl/pkg/util/term"
-
-	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/kubectl/pkg/cmd/kustomize"
 )
 
 type KubectlOptions struct {
@@ -162,7 +162,7 @@ func NewDefaultKubectlCommandWithArgs(o KubectlOptions) *cobra.Command {
 
 // NewKubectlCommand creates the `kubectl` command and its nested children.
 func NewKubectlCommand(o KubectlOptions) *cobra.Command {
-	warningHandler := rest.NewWarningWriter(o.IOStreams.ErrOut, rest.WarningWriterOptions{Deduplicate: true, Color: term.AllowsColorOutput(o.IOStreams.ErrOut)})
+	warningHandler := rest.NewWarningWriter(o.IOStreams.ErrOut, rest.WarningWriterOptions{Deduplicate: true, Color: printers.AllowsColorOutput(o.IOStreams.ErrOut)})
 	warningsAsErrors := false
 	var finishProfiling func() error
 	// Parent command to which all subcommands are added.
@@ -233,15 +233,17 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 	matchVersionKubeConfigFlags := cmdutil.NewMatchVersionFlags(kubeConfigFlags)
 	matchVersionKubeConfigFlags.AddFlags(flags)
 	// Updates hooks to add kubectl command headers: SIG CLI KEP 859.
-	addCmdHeaderHooks(cmds, kubeConfigFlags)
+	var isProxyCmd atomic.Bool
+	addCmdHeaderHooks(cmds, kubeConfigFlags, &isProxyCmd)
 
 	f := cmdutil.NewFactory(matchVersionKubeConfigFlags)
 
-	// Proxy command is incompatible with CommandHeaderRoundTripper, so
-	// clear the WrapConfigFn before running proxy command.
+	// Proxy command is incompatible with the headers set by
+	// CommandHeaderRoundTripper, so the RoundTripper hooks set in
+	// `addCmdHeaderHooks` needs to be aware that the subcommand is `proxy`
 	proxyCmd := proxy.NewCmdProxy(f, o.IOStreams)
 	proxyCmd.PreRun = func(cmd *cobra.Command, args []string) {
-		kubeConfigFlags.WrapConfigFn = nil
+		isProxyCmd.Store(true)
 	}
 
 	// Avoid import cycle by setting ValidArgsFunction here instead of in NewCmdGet()
@@ -366,7 +368,7 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 			}
 			return existingPreRunE(cmd, args)
 		}
-		_, err := pref.Apply(cmds, o.Arguments, o.IOStreams.ErrOut)
+		_, err := pref.Apply(cmds, kubeConfigFlags, o.Arguments, o.IOStreams.ErrOut)
 		if err != nil {
 			fmt.Fprintf(o.IOStreams.ErrOut, "error occurred while applying preferences %v\n", err)
 			os.Exit(1)
@@ -387,7 +389,7 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 // See SIG CLI KEP 859 for more information:
 //
 //	https://github.com/kubernetes/enhancements/tree/master/keps/sig-cli/859-kubectl-headers
-func addCmdHeaderHooks(cmds *cobra.Command, kubeConfigFlags *genericclioptions.ConfigFlags) {
+func addCmdHeaderHooks(cmds *cobra.Command, kubeConfigFlags *genericclioptions.ConfigFlags, isProxyCmd *atomic.Bool) {
 	crt := &genericclioptions.CommandHeaderRoundTripper{}
 	existingPreRunE := cmds.PersistentPreRunE
 	// Add command parsing to the existing persistent pre-run function.
@@ -397,7 +399,7 @@ func addCmdHeaderHooks(cmds *cobra.Command, kubeConfigFlags *genericclioptions.C
 	}
 	wrapConfigFn := kubeConfigFlags.WrapConfigFn
 	// Wraps CommandHeaderRoundTripper around standard RoundTripper.
-	kubeConfigFlags.WrapConfigFn = func(c *rest.Config) *rest.Config {
+	kubeConfigFlags.WithWrapConfigFn(func(c *rest.Config) *rest.Config {
 		if wrapConfigFn != nil {
 			c = wrapConfigFn(c)
 		}
@@ -405,12 +407,13 @@ func addCmdHeaderHooks(cmds *cobra.Command, kubeConfigFlags *genericclioptions.C
 			// Must be separate RoundTripper; not "crt" closure.
 			// Fixes: https://github.com/kubernetes/kubectl/issues/1098
 			return &genericclioptions.CommandHeaderRoundTripper{
-				Delegate: rt,
-				Headers:  crt.Headers,
+				Delegate:    rt,
+				Headers:     crt.Headers,
+				SkipHeaders: isProxyCmd, // proxy command is incompatible with these headers
 			}
 		})
 		return c
-	}
+	})
 }
 
 func runHelp(cmd *cobra.Command, args []string) {

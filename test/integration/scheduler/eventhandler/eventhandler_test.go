@@ -30,6 +30,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-helpers/scheduling/corev1"
+	"k8s.io/klog/v2"
 	configv1 "k8s.io/kube-scheduler/config/v1"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
@@ -55,12 +56,13 @@ func (pl *fooPlugin) Name() string {
 }
 
 func (pl *fooPlugin) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
+	logger := klog.FromContext(ctx)
 	taints := nodeInfo.Node().Spec.Taints
 	if len(taints) == 0 {
 		return nil
 	}
 
-	if corev1.TolerationsTolerateTaint(pod.Spec.Tolerations, &nodeInfo.Node().Spec.Taints[0]) {
+	if corev1.TolerationsTolerateTaint(logger, pod.Spec.Tolerations, &nodeInfo.Node().Spec.Taints[0], utilfeature.DefaultFeatureGate.Enabled(features.TaintTolerationComparisonOperators)) {
 		return nil
 	}
 	return fwk.NewStatus(fwk.Unschedulable)

@@ -181,6 +181,8 @@ func (*ISCSIVolumeSource) ProtoMessage() {}
 
 func (*ImageVolumeSource) ProtoMessage() {}
 
+func (*ImageVolumeStatus) ProtoMessage() {}
+
 func (*KeyToPath) ProtoMessage() {}
 
 func (*Lifecycle) ProtoMessage() {}
@@ -488,6 +490,8 @@ func (*VolumeProjection) ProtoMessage() {}
 func (*VolumeResourceRequirements) ProtoMessage() {}
 
 func (*VolumeSource) ProtoMessage() {}
+
+func (*VolumeStatus) ProtoMessage() {}
 
 func (*VsphereVirtualDiskVolumeSource) ProtoMessage() {}
 

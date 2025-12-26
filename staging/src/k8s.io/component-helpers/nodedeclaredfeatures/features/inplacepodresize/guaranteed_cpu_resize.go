@@ -36,8 +36,8 @@ const (
 	GuaranteedQoSPodCPUResize = "GuaranteedQoSPodCPUResize"
 )
 
-// Feature is the implementation of the `GuaranteedQoSPodCPUResize` feature.
-var Feature = &guaranteedQoSPodCPUResizeFeature{}
+// GuaranteedQoSPodCPUResizeFeature is the implementation of the `GuaranteedQoSPodCPUResize` feature.
+var GuaranteedQoSPodCPUResizeFeature = &guaranteedQoSPodCPUResizeFeature{}
 
 type guaranteedQoSPodCPUResizeFeature struct{}
 

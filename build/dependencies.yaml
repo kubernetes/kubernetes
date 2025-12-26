@@ -64,7 +64,7 @@ dependencies:
 
   # etcd
   - name: "etcd"
-    version: 3.6.5
+    version: 3.6.7
     refPaths:
     - path: cluster/gce/manifests/etcd.manifest
       match: etcd_docker_tag|etcd_version
@@ -78,13 +78,6 @@ dependencies:
       match: registry.k8s.io/etcd
     - path: test/utils/image/manifest.go
       match: configs\[Etcd\] = Config{list\.GcEtcdRegistry, "etcd", "\d+\.\d+.\d+(-(alpha|beta|rc).\d+)?(-\d+)?"}
-
-  - name: "etcd-image"
-    version: 3.6.4
-    refPaths:
-    - path: cluster/images/etcd/Makefile
-      match: BUNDLED_ETCD_VERSIONS\?|LATEST_ETCD_VERSION\?
-    - path: cluster/images/etcd/migrate/options.go
 
   - name: "node-problem-detector"
     version: 1.34.0
@@ -107,17 +100,10 @@ dependencies:
     #- path: cluster/gce/windows/k8s-node-setup.psm1
     #  match: DEFAULT_NPD_VERSION
 
-  # From https://github.com/etcd-io/etcd/blob/main/Makefile
-  - name: "golang: etcd release version"
-    version: 1.23.11 # https://github.com/etcd-io/etcd/blob/main/CHANGELOG/CHANGELOG-3.6.md
-    refPaths:
-    - path: cluster/images/etcd/Makefile
-      match: 'GOLANG_VERSION := \d+.\d+(alpha|beta|rc)?\.?(\d+)?'
-
   # Golang
   # TODO: this should really be eliminated and controlled by .go-version
   - name: "golang: upstream version"
-    version: 1.25.4
+    version: 1.25.5
     refPaths:
     - path: .go-version
     - path: staging/publishing/rules.yaml
@@ -131,7 +117,7 @@ dependencies:
   # should also be updated, but go-runner is much harder to exploit and has
   # far less relevancy to go updates for Kubernetes more generally.
   - name: "registry.k8s.io/kube-cross: dependents"
-    version: v1.35.0-go1.25.3-bullseye.0
+    version: v1.35.0-go1.25.5-bullseye.0
     refPaths:
     - path: build/build-image/cross/VERSION
 
@@ -151,16 +137,6 @@ dependencies:
   - name: "registry.k8s.io/debian-base: dependents"
     version: bookworm-v1.0.6
     refPaths:
-    - path: cluster/images/etcd/Makefile
-      match: BASEIMAGE\?\=registry\.k8s\.io\/build-image\/debian-base:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
-    - path: cluster/images/etcd/Makefile
-      match: BASEIMAGE\?\=registry\.k8s\.io\/build-image\/debian-base-arm:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
-    - path: cluster/images/etcd/Makefile
-      match: BASEIMAGE\?\=registry\.k8s\.io\/build-image\/debian-base-arm64:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
-    - path: cluster/images/etcd/Makefile
-      match: BASEIMAGE\?\=registry\.k8s\.io\/build-image\/debian-base-ppc64le:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
-    - path: cluster/images/etcd/Makefile
-      match: BASEIMAGE\?\=registry\.k8s\.io\/build-image\/debian-base-s390x:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
     - path: test/conformance/image/Makefile
       match: BASE_IMAGE_VERSION\?=
     - path: test/images/pets/peer-finder/BASEIMAGE
@@ -179,7 +155,7 @@ dependencies:
       match: registry\.k8s\.io\/build-image\/debian-base:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
 
   - name: "registry.k8s.io/distroless-iptables: dependents"
-    version: v0.8.4
+    version: v0.8.6
     refPaths:
     - path: build/common.sh
       match: __default_distroless_iptables_version=
@@ -187,7 +163,7 @@ dependencies:
       match: configs\[DistrolessIptables\] = Config{list\.BuildImageRegistry, "distroless-iptables", "v([0-9]+)\.([0-9]+)\.([0-9]+)"}
 
   - name: "registry.k8s.io/go-runner: dependents"
-    version: v2.4.0-go1.25.3-bookworm.0
+    version: v2.4.0-go1.25.5-bookworm.0
     refPaths:
     - path: build/common.sh
       match: __default_go_runner_version=
@@ -266,8 +242,6 @@ dependencies:
     version: v20240523-a15ad90fc9@sha256:bb04162508c2c61637eae700a0d8e8c8be8f2d4c831d2b75e59db2d4dd6cf75d
     refPaths:
     - path: build/pause/cloudbuild.yaml
-      match: gcr.io/k8s-staging-test-infra/gcb-docker-gcloud
-    - path: cluster/images/etcd/cloudbuild.yaml
       match: gcr.io/k8s-staging-test-infra/gcb-docker-gcloud
     - path: test/images/cloudbuild.yaml
       match: gcr.io/k8s-staging-test-infra/gcb-docker-gcloud

@@ -1,9 +1,17 @@
 {
   "spec": {
     "pinnedModules": {
+      "github.com/godbus/dbus/v5": {
+        "Version": "v5.2.0",
+        "Reason": "v5.2.1 has unused import on windows causing typecheck failures - https://github.com/kubernetes/kubernetes/issues/135864"
+      },
       "github.com/libopenstorage/openstorage": {
         "Version": "v1.0.0",
         "Reason": "portworx csi driver has been deprecated and will be removed - https://github.com/kubernetes/enhancements/issues/2589"
+      },
+      "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc": {
+        "Version": "v0.63.0",
+        "Reason": "v0.64.0 has nil pointer panic when nil TracerProvider is passed - https://github.com/kubernetes/kubernetes/issues/135865"
       }
     },
     "unwantedModules": {
@@ -44,7 +52,6 @@
       "github.com/gorilla/rpc": "unmaintained, archive mode",
       "github.com/gorilla/schema": "unmaintained, archive mode",
       "github.com/gregjones/httpcache": "unmaintained, archive mode",
-      "github.com/grpc-ecosystem/go-grpc-prometheus": "unmaintained, archive mode",
       "github.com/grpc-ecosystem/grpc-gateway": "use github.com/grpc-ecosystem/grpc-gateway/v2",
       "github.com/hashicorp/consul": "MPL license not in CNCF allowlist",
       "github.com/hashicorp/errwrap": "MPL license not in CNCF allowlist",
@@ -168,12 +175,6 @@
       "github.com/google/gofuzz": [
         "github.com/json-iterator/go"
       ],
-      "github.com/gregjones/httpcache": [
-        "k8s.io/client-go"
-      ],
-      "github.com/grpc-ecosystem/go-grpc-prometheus": [
-        "k8s.io/apiserver"
-      ],
       "github.com/json-iterator/go": [
         "github.com/prometheus/client_golang",
         "go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful",
@@ -208,7 +209,6 @@
         "sigs.k8s.io/structured-merge-diff/v6"
       ],
       "github.com/pkg/errors": [
-        "github.com/Microsoft/hnslib",
         "github.com/google/cadvisor",
         "sigs.k8s.io/kustomize/api",
         "sigs.k8s.io/kustomize/kustomize/v5"
@@ -268,13 +268,10 @@
       "github.com/davecgh/go-spew",
       "github.com/gogo/protobuf",
       "github.com/golang/protobuf",
-      "github.com/gregjones/httpcache",
-      "github.com/grpc-ecosystem/go-grpc-prometheus",
       "github.com/json-iterator/go",
       "github.com/mailru/easyjson",
       "github.com/modern-go/concurrent",
       "github.com/modern-go/reflect2",
-      "github.com/pkg/errors",
       "golang.org/x/exp",
       "gopkg.in/yaml.v3"
     ]

@@ -3154,6 +3154,19 @@
         },
         "type": "object"
       },
+      "io.k8s.api.core.v1.ImageVolumeStatus": {
+        "description": "ImageVolumeStatus represents the image-based volume status.",
+        "properties": {
+          "imageRef": {
+            "description": "ImageRef is the digest of the image used for this volume. It should have a value that's similar to the pod's status.containerStatuses[i].imageID. The ImageRef length should not exceed 256 characters.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "imageRef"
+        ],
+        "type": "object"
+      },
       "io.k8s.api.core.v1.KeyToPath": {
         "description": "Maps a string key to a path within a volume.",
         "properties": {
@@ -6072,6 +6085,13 @@
       "io.k8s.api.core.v1.PodStatus": {
         "description": "PodStatus represents information about the status of a pod. Status may trail the actual state of a system, especially if the node that hosts the pod cannot contact the control plane.",
         "properties": {
+          "allocatedResources": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
+            },
+            "description": "AllocatedResources is the total requests allocated for this pod by the node. If pod-level requests are not set, this will be the total requests aggregated across containers in the pod.",
+            "type": "object"
+          },
           "conditions": {
             "description": "Current service state of pod. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-conditions",
             "items": {
@@ -6224,6 +6244,14 @@
             "x-kubernetes-list-type": "map",
             "x-kubernetes-patch-merge-key": "name",
             "x-kubernetes-patch-strategy": "merge,retainKeys"
+          },
+          "resources": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.ResourceRequirements"
+              }
+            ],
+            "description": "Resources represents the compute resource requests and limits that have been applied at the pod level if pod-level requests or limits are set in PodSpec.Resources"
           },
           "startTime": {
             "allOf": [
@@ -8252,7 +8280,7 @@
             "type": "string"
           },
           "operator": {
-            "description": "Operator represents a key's relationship to the value. Valid operators are Exists and Equal. Defaults to Equal. Exists is equivalent to wildcard for value, so that a pod can tolerate all taints of a particular category.",
+            "description": "Operator represents a key's relationship to the value. Valid operators are Exists, Equal, Lt, and Gt. Defaults to Equal. Exists is equivalent to wildcard for value, so that a pod can tolerate all taints of a particular category. Lt and Gt perform numeric comparisons (requires feature gate TaintTolerationComparisonOperators).",
             "type": "string"
           },
           "tolerationSeconds": {
@@ -8711,6 +8739,15 @@
           "recursiveReadOnly": {
             "description": "RecursiveReadOnly must be set to Disabled, Enabled, or unspecified (for non-readonly mounts). An IfPossible value in the original VolumeMount must be translated to Disabled or Enabled, depending on the mount result.",
             "type": "string"
+          },
+          "volumeStatus": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.VolumeStatus"
+              }
+            ],
+            "default": {},
+            "description": "volumeStatus represents volume-type-specific status about the mounted volume."
           }
         },
         "required": [
@@ -8803,6 +8840,20 @@
             },
             "description": "Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
             "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "io.k8s.api.core.v1.VolumeStatus": {
+        "description": "VolumeStatus represents the status of a mounted volume. At most one of its members must be specified.",
+        "properties": {
+          "image": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.ImageVolumeStatus"
+              }
+            ],
+            "description": "image represents an OCI object (a container image or artifact) pulled and mounted on the kubelet's host machine."
           }
         },
         "type": "object"
@@ -9260,16 +9311,6 @@
             "group": "autoscaling",
             "kind": "DeleteOptions",
             "version": "v2"
-          },
-          {
-            "group": "autoscaling",
-            "kind": "DeleteOptions",
-            "version": "v2beta1"
-          },
-          {
-            "group": "autoscaling",
-            "kind": "DeleteOptions",
-            "version": "v2beta2"
           },
           {
             "group": "batch",
@@ -10015,16 +10056,6 @@
             "group": "autoscaling",
             "kind": "WatchEvent",
             "version": "v2"
-          },
-          {
-            "group": "autoscaling",
-            "kind": "WatchEvent",
-            "version": "v2beta1"
-          },
-          {
-            "group": "autoscaling",
-            "kind": "WatchEvent",
-            "version": "v2beta2"
           },
           {
             "group": "batch",

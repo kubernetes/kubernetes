@@ -758,8 +758,8 @@ func TestFileBasedImagePullManager_MustAttemptImagePull(t *testing.T) {
 			pullingDir := filepath.Join(testDir, "pulling")
 			pulledDir := filepath.Join(testDir, "pulled")
 
-			copyTestData(t, pullingDir, "pulling", tt.pullingFiles)
-			copyTestData(t, pulledDir, "pulled", tt.pulledFiles)
+			_ = teeTestData(t, pullingDir, "pulling", tt.pullingFiles)
+			_ = teeTestData(t, pulledDir, "pulled", tt.pulledFiles)
 
 			fsRecordAccessor := &testWriteCountingFSPullRecordsAccessor{
 				fsPullRecordsAccessor: fsPullRecordsAccessor{
@@ -1157,8 +1157,8 @@ func TestFileBasedImagePullManager_RecordImagePulled(t *testing.T) {
 			pullingDir := filepath.Join(testDir, "pulling")
 			pulledDir := filepath.Join(testDir, "pulled")
 
-			copyTestData(t, pullingDir, "pulling", tt.existingPulling)
-			copyTestData(t, pulledDir, "pulled", tt.existingPulled)
+			_ = teeTestData(t, pullingDir, "pulling", tt.existingPulling)
+			_ = teeTestData(t, pulledDir, "pulled", tt.existingPulled)
 
 			fsRecordAccessor := &fsPullRecordsAccessor{
 				pullingDir: pullingDir,
@@ -1193,7 +1193,7 @@ func TestFileBasedImagePullManager_RecordImagePulled(t *testing.T) {
 				t.Fatalf("failed to read the expected image pulled record: %v", err)
 			}
 
-			got, err := decodePulledRecord(decoder, pulledBytes)
+			got, _, err := decodePulledRecord(decoder, pulledBytes)
 			if err != nil {
 				t.Fatalf("failed to deserialize the image pulled record: %v", err)
 			}
@@ -1332,8 +1332,8 @@ func TestFileBasedImagePullManager_initialize(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			copyTestData(t, pullingDir, "pulling", tt.existingIntents)
-			copyTestData(t, pulledDir, "pulled", tt.existingPulledRecords)
+			_ = teeTestData(t, pullingDir, "pulling", tt.existingIntents)
+			_ = teeTestData(t, pulledDir, "pulled", tt.existingPulledRecords)
 
 			fsRecordAccessor := &fsPullRecordsAccessor{
 				pullingDir: pullingDir,
@@ -1449,7 +1449,7 @@ func TestFileBasedImagePullManager_PruneUnknownRecords(t *testing.T) {
 				t.Fatalf("failed to create testing dir %q: %v", pulledDir, err)
 			}
 
-			copyTestData(t, pulledDir, "pulled", tt.pulledFiles)
+			_ = teeTestData(t, pulledDir, "pulled", tt.pulledFiles)
 
 			fsRecordAccessor := &fsPullRecordsAccessor{
 				pulledDir: pulledDir,
@@ -1487,7 +1487,9 @@ func TestFileBasedImagePullManager_PruneUnknownRecords(t *testing.T) {
 	}
 }
 
-func copyTestData(t *testing.T, dstDir string, testdataDir string, src []string) {
+func teeTestData(t *testing.T, dstDir string, testdataDir string, src []string) map[string]string {
+	t.Helper()
+	ret := make(map[string]string, len(src))
 	for _, f := range src {
 		testBytes, err := os.ReadFile(filepath.Join("testdata", testdataDir, f))
 		if err != nil {
@@ -1496,7 +1498,9 @@ func copyTestData(t *testing.T, dstDir string, testdataDir string, src []string)
 		if err := writeFile(dstDir, f, testBytes); err != nil {
 			t.Fatalf("failed to write test data: %v", err)
 		}
+		ret[f] = string(testBytes)
 	}
+	return ret
 }
 
 func withImageRecord(r *kubeletconfiginternal.ImagePulledRecord, image string, record kubeletconfiginternal.ImagePullCredentials) *kubeletconfiginternal.ImagePulledRecord {

@@ -299,7 +299,7 @@ func escape(w writer, s string) error {
 		case '\r':
 			esc = "&#13;"
 		default:
-			panic("unrecognized escape character")
+			panic("html: unrecognized escape character")
 		}
 		s = s[i+1:]
 		if _, err := w.WriteString(esc); err != nil {

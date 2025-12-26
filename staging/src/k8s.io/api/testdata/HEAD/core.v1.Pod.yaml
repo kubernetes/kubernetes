@@ -1230,6 +1230,8 @@ spec:
     podGroup: podGroupValue
     podGroupReplicaKey: podGroupReplicaKeyValue
 status:
+  allocatedResources:
+    allocatedResourcesKey: "0"
   conditions:
   - lastProbeTime: "2003-01-01T01:01:01Z"
     lastTransitionTime: "2004-01-01T01:01:01Z"
@@ -1301,6 +1303,9 @@ status:
       name: nameValue
       readOnly: true
       recursiveReadOnly: recursiveReadOnlyValue
+      volumeStatus:
+        image:
+          imageRef: imageRefValue
   ephemeralContainerStatuses:
   - allocatedResources:
       allocatedResourcesKey: "0"
@@ -1364,6 +1369,9 @@ status:
       name: nameValue
       readOnly: true
       recursiveReadOnly: recursiveReadOnlyValue
+      volumeStatus:
+        image:
+          imageRef: imageRefValue
   extendedResourceClaimStatus:
     requestMappings:
     - containerName: containerNameValue
@@ -1436,6 +1444,9 @@ status:
       name: nameValue
       readOnly: true
       recursiveReadOnly: recursiveReadOnlyValue
+      volumeStatus:
+        image:
+          imageRef: imageRefValue
   message: messageValue
   nominatedNodeName: nominatedNodeNameValue
   observedGeneration: 17
@@ -1449,4 +1460,12 @@ status:
   resourceClaimStatuses:
   - name: nameValue
     resourceClaimName: resourceClaimNameValue
+  resources:
+    claims:
+    - name: nameValue
+      request: requestValue
+    limits:
+      limitsKey: "0"
+    requests:
+      requestsKey: "0"
   startTime: "2007-01-01T01:01:01Z"

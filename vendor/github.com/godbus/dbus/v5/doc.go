@@ -7,7 +7,7 @@ on remote objects and emit or receive signals. Using the Export method, you can
 arrange D-Bus methods calls to be directly translated to method calls on a Go
 value.
 
-Conversion Rules
+# Conversion Rules
 
 For outgoing messages, Go types are automatically converted to the
 corresponding D-Bus types. See the official specification at
@@ -15,25 +15,25 @@ https://dbus.freedesktop.org/doc/dbus-specification.html#type-system for more
 information on the D-Bus type system. The following types are directly encoded
 as their respective D-Bus equivalents:
 
-     Go type     | D-Bus type
-     ------------+-----------
-     byte        | BYTE
-     bool        | BOOLEAN
-     int16       | INT16
-     uint16      | UINT16
-     int         | INT32
-     uint        | UINT32
-     int32       | INT32
-     uint32      | UINT32
-     int64       | INT64
-     uint64      | UINT64
-     float64     | DOUBLE
-     string      | STRING
-     ObjectPath  | OBJECT_PATH
-     Signature   | SIGNATURE
-     Variant     | VARIANT
-     interface{} | VARIANT
-     UnixFDIndex | UNIX_FD
+	Go type     | D-Bus type
+	------------+-----------
+	byte        | BYTE
+	bool        | BOOLEAN
+	int16       | INT16
+	uint16      | UINT16
+	int         | INT32
+	uint        | UINT32
+	int32       | INT32
+	uint32      | UINT32
+	int64       | INT64
+	uint64      | UINT64
+	float64     | DOUBLE
+	string      | STRING
+	ObjectPath  | OBJECT_PATH
+	Signature   | SIGNATURE
+	Variant     | VARIANT
+	interface{} | VARIANT
+	UnixFDIndex | UNIX_FD
 
 Slices and arrays encode as ARRAYs of their element type.
 
@@ -57,7 +57,7 @@ of STRUCTs. Incoming STRUCTS are represented as a slice of empty interfaces
 containing the struct fields in the correct order. The Store function can be
 used to convert such values to Go structs.
 
-Unix FD passing
+# Unix FD passing
 
 Handling Unix file descriptors deserves special mention. To use them, you should
 first check that they are supported on a connection by calling SupportsUnixFDs.
@@ -66,6 +66,5 @@ UnixFD's to messages that are accompanied by the given file descriptors with the
 UnixFD values being substituted by the correct indices. Similarly, the indices
 of incoming messages are automatically resolved. It shouldn't be necessary to use
 UnixFDIndex.
-
 */
 package dbus

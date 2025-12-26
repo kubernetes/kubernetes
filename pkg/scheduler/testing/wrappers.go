@@ -794,6 +794,22 @@ func (p *PodWrapper) Res(resMap map[v1.ResourceName]string) *PodWrapper {
 	return p
 }
 
+// Resources sets requests and limits at pod-level.
+func (p *PodWrapper) PodLevelResourceRequests(reqMap map[v1.ResourceName]string) *PodWrapper {
+	if len(reqMap) == 0 {
+		return p
+	}
+
+	res := v1.ResourceList{}
+	for k, v := range reqMap {
+		res[k] = resource.MustParse(v)
+	}
+	p.Spec.Resources = &v1.ResourceRequirements{
+		Requests: res,
+	}
+	return p
+}
+
 // Req adds a new container to the inner pod with given resource map of requests.
 func (p *PodWrapper) Req(reqMap map[v1.ResourceName]string) *PodWrapper {
 	if len(reqMap) == 0 {

@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2016 The Kubernetes Authors.
@@ -20,55 +19,60 @@ limitations under the License.
 package conntrack
 
 import (
+	"sync"
+
 	"github.com/vishvananda/netlink"
 )
 
-// FakeInterface implements Interface by just recording entries that have been cleared.
-type FakeInterface struct {
+// NewFake creates a new FakeInterface
+func NewFake() Interface {
+	return newConntracker(
+		&fakeHandler{
+			entries: make([]*netlink.ConntrackFlow, 0),
+		},
+	)
+}
+
+var _ netlinkHandler = (*fakeHandler)(nil)
+
+type fakeHandler struct {
+	mu              sync.Mutex
 	entries         []*netlink.ConntrackFlow
 	netlinkRequests int // try to get the estimated number of netlink request
 }
 
-var _ Interface = &FakeInterface{}
-
-// NewFake creates a new FakeInterface
-func NewFake() *FakeInterface {
-	return &FakeInterface{entries: make([]*netlink.ConntrackFlow, 0)}
+func (f *fakeHandler) ConntrackTableList(_ netlink.ConntrackTableType, _ netlink.InetFamily) ([]*netlink.ConntrackFlow, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.netlinkRequests++
+	return f.entries, nil
 }
 
-// ListEntries is part of Interface
-func (fake *FakeInterface) ListEntries(_ uint8) ([]*netlink.ConntrackFlow, error) {
-	entries := make([]*netlink.ConntrackFlow, len(fake.entries))
-	copy(entries, fake.entries)
-	// 1 netlink request to dump the table
-	// https://github.com/vishvananda/netlink/blob/0af32151e72b990c271ef6268e8aadb7e015f2bd/conntrack_linux.go#L93-L94
-	fake.netlinkRequests++
-	return entries, nil
-}
+func (f *fakeHandler) ConntrackDeleteFilters(tableType netlink.ConntrackTableType, family netlink.InetFamily, netlinkFilters ...netlink.CustomConntrackFilter) (uint, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 
-// ClearEntries is part of Interface
-func (fake *FakeInterface) ClearEntries(_ uint8, filters ...netlink.CustomConntrackFilter) (int, error) {
-	var flows []*netlink.ConntrackFlow
-	before := len(fake.entries)
 	// 1 netlink request to dump the table
 	// https://github.com/vishvananda/netlink/blob/0af32151e72b990c271ef6268e8aadb7e015f2bd/conntrack_linux.go#L163
-	fake.netlinkRequests++
+	f.netlinkRequests++
+	var dataplaneFlows []*netlink.ConntrackFlow
+	before := len(f.entries)
 
-	for _, flow := range fake.entries {
+	for _, flow := range f.entries {
 		var matched bool
-		for _, filter := range filters {
+		for _, filter := range netlinkFilters {
 			matched = filter.MatchConntrackFlow(flow)
 			if matched {
 				// 1 netlink request to delete the flow
 				// https://github.com/vishvananda/netlink/blob/0af32151e72b990c271ef6268e8aadb7e015f2bd/conntrack_linux.go#L182
-				fake.netlinkRequests++
-				break
+				f.netlinkRequests++
 			}
 		}
+		// no filter matched, keep the flow
 		if !matched {
-			flows = append(flows, flow)
+			dataplaneFlows = append(dataplaneFlows, flow)
 		}
 	}
-	fake.entries = flows
-	return before - len(fake.entries), nil
+	f.entries = dataplaneFlows
+	return uint(before - len(f.entries)), nil
 }

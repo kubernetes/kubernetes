@@ -134,7 +134,7 @@ func (n *node) unblockOwnerReferencesStrategicMergePatch() ([]byte, error) {
 	var dummy metaonly.MetadataOnlyObject
 	var blockingRefs []metav1.OwnerReference
 	falseVar := false
-	for _, owner := range n.owners {
+	for _, owner := range n.getOwners() {
 		if owner.BlockOwnerDeletion != nil && *owner.BlockOwnerDeletion {
 			ref := owner
 			ref.BlockOwnerDeletion = &falseVar
@@ -157,7 +157,7 @@ func (gc *GarbageCollector) unblockOwnerReferencesJSONMergePatch(n *node) ([]byt
 	expectedObjectMeta.ResourceVersion = accessor.GetResourceVersion()
 	var expectedOwners []metav1.OwnerReference
 	falseVar := false
-	for _, owner := range n.owners {
+	for _, owner := range n.getOwners() {
 		owner.BlockOwnerDeletion = &falseVar
 		expectedOwners = append(expectedOwners, owner)
 	}

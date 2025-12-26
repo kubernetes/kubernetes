@@ -30,15 +30,19 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	kubeletconfigv1alpha1 "k8s.io/kubelet/config/v1alpha1"
+	"k8s.io/klog/v2"
+	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
-	kubeletconfigvint1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/config/v1alpha1"
+	kubeletconfigint1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/config/v1alpha1"
+	kubeletconfigint1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/config/v1beta1"
 )
 
 const (
 	cacheFilesSHA256Prefix = "sha256-"
 	tmpFilesSuffix         = ".tmp"
 )
+
+var encodeVersion = kubeletconfigv1beta1.SchemeGroupVersion
 
 var _ PullRecordsAccessor = &fsPullRecordsAccessor{}
 
@@ -76,7 +80,44 @@ func NewFSPullRecordsAccessor(kubeletDir string) (PullRecordsAccessor, error) {
 		return nil, err
 	}
 
+	accessor.recordsVersionMigration()
 	return NewMeteringRecordsAccessor(accessor, fsPullIntentsSize, fsPulledRecordsSize), nil
+}
+
+func (f *fsPullRecordsAccessor) recordsVersionMigration() {
+	err := processDirFiles(f.pullingDir,
+		func(filePath string, fileContent []byte) error {
+			intent, isCurrentVersion, err := decodeIntent(f.decoder, fileContent)
+			if err != nil {
+				return fmt.Errorf("failed to decode ImagePullIntent from file %q: %w", filePath, err)
+			}
+			if !isCurrentVersion {
+				if err := f.WriteImagePullIntent(intent.Image); err != nil {
+					return fmt.Errorf("failed to migrate ImagePullIntent for image %q to the current version: %w", intent.Image, err)
+				}
+			}
+			return nil
+		})
+	if err != nil {
+		klog.ErrorS(err, "Error migrating image pull intents")
+	}
+	err = processDirFiles(f.pulledDir,
+		func(filePath string, fileContent []byte) error {
+			pullRecord, isCurrentVersion, err := decodePulledRecord(f.decoder, fileContent)
+			if err != nil {
+				return fmt.Errorf("failed to decode ImagePulledRecord from file %q: %w", filePath, err)
+			}
+			if !isCurrentVersion {
+				if err := f.WriteImagePulledRecord(pullRecord); err != nil {
+					return fmt.Errorf("failed to migrate ImagePulledRecord for image ref %q to the current version: %w", pullRecord.ImageRef, err)
+				}
+			}
+			return nil
+		})
+
+	if err != nil {
+		klog.ErrorS(err, "Error migrating image pulled records")
+	}
 }
 
 func (f *fsPullRecordsAccessor) WriteImagePullIntent(image string) error {
@@ -97,7 +138,7 @@ func (f *fsPullRecordsAccessor) ListImagePullIntents() ([]*kubeletconfiginternal
 	// walk the pulling directory for any pull intent records
 	err := processDirFiles(f.pullingDir,
 		func(filePath string, fileContent []byte) error {
-			intent, err := decodeIntent(f.decoder, fileContent)
+			intent, _, err := decodeIntent(f.decoder, fileContent)
 			if err != nil {
 				return fmt.Errorf("failed to deserialize content of file %q into ImagePullIntent: %w", filePath, err)
 			}
@@ -117,7 +158,7 @@ func (f *fsPullRecordsAccessor) ImagePullIntentExists(image string) (bool, error
 		return false, err
 	}
 
-	intent, err := decodeIntent(f.decoder, intentBytes)
+	intent, _, err := decodeIntent(f.decoder, intentBytes)
 	if err != nil {
 		return false, err
 	}
@@ -141,7 +182,7 @@ func (f *fsPullRecordsAccessor) GetImagePulledRecord(imageRef string) (*kubeletc
 		return nil, false, err
 	}
 
-	pulledRecord, err := decodePulledRecord(f.decoder, recordBytes)
+	pulledRecord, _, err := decodePulledRecord(f.decoder, recordBytes)
 	if err != nil {
 		return nil, true, err
 	}
@@ -155,7 +196,7 @@ func (f *fsPullRecordsAccessor) ListImagePulledRecords() ([]*kubeletconfigintern
 	var pullRecords []*kubeletconfiginternal.ImagePulledRecord
 	err := processDirFiles(f.pulledDir,
 		func(filePath string, fileContent []byte) error {
-			pullRecord, err := decodePulledRecord(f.decoder, fileContent)
+			pullRecord, _, err := decodePulledRecord(f.decoder, fileContent)
 			if err != nil {
 				return fmt.Errorf("failed to deserialize content of file %q into ImagePulledRecord: %w", filePath, err)
 			}
@@ -311,10 +352,21 @@ func processDirFiles(dirName string, fileAction func(filePath string, fileConten
 // createKubeletCOnfigSchemeEncoderDecoder creates strict-encoding encoder and
 // decoder for the internal and alpha kubelet config APIs.
 func createKubeletConfigSchemeEncoderDecoder() (runtime.Encoder, runtime.Decoder, error) {
+	codecs, info, err := getKubeletConfigSerializerInfo()
+	if err != nil {
+		return nil, nil, err
+	}
+	return codecs.EncoderForVersion(info.Serializer, encodeVersion), codecs.UniversalDecoder(), nil
+}
+
+func getKubeletConfigSerializerInfo() (*serializer.CodecFactory, *runtime.SerializerInfo, error) {
 	const mediaType = runtime.ContentTypeJSON
 
 	scheme := runtime.NewScheme()
-	if err := kubeletconfigvint1alpha1.AddToScheme(scheme); err != nil {
+	if err := kubeletconfigint1beta1.AddToScheme(scheme); err != nil {
+		return nil, nil, err
+	}
+	if err := kubeletconfigint1alpha1.AddToScheme(scheme); err != nil {
 		return nil, nil, err
 	}
 	if err := kubeletconfiginternal.AddToScheme(scheme); err != nil {
@@ -328,33 +380,45 @@ func createKubeletConfigSchemeEncoderDecoder() (runtime.Encoder, runtime.Decoder
 	if !ok {
 		return nil, nil, fmt.Errorf("unable to locate encoder -- %q is not a supported media type", mediaType)
 	}
-	return codecs.EncoderForVersion(info.Serializer, kubeletconfigv1alpha1.SchemeGroupVersion), codecs.UniversalDecoder(), nil
+	return &codecs, &info, nil
 }
 
-func decodeIntent(d runtime.Decoder, objBytes []byte) (*kubeletconfiginternal.ImagePullIntent, error) {
-	obj, _, err := d.Decode(objBytes, nil, nil)
+// decodeIntent decodes the image pull intent and converts it to the internal API version.
+// The decoder must be aware of the schemas available for the kubelet config API.
+//
+// The returned object is an internal representation of the image pull intent and a bool
+// that indicates whether the image pull intent appears in the latest known version of the kubelet config API.
+func decodeIntent(d runtime.Decoder, objBytes []byte) (*kubeletconfiginternal.ImagePullIntent, bool, error) {
+	obj, gvk, err := d.Decode(objBytes, nil, nil)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	intentObj, ok := obj.(*kubeletconfiginternal.ImagePullIntent)
 	if !ok {
-		return nil, fmt.Errorf("failed to convert object to *ImagePullIntent: %T", obj)
+		return nil, false, fmt.Errorf("failed to convert object to *ImagePullIntent: %T", obj)
 	}
 
-	return intentObj, nil
+	isLatestVersion := gvk.Version == encodeVersion.Version
+	return intentObj, isLatestVersion, nil
 }
 
-func decodePulledRecord(d runtime.Decoder, objBytes []byte) (*kubeletconfiginternal.ImagePulledRecord, error) {
-	obj, _, err := d.Decode(objBytes, nil, nil)
+// decodePulledRecord decodes the pulled record and converts it to the internal API version.
+// The decoder must be aware of the schemas available for the kubelet config API.
+//
+// The returned object is an internal representation of the pulled record and a bool
+// that indicates whether the record appears in the latest known version of the kubelet config API.
+func decodePulledRecord(d runtime.Decoder, objBytes []byte) (*kubeletconfiginternal.ImagePulledRecord, bool, error) {
+	obj, gvk, err := d.Decode(objBytes, nil, nil)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	pulledRecord, ok := obj.(*kubeletconfiginternal.ImagePulledRecord)
 	if !ok {
-		return nil, fmt.Errorf("failed to convert object to *ImagePulledRecord: %T", obj)
+		return nil, false, fmt.Errorf("failed to convert object to *ImagePulledRecord: %T", obj)
 	}
 
-	return pulledRecord, nil
+	isLatestVersion := gvk.Version == encodeVersion.Version
+	return pulledRecord, isLatestVersion, nil
 }

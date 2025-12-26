@@ -424,10 +424,14 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		AllowSidecarResizePolicy:                            utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
 		AllowMatchLabelKeysInPodTopologySpread:              utilfeature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodTopologySpread),
 		AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: utilfeature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodTopologySpreadSelectorMerge),
+		InPlacePodLevelResourcesVerticalScalingEnabled:      utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling),
 		OldPodViolatesMatchLabelKeysValidation:              false,
 		OldPodViolatesLegacyMatchLabelKeysValidation:        false,
 		AllowContainerRestartPolicyRules:                    utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules),
 		AllowUserNamespacesWithVolumeDevices:                false,
+		// This also allows restart rules on sidecar containers.
+		AllowRestartAllContainers:  utilfeature.DefaultFeatureGate.Enabled(features.RestartAllContainersOnContainerExits),
+		AllowImageVolumeWithDigest: utilfeature.DefaultFeatureGate.Enabled(features.ImageVolumeWithDigest),
 	}
 
 	// If old spec uses relaxed validation or enabled the RelaxedEnvironmentVariableValidation feature gate,
@@ -438,6 +442,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 	opts.AllowUserNamespacesHostNetworkSupport = useAllowUserNamespacesHostNetworkSupport(oldPodSpec)
 
 	opts.AllowOnlyRecursiveSELinuxChangePolicy = useOnlyRecursiveSELinuxChangePolicy(oldPodSpec)
+	opts.AllowTaintTolerationComparisonOperators = allowTaintTolerationComparisonOperators(oldPodSpec)
 
 	if oldPodSpec != nil {
 		// if old spec used non-integer multiple of huge page unit size, we must allow it
@@ -475,6 +480,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		opts.AllowSidecarResizePolicy = opts.AllowSidecarResizePolicy || hasRestartableInitContainerResizePolicy(oldPodSpec)
 
 		opts.AllowContainerRestartPolicyRules = opts.AllowContainerRestartPolicyRules || containerRestartRulesInUse(oldPodSpec)
+		opts.AllowRestartAllContainers = opts.AllowRestartAllContainers || restartAllContainersActionInUse(oldPodSpec)
 
 		// If old spec has userns and volume devices (doesn't work), we still allow
 		// modifications to it.
@@ -1002,6 +1008,12 @@ func dropDisabledPodStatusFields(podStatus, oldPodStatus *api.PodStatus, podSpec
 		podStatus = &api.PodStatus{}
 	}
 
+	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) && !podLevelStatusResourcesInUse(oldPodStatus) {
+		// Drop Resources and AllocatedResources fields from PodStatus
+		podStatus.Resources = nil
+		podStatus.AllocatedResources = nil
+	}
+
 	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && !inPlacePodVerticalScalingInUse(oldPodSpec) {
 		// Drop Resources fields
 		dropResourcesField := func(csl []api.ContainerStatus) {
@@ -1073,6 +1085,11 @@ func dropDisabledPodStatusFields(podStatus, oldPodStatus *api.PodStatus, podSpec
 			podStatus.Conditions[i].ObservedGeneration = 0
 		}
 	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ImageVolumeWithDigest) && !imageVolumeWithDigestInUse(oldPodStatus) {
+		dropImageVolumeWithDigest(podStatus)
+	}
+
 }
 
 // dropDisabledDynamicResourceAllocationFields removes pod claim references from
@@ -1320,6 +1337,16 @@ func podLevelResourcesInUse(podSpec *api.PodSpec) bool {
 	}
 
 	return false
+}
+
+// podLevelStatusResourcesInUse checks if AllocationResources or Resources are set
+// in PodStatus.
+func podLevelStatusResourcesInUse(podStatus *api.PodStatus) bool {
+	if podStatus == nil {
+		return false
+	}
+
+	return podStatus.Resources != nil || podStatus.AllocatedResources != nil
 }
 
 // inPlacePodVerticalScalingInUse returns true if pod spec is non-nil and ResizePolicy is set
@@ -1618,6 +1645,28 @@ func useOnlyRecursiveSELinuxChangePolicy(oldPodSpec *api.PodSpec) bool {
 	return true
 }
 
+func taintTolerationComparisonOperatorsInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	for _, toleration := range podSpec.Tolerations {
+		if toleration.Operator == api.TolerationOpLt || toleration.Operator == api.TolerationOpGt {
+			return true
+		}
+	}
+	return false
+}
+
+func allowTaintTolerationComparisonOperators(oldPodSpec *api.PodSpec) bool {
+	// allow the operators if the feature gate is enabled or the old pod spec uses
+	// comparison operators
+	if utilfeature.DefaultFeatureGate.Enabled(features.TaintTolerationComparisonOperators) ||
+		taintTolerationComparisonOperatorsInUse(oldPodSpec) {
+		return true
+	}
+	return false
+}
+
 func hasUserNamespacesWithVolumeDevices(podSpec *api.PodSpec) bool {
 	if podSpec.SecurityContext == nil || podSpec.SecurityContext.HostUsers == nil || *podSpec.SecurityContext.HostUsers {
 		return false
@@ -1802,4 +1851,85 @@ func workloadRefInUse(podSpec *api.PodSpec) bool {
 	}
 
 	return podSpec.WorkloadRef != nil
+}
+
+func restartAllContainersActionInUse(oldPodSpec *api.PodSpec) bool {
+	if oldPodSpec == nil {
+		return false
+	}
+	for _, c := range oldPodSpec.Containers {
+		for _, rule := range c.RestartPolicyRules {
+			if rule.Action == api.ContainerRestartRuleActionRestartAllContainers {
+				return true
+			}
+		}
+	}
+	for _, c := range oldPodSpec.InitContainers {
+		for _, rule := range c.RestartPolicyRules {
+			if rule.Action == api.ContainerRestartRuleActionRestartAllContainers {
+				return true
+			}
+		}
+		// This feature also allows sidecar containers to have rules.
+		if c.RestartPolicy != nil && *c.RestartPolicy == api.ContainerRestartPolicyAlways && len(c.RestartPolicyRules) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func imageVolumeWithDigestInUse(oldPodStatus *api.PodStatus) bool {
+	if oldPodStatus == nil {
+		return false
+	}
+
+	for _, containerStatus := range oldPodStatus.ContainerStatuses {
+		for _, volumeMount := range containerStatus.VolumeMounts {
+			if volumeMount.VolumeStatus.Image != nil {
+				return true
+			}
+		}
+	}
+
+	for _, containerStatus := range oldPodStatus.InitContainerStatuses {
+		for _, volumeMount := range containerStatus.VolumeMounts {
+			if volumeMount.VolumeStatus.Image != nil {
+				return true
+			}
+		}
+	}
+
+	for _, containerStatus := range oldPodStatus.EphemeralContainerStatuses {
+		for _, volumeMount := range containerStatus.VolumeMounts {
+			if volumeMount.VolumeStatus.Image != nil {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func dropImageVolumeWithDigest(podStatus *api.PodStatus) {
+	if podStatus == nil {
+		return
+	}
+
+	for i := range podStatus.ContainerStatuses {
+		for j := range podStatus.ContainerStatuses[i].VolumeMounts {
+			podStatus.ContainerStatuses[i].VolumeMounts[j].VolumeStatus.Image = nil
+		}
+	}
+
+	for i := range podStatus.InitContainerStatuses {
+		for j := range podStatus.InitContainerStatuses[i].VolumeMounts {
+			podStatus.InitContainerStatuses[i].VolumeMounts[j].VolumeStatus.Image = nil
+		}
+	}
+
+	for i := range podStatus.EphemeralContainerStatuses {
+		for j := range podStatus.EphemeralContainerStatuses[i].VolumeMounts {
+			podStatus.EphemeralContainerStatuses[i].VolumeMounts[j].VolumeStatus.Image = nil
+		}
+	}
 }

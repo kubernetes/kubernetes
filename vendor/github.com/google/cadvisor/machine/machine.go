@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:build linux
+
 // The machine package contains functions that extract machine-level specs.
 package machine
 
@@ -257,7 +259,7 @@ func getMachineArch() string {
 		klog.Errorf("Cannot get machine architecture, err: %v", err)
 		return ""
 	}
-	return string(uname.Machine[:])
+	return unix.ByteSliceToString(uname.Machine[:])
 }
 
 // arm32 changes

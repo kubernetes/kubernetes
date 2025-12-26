@@ -181,6 +181,7 @@ aliases:
   # - ravisantoshgudimetla
   # - wojtek-t
   sig-scheduling:
+    - ania-borowiec
     - AxeZhan
     - damemi
     - denkensk
@@ -539,9 +540,9 @@ aliases:
     - logicalhan
   feature-approvers:
     - adrianmoisey # Autoscaling
-    - andrewsykim # Cloud Provider
     - ardaguclu # CLI
     - aojea # Network, Testing
+    - cheftako # Cloud Provider
     - danwinship # Network
     - dashpole # Instrumentation
     - dchen1107 # Node
@@ -551,11 +552,13 @@ aliases:
     - dims # Architecture
     - dom4ha # Scheduling
     - eddiezane # CLI
+    - elmiko # Cloud Provider
     - enj # Auth
     - gjtempleton # Autoscaling
     - jackfrancis # Autoscaling
     - janetkuo # Apps
     - jayunit100 # Windows
+    - joelspeed # Cloud Provider
     - jpbetz # API Machinery
     - jsafrane # Storage
     - jsturtevant # Windows

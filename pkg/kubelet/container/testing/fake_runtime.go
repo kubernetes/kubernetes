@@ -237,7 +237,7 @@ func (f *FakeRuntime) GetPods(_ context.Context, all bool) ([]*kubecontainer.Pod
 	return pods, f.Err
 }
 
-func (f *FakeRuntime) SyncPod(_ context.Context, pod *v1.Pod, _ *kubecontainer.PodStatus, _ []v1.Secret, backOff *flowcontrol.Backoff) (result kubecontainer.PodSyncResult) {
+func (f *FakeRuntime) SyncPod(_ context.Context, pod *v1.Pod, _ *kubecontainer.PodStatus, _ []v1.Secret, backOff *flowcontrol.Backoff, _ bool) (result kubecontainer.PodSyncResult) {
 	f.Lock()
 	defer f.Unlock()
 
@@ -560,7 +560,7 @@ func (f *FakeRuntime) GetContainerStatus(_ context.Context, _ types.UID, _ kubec
 	defer f.Unlock()
 
 	f.CalledFunctions = append(f.CalledFunctions, "GetContainerStatus")
-	return nil, f.Err
+	return &kubecontainer.Status{}, f.Err
 }
 
 func (f *FakeRuntime) GetContainerSwapBehavior(pod *v1.Pod, container *v1.Container) kubetypes.SwapBehavior {
@@ -572,4 +572,8 @@ func (f *FakeRuntime) GetContainerSwapBehavior(pod *v1.Pod, container *v1.Contai
 
 func (f *FakeRuntime) IsPodResizeInProgress(allocatedPod *v1.Pod, podStatus *kubecontainer.PodStatus) bool {
 	return f.PodResizeInProgress
+}
+
+func (f *FakeRuntime) UpdateActuatedPodLevelResources(allocatedPod *v1.Pod) error {
+	return nil
 }

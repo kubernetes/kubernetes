@@ -1495,9 +1495,238 @@ func TestTaintTolerationFilter(t *testing.T) {
 			}).Container(pause).Obj(),
 			fit: true,
 		},
+		{
+			name: "Pod with Gt toleration matches node taint with greater value",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-gt-1").
+					Taints([]v1.Taint{
+						{
+							Key:    "node.example.com/priority-level",
+							Value:  "999",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					}).Obj(),
+			},
+			incomingPod: st.MakePod().Name("pod-gt-1").
+				Tolerations([]v1.Toleration{
+					{
+						Key:      "node.example.com/priority-level",
+						Operator: v1.TolerationOpGt,
+						Value:    "900",
+						Effect:   v1.TaintEffectNoSchedule,
+					},
+				}).Container(pause).
+				Obj(),
+			fit: true,
+		},
+		{
+			name: "Pod with Gt toleration does not match node taint with lesser value",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-gt-2").
+					Taints([]v1.Taint{
+						{
+							Key:    "node.example.com/priority-level",
+							Value:  "850",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					}).Obj(),
+			},
+			incomingPod: st.MakePod().Name("pod-gt-2").
+				Tolerations([]v1.Toleration{
+					{
+						Key:      "node.example.com/priority-level",
+						Operator: v1.TolerationOpGt,
+						Value:    "900",
+						Effect:   v1.TaintEffectNoSchedule,
+					},
+				}).Container(pause).
+				Obj(),
+			fit: false,
+		},
+		{
+			name: "Pod with Lt toleration matches node taint with lesser value",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-lt-1").
+					Taints([]v1.Taint{
+						{
+							Key:    "node.example.com/error-rate",
+							Value:  "5",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					}).Obj(),
+			},
+			incomingPod: st.MakePod().Name("pod-lt-1").
+				Tolerations([]v1.Toleration{
+					{
+						Key:      "node.example.com/error-rate",
+						Operator: v1.TolerationOpLt,
+						Value:    "10",
+						Effect:   v1.TaintEffectNoSchedule,
+					},
+				}).Container(pause).
+				Obj(),
+			fit: true,
+		},
+		{
+			name: "Pod with Lt toleration does not match node taint with greater value",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-lt-2").
+					Taints([]v1.Taint{
+						{
+							Key:    "node.example.com/error-rate",
+							Value:  "15",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					}).Obj(),
+			},
+			incomingPod: st.MakePod().Name("pod-lt-2").
+				Tolerations([]v1.Toleration{
+					{
+						Key:      "node.example.com/error-rate",
+						Operator: v1.TolerationOpLt,
+						Value:    "10",
+						Effect:   v1.TaintEffectNoSchedule,
+					},
+				}).Container(pause).
+				Obj(),
+			fit: false,
+		},
+		{
+			name: "Pod with mixed tolerations including Gt operator",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-mixed").
+					Taints([]v1.Taint{
+						{
+							Key:    "node.example.com/priority-level",
+							Value:  "950",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+						{
+							Key:    "node.example.com/zone",
+							Value:  "west",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					}).Obj(),
+			},
+			incomingPod: st.MakePod().Name("pod-mixed").
+				Tolerations([]v1.Toleration{
+					{
+						Key:      "node.example.com/priority-level",
+						Operator: v1.TolerationOpGt,
+						Value:    "900",
+						Effect:   v1.TaintEffectNoSchedule,
+					},
+					{
+						Key:      "node.example.com/zone",
+						Operator: v1.TolerationOpEqual,
+						Value:    "west",
+						Effect:   v1.TaintEffectNoSchedule,
+					},
+				}).Container(pause).
+				Obj(),
+			fit: true,
+		},
+		{
+			name: "Pod with Gt toleration with negative values",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-negative").
+					Taints([]v1.Taint{
+						{
+							Key:    "node.example.com/temperature",
+							Value:  "10",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					}).Obj(),
+			},
+			incomingPod: st.MakePod().Name("pod-negative").
+				Tolerations([]v1.Toleration{
+					{
+						Key:      "node.example.com/temperature",
+						Operator: v1.TolerationOpGt,
+						Value:    "-20",
+						Effect:   v1.TaintEffectNoSchedule,
+					},
+				}).Container(pause).
+				Obj(),
+			fit: true,
+		},
+		{
+			name: "Pod with Lt toleration with zero values",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-zero").
+					Taints([]v1.Taint{
+						{
+							Key:    "node.example.com/latency",
+							Value:  "0",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					}).Obj(),
+			},
+			incomingPod: st.MakePod().Name("pod-zero").
+				Tolerations([]v1.Toleration{
+					{
+						Key:      "node.example.com/latency",
+						Operator: v1.TolerationOpLt,
+						Value:    "5",
+						Effect:   v1.TaintEffectNoSchedule,
+					},
+				}).Container(pause).
+				Obj(),
+			fit: true, // 0 < 5
+		},
+		{
+			name: "Pod with Gt toleration and empty Effect matches any taint effect",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-any-effect").
+					Taints([]v1.Taint{
+						{
+							Key:    "node.example.com/priority-level",
+							Value:  "999",
+							Effect: v1.TaintEffectPreferNoSchedule,
+						},
+					}).Obj(),
+			},
+			incomingPod: st.MakePod().Name("pod-any-effect").
+				Tolerations([]v1.Toleration{
+					{
+						Key:      "node.example.com/priority-level",
+						Operator: v1.TolerationOpGt,
+						Value:    "900",
+					},
+				}).Container(pause).
+				Obj(),
+			fit: true,
+		},
+		{
+			name: "Pod with Lt toleration with large numbers",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-large").
+					Taints([]v1.Taint{
+						{
+							Key:    "node.example.com/memory",
+							Value:  "999999999",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					}).Obj(),
+			},
+			incomingPod: st.MakePod().Name("pod-large").
+				Tolerations([]v1.Toleration{
+					{
+						Key:      "node.example.com/memory",
+						Operator: v1.TolerationOpLt,
+						Value:    "1000000000",
+						Effect:   v1.TaintEffectNoSchedule,
+					},
+				}).Container(pause).
+				Obj(),
+			fit: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Enable the TaintTolerationComparisonOperators feature gate for Gt/Lt tests
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TaintTolerationComparisonOperators, true)
+
 			testCtx := initTest(t, "taint-toleration-filter")
 			cs := testCtx.ClientSet
 			ns := testCtx.NS.Name

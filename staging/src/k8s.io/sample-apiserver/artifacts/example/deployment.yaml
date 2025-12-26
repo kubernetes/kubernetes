@@ -26,4 +26,4 @@ spec:
         imagePullPolicy: Never
         args: [ "--etcd-servers=http://localhost:2379" ]
       - name: etcd
-        image: registry.k8s.io/etcd:v3.6.5
+        image: registry.k8s.io/etcd:v3.6.7

@@ -668,3 +668,10 @@ func newPodInformer(cs clientset.Interface, resyncPeriod time.Duration) cache.Sh
 	informer.SetTransform(trim)
 	return informer
 }
+
+func (sched *Scheduler) CurrentCycle() int64 {
+	if sched.SchedulingQueue != nil {
+		return sched.SchedulingQueue.SchedulingCycle()
+	}
+	return 0
+}

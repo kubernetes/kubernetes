@@ -19,12 +19,16 @@ package incubating
 import (
 	"context"
 	"fmt"
+	"slices"
+
+	"github.com/go-logr/logr"
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	draapi "k8s.io/dynamic-resource-allocation/api"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
 )
 
@@ -389,4 +393,127 @@ type PoolID struct {
 
 func (p PoolID) String() string {
 	return p.Driver.String() + "/" + p.Pool.String()
+}
+
+// At V(6), log only a limited number of devices to avoid blowing up logs. For
+// many E2E tests, 10 devices is enough for all devices without having to
+// truncate, at least when running the tests sequentially.
+const maxDevicesLevel6 = 10
+
+// logPools returns a handle for the value in a structured log call which
+// includes varying amounts of information about the pools, depending on
+// the verbosity of the logger.
+func logPools(logger klog.Logger, pools []*Pool) any {
+	// We need to check verbosity here because our caller's source code
+	// location may be relevant (-vmodule !).
+	helper, logger := logger.WithCallStackHelper()
+	helper()
+
+	// We always produce the same output at V <= 5. 6 adds a summary and
+	// 7 is a complete dump.
+	verbosity := 5
+	for i := 7; i > verbosity; i-- {
+		if loggerV := logger.V(i); loggerV.Enabled() {
+			verbosity = i
+			break
+		}
+	}
+	return &poolsLogger{verbosity, pools}
+}
+
+type poolsLogger struct {
+	verbosity int
+	pools     []*Pool
+}
+
+var _ logr.Marshaler = &poolsLogger{}
+
+func (p *poolsLogger) MarshalLog() any {
+	info := map[string]any{"count": len(p.pools)}
+	if p.verbosity == 6 {
+		meta := make([]map[string]any, len(p.pools))
+		for i, pool := range p.pools {
+			meta[i] = map[string]any{
+				"id":            pool.PoolID.String(),
+				"isIncomplete":  pool.IsIncomplete,
+				"isInvalid":     pool.IsInvalid,
+				"InvalidReason": pool.InvalidReason,
+			}
+		}
+		info["meta"] = meta
+		info["devices"] = p.listDevices(maxDevicesLevel6)
+	}
+	if p.verbosity >= 7 {
+		info["devices"] = p.listDevices(-1)
+		info["content"] = p.pools
+	}
+	return info
+}
+
+func (p *poolsLogger) listDevices(maxDevices int) []string {
+	var devices []string
+	for _, pool := range p.pools {
+		devices = p.addDevicesInSlices(devices, pool.PoolID, pool.DeviceSlicesTargetingNode, maxDevices)
+		devices = p.addDevicesInSlices(devices, pool.PoolID, pool.DeviceSlicesNotTargetingNode, maxDevices)
+	}
+	return devices
+}
+
+func (p *poolsLogger) addDevicesInSlices(devices []string, poolID PoolID, slices []*draapi.ResourceSlice, maxDevices int) []string {
+	for _, slice := range slices {
+		for _, device := range slice.Spec.Devices {
+			if maxDevices != -1 && len(devices) >= maxDevices {
+				devices = append(devices, "...")
+				return devices
+			}
+			devices = append(devices, DeviceID{Driver: poolID.Driver, Pool: poolID.Pool, Device: device.Name}.String())
+		}
+	}
+	return devices
+}
+
+// logPools returns a handle for the value in a structured log call which
+// includes varying amounts of information about the allocated devices, depending on
+// the verbosity of the logger.
+func logAllocatedDevices(logger klog.Logger, allocatedDevices sets.Set[DeviceID]) any {
+	// We need to check verbosity here because our caller's source code
+	// location may be relevant (-vmodule !).
+	helper, logger := logger.WithCallStackHelper()
+	helper()
+
+	// We always produce the same output at V <= 5. 6 adds all IDs.
+	verbosity := 5
+	for i := 7; i > verbosity; i-- {
+		if loggerV := logger.V(i); loggerV.Enabled() {
+			verbosity = i
+			break
+		}
+	}
+
+	return &allocatedDevicesLogger{verbosity, allocatedDevices}
+}
+
+type allocatedDevicesLogger struct {
+	verbosity int
+	devices   sets.Set[DeviceID]
+}
+
+var _ logr.Marshaler = &allocatedDevicesLogger{}
+
+func (a *allocatedDevicesLogger) MarshalLog() any {
+	info := map[string]any{"count": len(a.devices)}
+	if a.verbosity >= 6 {
+		ids := make([]string, 0, len(a.devices))
+		for id := range a.devices {
+			if a.verbosity == 6 && len(ids) >= maxDevicesLevel6 {
+				ids = append(ids, "...")
+				break
+			}
+			ids = append(ids, id.String())
+		}
+		slices.Sort(ids)
+		info["devices"] = ids
+
+	}
+	return info
 }

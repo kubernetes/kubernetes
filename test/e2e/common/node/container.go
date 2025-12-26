@@ -51,7 +51,7 @@ type ConformanceContainer struct {
 }
 
 // Create creates the defined conformance container
-func (cc *ConformanceContainer) Create(ctx context.Context) {
+func (cc *ConformanceContainer) Create(ctx context.Context) *v1.Pod {
 	cc.podName = cc.Container.Name + string(uuid.NewUUID())
 	imagePullSecrets := []v1.LocalObjectReference{}
 	for _, s := range cc.ImagePullSecrets {
@@ -72,7 +72,7 @@ func (cc *ConformanceContainer) Create(ctx context.Context) {
 			ImagePullSecrets: imagePullSecrets,
 		},
 	}
-	cc.PodClient.Create(ctx, pod)
+	return cc.PodClient.Create(ctx, pod)
 }
 
 // Delete deletes the defined conformance container

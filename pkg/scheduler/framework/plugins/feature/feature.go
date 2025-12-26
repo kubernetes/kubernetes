@@ -25,56 +25,60 @@ import (
 // This struct allows us to break the dependency of the plugins on
 // the internal k8s features pkg.
 type Features struct {
-	EnableDRAExtendedResource                    bool
-	EnableDRAPrioritizedList                     bool
-	EnableDRAAdminAccess                         bool
-	EnableDRAConsumableCapacity                  bool
-	EnableDRADeviceTaints                        bool
-	EnableDRADeviceBindingConditions             bool
-	EnableDRAPartitionableDevices                bool
-	EnableDRAResourceClaimDeviceStatus           bool
-	EnableDRASchedulerFilterTimeout              bool
-	EnableDynamicResourceAllocation              bool
-	EnableVolumeAttributesClass                  bool
-	EnableCSIMigrationPortworx                   bool
-	EnableVolumeLimitScaling                     bool
-	EnableNodeInclusionPolicyInPodTopologySpread bool
-	EnableMatchLabelKeysInPodTopologySpread      bool
-	EnableInPlacePodVerticalScaling              bool
-	EnableSidecarContainers                      bool
-	EnableSchedulingQueueHint                    bool
-	EnableAsyncPreemption                        bool
-	EnablePodLevelResources                      bool
-	EnableStorageCapacityScoring                 bool
-	EnableNodeDeclaredFeatures                   bool
-	EnableGangScheduling                         bool
+	EnableDRAExtendedResource                     bool
+	EnableDRAPrioritizedList                      bool
+	EnableDRAAdminAccess                          bool
+	EnableDRAConsumableCapacity                   bool
+	EnableDRADeviceTaints                         bool
+	EnableDRADeviceBindingConditions              bool
+	EnableDRAPartitionableDevices                 bool
+	EnableDRAResourceClaimDeviceStatus            bool
+	EnableDRASchedulerFilterTimeout               bool
+	EnableDynamicResourceAllocation               bool
+	EnableVolumeAttributesClass                   bool
+	EnableCSIMigrationPortworx                    bool
+	EnableVolumeLimitScaling                      bool
+	EnableNodeInclusionPolicyInPodTopologySpread  bool
+	EnableMatchLabelKeysInPodTopologySpread       bool
+	EnableInPlacePodVerticalScaling               bool
+	EnableSidecarContainers                       bool
+	EnableSchedulingQueueHint                     bool
+	EnableAsyncPreemption                         bool
+	EnablePodLevelResources                       bool
+	EnableStorageCapacityScoring                  bool
+	EnableNodeDeclaredFeatures                    bool
+	EnableGangScheduling                          bool
+	EnableTaintTolerationComparisonOperators      bool
+	EnableInPlacePodLevelResourcesVerticalScaling bool
 }
 
 // NewSchedulerFeaturesFromGates copies the current state of the feature gates into the struct.
 func NewSchedulerFeaturesFromGates(featureGate featuregate.FeatureGate) Features {
 	return Features{
-		EnableDRAExtendedResource:                    featureGate.Enabled(features.DRAExtendedResource),
-		EnableDRAPrioritizedList:                     featureGate.Enabled(features.DRAPrioritizedList),
-		EnableDRAAdminAccess:                         featureGate.Enabled(features.DRAAdminAccess),
-		EnableDRAConsumableCapacity:                  featureGate.Enabled(features.DRAConsumableCapacity),
-		EnableDRADeviceTaints:                        featureGate.Enabled(features.DRADeviceTaints),
-		EnableDRASchedulerFilterTimeout:              featureGate.Enabled(features.DRASchedulerFilterTimeout),
-		EnableDRAResourceClaimDeviceStatus:           featureGate.Enabled(features.DRAResourceClaimDeviceStatus),
-		EnableDRADeviceBindingConditions:             featureGate.Enabled(features.DRADeviceBindingConditions),
-		EnableDynamicResourceAllocation:              featureGate.Enabled(features.DynamicResourceAllocation),
-		EnableVolumeAttributesClass:                  featureGate.Enabled(features.VolumeAttributesClass),
-		EnableCSIMigrationPortworx:                   featureGate.Enabled(features.CSIMigrationPortworx),
-		EnableVolumeLimitScaling:                     featureGate.Enabled(features.VolumeLimitScaling),
-		EnableNodeInclusionPolicyInPodTopologySpread: featureGate.Enabled(features.NodeInclusionPolicyInPodTopologySpread),
-		EnableMatchLabelKeysInPodTopologySpread:      featureGate.Enabled(features.MatchLabelKeysInPodTopologySpread),
-		EnableInPlacePodVerticalScaling:              featureGate.Enabled(features.InPlacePodVerticalScaling),
-		EnableSidecarContainers:                      featureGate.Enabled(features.SidecarContainers),
-		EnableSchedulingQueueHint:                    featureGate.Enabled(features.SchedulerQueueingHints),
-		EnableAsyncPreemption:                        featureGate.Enabled(features.SchedulerAsyncPreemption),
-		EnablePodLevelResources:                      featureGate.Enabled(features.PodLevelResources),
-		EnableDRAPartitionableDevices:                featureGate.Enabled(features.DRAPartitionableDevices),
-		EnableStorageCapacityScoring:                 featureGate.Enabled(features.StorageCapacityScoring),
-		EnableNodeDeclaredFeatures:                   featureGate.Enabled(features.NodeDeclaredFeatures),
-		EnableGangScheduling:                         featureGate.Enabled(features.GangScheduling),
+		EnableDRAExtendedResource:                     featureGate.Enabled(features.DRAExtendedResource),
+		EnableDRAPrioritizedList:                      featureGate.Enabled(features.DRAPrioritizedList),
+		EnableDRAAdminAccess:                          featureGate.Enabled(features.DRAAdminAccess),
+		EnableDRAConsumableCapacity:                   featureGate.Enabled(features.DRAConsumableCapacity),
+		EnableDRADeviceTaints:                         featureGate.Enabled(features.DRADeviceTaints),
+		EnableDRASchedulerFilterTimeout:               featureGate.Enabled(features.DRASchedulerFilterTimeout),
+		EnableDRAResourceClaimDeviceStatus:            featureGate.Enabled(features.DRAResourceClaimDeviceStatus),
+		EnableDRADeviceBindingConditions:              featureGate.Enabled(features.DRADeviceBindingConditions),
+		EnableDynamicResourceAllocation:               featureGate.Enabled(features.DynamicResourceAllocation),
+		EnableVolumeAttributesClass:                   featureGate.Enabled(features.VolumeAttributesClass),
+		EnableCSIMigrationPortworx:                    featureGate.Enabled(features.CSIMigrationPortworx),
+		EnableVolumeLimitScaling:                      featureGate.Enabled(features.VolumeLimitScaling),
+		EnableNodeInclusionPolicyInPodTopologySpread:  featureGate.Enabled(features.NodeInclusionPolicyInPodTopologySpread),
+		EnableMatchLabelKeysInPodTopologySpread:       featureGate.Enabled(features.MatchLabelKeysInPodTopologySpread),
+		EnableInPlacePodVerticalScaling:               featureGate.Enabled(features.InPlacePodVerticalScaling),
+		EnableSidecarContainers:                       featureGate.Enabled(features.SidecarContainers),
+		EnableSchedulingQueueHint:                     featureGate.Enabled(features.SchedulerQueueingHints),
+		EnableAsyncPreemption:                         featureGate.Enabled(features.SchedulerAsyncPreemption),
+		EnablePodLevelResources:                       featureGate.Enabled(features.PodLevelResources),
+		EnableDRAPartitionableDevices:                 featureGate.Enabled(features.DRAPartitionableDevices),
+		EnableStorageCapacityScoring:                  featureGate.Enabled(features.StorageCapacityScoring),
+		EnableNodeDeclaredFeatures:                    featureGate.Enabled(features.NodeDeclaredFeatures),
+		EnableGangScheduling:                          featureGate.Enabled(features.GangScheduling),
+		EnableTaintTolerationComparisonOperators:      featureGate.Enabled(features.TaintTolerationComparisonOperators),
+		EnableInPlacePodLevelResourcesVerticalScaling: featureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling),
 	}
 }

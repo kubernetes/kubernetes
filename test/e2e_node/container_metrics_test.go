@@ -27,8 +27,10 @@ import (
 	"github.com/onsi/gomega/types"
 
 	"k8s.io/kubernetes/pkg/cluster/ports"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
@@ -38,6 +40,11 @@ var _ = SIGDescribe("ContainerMetrics", "[LinuxOnly]", framework.WithNodeConform
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("when querying /metrics/cadvisor", func() {
 		ginkgo.BeforeEach(func(ctx context.Context) {
+			// When PodAndContainerStatsFromCRI is enabled, cadvisor metrics are not available
+			// as stats are fetched directly from CRI instead.
+			if e2eskipper.IsFeatureGateEnabled(features.PodAndContainerStatsFromCRI) {
+				e2eskipper.Skipf("Skipping cadvisor metrics test because PodAndContainerStatsFromCRI feature gate is enabled")
+			}
 			createMetricsPods(ctx, f)
 		})
 		ginkgo.AfterEach(func(ctx context.Context) {

@@ -152,8 +152,16 @@ service ImageService {
     // RemoveImage removes the image.
     // This call is idempotent, and must not return an error if the image has
     // already been removed.
+    // Note that if the image is referenced by multiple tags (even across different repositories
+    // if they resolve to the same image digest), removing the image by a single tag
+    // will remove all of its tags. For example, if `repo/image:v1` and `another_repo/image:latest`
+    // point to the same image, removing `repo/image:v1` will also remove `another_repo/image:latest`.
+    // The next call to ListImages, ImageStatus, ImageFsInfo will not return this image.
+    // The resources (e.g. disk space) may be cleaned asynchronously
+    // and not guaranteed to be cleaned up by the time this method returns.
     rpc RemoveImage(RemoveImageRequest) returns (RemoveImageResponse) {}
     // ImageFSInfo returns information of the filesystem that is used to store images.
+    // Usage information may include images that were removed, but are still being cleaned up.
     rpc ImageFsInfo(ImageFsInfoRequest) returns (ImageFsInfoResponse) {}
 }
 
@@ -835,6 +843,9 @@ message ImageSpec {
     // If the runtime handler is unknown, the request should be rejected.
     // An empty string would select the default runtime handler.
     string runtime_handler = 19;
+    // The digest of the image used for this volume.
+    // It should have a value that's similar to the pod's status.containerStatuses[i].imageID.
+    string image_ref = 20;
 }
 
 message KeyValue {

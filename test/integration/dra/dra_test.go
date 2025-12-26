@@ -783,12 +783,25 @@ func expectedAllocatedClaim(request string, nodeInfo nodeInfo) gtypes.GomegaMatc
 
 func testExtendedResource(tCtx ktesting.TContext, enabled bool) {
 	tCtx.Parallel()
-	c, err := tCtx.Client().ResourceV1().DeviceClasses().Create(tCtx, classWithExtendedResource, metav1.CreateOptions{FieldValidation: "Strict"})
+
+	namespace := createTestNamespace(tCtx, nil)
+	driverName := namespace + driverNameSuffix
+	class := classWithExtendedResource.DeepCopy()
+	class.Spec.Selectors = []resourceapi.DeviceSelector{{
+		CEL: &resourceapi.CELDeviceSelector{
+			Expression: fmt.Sprintf("device.driver == %q", driverName),
+		},
+	}}
+	c, err := tCtx.Client().ResourceV1().DeviceClasses().Create(tCtx, class, metav1.CreateOptions{FieldValidation: "Strict"})
 	tCtx.ExpectNoError(err, "create class")
+
+	slice := st.MakeResourceSlice("worker-0", driverName).Devices(device1)
+	createSlice(tCtx, slice.Obj())
+
 	if enabled {
 		require.NotEmpty(tCtx, c.Spec.ExtendedResourceName, "should store ExtendedResourceName")
 	}
-	namespace := createTestNamespace(tCtx, nil)
+
 	tCtx.Run("scheduler", func(tCtx ktesting.TContext) {
 		startScheduler(tCtx)
 

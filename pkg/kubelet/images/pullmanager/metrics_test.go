@@ -193,7 +193,7 @@ func TestMustAttemptPullMetrics(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	copyTestData(t, pulledDir, "pulled", []string{
+	teeTestData(t, pulledDir, "pulled", []string{
 		"sha256-e766e4624f9bc4d3847d6c5b470d9d5362cc8d0c250bd9572daf95278e044263",
 		"sha256-a2eace2182b24cdbbb730798e47b10709b9ef5e0f0c1624a3bc06c8ca987727a",
 		"sha256-f4058727984875eb66ddbf289f7013096d4cbaa167e591fbcb2e447e36391c1f",

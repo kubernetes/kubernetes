@@ -27,6 +27,11 @@ func (in AliasOverride) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in AllowlistEntry) OpenAPIModelName() string {
+	return "io.k8s.kubectl.pkg.config.v1beta1.AllowlistEntry"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in CommandDefaults) OpenAPIModelName() string {
 	return "io.k8s.kubectl.pkg.config.v1beta1.CommandDefaults"
 }

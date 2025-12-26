@@ -326,7 +326,7 @@ const (
 	MinExternalEtcdVersion = "3.5.24-0"
 
 	// DefaultEtcdVersion indicates the default etcd version that kubeadm uses
-	DefaultEtcdVersion = "3.6.5-0"
+	DefaultEtcdVersion = "3.6.7-0"
 
 	// Etcd defines variable used internally when referring to etcd component
 	Etcd = "etcd"
@@ -478,12 +478,6 @@ var (
 		Effect: v1.TaintEffectNoSchedule,
 	}
 
-	// ControlPlaneToleration is the toleration to apply on the PodSpec for being able to run that Pod on the control-plane
-	ControlPlaneToleration = v1.Toleration{
-		Key:    LabelNodeRoleControlPlane,
-		Effect: v1.TaintEffectNoSchedule,
-	}
-
 	// ControlPlaneComponents defines the control-plane component names
 	ControlPlaneComponents = []string{KubeAPIServer, KubeControllerManager, KubeScheduler}
 
@@ -496,15 +490,27 @@ var (
 	// CurrentKubernetesVersion specifies current Kubernetes version supported by kubeadm
 	CurrentKubernetesVersion = getSkewedKubernetesVersion(0)
 
-	// SupportedEtcdVersion lists officially supported etcd versions with corresponding Kubernetes releases
+	// SupportedEtcdVersion lists officially supported etcd versions with corresponding
+	// Kubernetes releases.
+	//
 	// If you are updating the versions in this map, make sure to also update:
 	// - MinExternalEtcdVersion: with the minimum etcd version from this map.
-	// - DefaultEtcdVersion: with etcd version used for the current k8s release (0).
-	// The maximum length of the map should be 2, as kubeadm supports a maximum skew of -1
-	// with the control plane version.
+	// - DefaultEtcdVersion: with etcd version used for the current k8s release.
+	//
+	// The maximum length of the map should be 3. kubeadm supports a maximum skew of -1
+	// with the control plane version, but before a release the oldest k8s version in this
+	// map will be the only stable version, thus one additional version is required
+	// to be unit tested.
+	//
+	// This map should not be used directly in kubeadm code. Instead, it should be used with
+	// EtcdSupportedVersion(), as it allows for returning a valid version even if the input
+	// k8s version key is not defined (out of bounds). This allows for kubeadm to assume
+	// an etcd version even if the map is not yet updated before a release. The user will
+	// get a warning in that case, so ideally the map should be updated for each release.
 	SupportedEtcdVersion = map[uint8]string{
-		uint8(getSkewedKubernetesVersion(-1).Minor()): "3.5.24-0",
-		uint8(getSkewedKubernetesVersion(0).Minor()):  "3.6.5-0",
+		34: "3.6.7-0",
+		35: "3.6.7-0",
+		36: "3.6.7-0",
 	}
 
 	// KubeadmCertsClusterRoleName sets the name for the ClusterRole that allows

@@ -194,9 +194,6 @@ func ListenAndServeKubeletServer(
 
 	if tlsOptions != nil {
 		s.TLSConfig = tlsOptions.Config
-		// Passing empty strings as the cert and key files means no
-		// cert/keys are specified and GetCertificate in the TLSConfig
-		// should be called instead.
 		if err := s.ListenAndServeTLS(tlsOptions.CertFile, tlsOptions.KeyFile); err != nil {
 			logger.Error(err, "Failed to listen and serve")
 			os.Exit(1)

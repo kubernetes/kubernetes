@@ -422,6 +422,11 @@ func (in ImageVolumeSource) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in ImageVolumeStatus) OpenAPIModelName() string {
+	return "io.k8s.api.core.v1.ImageVolumeStatus"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in KeyToPath) OpenAPIModelName() string {
 	return "io.k8s.api.core.v1.KeyToPath"
 }
@@ -1189,6 +1194,11 @@ func (in VolumeResourceRequirements) OpenAPIModelName() string {
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in VolumeSource) OpenAPIModelName() string {
 	return "io.k8s.api.core.v1.VolumeSource"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in VolumeStatus) OpenAPIModelName() string {
+	return "io.k8s.api.core.v1.VolumeStatus"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.

@@ -26,6 +26,7 @@ import (
 	"sync/atomic"
 
 	"go.opentelemetry.io/auto/sdk"
+
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"

@@ -701,6 +701,12 @@ func checkContainerStateTransition(oldStatuses, newStatuses *v1.PodStatus, podSp
 	if podSpec.RestartPolicy == v1.RestartPolicyAlways {
 		return nil
 	}
+	// If the pod can restart in-place, allow all containers to leave the terminated state.
+	if utilfeature.DefaultFeatureGate.Enabled(features.RestartAllContainersOnContainerExits) {
+		if podutil.AllContainersCouldRestart(podSpec) {
+			return nil
+		}
+	}
 	for _, oldStatus := range oldStatuses.ContainerStatuses {
 		// Skip any container that wasn't terminated
 		if oldStatus.State.Terminated == nil {
@@ -811,6 +817,9 @@ func (m *manager) updateStatusInternal(logger klog.Logger, pod *v1.Pod, status v
 
 	// Set DisruptionTarget.LastTransitionTime.
 	updateLastTransitionTime(&status, &oldStatus, v1.DisruptionTarget)
+
+	// Set AllContainersRestarting.LastTransitionTime
+	updateLastTransitionTime(&status, &oldStatus, v1.AllContainersRestarting)
 
 	// ensure that the start time does not change across updates.
 	if oldStatus.StartTime != nil && !oldStatus.StartTime.IsZero() {

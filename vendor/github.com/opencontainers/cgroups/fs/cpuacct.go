@@ -129,12 +129,16 @@ func getPercpuUsageInModes(path string) ([]uint64, []uint64, error) {
 	defer fd.Close()
 
 	scanner := bufio.NewScanner(fd)
-	scanner.Scan() // skipping header line
+	scanner.Scan() // Read header line.
+	const want = "cpu user system"
+	if hdr := scanner.Text(); !strings.HasPrefix(hdr, want) {
+		return nil, nil, malformedLine(path, file, hdr)
+	}
 
 	for scanner.Scan() {
-		// Each line is: cpu user system
-		fields := strings.SplitN(scanner.Text(), " ", 3)
-		if len(fields) != 3 {
+		// Each line is: cpu user system. Keep N at 4 to ignore extra fields.
+		fields := strings.SplitN(scanner.Text(), " ", 4)
+		if len(fields) < 3 {
 			continue
 		}
 

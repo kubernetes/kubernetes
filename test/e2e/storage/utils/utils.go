@@ -37,6 +37,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
@@ -685,6 +686,52 @@ func WaitForNamespacedGVRDeletion(ctx context.Context, c dynamic.Interface, gvr 
 	}
 
 	return fmt.Errorf("%s %s in namespace %s is not deleted within %v", gvr.Resource, objectName, ns, timeout)
+}
+
+// WaitForOwnedResourcesDeleted waits until all objects of the given GVR
+// in the namespace (or cluster-scoped if ns=="") with the specified ownerUID are deleted.
+func WaitForOwnedResourcesDeleted(ctx context.Context,
+	c dynamic.Interface,
+	gvr schema.GroupVersionResource,
+	ns string, // empty for cluster-scoped resources
+	ownerUID types.UID,
+	poll, timeout time.Duration) error {
+	scope := "cluster-scoped"
+	if ns != "" {
+		scope = fmt.Sprintf("namespace %s", ns)
+	}
+	framework.Logf("Waiting up to %v for all %s %s owned by %s to be deleted", timeout, gvr.Resource, scope, ownerUID)
+
+	successful := WaitUntil(poll, timeout, func() bool {
+		var list *unstructured.UnstructuredList
+		var err error
+		if ns == "" {
+			list, err = c.Resource(gvr).List(ctx, metav1.ListOptions{})
+		} else {
+			list, err = c.Resource(gvr).Namespace(ns).List(ctx, metav1.ListOptions{})
+		}
+		if err != nil {
+			framework.Logf("List %s %s returned error: %v", gvr.Resource, scope, err)
+			return false
+		}
+
+		for _, item := range list.Items {
+			for _, owner := range item.GetOwnerReferences() {
+				if owner.UID == ownerUID {
+					framework.Logf("%s %s is still present, waiting...", gvr.Resource, item.GetName())
+					return false
+				}
+			}
+		}
+
+		framework.Logf("All %s %s owned by %s have been deleted", gvr.Resource, scope, ownerUID)
+		return true
+	})
+
+	if successful {
+		return nil
+	}
+	return fmt.Errorf("some %s %s owned by %s were not deleted within %v", gvr.Resource, scope, ownerUID, timeout)
 }
 
 // WaitUntil runs checkDone until a timeout is reached

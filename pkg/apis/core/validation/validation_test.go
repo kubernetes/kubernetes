@@ -561,6 +561,9 @@ func TestValidatePersistentVolumes(t *testing.T) {
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
+			if !scenario.enableVolumeAttributesClass {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, scenario.enableVolumeAttributesClass)
 
 			opts := ValidationOptionsForPersistentVolume(scenario.volume, nil)
@@ -1040,6 +1043,9 @@ func TestValidationOptionsForPersistentVolume(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
+			if !tc.enableVolumeAttributesClass {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, tc.enableVolumeAttributesClass)
 
 			opts := ValidationOptionsForPersistentVolume(nil, tc.oldPv)
@@ -1626,6 +1632,9 @@ func TestValidatePeristentVolumeAttributesClassUpdate(t *testing.T) {
 	}
 
 	for name, scenario := range scenarios {
+		if !scenario.enableVolumeAttributesClass {
+			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+		}
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, scenario.enableVolumeAttributesClass)
 
 		originalNewPV := scenario.newPV.DeepCopy()
@@ -2227,6 +2236,9 @@ func testValidatePVC(t *testing.T, ephemeral bool) {
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
+			if !scenario.enableVolumeAttributesClass {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, scenario.enableVolumeAttributesClass)
 
 			var errs field.ErrorList
@@ -3183,6 +3195,9 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
+			if !tc.enableVolumeAttributesClass {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, tc.enableVolumeAttributesClass)
 
 			opts := ValidationOptionsForPersistentVolumeClaim(nil, tc.oldPvc)
@@ -3214,6 +3229,9 @@ func TestValidationOptionsForPersistentVolumeClaimTemplate(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
+			if !tc.enableVolumeAttributesClass {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, tc.enableVolumeAttributesClass)
 
 			opts := ValidationOptionsForPersistentVolumeClaimTemplate(nil, tc.oldPvcTemplate)
@@ -12246,6 +12264,18 @@ func TestValidatePod(t *testing.T) {
 				podtest.SetTolerations(core.Toleration{Key: "node.kubernetes.io/not-ready", Operator: "Exists", Effect: "NoSchedule", TolerationSeconds: &[]int64{20}[0]}),
 			),
 		},
+		"numeric operator Lt requires feature gate (gate disabled)": {
+			expectedError: "Unsupported value: \"Lt\"",
+			spec: *podtest.MakePod("123",
+				podtest.SetTolerations(core.Toleration{Key: "node.kubernetes.io/sla", Operator: "Lt", Value: "950", Effect: "NoSchedule"}),
+			),
+		},
+		"numeric operator Gt requires feature gate (gate disabled)": {
+			expectedError: "Unsupported value: \"Gt\"",
+			spec: *podtest.MakePod("123",
+				podtest.SetTolerations(core.Toleration{Key: "node.kubernetes.io/sla", Operator: "Gt", Value: "950", Effect: "NoSchedule"}),
+			),
+		},
 		"must be a valid pod seccomp profile": {
 			expectedError: "must be a valid seccomp profile",
 			spec: *podtest.MakePod("123",
@@ -14609,6 +14639,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 		old                                         core.Pod
 		err                                         string
 		enableClearingNominatedNodeNameAfterBinding bool
+		validationOptions                           PodValidationOptions
 	}{{
 		new: *podtest.MakePod("foo",
 			podtest.SetStatus(core.PodStatus{
@@ -15991,6 +16022,127 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 		),
 		err:  `status.ephemeralContainerStatuses[0].user.linux: Forbidden: cannot be set for a windows pod`,
 		test: "containerUser cannot be set for windows pod in ephemeralContainerStatuses",
+	}, {
+		new: *podtest.MakePod("foo",
+			podtest.SetStatus(core.PodStatus{
+				Conditions: []core.PodCondition{{
+					Type:   core.AllContainersRestarting,
+					Status: core.ConditionTrue,
+				}},
+			}),
+		),
+		old: *podtest.MakePod("foo"),
+	}, {
+		old: *podtest.MakePod("foo",
+			podtest.SetStatus(
+				podtest.MakePodStatus(
+					podtest.SetContainerStatuses(core.ContainerStatus{
+						VolumeMounts: []core.VolumeMountStatus{
+							{
+								VolumeStatus: core.VolumeStatus{
+									Image: &core.ImageVolumeStatus{
+										ImageRef: "imageref",
+									},
+								},
+							},
+						},
+					}),
+				),
+			),
+		),
+		new: *podtest.MakePod("foo",
+			podtest.SetStatus(
+				podtest.MakePodStatus(
+					podtest.SetContainerStatuses(core.ContainerStatus{
+						VolumeMounts: []core.VolumeMountStatus{
+							{
+								VolumeStatus: core.VolumeStatus{
+									Image: nil,
+								},
+							},
+						},
+					}),
+				),
+			),
+		),
+		test:              "should wipe VolumeStatus if ImageVolumeWithDigest feature gate is disabled didn't exist on previous pod",
+		validationOptions: PodValidationOptions{AllowImageVolumeWithDigest: false},
+	}, {
+		old: *podtest.MakePod("foo",
+			podtest.SetStatus(
+				podtest.MakePodStatus(
+					podtest.SetContainerStatuses(core.ContainerStatus{
+						VolumeMounts: []core.VolumeMountStatus{
+							{
+								VolumeStatus: core.VolumeStatus{
+									Image: &core.ImageVolumeStatus{
+										ImageRef: "",
+									},
+								},
+							},
+						},
+					}),
+				),
+			),
+		),
+		new: *podtest.MakePod("foo",
+			podtest.SetStatus(
+				podtest.MakePodStatus(
+					podtest.SetContainerStatuses(core.ContainerStatus{
+						VolumeMounts: []core.VolumeMountStatus{
+							{
+								VolumeStatus: core.VolumeStatus{
+									Image: &core.ImageVolumeStatus{
+										ImageRef: "",
+									},
+								},
+							},
+						},
+					}),
+				),
+			),
+		),
+		test:              "should not be allowed to set an empty imageRef",
+		validationOptions: PodValidationOptions{AllowImageVolumeWithDigest: true},
+		err:               `status.containerStatuses[0].volumeMounts[0].volumeStatus.imageVolumeStatus.imageRef: Required value: imageRef must not be empty`,
+	}, {
+		old: *podtest.MakePod("foo",
+			podtest.SetStatus(
+				podtest.MakePodStatus(
+					podtest.SetContainerStatuses(core.ContainerStatus{
+						VolumeMounts: []core.VolumeMountStatus{
+							{
+								VolumeStatus: core.VolumeStatus{
+									Image: &core.ImageVolumeStatus{
+										ImageRef: strings.Repeat("x", 257),
+									},
+								},
+							},
+						},
+					}),
+				),
+			),
+		),
+		new: *podtest.MakePod("foo",
+			podtest.SetStatus(
+				podtest.MakePodStatus(
+					podtest.SetContainerStatuses(core.ContainerStatus{
+						VolumeMounts: []core.VolumeMountStatus{
+							{
+								VolumeStatus: core.VolumeStatus{
+									Image: &core.ImageVolumeStatus{
+										ImageRef: strings.Repeat("x", 257),
+									},
+								},
+							},
+						},
+					}),
+				),
+			),
+		),
+		test:              "should not be allowed to set an imageRef of len larger than 256",
+		validationOptions: PodValidationOptions{AllowImageVolumeWithDigest: true},
+		err:               `status.containerStatuses[0].volumeMounts[0].volumeStatus.imageVolumeStatus.imageRef: Too long: may not be more than 256`,
 	},
 	}
 
@@ -15999,7 +16151,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 
 		test.new.ResourceVersion = "1"
 		test.old.ResourceVersion = "1"
-		errs := ValidatePodStatusUpdate(&test.new, &test.old, PodValidationOptions{})
+		errs := ValidatePodStatusUpdate(&test.new, &test.old, test.validationOptions)
 		if test.err == "" {
 			if len(errs) != 0 {
 				t.Errorf("unexpected invalid: %s (%+v)\nA: %+v\nB: %+v", test.test, errs, test.new, test.old)
@@ -27965,6 +28117,60 @@ func TestValidatePodResize(t *testing.T) {
 		err  string
 	}{
 		{
+			test: "pod-level resources resize with nil resources in old pod",
+			new: podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: getResources("100m", "100Mi", "", ""),
+					}))),
+				podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("100m", "200Mi", "", "")}),
+			),
+			old: podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: getResources("200m", "", "", ""),
+					}))),
+				podtest.SetPodResources(nil),
+			),
+			err: "",
+		},
+		{
+			test: "pod-level resources resize with nil requests in old pod",
+			new: podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: getResources("100m", "100Mi", "", ""),
+					}))),
+				podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("100m", "200Mi", "", "")}),
+			),
+			old: podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: getResources("", "", "", ""),
+					}))),
+				podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("", "200Mi", "", "")}),
+			),
+			err: "",
+		},
+		{
+			test: "pod-level resources resize with nil limits in old pod",
+			new: podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: getResources("100m", "100Mi", "", ""),
+					}))),
+				podtest.SetPodResources(&core.ResourceRequirements{Requests: getResources("100m", "200Mi", "", "")}),
+			),
+			old: podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: getResources("", "", "", ""),
+					}))),
+				podtest.SetPodResources(&core.ResourceRequirements{Requests: getResources("", "200Mi", "", "")}),
+			),
+			err: "",
+		},
+		{
 			test: "pod-level resources with container cpu limit change",
 			new: podtest.MakePod("pod",
 				podtest.SetContainers(podtest.MakeContainer("container",
@@ -27980,7 +28186,7 @@ func TestValidatePodResize(t *testing.T) {
 					}))),
 				podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("100m", "200Mi", "", "")}),
 			),
-			err: "pods with pod-level resources cannot be resized",
+			err: "",
 		}, {
 			test: "pod-level resources with container memory limit change",
 			new: podtest.MakePod("pod",
@@ -27997,7 +28203,7 @@ func TestValidatePodResize(t *testing.T) {
 					}))),
 				podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("100m", "200Mi", "", "")}),
 			),
-			err: "pods with pod-level resources cannot be resized",
+			err: "",
 		},
 		{
 			test: "pod-level resources with container cpu request change",
@@ -28015,7 +28221,7 @@ func TestValidatePodResize(t *testing.T) {
 					}))),
 				podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("100m", "200Mi", "", "")}),
 			),
-			err: "pods with pod-level resources cannot be resized",
+			err: "",
 		}, {
 			test: "pod-level resources with container memory request change",
 			new: podtest.MakePod("pod",
@@ -28032,7 +28238,7 @@ func TestValidatePodResize(t *testing.T) {
 					}))),
 				podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("100m", "200Mi", "", "")}),
 			),
-			err: "pods with pod-level resources cannot be resized",
+			err: "",
 		},
 		{
 			test: "pod-level resources with pod-level memory limit change",
@@ -28050,7 +28256,7 @@ func TestValidatePodResize(t *testing.T) {
 					}))),
 				podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("200m", "100Mi", "", "")}),
 			),
-			err: "pods with pod-level resources cannot be resized",
+			err: "",
 		},
 		{
 			test: "pod-level resources with pod-level memory request change",
@@ -28068,7 +28274,7 @@ func TestValidatePodResize(t *testing.T) {
 					}))),
 				podtest.SetPodResources(&core.ResourceRequirements{Requests: getResources("200m", "100Mi", "", "")}),
 			),
-			err: "pods with pod-level resources cannot be resized",
+			err: "",
 		},
 		{
 			test: "pod-level resources with pod-level cpu limit change",
@@ -28086,7 +28292,7 @@ func TestValidatePodResize(t *testing.T) {
 					}))),
 				podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("100m", "200Mi", "", "")}),
 			),
-			err: "pods with pod-level resources cannot be resized",
+			err: "",
 		},
 		{
 			test: "pod-level resources with pod-level cpu request change",
@@ -28104,7 +28310,31 @@ func TestValidatePodResize(t *testing.T) {
 					}))),
 				podtest.SetPodResources(&core.ResourceRequirements{Requests: getResources("200m", "200Mi", "", "")}),
 			),
-			err: "pods with pod-level resources cannot be resized",
+			err: "",
+		},
+		{
+			test: "pod-level resources with pod-level storage changes",
+			new: podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{Requests: getResources("100m", "100Mi", "", "")}),
+					podtest.SetContainerResizePolicy(core.ContainerResizePolicy{ResourceName: core.ResourceMemory, RestartPolicy: core.NotRequired}),
+				)),
+				podtest.SetPodResources(&core.ResourceRequirements{
+					Requests: getResources("100m", "100Mi", "", "200Mi"),
+					Limits:   getResources("100m", "100Mi", "", ""),
+				}),
+			),
+			old: podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{Requests: getResources("100m", "100Mi", "", "")}),
+					podtest.SetContainerResizePolicy(core.ContainerResizePolicy{ResourceName: core.ResourceMemory, RestartPolicy: core.NotRequired}),
+				)),
+				podtest.SetPodResources(&core.ResourceRequirements{
+					Requests: getResources("200m", "100Mi", "", "100Mi"),
+					Limits:   getResources("100m", "200Mi", "", ""),
+				}),
+			),
+			err: "spec: Forbidden: only cpu and memory resources are mutable",
 		},
 		{
 			test: "cpu limit change",
@@ -28349,6 +28579,11 @@ func TestValidatePodResize(t *testing.T) {
 			new:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "100Mi", "", ""), core.ContainerRestartPolicyAlways),
 			err:  "",
 		}, {
+			test: "memory limit decrease for sidecar containers, resize policy RestartContainer",
+			old:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "200Mi", "", ""), core.ContainerRestartPolicyAlways, resizePolicy(core.ResourceMemory, core.RestartContainer)),
+			new:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "100Mi", "", ""), core.ContainerRestartPolicyAlways, resizePolicy(core.ResourceMemory, core.RestartContainer)),
+			err:  "",
+		}, {
 			test: "storage limit change for sidecar containers",
 			old:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "100Mi", "2Gi", ""), core.ContainerRestartPolicyAlways),
 			new:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "100Mi", "1Gi", ""), core.ContainerRestartPolicyAlways),
@@ -28500,7 +28735,8 @@ func TestValidatePodResize(t *testing.T) {
 				test.old.Spec.RestartPolicy = "Always"
 			}
 
-			errs := ValidatePodResize(test.new, test.old, PodValidationOptions{AllowSidecarResizePolicy: true})
+			errs := ValidatePodResize(test.new, test.old, PodValidationOptions{AllowSidecarResizePolicy: true, InPlacePodLevelResourcesVerticalScalingEnabled: true, PodLevelResourcesEnabled: true})
+
 			if test.err == "" {
 				if len(errs) != 0 {
 					t.Errorf("unexpected invalid: (%+v)\nA: %+v\nB: %+v", errs, test.new, test.old)
@@ -29195,9 +29431,10 @@ func TestValidateContainerRestartPolicy(t *testing.T) {
 	podRestartPolicyAlways := core.RestartPolicyAlways
 
 	successCases := []struct {
-		Name               string
-		RestartPolicy      *core.ContainerRestartPolicy
-		RestartPolicyRules []core.ContainerRestartRule
+		Name                      string
+		RestartPolicy             *core.ContainerRestartPolicy
+		RestartPolicyRules        []core.ContainerRestartRule
+		AllowRestartAllContainers bool
 	}{
 		{
 			Name: "no-restart-policy-and-rules",
@@ -29221,6 +29458,17 @@ func TestValidateContainerRestartPolicy(t *testing.T) {
 					Values:   []int32{42},
 				},
 			}},
+		}, {
+			Name:          "restart-all-containers",
+			RestartPolicy: &containerRestartPolicyNever,
+			RestartPolicyRules: []core.ContainerRestartRule{{
+				Action: "RestartAllContainers",
+				ExitCodes: &core.ContainerRestartRuleOnExitCodes{
+					Operator: "In",
+					Values:   []int32{42},
+				},
+			}},
+			AllowRestartAllContainers: true,
 		},
 	}
 
@@ -29236,6 +29484,7 @@ func TestValidateContainerRestartPolicy(t *testing.T) {
 			}}
 			opts := PodValidationOptions{
 				AllowContainerRestartPolicyRules: true,
+				AllowRestartAllContainers:        tc.AllowRestartAllContainers,
 			}
 			errs := validateContainers(containers, podOS, volumeDevices, nil, defaultGracePeriod, field.NewPath("containers"), opts, &podRestartPolicyAlways, noUserNamespace)
 			if len(errs) > 0 {
@@ -29384,27 +29633,70 @@ func TestValidateContainerRestartPolicy(t *testing.T) {
 		})
 	}
 
-	// test cases sidecar containers
+	containerRestartPolicyAlways := core.ContainerRestartPolicyAlways
+	// test cases init containers
 	cases := []struct {
 		title              string
+		restartPolicy      *core.ContainerRestartPolicy
 		restartPolicyRules []core.ContainerRestartRule
+		opts               PodValidationOptions
 		expectedErrors     field.ErrorList
 	}{
 		{
 			"sidecar containers without restart policy rules",
+			&containerRestartPolicyAlways,
 			nil,
+			PodValidationOptions{
+				AllowContainerRestartPolicyRules: true,
+			},
 			nil,
 		},
 		{
-			"restart policy rules are not supported with restart policy Always",
+			"restart policy rules are supported with restart policy Always with option",
+			&containerRestartPolicyAlways,
 			[]core.ContainerRestartRule{{
-				Action: core.ContainerRestartRuleActionRestart,
+				Action: core.ContainerRestartRuleActionRestartAllContainers,
 				ExitCodes: &core.ContainerRestartRuleOnExitCodes{
 					Operator: core.ContainerRestartRuleOnExitCodesOpIn,
 					Values:   []int32{1},
 				},
 			}},
+			PodValidationOptions{
+				AllowContainerRestartPolicyRules: true,
+				AllowRestartAllContainers:        true,
+			},
+			nil,
+		},
+		{
+			"restart policy rules are not supported with restart policy Always without option",
+			&containerRestartPolicyAlways,
+			[]core.ContainerRestartRule{{
+				Action: core.ContainerRestartRuleActionRestartAllContainers,
+				ExitCodes: &core.ContainerRestartRuleOnExitCodes{
+					Operator: core.ContainerRestartRuleOnExitCodesOpIn,
+					Values:   []int32{1},
+				},
+			}},
+			PodValidationOptions{
+				AllowContainerRestartPolicyRules: true,
+			},
 			field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "initContainers[0].restartPolicyRules", BadValue: ""}},
+		},
+		{
+			"restart policy rules are not supported if no restart policy is set",
+			nil,
+			[]core.ContainerRestartRule{{
+				Action: core.ContainerRestartRuleActionRestartAllContainers,
+				ExitCodes: &core.ContainerRestartRuleOnExitCodes{
+					Operator: core.ContainerRestartRuleOnExitCodesOpIn,
+					Values:   []int32{1},
+				},
+			}},
+			PodValidationOptions{
+				AllowContainerRestartPolicyRules: true,
+				AllowRestartAllContainers:        true,
+			},
+			field.ErrorList{{Type: field.ErrorTypeRequired, Field: "initContainers[0].restartPolicy", BadValue: ""}},
 		},
 	}
 
@@ -29415,13 +29707,10 @@ func TestValidateContainerRestartPolicy(t *testing.T) {
 				Image:                    "image",
 				ImagePullPolicy:          "IfNotPresent",
 				TerminationMessagePolicy: "File",
-				RestartPolicy:            &containerRestartPolicyAlways,
+				RestartPolicy:            tc.restartPolicy,
 				RestartPolicyRules:       tc.restartPolicyRules,
 			}}
-			opts := PodValidationOptions{
-				AllowContainerRestartPolicyRules: true,
-			}
-			errs := validateInitContainers(containers, podOS, nil, volumeDevices, nil, defaultGracePeriod, field.NewPath("initContainers"), opts, &podRestartPolicyAlways, noUserNamespace)
+			errs := validateInitContainers(containers, podOS, nil, volumeDevices, nil, defaultGracePeriod, field.NewPath("initContainers"), tc.opts, &podRestartPolicyAlways, noUserNamespace)
 			if tc.expectedErrors == nil {
 				if len(errs) > 0 {
 					t.Errorf("unexpected errors: %v", prettyErrorList(errs))
@@ -29536,19 +29825,446 @@ func TestValidateContainerStateTransition(t *testing.T) {
 			newStatuses: []core.ContainerStatus{{Name: "c1", State: runningState}},
 			expectErr:   true,
 		},
+		{
+			name: "restart allowed if the container have RestartAllContainers actions",
+			podSpec: core.PodSpec{
+				RestartPolicy: core.RestartPolicyNever,
+				Containers: []core.Container{
+					{
+						Name:          "c1",
+						Image:         "image",
+						RestartPolicy: &containerRestartPolicyNever,
+						RestartPolicyRules: []core.ContainerRestartRule{
+							{
+								Action: core.ContainerRestartRuleActionRestartAllContainers,
+								ExitCodes: &core.ContainerRestartRuleOnExitCodes{
+									Operator: core.ContainerRestartRuleOnExitCodesOpIn,
+									Values:   []int32{42},
+								},
+							},
+						},
+					},
+				},
+			},
+			oldStatuses: []core.ContainerStatus{{Name: "c1", State: terminatedState(1)}},
+			newStatuses: []core.ContainerStatus{{Name: "c1", State: runningState}},
+		},
+		{
+			name: "restart allowed if other container have RestartAllContainers actions",
+			podSpec: core.PodSpec{
+				RestartPolicy: core.RestartPolicyNever,
+				Containers: []core.Container{
+					container1RestartNever,
+					{
+						Name:          "c2",
+						Image:         "image",
+						RestartPolicy: &containerRestartPolicyNever,
+						RestartPolicyRules: []core.ContainerRestartRule{
+							{
+								Action: core.ContainerRestartRuleActionRestartAllContainers,
+								ExitCodes: &core.ContainerRestartRuleOnExitCodes{
+									Operator: core.ContainerRestartRuleOnExitCodesOpIn,
+									Values:   []int32{42},
+								},
+							},
+						},
+					},
+				},
+			},
+			oldStatuses: []core.ContainerStatus{{Name: "c1", State: terminatedState(1)}},
+			newStatuses: []core.ContainerStatus{{Name: "c1", State: runningState}},
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerRestartRules, true)
-
-			errs := ValidateContainerStateTransition(tc.newStatuses, tc.oldStatuses, field.NewPath("field"), tc.podSpec)
+			opts := PodValidationOptions{
+				AllowContainerRestartPolicyRules: true,
+				AllowRestartAllContainers:        true,
+			}
+			errs := ValidateContainerStateTransition(tc.newStatuses, tc.oldStatuses, field.NewPath("field"), tc.podSpec, opts)
 
 			if tc.expectErr && len(errs) == 0 {
 				t.Errorf("Unexpected success")
 			}
 			if !tc.expectErr && len(errs) > 0 {
 				t.Errorf("Unexpected error(s): %v", errs)
+			}
+		})
+	}
+}
+
+func TestValidateInitContainerStateTransition(t *testing.T) {
+	var (
+		containerRestartPolicyAlways = core.ContainerRestartPolicyAlways
+		containerRestartPolicyNever  = core.ContainerRestartPolicyNever
+	)
+	runningState := core.ContainerState{Running: &core.ContainerStateRunning{}}
+	terminatedState := func(exitCode int32) core.ContainerState {
+		return core.ContainerState{Terminated: &core.ContainerStateTerminated{ExitCode: exitCode}}
+	}
+
+	container1 := core.Container{Name: "c1", Image: "image"}
+	container1RestartNever := core.Container{Name: "c1", Image: "image", RestartPolicy: &containerRestartPolicyNever}
+	container1RestartAlways := core.Container{Name: "c1", Image: "image", RestartPolicy: &containerRestartPolicyAlways}
+	container1RestartRuleIn42 := core.Container{
+		Name:          "c1",
+		Image:         "image",
+		RestartPolicy: &containerRestartPolicyNever,
+		RestartPolicyRules: []core.ContainerRestartRule{
+			{
+				Action: core.ContainerRestartRuleActionRestart,
+				ExitCodes: &core.ContainerRestartRuleOnExitCodes{
+					Operator: "In",
+					Values:   []int32{42},
+				},
+			},
+		},
+	}
+
+	testCases := []struct {
+		name        string
+		podSpec     core.PodSpec
+		oldStatuses []core.ContainerStatus
+		newStatuses []core.ContainerStatus
+		expectErr   bool
+	}{
+		{
+			name: "feature enabled, not terminated",
+			podSpec: core.PodSpec{
+				RestartPolicy:  core.RestartPolicyNever,
+				InitContainers: []core.Container{container1RestartNever},
+			},
+			oldStatuses: []core.ContainerStatus{{Name: "c1", State: runningState}},
+			newStatuses: []core.ContainerStatus{{Name: "c1", State: runningState}},
+			expectErr:   false,
+		},
+		{
+			name: "feature enabled, restart allowed by pod policy 'Always'",
+			podSpec: core.PodSpec{
+				RestartPolicy:  core.RestartPolicyAlways,
+				InitContainers: []core.Container{container1},
+			},
+			oldStatuses: []core.ContainerStatus{{Name: "c1", State: terminatedState(0)}},
+			newStatuses: []core.ContainerStatus{{Name: "c1", State: runningState}},
+			expectErr:   false,
+		},
+		{
+			name: "feature enabled, restart allowed by pod policy 'OnFailure' with exit 1",
+			podSpec: core.PodSpec{
+				RestartPolicy:  core.RestartPolicyOnFailure,
+				InitContainers: []core.Container{container1},
+			},
+			oldStatuses: []core.ContainerStatus{{Name: "c1", State: terminatedState(1)}},
+			newStatuses: []core.ContainerStatus{{Name: "c1", State: runningState}},
+			expectErr:   false,
+		},
+		{
+			name: "feature enabled, restart not allowed by pod policy 'OnFailure' with exit 0",
+			podSpec: core.PodSpec{
+				RestartPolicy:  core.RestartPolicyOnFailure,
+				InitContainers: []core.Container{container1},
+			},
+			oldStatuses: []core.ContainerStatus{{Name: "c1", State: terminatedState(0)}},
+			newStatuses: []core.ContainerStatus{{Name: "c1", State: runningState}},
+			expectErr:   true,
+		},
+		{
+			name: "feature enabled, restart not allowed by pod policy 'Never', with transition",
+			podSpec: core.PodSpec{
+				RestartPolicy:  core.RestartPolicyNever,
+				InitContainers: []core.Container{container1},
+			},
+			oldStatuses: []core.ContainerStatus{{Name: "c1", State: terminatedState(0)}},
+			newStatuses: []core.ContainerStatus{{Name: "c1", State: runningState}},
+			expectErr:   true,
+		},
+		{
+			name: "feature enabled, restart allowed by container policy 'Always'",
+			podSpec: core.PodSpec{
+				RestartPolicy:  core.RestartPolicyNever,
+				InitContainers: []core.Container{container1RestartAlways},
+			},
+			oldStatuses: []core.ContainerStatus{{Name: "c1", State: terminatedState(0)}},
+			newStatuses: []core.ContainerStatus{{Name: "c1", State: runningState}},
+			expectErr:   false,
+		},
+		{
+			name: "feature enabled, restart not allowed by container policy 'Never'",
+			podSpec: core.PodSpec{
+				RestartPolicy:  core.RestartPolicyAlways,
+				InitContainers: []core.Container{container1RestartNever},
+			},
+			oldStatuses: []core.ContainerStatus{{Name: "c1", State: terminatedState(0)}},
+			newStatuses: []core.ContainerStatus{{Name: "c1", State: runningState}},
+			expectErr:   true,
+		},
+		{
+			name: "feature enabled, restart allowed by container rule",
+			podSpec: core.PodSpec{
+				RestartPolicy:  core.RestartPolicyNever,
+				InitContainers: []core.Container{container1RestartRuleIn42},
+			},
+			oldStatuses: []core.ContainerStatus{{Name: "c1", State: terminatedState(42)}},
+			newStatuses: []core.ContainerStatus{{Name: "c1", State: runningState}},
+			expectErr:   false,
+		},
+		{
+			name: "feature enabled, restart not allowed by container rule mismatch",
+			podSpec: core.PodSpec{
+				RestartPolicy:  core.RestartPolicyNever,
+				InitContainers: []core.Container{container1RestartRuleIn42},
+			},
+			oldStatuses: []core.ContainerStatus{{Name: "c1", State: terminatedState(1)}},
+			newStatuses: []core.ContainerStatus{{Name: "c1", State: runningState}},
+			expectErr:   true,
+		},
+		{
+			name: "restart allowed if the container have RestartAllContainers actions",
+			podSpec: core.PodSpec{
+				RestartPolicy: core.RestartPolicyNever,
+				InitContainers: []core.Container{
+					{
+						Name:          "c1",
+						Image:         "image",
+						RestartPolicy: &containerRestartPolicyNever,
+						RestartPolicyRules: []core.ContainerRestartRule{
+							{
+								Action: core.ContainerRestartRuleActionRestartAllContainers,
+								ExitCodes: &core.ContainerRestartRuleOnExitCodes{
+									Operator: core.ContainerRestartRuleOnExitCodesOpIn,
+									Values:   []int32{42},
+								},
+							},
+						},
+					},
+				},
+			},
+			oldStatuses: []core.ContainerStatus{{Name: "c1", State: terminatedState(1)}},
+			newStatuses: []core.ContainerStatus{{Name: "c1", State: runningState}},
+		},
+		{
+			name: "restart allowed if other container have RestartAllContainers actions",
+			podSpec: core.PodSpec{
+				RestartPolicy: core.RestartPolicyNever,
+				InitContainers: []core.Container{
+					container1RestartNever,
+					{
+						Name:          "c2",
+						Image:         "image",
+						RestartPolicy: &containerRestartPolicyNever,
+						RestartPolicyRules: []core.ContainerRestartRule{
+							{
+								Action: core.ContainerRestartRuleActionRestartAllContainers,
+								ExitCodes: &core.ContainerRestartRuleOnExitCodes{
+									Operator: core.ContainerRestartRuleOnExitCodesOpIn,
+									Values:   []int32{42},
+								},
+							},
+						},
+					},
+				},
+			},
+			oldStatuses: []core.ContainerStatus{{Name: "c1", State: terminatedState(1)}},
+			newStatuses: []core.ContainerStatus{{Name: "c1", State: runningState}},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			opts := PodValidationOptions{
+				AllowContainerRestartPolicyRules: true,
+				AllowRestartAllContainers:        true,
+			}
+			errs := ValidateInitContainerStateTransition(tc.newStatuses, tc.oldStatuses, field.NewPath("field"), tc.podSpec, opts)
+
+			if tc.expectErr && len(errs) == 0 {
+				t.Errorf("Unexpected success")
+			}
+			if !tc.expectErr && len(errs) > 0 {
+				t.Errorf("Unexpected error(s): %v", errs)
+			}
+		})
+	}
+}
+
+func TestNumericTolerationsWithFeatureGate(t *testing.T) {
+	testCases := []struct {
+		name          string
+		toleration    core.Toleration
+		featureGateOn bool
+		errorMsg      string
+	}{
+		{
+			name: "Gt operator with valid numeric value and feature gate enabled",
+			toleration: core.Toleration{
+				Key:      "node.kubernetes.io/sla",
+				Operator: core.TolerationOpGt,
+				Value:    "950",
+				Effect:   core.TaintEffectNoSchedule,
+			},
+			featureGateOn: true,
+		},
+		{
+			name: "Lt operator with valid numeric value and feature gate enabled",
+			toleration: core.Toleration{
+				Key:      "node.kubernetes.io/sla",
+				Operator: core.TolerationOpLt,
+				Value:    "800",
+				Effect:   core.TaintEffectNoSchedule,
+			},
+			featureGateOn: true,
+		},
+		{
+			name: "Gt operator with negative numeric value and feature gate enabled",
+			toleration: core.Toleration{
+				Key:      "test-key",
+				Operator: core.TolerationOpGt,
+				Value:    "-100",
+				Effect:   core.TaintEffectNoSchedule,
+			},
+			featureGateOn: true,
+		},
+		{
+			name: "Gt operator with non-numeric value and feature gate enabled",
+			toleration: core.Toleration{
+				Key:      "node.kubernetes.io/sla",
+				Operator: core.TolerationOpGt,
+				Value:    "high",
+				Effect:   core.TaintEffectNoSchedule,
+			},
+			featureGateOn: true,
+			errorMsg:      fmt.Sprintf("tolerations[0].value: Invalid value: %q: must be a valid decimal integer in canonical form", "high"),
+		},
+		{
+			name: "Gt operator with leading zeros and feature gate enabled (invalid - strict validation)",
+			toleration: core.Toleration{
+				Key:      "node.kubernetes.io/sla",
+				Operator: core.TolerationOpGt,
+				Value:    "0950",
+				Effect:   core.TaintEffectNoSchedule,
+			},
+			featureGateOn: true,
+			errorMsg:      fmt.Sprintf("tolerations[0].value: Invalid value: %q: must be a valid decimal integer in canonical form", "0950"),
+		},
+		{
+			name: "Gt operator with value '0' and feature gate enabled (valid)",
+			toleration: core.Toleration{
+				Key:      "test-key",
+				Operator: core.TolerationOpGt,
+				Value:    "0",
+				Effect:   core.TaintEffectNoSchedule,
+			},
+			featureGateOn: true,
+		},
+		{
+			name: "Gt operator with decimal value and feature gate enabled",
+			toleration: core.Toleration{
+				Key:      "node.kubernetes.io/sla",
+				Operator: core.TolerationOpGt,
+				Value:    "95.5",
+				Effect:   core.TaintEffectNoSchedule,
+			},
+			featureGateOn: true,
+			errorMsg:      fmt.Sprintf("tolerations[0].value: Invalid value: %q: must be a valid decimal integer in canonical form", "95.5"),
+		},
+		{
+			name: "Gt operator with just minus sign and feature gate enabled",
+			toleration: core.Toleration{
+				Key:      "test-key",
+				Operator: core.TolerationOpGt,
+				Value:    "-",
+				Effect:   core.TaintEffectNoSchedule,
+			},
+			featureGateOn: true,
+			errorMsg:      fmt.Sprintf("tolerations[0].value: Invalid value: %q: must be a valid decimal integer in canonical form", "-"),
+		},
+		{
+			name: "Gt operator with plus sign and feature gate enabled (invalid - strict validation)",
+			toleration: core.Toleration{
+				Key:      "test-key",
+				Operator: core.TolerationOpGt,
+				Value:    "+100",
+				Effect:   core.TaintEffectNoSchedule,
+			},
+			featureGateOn: true,
+			errorMsg:      fmt.Sprintf("tolerations[0].value: Invalid value: %q: must be a valid decimal integer in canonical form", "+100"),
+		},
+		{
+			name: "Gt operator with space in value and feature gate enabled",
+			toleration: core.Toleration{
+				Key:      "test-key",
+				Operator: core.TolerationOpGt,
+				Value:    "95 0",
+				Effect:   core.TaintEffectNoSchedule,
+			},
+			featureGateOn: true,
+			errorMsg:      fmt.Sprintf("tolerations[0].value: Invalid value: %q: must be a valid decimal integer in canonical form", "95 0"),
+		},
+		{
+			name: "Gt operator with empty value and feature gate enabled",
+			toleration: core.Toleration{
+				Key:      "test-key",
+				Operator: core.TolerationOpGt,
+				Value:    "",
+				Effect:   core.TaintEffectNoSchedule,
+			},
+			featureGateOn: true,
+			errorMsg:      fmt.Sprintf("tolerations[0].value: Invalid value: %q: must be non-empty", ""),
+		},
+		{
+			name: "Lt operator with feature gate disabled",
+			toleration: core.Toleration{
+				Key:      "node.kubernetes.io/sla",
+				Operator: core.TolerationOpLt,
+				Value:    "950",
+				Effect:   core.TaintEffectNoSchedule,
+			},
+			featureGateOn: false,
+			errorMsg:      "Unsupported value",
+		},
+		{
+			name: "Gt operator with max int64 value and feature gate enabled",
+			toleration: core.Toleration{
+				Key:      "test-key",
+				Operator: core.TolerationOpGt,
+				Value:    "9223372036854775807",
+				Effect:   core.TaintEffectNoSchedule,
+			},
+			featureGateOn: true,
+		},
+		{
+			name: "Gt operator with overflow value and feature gate enabled",
+			toleration: core.Toleration{
+				Key:      "test-key",
+				Operator: core.TolerationOpGt,
+				Value:    "9223372036854775808", // max int64 + 1
+				Effect:   core.TaintEffectNoSchedule,
+			},
+			featureGateOn: true,
+			errorMsg:      fmt.Sprintf("tolerations[0].value: Invalid value: %q: strconv.ParseInt: parsing %q: value out of range", "9223372036854775808", "9223372036854775808"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TaintTolerationComparisonOperators, tc.featureGateOn)
+
+			opts := PodValidationOptions{
+				AllowTaintTolerationComparisonOperators: tc.featureGateOn,
+			}
+			errs := ValidateTolerations([]core.Toleration{tc.toleration}, field.NewPath("tolerations"), opts)
+
+			if tc.errorMsg != "" {
+				if len(errs) == 0 {
+					t.Errorf("Expected error but got none")
+				} else if !strings.Contains(errs.ToAggregate().Error(), tc.errorMsg) {
+					t.Errorf("Expected error message to contain %q, got %q", tc.errorMsg, errs.ToAggregate().Error())
+				}
+			} else {
+				if len(errs) > 0 {
+					t.Errorf("Unexpected error(s): %v", errs)
+				}
 			}
 		})
 	}

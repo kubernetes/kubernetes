@@ -102,6 +102,7 @@ type podChangeExtractor func(newPod *v1.Pod, oldPod *v1.Pod) fwk.ActionType
 func extractPodScaleDown(newPod, oldPod *v1.Pod) fwk.ActionType {
 	opt := resource.PodResourcesOptions{
 		UseStatusResources: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
+		InPlacePodLevelResourcesVerticalScalingEnabled: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling),
 	}
 	newPodRequests := resource.PodRequests(newPod, opt)
 	oldPodRequests := resource.PodRequests(oldPod, opt)

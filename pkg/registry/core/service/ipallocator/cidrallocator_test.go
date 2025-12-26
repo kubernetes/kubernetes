@@ -33,6 +33,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	networkingv1fake "k8s.io/client-go/kubernetes/typed/networking/v1/fake"
 	k8stesting "k8s.io/client-go/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/testutil"
@@ -847,5 +848,141 @@ func TestCIDRAllocatorClusterIPAllocatedMetrics(t *testing.T) {
 	}
 	if staticErrorsCidr2 != float64(errorCount2) {
 		t.Fatalf("Expected %d static allocation errors from second CIDR, received %f", errorCount2, staticErrorsCidr2)
+	}
+}
+
+func TestCIDRAllocateNextStopOnError(t *testing.T) {
+	r, err := newTestMetaAllocator()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Destroy()
+
+	// add a CIDR
+	cidr1 := newServiceCIDR("test1", "192.168.0.0/24")
+	_, err = r.client.ServiceCIDRs().Create(context.Background(), cidr1, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.enqueueServiceCIDR(cidr1)
+	// wait for the cidr to be processed
+	err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
+		allocator, err := r.getAllocator(netutils.ParseIPSloppy("192.168.0.1"), true)
+		if err != nil {
+			return false, nil
+		}
+		allocator.ipAddressSynced = func() bool { return true }
+		return allocator.ready.Load(), nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// add a second CIDR
+	cidr2 := newServiceCIDR("test2", "192.168.1.0/24")
+	_, err = r.client.ServiceCIDRs().Create(context.Background(), cidr2, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.enqueueServiceCIDR(cidr2)
+
+	// wait for the cidr to be processed
+	err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
+		allocator, err := r.getAllocator(netutils.ParseIPSloppy("192.168.1.1"), true)
+		if err != nil {
+			return false, nil
+		}
+		allocator.ipAddressSynced = func() bool { return true }
+		return allocator.ready.Load(), nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	calls := 0
+	// override the client to inject the reactor to fail the allocation
+	fakeclient, ok := r.client.(*networkingv1fake.FakeNetworkingV1)
+	if !ok {
+		t.Fatal("invalid client")
+	}
+	fakeclient.PrependReactor("create", "ipaddresses", k8stesting.ReactionFunc(func(action k8stesting.Action) (bool, runtime.Object, error) {
+		calls++
+		return true, nil, fmt.Errorf("server error")
+	}))
+
+	_, err = r.AllocateNext()
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if err.Error() != "server error" {
+		t.Fatalf("expected 'server error', got %v", err)
+	}
+	if calls != 1 {
+		t.Fatalf("expected 1 call, got %d", calls)
+	}
+}
+
+func TestCIDRAllocateNextDontStopOnNot(t *testing.T) {
+	r, err := newTestMetaAllocator()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Destroy()
+
+	// add a CIDR
+	cidr1 := newServiceCIDR("test1", "192.168.0.0/24")
+	_, err = r.client.ServiceCIDRs().Create(context.Background(), cidr1, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.enqueueServiceCIDR(cidr1)
+	// wait for the cidr to be processed
+	err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
+		allocator, err := r.getAllocator(netutils.ParseIPSloppy("192.168.0.1"), true)
+		if err != nil {
+			return false, nil
+		}
+		allocator.ipAddressSynced = func() bool { return false }
+		return allocator.ready.Load(), nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// add a second CIDR
+	cidr2 := newServiceCIDR("test2", "192.168.1.0/24")
+	_, err = r.client.ServiceCIDRs().Create(context.Background(), cidr2, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.enqueueServiceCIDR(cidr2)
+
+	// wait for the cidr to be processed
+	err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
+		allocator, err := r.getAllocator(netutils.ParseIPSloppy("192.168.1.1"), true)
+		if err != nil {
+			return false, nil
+		}
+		allocator.ipAddressSynced = func() bool { return true }
+		return allocator.ready.Load(), nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// make the first allocator not ready
+	r.allocators["192.168.0.0/24"].allocator.ready.Store(false)
+	_, secondSubnet, err := netutils.ParseCIDRSloppy("192.168.1.0/24")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 200; i++ {
+		ip, err := r.AllocateNext()
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !secondSubnet.Contains(ip) {
+			t.Fatalf("expected IP %s to be in %s", ip.String(), secondSubnet.String())
+		}
 	}
 }

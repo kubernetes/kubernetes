@@ -73,7 +73,7 @@ func (cfg *SpanConfig) Timestamp() time.Time {
 	return cfg.timestamp
 }
 
-// StackTrace checks whether stack trace capturing is enabled.
+// StackTrace reports whether stack trace capturing is enabled.
 func (cfg *SpanConfig) StackTrace() bool {
 	return cfg.stackTrace
 }
@@ -154,7 +154,7 @@ func (cfg *EventConfig) Timestamp() time.Time {
 	return cfg.timestamp
 }
 
-// StackTrace checks whether stack trace capturing is enabled.
+// StackTrace reports whether stack trace capturing is enabled.
 func (cfg *EventConfig) StackTrace() bool {
 	return cfg.stackTrace
 }

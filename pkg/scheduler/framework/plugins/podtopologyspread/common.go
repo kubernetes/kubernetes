@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	v1helper "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
+	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	"k8s.io/utils/ptr"
@@ -39,7 +40,7 @@ type topologySpreadConstraint struct {
 	NodeTaintsPolicy   v1.NodeInclusionPolicy
 }
 
-func (tsc *topologySpreadConstraint) matchNodeInclusionPolicies(pod *v1.Pod, node *v1.Node, require nodeaffinity.RequiredNodeAffinity) bool {
+func (tsc *topologySpreadConstraint) matchNodeInclusionPolicies(logger klog.Logger, pod *v1.Pod, node *v1.Node, require nodeaffinity.RequiredNodeAffinity, enableComparisonOperators bool) bool {
 	if tsc.NodeAffinityPolicy == v1.NodeInclusionPolicyHonor {
 		// We ignore parsing errors here for backwards compatibility.
 		if match, _ := require.Match(node); !match {
@@ -48,7 +49,7 @@ func (tsc *topologySpreadConstraint) matchNodeInclusionPolicies(pod *v1.Pod, nod
 	}
 
 	if tsc.NodeTaintsPolicy == v1.NodeInclusionPolicyHonor {
-		if _, untolerated := v1helper.FindMatchingUntoleratedTaint(node.Spec.Taints, pod.Spec.Tolerations, helper.DoNotScheduleTaintsFilterFunc()); untolerated {
+		if _, untolerated := v1helper.FindMatchingUntoleratedTaint(logger, node.Spec.Taints, pod.Spec.Tolerations, helper.DoNotScheduleTaintsFilterFunc(), enableComparisonOperators); untolerated {
 			return false
 		}
 	}

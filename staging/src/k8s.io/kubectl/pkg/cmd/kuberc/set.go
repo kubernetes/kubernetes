@@ -243,6 +243,12 @@ func (o *SetOptions) setDefaults(pref *v1beta1.Preference, options []v1beta1.Com
 				return fmt.Errorf("defaults for command %q already exist, use --overwrite to replace", o.Command)
 			}
 
+			if len(options) == 0 {
+				// Preserve existing options if --option flag was not specified
+				// If specified, completely replace existing options
+				options = def.Options
+			}
+
 			pref.Defaults[i].Options = options
 			return nil
 		}
@@ -265,11 +271,31 @@ func (o *SetOptions) setAlias(pref *v1beta1.Preference, options []v1beta1.Comman
 				return fmt.Errorf("alias %q already exists, use --overwrite to replace", o.AliasName)
 			}
 
+			if len(options) == 0 {
+				// Preserve existing options if --option flag was not specified
+				// If specified, completely replace existing options
+				options = alias.Options
+			}
+
+			prependArgs := o.PrependArgs
+			if len(prependArgs) == 0 {
+				// Preserve existing prependArgs if --prependarg flag was not specified
+				// If specified, completely replace existing prependArgs
+				prependArgs = alias.PrependArgs
+			}
+
+			appendArgs := o.AppendArgs
+			if len(appendArgs) == 0 {
+				// Preserve existing appendArgs if --appendarg flag was not specified
+				// If specified, completely replace existing appendArgs
+				appendArgs = alias.AppendArgs
+			}
+
 			pref.Aliases[i] = v1beta1.AliasOverride{
 				Name:        o.AliasName,
 				Command:     o.Command,
-				PrependArgs: o.PrependArgs,
-				AppendArgs:  o.AppendArgs,
+				PrependArgs: prependArgs,
+				AppendArgs:  appendArgs,
 				Options:     options,
 			}
 			return nil

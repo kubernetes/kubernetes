@@ -60,7 +60,7 @@ var (
 	DynamicCreatedSnapshot TestSnapshotType = "DynamicSnapshot"
 	// PreprovisionedCreatedSnapshot represents a snapshot type for pre-provisioned snapshot
 	PreprovisionedCreatedSnapshot TestSnapshotType = "PreprovisionedSnapshot"
-
+	// VolumeGroupSnapshot represents a group snapshot type for dynamic created volumegroupsnapshot
 	VolumeGroupSnapshot TestSnapshotType = "VolumeGroupSnapshot"
 )
 
@@ -229,6 +229,7 @@ var (
 		TestTags:               []interface{}{framework.WithSlow()},
 		SnapshotType:           DynamicCreatedSnapshot,
 		SnapshotDeletionPolicy: DeleteSnapshot,
+		AllowExpansion:         true,
 	}
 
 	// Definitions for ntfs
@@ -357,7 +358,7 @@ var (
 		SnapshotDeletionPolicy: RetainSnapshot,
 		VolType:                DynamicPV,
 	}
-	// EphemeralSnapshotDelete is TestPattern for snapshotting of a generic ephemeral volume
+	// EphemeralSnapshotRetain is TestPattern for snapshotting of a generic ephemeral volume
 	// where snapshots are preserved.
 	EphemeralSnapshotRetain = TestPattern{
 		Name:                   "Ephemeral Snapshot (retain policy)",

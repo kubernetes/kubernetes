@@ -109,10 +109,9 @@ A PR is considered **ready to merge** when:
 
   This is not enforced through automation, but needs to be validated by the
   maintainer merging.
-  * The qualified approvals need to be from [Approver]s/[Maintainer]s
-    affiliated with different companies. Two qualified approvals from
-    [Approver]s or [Maintainer]s affiliated with the same company counts as a
-    single qualified approval.
+  * At least one of the qualified approvals need to be from an
+    [Approver]/[Maintainer] affiliated with a different company than the author
+    of the PR.
   * PRs introducing changes that have already been discussed and consensus
     reached only need one qualified approval. The discussion and resolution
     needs to be linked to the PR.
@@ -193,6 +192,35 @@ should have `go test -bench` output in their description.
 should have [`benchstat`](https://pkg.go.dev/golang.org/x/perf/cmd/benchstat)
 output in their description.
 
+## Dependencies
+
+This project uses [Go Modules] for dependency management. All modules will use
+`go.mod` to explicitly list all direct and indirect dependencies, ensuring a
+clear dependency graph. The `go.sum` file for each module will be committed to
+the repository and used to verify the integrity of downloaded modules,
+preventing malicious tampering.
+
+This project uses automated dependency update tools (i.e. dependabot,
+renovatebot) to manage updates to dependencies. This ensures that dependencies
+are kept up-to-date with the latest security patches and features and are
+reviewed before being merged. If you would like to propose a change to a
+dependency it should be done through a pull request that updates the `go.mod`
+file and includes a description of the change.
+
+See the [versioning and compatibility](./VERSIONING.md) policy for more details
+about dependency compatibility.
+
+[Go Modules]: https://pkg.go.dev/cmd/go#hdr-Modules__module_versions__and_more
+
+### Environment Dependencies
+
+This project does not partition dependencies based on the environment (i.e.
+`development`, `staging`, `production`).
+
+Only the dependencies explicitly included in the released modules have be
+tested and verified to work with the released code. No other guarantee is made
+about the compatibility of other dependencies.
+
 ## Documentation
 
 Each (non-internal, non-test) package must be documented using
@@ -233,6 +261,10 @@ practices.
 For a non-comprehensive but foundational overview of these best practices
 the [Effective Go](https://golang.org/doc/effective_go.html) documentation
 is an excellent starting place.
+
+We also recommend following the
+[Go Code Review Comments](https://go.dev/wiki/CodeReviewComments)
+that collects common comments made during reviews of Go code.
 
 As a convenience for developers building this project the `make precommit`
 will format, lint, validate, and in some cases fix the changes you plan to
@@ -587,6 +619,10 @@ See also:
 
 ### Testing
 
+We allow using [`testify`](https://github.com/stretchr/testify) even though
+it is seen as non-idiomatic according to
+the [Go Test Comments](https://go.dev/wiki/TestComments#assert-libraries) page.
+
 The tests should never leak goroutines.
 
 Use the term `ConcurrentSafe` in the test name when it aims to verify the
@@ -641,20 +677,28 @@ should be canceled.
 
 ## Approvers and Maintainers
 
+### Maintainers
+
+- [Damien Mathieu](https://github.com/dmathieu), Elastic ([GPG](https://keys.openpgp.org/search?q=5A126B972A81A6CE443E5E1B408B8E44F0873832))
+- [David Ashpole](https://github.com/dashpole), Google ([GPG](https://keys.openpgp.org/search?q=C0D1BDDCAAEAE573673085F176327DA4D864DC70))
+- [Robert Pająk](https://github.com/pellared), Splunk ([GPG](https://keys.openpgp.org/search?q=CDAD3A60476A3DE599AA5092E5F7C35A4DBE90C2))
+- [Sam Xie](https://github.com/XSAM), Splunk ([GPG](https://keys.openpgp.org/search?q=AEA033782371ABB18EE39188B8044925D6FEEBEA))
+- [Tyler Yahn](https://github.com/MrAlias), Splunk ([GPG](https://keys.openpgp.org/search?q=0x46B0F3E1A8B1BA5A))
+
+For more information about the maintainer role, see the [community repository](https://github.com/open-telemetry/community/blob/main/guides/contributor/membership.md#maintainer).
+
+### Approvers
+
+- [Flc](https://github.com/flc1125), Independent
+
+For more information about the approver role, see the [community repository](https://github.com/open-telemetry/community/blob/main/guides/contributor/membership.md#approver).
+
 ### Triagers
 
 - [Alex Kats](https://github.com/akats7), Capital One
 - [Cheng-Zhen Yang](https://github.com/scorpionknifes), Independent
 
-### Approvers
-
-### Maintainers
-
-- [Damien Mathieu](https://github.com/dmathieu), Elastic
-- [David Ashpole](https://github.com/dashpole), Google
-- [Robert Pająk](https://github.com/pellared), Splunk
-- [Sam Xie](https://github.com/XSAM), Cisco/AppDynamics
-- [Tyler Yahn](https://github.com/MrAlias), Splunk
+For more information about the triager role, see the [community repository](https://github.com/open-telemetry/community/blob/main/guides/contributor/membership.md#triager).
 
 ### Emeritus
 
@@ -665,6 +709,8 @@ should be canceled.
 - [Gustavo Silva Paiva](https://github.com/paivagustavo)
 - [Josh MacDonald](https://github.com/jmacd)
 - [Liz Fong-Jones](https://github.com/lizthegrey)
+
+For more information about the emeritus role, see the [community repository](https://github.com/open-telemetry/community/blob/main/guides/contributor/membership.md#emeritus-maintainerapprovertriager).
 
 ### Become an Approver or a Maintainer
 

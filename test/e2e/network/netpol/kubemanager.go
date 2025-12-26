@@ -80,7 +80,7 @@ func (k *kubeManager) initializeClusterFromModel(ctx context.Context, model *Mod
 	var createdPods []*v1.Pod
 	for _, ns := range model.Namespaces {
 		// no labels needed, we just need the default kubernetes.io/metadata.name label
-		namespace, err := k.framework.CreateNamespace(ctx, ns.BaseName, nil)
+		namespace, err := k.framework.CreateNamespace(ctx, ns.Name, nil)
 		if err != nil {
 			return err
 		}
