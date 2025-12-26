@@ -178,6 +178,11 @@ const (
 	// as well. Hence, Replaced is only emitted when the option
 	// EmitDeltaTypeReplaced is true.
 	Replaced DeltaType = "Replaced"
+	// ReplacedList is emitted when we encountered watch errors and had to do
+	// a relist. This is the same reason as Replaced but will be emitted instead
+	// when the FIFO supports atomic replacement. This event will return the
+	// full list of replaced items instead of a single object.
+	ReplacedList DeltaType = "ReplacedList"
 	// Sync is for synthetic events during a periodic resync.
 	Sync DeltaType = "Sync"
 )
