@@ -19,6 +19,7 @@ package cronjob
 import (
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
@@ -42,7 +43,15 @@ func testDeclarativeValidateForDeclarative(t *testing.T, apiVersion string) {
 		input        batch.CronJob
 		expectedErrs field.ErrorList
 	}{
-		// TODO: Add more test cases
+		"valid": {
+			input: mkCronJob(),
+		},
+		"schedule: empty": {
+			input: mkCronJob(tweakSchedule("")),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "schedule"), ""),
+			},
+		},
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
@@ -67,11 +76,50 @@ func testValidateUpdateForDeclarative(t *testing.T, apiVersion string) {
 		update       batch.CronJob
 		expectedErrs field.ErrorList
 	}{
-		// TODO: Add more test cases
+		"valid (no changes)": {
+			old:    mkCronJob(),
+			update: mkCronJob(tweakResourceVersion("poke")),
+		},
+
+		"schedule: updated to empty": {
+			old:    mkCronJob(),
+			update: mkCronJob(tweakSchedule(""), tweakResourceVersion("poke")),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "schedule"), ""),
+			},
+		},
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
 			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, Strategy.ValidateUpdate, tc.expectedErrs)
 		})
+	}
+}
+
+func mkCronJob(mutators ...func(*batch.CronJob)) batch.CronJob {
+	job := batch.CronJob{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-class",
+			Namespace: "test-namespace",
+		},
+		Spec: validCronjobSpec,
+	}
+
+	for _, mutate := range mutators {
+		mutate(&job)
+	}
+
+	return job
+}
+
+func tweakSchedule(schedule string) func(*batch.CronJob) {
+	return func(job *batch.CronJob) {
+		job.Spec.Schedule = schedule
+	}
+}
+
+func tweakResourceVersion(version string) func(*batch.CronJob) {
+	return func(job *batch.CronJob) {
+		job.ObjectMeta.ResourceVersion = version
 	}
 }
