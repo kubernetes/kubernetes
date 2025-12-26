@@ -44,6 +44,8 @@ func TestVersionedValidationByFuzzing(t *testing.T) {
 		{Group: "storage.k8s.io", Version: "v1"},
 		{Group: "storage.k8s.io", Version: "v1beta1"},
 		{Group: "storage.k8s.io", Version: "v1alpha1"},
+		{Group: "network.k8s.io", Version: "v1beta1"},
+		{Group: "network.k8s.io", Version: "v1"},
 		{Group: "node.k8s.io", Version: "v1beta1"},
 		{Group: "node.k8s.io", Version: "v1"},
 		{Group: "node.k8s.io", Version: "v1alpha1"},
