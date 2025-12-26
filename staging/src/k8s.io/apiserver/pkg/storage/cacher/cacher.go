@@ -45,6 +45,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/cacher/delegator"
 	"k8s.io/apiserver/pkg/storage/cacher/metrics"
 	"k8s.io/apiserver/pkg/storage/cacher/progress"
+	"k8s.io/apiserver/pkg/storage/cacher/store"
 	etcdfeature "k8s.io/apiserver/pkg/storage/feature"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
@@ -696,9 +697,9 @@ func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, o
 	}
 
 	if exists {
-		elem, ok := obj.(*storeElement)
+		elem, ok := obj.(*store.Element)
 		if !ok {
-			return fmt.Errorf("non *storeElement returned from storage: %v", obj)
+			return fmt.Errorf("non *store.Element returned from storage: %v", obj)
 		}
 		objVal.Set(reflect.ValueOf(elem.Object).Elem())
 	} else {
@@ -785,9 +786,9 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 	var hasMoreListItems bool
 	limit := computeListLimit(opts)
 	for i, obj := range resp.Items {
-		elem, ok := obj.(*storeElement)
+		elem, ok := obj.(*store.Element)
 		if !ok {
-			return fmt.Errorf("non *storeElement returned from storage: %v", obj)
+			return fmt.Errorf("non *store.Element returned from storage: %v", obj)
 		}
 		if opts.Predicate.MatchesObjectAttributes(elem.Labels, elem.Fields) {
 			selectedObjects = append(selectedObjects, elem.Object)

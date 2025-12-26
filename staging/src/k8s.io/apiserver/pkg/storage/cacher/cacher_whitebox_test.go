@@ -50,6 +50,7 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher/delegator"
 	"k8s.io/apiserver/pkg/storage/cacher/metrics"
+	"k8s.io/apiserver/pkg/storage/cacher/store"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	etcdfeature "k8s.io/apiserver/pkg/storage/feature"
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
@@ -706,7 +707,7 @@ func TestMatchExactResourceVersionFallback(t *testing.T) {
 			snapshotRequestCount := 0
 			cacher.watchCache.RWMutex.Lock()
 			cacher.watchCache.snapshots = &fakeSnapshotter{
-				getLessOrEqual: func(rv uint64) (orderedLister, bool) {
+				getLessOrEqual: func(rv uint64) (store.OrderedLister, bool) {
 					snapshotAvailable := tc.snapshotsAvailable[snapshotRequestCount]
 					snapshotRequestCount++
 					if snapshotAvailable {
@@ -3445,4 +3446,35 @@ func TestWatchListSemanticsSimple(t *testing.T) {
 	if err = cacher.ready.wait(ctx); err != nil {
 		t.Fatalf("error waiting for the cache to be ready, err: %v", err)
 	}
+}
+
+type fakeOrderedLister struct {
+}
+
+func (f fakeOrderedLister) Add(obj interface{}) error    { return nil }
+func (f fakeOrderedLister) Update(obj interface{}) error { return nil }
+func (f fakeOrderedLister) Delete(obj interface{}) error { return nil }
+func (f fakeOrderedLister) Clone() store.OrderedLister   { return f }
+func (f fakeOrderedLister) ListPrefix(prefixKey, continueKey string) []interface{} {
+	return nil
+}
+func (f fakeOrderedLister) Count(prefixKey, continueKey string) int { return 0 }
+
+type fakeSnapshotter struct {
+	getLessOrEqual func(rv uint64) (store.OrderedLister, bool)
+}
+
+var _ store.Snapshotter = (*fakeSnapshotter)(nil)
+
+func (f *fakeSnapshotter) Reset() {}
+func (f *fakeSnapshotter) GetLessOrEqual(rv uint64) (store.OrderedLister, bool) {
+	if f.getLessOrEqual == nil {
+		return nil, false
+	}
+	return f.getLessOrEqual(rv)
+}
+func (f *fakeSnapshotter) Add(rv uint64, indexer store.OrderedLister) {}
+func (f *fakeSnapshotter) RemoveLess(rv uint64)                       {}
+func (f *fakeSnapshotter) Len() int {
+	return 0
 }

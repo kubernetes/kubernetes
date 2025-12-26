@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cacher
+package store
 
 import (
 	"testing"
@@ -71,12 +71,12 @@ func TestStoreListPrefix(t *testing.T) {
 }
 
 func TestStoreSnapshotter(t *testing.T) {
-	cache := newStoreSnapshotter()
+	cache := NewSnapshotter()
 	cache.Add(10, fakeOrderedLister{rv: 10})
 	cache.Add(20, fakeOrderedLister{rv: 20})
 	cache.Add(30, fakeOrderedLister{rv: 30})
 	cache.Add(40, fakeOrderedLister{rv: 40})
-	assert.Equal(t, 4, cache.snapshots.Len())
+	assert.Equal(t, 4, cache.Len())
 
 	t.Log("No snapshot from before first RV")
 	_, found := cache.GetLessOrEqual(9)
@@ -105,7 +105,7 @@ func TestStoreSnapshotter(t *testing.T) {
 	t.Log("Remove snapshot less than 30")
 	cache.RemoveLess(30)
 
-	assert.Equal(t, 2, cache.snapshots.Len())
+	assert.Equal(t, 2, cache.Len())
 	_, found = cache.GetLessOrEqual(10)
 	assert.False(t, found)
 
@@ -118,7 +118,7 @@ func TestStoreSnapshotter(t *testing.T) {
 
 	t.Log("Remove removing all RVs")
 	cache.Reset()
-	assert.Equal(t, 0, cache.snapshots.Len())
+	assert.Equal(t, 0, cache.Len())
 	_, found = cache.GetLessOrEqual(30)
 	assert.False(t, found)
 	_, found = cache.GetLessOrEqual(40)
@@ -132,26 +132,26 @@ type fakeOrderedLister struct {
 func (f fakeOrderedLister) Add(obj interface{}) error    { return nil }
 func (f fakeOrderedLister) Update(obj interface{}) error { return nil }
 func (f fakeOrderedLister) Delete(obj interface{}) error { return nil }
-func (f fakeOrderedLister) Clone() orderedLister         { return f }
+func (f fakeOrderedLister) Clone() OrderedLister         { return f }
 func (f fakeOrderedLister) ListPrefix(prefixKey, continueKey string) []interface{} {
 	return nil
 }
 func (f fakeOrderedLister) Count(prefixKey, continueKey string) int { return 0 }
 
 type fakeSnapshotter struct {
-	getLessOrEqual func(rv uint64) (orderedLister, bool)
+	getLessOrEqual func(rv uint64) (OrderedLister, bool)
 }
 
 var _ Snapshotter = (*fakeSnapshotter)(nil)
 
 func (f *fakeSnapshotter) Reset() {}
-func (f *fakeSnapshotter) GetLessOrEqual(rv uint64) (orderedLister, bool) {
+func (f *fakeSnapshotter) GetLessOrEqual(rv uint64) (OrderedLister, bool) {
 	if f.getLessOrEqual == nil {
 		return nil, false
 	}
 	return f.getLessOrEqual(rv)
 }
-func (f *fakeSnapshotter) Add(rv uint64, indexer orderedLister) {}
+func (f *fakeSnapshotter) Add(rv uint64, indexer OrderedLister) {}
 func (f *fakeSnapshotter) RemoveLess(rv uint64)                 {}
 func (f *fakeSnapshotter) Len() int {
 	return 0
