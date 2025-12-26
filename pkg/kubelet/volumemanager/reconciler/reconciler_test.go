@@ -1500,9 +1500,9 @@ func Test_UncertainDeviceGlobalMounts(t *testing.T) {
 			volumeName:             volumetesting.FailMountDeviceVolumeName,
 		},
 		{
-			name:                   "timeout followed by failed operation should result in non-mounted device",
-			deviceState:            operationexecutor.DeviceNotMounted,
-			unmountDeviceCallCount: 0,
+			name:                   "timeout followed by failed operation should result in device marked as uncertain",
+			deviceState:            operationexecutor.DeviceMountUncertain,
+			unmountDeviceCallCount: 1,
 			volumeName:             volumetesting.TimeoutAndFailOnMountDeviceVolumeName,
 		},
 		{
