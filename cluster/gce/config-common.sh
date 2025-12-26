@@ -162,11 +162,11 @@ export CSI_PROXY_VERSION="${CSI_PROXY_VERSION:-v1.2.1-gke.2}"
 # csi-proxy additional flags, there are additional flags that cannot be unset in k8s-node-setup.psm1
 export CSI_PROXY_FLAGS="${CSI_PROXY_FLAGS:-}"
 # Storage path for auth-provider-gcp binaries
-export AUTH_PROVIDER_GCP_STORAGE_PATH="${AUTH_PROVIDER_GCP_STORAGE_PATH:-https://storage.googleapis.com/gke-release/auth-provider-gcp}"
+export AUTH_PROVIDER_GCP_STORAGE_PATH="${AUTH_PROVIDER_GCP_STORAGE_PATH:-https://artifacts.k8s.io/binaries/cloud-provider-gcp}"
 # auth-provider-gcp version
-export AUTH_PROVIDER_GCP_VERSION="${AUTH_PROVIDER_GCP_VERSION:-v0.0.2-gke.4}"
+export AUTH_PROVIDER_GCP_VERSION="${AUTH_PROVIDER_GCP_VERSION:-v35.0.0}"
 # Hash of auth-provider-gcp.exe binary
-export AUTH_PROVIDER_GCP_HASH_WINDOWS_AMD64="${AUTH_PROVIDER_GCP_HASH_WINDOWS_AMD64:-348af2c189d938e1a4fa5ac5c640d21e003da1f000abcd6fd7eef2acd0678638286e40703618758d4fdfe2cc4b90e920f0422128ec777c74054af9dd4405de12}"
+export AUTH_PROVIDER_GCP_HASH_WINDOWS_AMD64="${AUTH_PROVIDER_GCP_HASH_WINDOWS_AMD64:-a5e8c41369d7c49215dc2118185c5dcacc6e2f600dc1b8e28f3837a4191a18fdf0c8aed97b852bc8b273dd6c85dffba59471d60a86d126133789f83af79109b9}"
 # Directory of kubelet image credential provider binary files on windows
 export AUTH_PROVIDER_GCP_LINUX_BIN_DIR="${AUTH_PROVIDER_GCP_LINUX_BIN_DIR:-/home/kubernetes/bin}"
 # Location of kubelet image credential provider config file on windows
