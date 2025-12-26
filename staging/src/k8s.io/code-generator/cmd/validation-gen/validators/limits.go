@@ -79,7 +79,7 @@ func (maxLengthTagValidator) GetValidations(context Context, tag codetags.Tag) (
 func (mltv maxLengthTagValidator) Docs() TagDoc {
 	return TagDoc{
 		Tag:            mltv.TagName(),
-		StabilityLevel: Beta,
+		StabilityLevel: Stable,
 		Scopes:         mltv.ValidScopes().UnsortedList(),
 		Description:    "Indicates that a string field has a limit on its length.",
 		Payloads: []TagPayloadDoc{{
@@ -137,7 +137,7 @@ func (maxItemsTagValidator) GetValidations(context Context, tag codetags.Tag) (V
 func (mitv maxItemsTagValidator) Docs() TagDoc {
 	return TagDoc{
 		Tag:            mitv.TagName(),
-		StabilityLevel: Beta,
+		StabilityLevel: Stable,
 		Scopes:         mitv.ValidScopes().UnsortedList(),
 		Description:    "Indicates that a list has a limit on its size.",
 		Payloads: []TagPayloadDoc{{
@@ -187,7 +187,7 @@ func (minimumTagValidator) GetValidations(context Context, tag codetags.Tag) (Va
 func (mtv minimumTagValidator) Docs() TagDoc {
 	return TagDoc{
 		Tag:            mtv.TagName(),
-		StabilityLevel: Beta,
+		StabilityLevel: Stable,
 		Scopes:         mtv.ValidScopes().UnsortedList(),
 		Description:    "Indicates that a numeric field has a minimum value.",
 		Payloads: []TagPayloadDoc{{

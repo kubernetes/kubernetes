@@ -156,7 +156,7 @@ func (umtv unionMemberTagValidator) GetValidations(context Context, tag codetags
 func (umtv unionMemberTagValidator) Docs() TagDoc {
 	return TagDoc{
 		Tag:            umtv.TagName(),
-		StabilityLevel: Beta,
+		StabilityLevel: Stable,
 		Scopes:         umtv.ValidScopes().UnsortedList(),
 		Description:    "Indicates that this field is a member of a union.",
 		Args: []TagArgDoc{{
