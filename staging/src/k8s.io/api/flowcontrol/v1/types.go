@@ -146,6 +146,7 @@ type FlowSchemaSpec struct {
 	// `priorityLevelConfiguration` should reference a PriorityLevelConfiguration in the cluster. If the reference cannot
 	// be resolved, the FlowSchema will be ignored and marked as invalid in its status.
 	// Required.
+	// +k8s:required
 	PriorityLevelConfiguration PriorityLevelConfigurationReference `json:"priorityLevelConfiguration" protobuf:"bytes,1,opt,name=priorityLevelConfiguration"`
 	// `matchingPrecedence` is used to choose among the FlowSchemas that match a given request. The chosen
 	// FlowSchema is among those with the numerically lowest (which we take to be logically highest)
@@ -194,6 +195,7 @@ type FlowDistinguisherMethod struct {
 type PriorityLevelConfigurationReference struct {
 	// `name` is the name of the priority level configuration being referenced
 	// Required.
+	// +k8s:required
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 }
 

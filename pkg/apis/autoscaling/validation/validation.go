@@ -82,7 +82,7 @@ func validateHorizontalPodAutoscalerSpec(autoscaler autoscaling.HorizontalPodAut
 func ValidateCrossVersionObjectReference(ref autoscaling.CrossVersionObjectReference, fldPath *field.Path, opts CrossVersionObjectReferenceValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(ref.Kind) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("kind"), ""))
+		allErrs = append(allErrs, field.Required(fldPath.Child("kind"), "").MarkCoveredByDeclarative())
 	} else {
 		for _, msg := range pathvalidation.IsValidPathSegmentName(ref.Kind) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("kind"), ref.Kind, msg))
@@ -90,7 +90,7 @@ func ValidateCrossVersionObjectReference(ref autoscaling.CrossVersionObjectRefer
 	}
 
 	if len(ref.Name) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "").MarkCoveredByDeclarative())
 	} else {
 		for _, msg := range pathvalidation.IsValidPathSegmentName(ref.Name) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), ref.Name, msg))

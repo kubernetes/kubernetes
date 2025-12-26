@@ -67,9 +67,11 @@ message ContainerResourceMetricStatus {
 // CrossVersionObjectReference contains enough information to let you identify the referred resource.
 message CrossVersionObjectReference {
   // kind is the kind of the referent; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  // +k8s:required
   optional string kind = 1;
 
   // name is the name of the referent; More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+  // +k8s:required
   optional string name = 2;
 
   // apiVersion is the API version of the referent
@@ -240,6 +242,7 @@ message HorizontalPodAutoscalerList {
 message HorizontalPodAutoscalerSpec {
   // scaleTargetRef points to the target resource to scale, and is used to the pods for which metrics
   // should be collected, as well as to actually change the replica count.
+  // +k8s:required
   optional CrossVersionObjectReference scaleTargetRef = 1;
 
   // minReplicas is the lower limit for the number of replicas to which the autoscaler
@@ -252,6 +255,7 @@ message HorizontalPodAutoscalerSpec {
 
   // maxReplicas is the upper limit for the number of replicas to which the autoscaler can scale up.
   // It cannot be less that minReplicas.
+  // +k8s:required
   optional int32 maxReplicas = 3;
 
   // metrics contains the specifications for which to use to calculate the
