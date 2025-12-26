@@ -403,7 +403,7 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 
 		if o.DryRunStrategy == cmdutil.DryRunClient {
 			if !o.Quiet {
-				o.PrintObj(info)
+				o.PrintObj(info, nil)
 			}
 			return nil
 		}
@@ -486,14 +486,14 @@ func (o *DeleteOptions) deleteResource(info *resource.Info, deleteOptions *metav
 	}
 
 	if !o.Quiet {
-		o.PrintObj(info)
+		o.PrintObj(info, deleteResponse)
 	}
 	return deleteResponse, nil
 }
 
 // PrintObj for deleted objects is special because we do not have an object to print.
 // This mirrors name printer behavior
-func (o *DeleteOptions) PrintObj(info *resource.Info) {
+func (o *DeleteOptions) PrintObj(info *resource.Info, response runtime.Object) {
 	operation := "deleted"
 	groupKind := info.Mapping.GroupVersionKind
 	kindString := fmt.Sprintf("%s.%s", strings.ToLower(groupKind.Kind), groupKind.Group)
@@ -507,6 +507,20 @@ func (o *DeleteOptions) PrintObj(info *resource.Info) {
 
 	if info.Namespaced() {
 		operation = fmt.Sprintf("%s from %s namespace", operation, info.Namespace)
+	}
+
+	if response != nil {
+		if accessor, err := meta.Accessor(response); err == nil {
+			if accessor.GetDeletionTimestamp() != nil && len(accessor.GetFinalizers()) > 0 {
+				finalizersList := accessor.GetFinalizers()
+				if len(finalizersList) > 3 {
+					finalizersList = append(finalizersList[:3], fmt.Sprintf("and %d more", len(finalizersList)-3))
+				}
+				finalizers := strings.Join(finalizersList, ", ")
+				msg := fmt.Sprintf(" The resource %q has finalizers (%s) and will not be deleted until they are removed.\n", info.Name, finalizers)
+				o.WarningPrinter.Print(msg)
+			}
+		}
 	}
 
 	switch o.DryRunStrategy {
