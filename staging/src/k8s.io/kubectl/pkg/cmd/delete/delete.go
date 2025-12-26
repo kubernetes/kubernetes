@@ -403,7 +403,7 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 
 		if o.DryRunStrategy == cmdutil.DryRunClient {
 			if !o.Quiet {
-				o.PrintObj(info)
+				o.PrintObj(info, nil)
 			}
 			return nil
 		}
@@ -486,14 +486,14 @@ func (o *DeleteOptions) deleteResource(info *resource.Info, deleteOptions *metav
 	}
 
 	if !o.Quiet {
-		o.PrintObj(info)
+		o.PrintObj(info, deleteResponse)
 	}
 	return deleteResponse, nil
 }
 
 // PrintObj for deleted objects is special because we do not have an object to print.
 // This mirrors name printer behavior
-func (o *DeleteOptions) PrintObj(info *resource.Info) {
+func (o *DeleteOptions) PrintObj(info *resource.Info, response runtime.Object) {
 	operation := "deleted"
 	groupKind := info.Mapping.GroupVersionKind
 	kindString := fmt.Sprintf("%s.%s", strings.ToLower(groupKind.Kind), groupKind.Group)
@@ -507,6 +507,20 @@ func (o *DeleteOptions) PrintObj(info *resource.Info) {
 
 	if info.Namespaced() {
 		operation = fmt.Sprintf("%s from %s namespace", operation, info.Namespace)
+	}
+
+	if response != nil {
+		if accessor, err := meta.Accessor(response); err == nil {
+			if accessor.GetDeletionTimestamp() != nil && len(accessor.GetFinalizers()) > 0 {
+				finalizers := strings.Join(accessor.GetFinalizers(), ", ")
+				msg := fmt.Sprintf(" The resource %q has finalizers (%s) and will not be deleted until they are removed.\n", info.Name, finalizers)
+				msg += fmt.Sprintf("    To remove them manually, run:\n    kubectl patch %s %s --type=merge -p '{\"metadata\":{\"finalizers\":null}}'", info.Mapping.Resource.Resource, info.Name)
+				if info.Namespaced() {
+					msg += fmt.Sprintf(" -n %s", info.Namespace)
+				}
+				o.WarningPrinter.Print(msg)
+			}
+		}
 	}
 
 	switch o.DryRunStrategy {
