@@ -110,6 +110,16 @@ func (pl *NodeDeclaredFeatures) PreFilterExtensions() fwk.PreFilterExtensions {
 	return nil
 }
 
+func isTemplateNode(node *v1.Node) bool {
+	// TODO: improve template node detection logic if needed.
+	// For now, we consider a node as a template node if UID or creation timestamp is not set.
+	// We may also want to consider fields like kubelet version etc.
+	if node.UID == "" || node.CreationTimestamp.IsZero() {
+		return true
+	}
+	return false
+}
+
 // Filter checks if the node has the required features.
 func (pl *NodeDeclaredFeatures) Filter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
 	if !pl.enabled {
@@ -118,6 +128,12 @@ func (pl *NodeDeclaredFeatures) Filter(ctx context.Context, cycleState fwk.Cycle
 	s, err := getPreFilterState(cycleState)
 	if err != nil {
 		return fwk.AsStatus(err)
+	}
+	// We need to heuristically detect if the node is a template node (e.g., in case of cluster autoscaler simulations).
+	// In that case, we skip the plugin as the node doesn't have any declared features yet and we don't want to
+	// block scale-up.
+	if isTemplateNode(nodeInfo.Node()) {
+		return nil
 	}
 	result, err := ndf.MatchNodeFeatureSet(s.reqs, nodeInfo.GetNodeDeclaredFeatures())
 	if err != nil {
