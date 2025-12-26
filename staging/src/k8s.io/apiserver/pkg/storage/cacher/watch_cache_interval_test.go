@@ -29,6 +29,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
+
+	"k8s.io/apiserver/pkg/storage/cacher/store"
 )
 
 func intervalFromEvents(events []*watchCacheEvent) *watchCacheInterval {
@@ -371,7 +373,7 @@ func TestCacheIntervalNextFromStore(t *testing.T) {
 		return labels.Set(pod.Labels), fields.Set{"spec.nodeName": pod.Spec.NodeName}, nil
 	}
 	const numEvents = 50
-	store := cache.NewIndexer(storeElementKey, storeElementIndexers(nil))
+	store := cache.NewIndexer(store.ElementKey, store.ElementIndexers(nil))
 	events := make(map[string]*watchCacheEvent)
 	var rv uint64 = 1 // arbitrary number; rv till which the watch cache has progressed.
 
