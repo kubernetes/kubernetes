@@ -783,7 +783,7 @@ func validateCronJobSpec(spec, oldSpec *batch.CronJobSpec, fldPath *field.Path, 
 	allErrs := field.ErrorList{}
 
 	if len(spec.Schedule) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("schedule"), ""))
+		allErrs = append(allErrs, field.Required(fldPath.Child("schedule"), "")).MarkCoveredByDeclarative()
 	} else {
 		allowTZInSchedule := false
 		if oldSpec != nil {
