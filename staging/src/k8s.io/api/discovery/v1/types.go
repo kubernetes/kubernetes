@@ -90,6 +90,9 @@ type Endpoint struct {
 	// controller will always have exactly 1 address. No semantics are defined for
 	// additional addresses beyond the first, and kube-proxy does not look at them.
 	// +listType=set
+	// +required
+	// +k8s:required
+	// +k8s:maxItems=100
 	Addresses []string `json:"addresses" protobuf:"bytes,1,rep,name=addresses"`
 
 	// conditions contains information about the current status of the endpoint.
