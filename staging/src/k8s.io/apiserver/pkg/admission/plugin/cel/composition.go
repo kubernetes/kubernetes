@@ -18,6 +18,7 @@ package cel
 
 import (
 	"context"
+	"fmt"
 	"math"
 
 	"github.com/google/cel-go/cel"
@@ -70,19 +71,41 @@ func NewCompositedCompiler(envSet *environment.EnvSet) (*CompositedCompiler, err
 }
 
 func NewCompositedCompilerFromTemplate(context *CompositionEnv) *CompositedCompiler {
-	context = &CompositionEnv{
-		MapType:           context.MapType,
-		EnvSet:            context.EnvSet,
+	// shallow copy the MapType
+	newMapType := *context.MapType
+
+	// We are making fields empty similar to CompiledVariables.
+	// In all combinations fields are always empty when initializing from a template.
+	newMapType.Fields = map[string]*apiservercel.DeclField{}
+
+	// Create a NEW environment from the BASE environment.
+	// We cannot extend context.EnvSet because it already has 'variables' defined, which causes a conflict.
+	// Instead, we extend the original baseEnvSet with our NEW MapType.
+	newEnvSet := mustExtend(context.baseEnvSet, environment.VersionedOptions{
+		IntroducedVersion: version.MajorMinor(1, 0),
+		EnvOptions: []cel.EnvOption{
+			cel.Variable("variables", newMapType.CelType()),
+		},
+		DeclTypes: []*apiservercel.DeclType{
+			&newMapType,
+		},
+	})
+
+	newContext := &CompositionEnv{
+		MapType:           &newMapType,
+		EnvSet:            newEnvSet,
+		baseEnvSet:        context.baseEnvSet,
 		CompiledVariables: map[string]CompilationResult{},
 	}
-	compiler := NewCompiler(context.EnvSet)
+
+	compiler := NewCompiler(newContext.EnvSet)
 	conditionCompiler := &conditionCompiler{compiler}
 	mutation := &mutatingCompiler{compiler}
 	return &CompositedCompiler{
 		Compiler:          compiler,
 		ConditionCompiler: conditionCompiler,
 		MutatingCompiler:  mutation,
-		CompositionEnv:    context,
+		CompositionEnv:    newContext,
 	}
 }
 
@@ -119,6 +142,10 @@ func (c *CompositedCompiler) CompileMutatingEvaluator(expression ExpressionAcces
 type CompositionEnv struct {
 	*environment.EnvSet
 
+	// baseEnvSet is the environment before 'variables' was added.
+	// We need this to safely create new environments with modified variable types.
+	baseEnvSet *environment.EnvSet
+
 	MapType           *apiservercel.DeclType
 	CompiledVariables map[string]CompilationResult
 }
@@ -145,6 +172,7 @@ func NewCompositionEnv(typeName string, baseEnvSet *environment.EnvSet) (*Compos
 	return &CompositionEnv{
 		MapType:           declType,
 		EnvSet:            envSet,
+		baseEnvSet:        baseEnvSet,
 		CompiledVariables: map[string]CompilationResult{},
 	}, nil
 }
@@ -273,4 +301,15 @@ func convertCelTypeToDeclType(celType *cel.Type) *apiservercel.DeclType {
 		}
 		return apiservercel.DynType
 	}
+}
+
+// mustExtend extends an environment set with the given options.
+// This is a convenience wrapper that panics on error, making it clear
+// that this operation is expected to be infallible for valid inputs.
+func mustExtend(base *environment.EnvSet, opts environment.VersionedOptions) *environment.EnvSet {
+	newSet, err := base.Extend(opts)
+	if err != nil {
+		panic(fmt.Errorf("failed to extend environment for composition: %w", err))
+	}
+	return newSet
 }

@@ -247,3 +247,58 @@ func TestCompositedPolicies(t *testing.T) {
 		})
 	}
 }
+func TestCompositionEnvTemplate(t *testing.T) {
+	baseEnv, err := NewCompositionEnv("variables", environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	compiler1 := NewCompositedCompilerFromTemplate(baseEnv)
+	compiler2 := NewCompositedCompilerFromTemplate(baseEnv)
+
+	compiler1.CompositionEnv.AddField("v1", cel.StringType)
+
+	if _, ok := compiler1.CompositionEnv.MapType.Fields["v1"]; !ok {
+		t.Error("compiler1 should have v1")
+	}
+	if _, ok := compiler2.CompositionEnv.MapType.Fields["v1"]; ok {
+		t.Error("compiler2 should not have v1")
+	}
+}
+
+// TestMapTypePollution checks that variables compiled in one compiler do not leak into another
+// compiler that was created from the same template.
+func TestMapTypePollution(t *testing.T) {
+	// 1. Create a base template (mimicking the singleton in plugin.go)
+	// this templateEnv is created once in validating/plugin.go
+	baseEnv := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion())
+	templateEnv, err := NewCompositionEnv(VariablesTypeName, baseEnv)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// 2. Compile first policy with variable "foo"
+	compiler1 := NewCompositedCompilerFromTemplate(templateEnv)
+	vars1 := []NamedExpressionAccessor{
+		&testVariable{name: "foo", expression: "'bar'"},
+	}
+	compiler1.CompileAndStoreVariables(vars1, OptionalVariableDeclarations{}, environment.StoredExpressions)
+
+	// 3. Compile second policy with variable "bar" using SAME template
+	compiler2 := NewCompositedCompilerFromTemplate(templateEnv)
+	vars2 := []NamedExpressionAccessor{
+		&testVariable{name: "bar", expression: "'baz'"},
+	}
+	compiler2.CompileAndStoreVariables(vars2, OptionalVariableDeclarations{}, environment.StoredExpressions)
+
+	// 4. Check if "foo" leaked into compiler2's CompositionEnv
+	// If MapType is shared, compiler2.CompositionEnv.MapType.Fields will contain "foo"
+	if _, ok := compiler2.CompositionEnv.MapType.Fields["foo"]; ok {
+		t.Errorf("Pollution detected: variable 'foo' from policy 1 leaked into policy 2")
+	}
+
+	// Also check if "bar" leaked into compiler1 (if they share the exact same map object)
+	if _, ok := compiler1.CompositionEnv.MapType.Fields["bar"]; ok {
+		t.Errorf("Pollution detected: variable 'bar' from policy 2 leaked into policy 1")
+	}
+}
