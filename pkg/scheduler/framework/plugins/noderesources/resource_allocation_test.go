@@ -17,8 +17,6 @@ limitations under the License.
 package noderesources
 
 import (
-	"context"
-	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -37,8 +35,6 @@ import (
 	"k8s.io/dynamic-resource-allocation/deviceclass/extendedresourcecache"
 	"k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/dynamic-resource-allocation/structured"
-	"k8s.io/klog/v2"
-	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -47,6 +43,7 @@ import (
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -265,6 +262,9 @@ func TestResourceAllocationScorerCalculateRequests(t *testing.T) {
 }
 
 func TestCalculateResourceAllocatableRequest(t *testing.T) {
+	testCalculateResourceAllocatableRequest(ktesting.Init(t))
+}
+func testCalculateResourceAllocatableRequest(tCtx ktesting.TContext) {
 	// Initialize test variables
 	nodeName := "resource-node"
 	driverName := "test-driver"
@@ -552,18 +552,11 @@ func TestCalculateResourceAllocatableRequest(t *testing.T) {
 	}
 
 	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
+		tCtx.SyncTest(name, func(tCtx ktesting.TContext) {
 			// Setup environment, create required objects
-			logger, tCtx := ktesting.NewTestContext(t)
-			tCtx, cancel := context.WithCancel(tCtx)
-			defer cancel()
+			featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, tc.enableDRAExtendedResource)
 
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, tc.enableDRAExtendedResource)
-
-			draManager, err := newTestDRAManager(t, tCtx, logger, tc.objects...)
-			if err != nil {
-				t.Fatalf("failed to create fake DRA manager: %v", err)
-			}
+			draManager := newTestDRAManager(tCtx, tc.objects...)
 
 			nodeInfo := framework.NewNodeInfo()
 			nodeInfo.SetNode(tc.node)
@@ -582,24 +575,26 @@ func TestCalculateResourceAllocatableRequest(t *testing.T) {
 				var status *fwk.Status
 				draPreScoreState, status = getDRAPreScoredParams(draManager, []config.ResourceSpec{{Name: string(tc.extendedResource)}})
 				if status != nil {
-					t.Fatalf("getting DRA pre-scored params failed: %v", status)
+					tCtx.Fatalf("getting DRA pre-scored params failed: %v", status)
 				}
 			}
 
 			// Test calculateResourceAllocatableRequest API
 			allocatable, requested := scorer.calculateResourceAllocatableRequest(tCtx, nodeInfo, tc.extendedResource, tc.podRequest, draPreScoreState)
 			if !cmp.Equal(allocatable, tc.expectedAllocatable) {
-				t.Errorf("Expected allocatable=%v, but got allocatable=%v", tc.expectedAllocatable, allocatable)
+				tCtx.Errorf("Expected allocatable=%v, but got allocatable=%v", tc.expectedAllocatable, allocatable)
 			}
 			if !cmp.Equal(requested, tc.expectedRequested) {
-				t.Errorf("Expected requested=%v, but got requested=%v", tc.expectedRequested, requested)
+				tCtx.Errorf("Expected requested=%v, but got requested=%v", tc.expectedRequested, requested)
 			}
 		})
 	}
 }
 
-// newTestDRAManager creates a DefaultDRAManager for testing purposes
-func newTestDRAManager(t *testing.T, ctx context.Context, logger klog.Logger, objects ...apiruntime.Object) (*dynamicresources.DefaultDRAManager, error) {
+// newTestDRAManager creates a DefaultDRAManager for testing purposes.
+// Only usable in a syntest bubble.
+func newTestDRAManager(tCtx ktesting.TContext, objects ...apiruntime.Object) *dynamicresources.DefaultDRAManager {
+	tCtx = ktesting.WithCancel(tCtx)
 	client := fake.NewClientset(objects...)
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	resourceSliceTrackerOpts := tracker.Options{
@@ -608,14 +603,12 @@ func newTestDRAManager(t *testing.T, ctx context.Context, logger klog.Logger, ob
 		ClassInformer: informerFactory.Resource().V1().DeviceClasses(),
 		KubeClient:    client,
 	}
-	resourceSliceTracker, err := tracker.StartTracker(ctx, resourceSliceTrackerOpts)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't start resource slice tracker: %w", err)
-	}
+	resourceSliceTracker, err := tracker.StartTracker(tCtx, resourceSliceTrackerOpts)
+	tCtx.ExpectNoError(err, "couldn't start resource slice tracker")
 	draManager := dynamicresources.NewDRAManager(
-		ctx,
+		tCtx,
 		assumecache.NewAssumeCache(
-			logger,
+			tCtx.Logger(),
 			informerFactory.Resource().V1().ResourceClaims().Informer(),
 			"resource claim",
 			"",
@@ -624,18 +617,25 @@ func newTestDRAManager(t *testing.T, ctx context.Context, logger klog.Logger, ob
 		informerFactory)
 
 	cache := draManager.DeviceClassResolver().(*extendedresourcecache.ExtendedResourceCache)
-	if _, err := informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandler(cache); err != nil {
-		return nil, fmt.Errorf("failed to add device class informer event handler: %w", err)
-	}
+	handle, err := informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandler(cache)
+	tCtx.ExpectNoError(err, "add device class informer event handler")
+	tCtx.Cleanup(func() {
+		_ = informerFactory.Resource().V1().DeviceClasses().Informer().RemoveEventHandler(handle)
+	})
 
-	informerFactory.Start(ctx.Done())
-	t.Cleanup(func() {
+	informerFactory.Start(tCtx.Done())
+	tCtx.Cleanup(func() {
+		tCtx.Cancel("test has completed")
 		// Now we can wait for all goroutines to stop.
 		informerFactory.Shutdown()
 	})
-	informerFactory.WaitForCacheSync(ctx.Done())
+	informerFactory.WaitForCacheSync(tCtx.Done())
 
-	return draManager, nil
+	// Wait for full initialization of manager, including
+	// processing of all informer events.
+	tCtx.Wait()
+
+	return draManager
 }
 
 // getCachedDeviceMatch checks the cache for a DeviceMatches result
