@@ -137,6 +137,7 @@ type DebugOptions struct {
 	SameNode           bool
 	SetImages          map[string]string
 	ShareProcesses     bool
+	ShareVolumes       bool
 	TargetContainer    string
 	TTY                bool
 	Profile            string
@@ -211,6 +212,7 @@ func (o *DebugOptions) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVarP(&o.Quiet, "quiet", "q", o.Quiet, i18n.T("If true, suppress informational messages."))
 	cmd.Flags().BoolVar(&o.SameNode, "same-node", o.SameNode, i18n.T("When used with '--copy-to', schedule the copy of target Pod on the same node."))
 	cmd.Flags().BoolVar(&o.ShareProcesses, "share-processes", o.ShareProcesses, i18n.T("When used with '--copy-to', enable process namespace sharing in the copy."))
+	cmd.Flags().BoolVar(&o.ShareVolumes, "share-volumes", o.ShareVolumes, i18n.T("If true, the debug container will share all volume mounts of the target container."))
 	cmd.Flags().StringVar(&o.TargetContainer, "target", "", i18n.T("When using an ephemeral container, target processes in this container name."))
 	cmd.Flags().BoolVarP(&o.TTY, "tty", "t", o.TTY, i18n.T("Allocate a TTY for the debugging container."))
 	cmd.Flags().StringVar(&o.Profile, "profile", ProfileLegacy, i18n.T(`Options are "legacy", "general", "baseline", "netadmin", "restricted" or "sysadmin".`))
@@ -681,6 +683,15 @@ func (o *DebugOptions) generateDebugContainer(pod *corev1.Pod) (*corev1.Pod, *co
 		TargetContainerName: o.TargetContainer,
 	}
 
+	if o.ShareVolumes && len(o.TargetContainer) > 0 {
+		for _, c := range pod.Spec.Containers {
+			if c.Name == o.TargetContainer {
+				ec.VolumeMounts = append(ec.VolumeMounts, c.VolumeMounts...)
+				break
+			}
+		}
+	}
+
 	if o.ArgsOnly {
 		ec.Args = o.Args
 	} else {
@@ -846,6 +857,19 @@ func (o *DebugOptions) generatePodCopyWithDebugContainer(pod *corev1.Pod) (*core
 	}
 	c.Stdin = o.Interactive
 	c.TTY = o.TTY
+
+	if o.ShareVolumes {
+		containerByRef := containerNameToRef(pod)
+
+		sourceName := o.Container
+		if len(sourceName) == 0 && len(pod.Spec.Containers) > 0 {
+			sourceName = pod.Spec.Containers[0].Name
+		}
+
+		if target, ok := containerByRef[sourceName]; ok {
+			c.VolumeMounts = append(c.VolumeMounts, target.VolumeMounts...)
+		}
+	}
 
 	err := o.Applier.Apply(copied, c.Name, pod)
 	if err != nil {
