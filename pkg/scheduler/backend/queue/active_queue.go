@@ -504,5 +504,7 @@ func (aq *activeQueue) close() {
 
 // broadcast notifies the pop() operation that new pod(s) was added to the activeQueue.
 func (aq *activeQueue) broadcast() {
+	aq.lock.Lock()
+	defer aq.lock.Unlock()
 	aq.cond.Broadcast()
 }
