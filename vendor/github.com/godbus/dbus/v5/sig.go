@@ -31,7 +31,7 @@ type Signature struct {
 
 // SignatureOf returns the concatenation of all the signatures of the given
 // values. It panics if one of them is not representable in D-Bus.
-func SignatureOf(vs ...interface{}) Signature {
+func SignatureOf(vs ...any) Signature {
 	var s string
 	for _, v := range vs {
 		s += getSignature(reflect.TypeOf(v), &depthCounter{})
@@ -183,19 +183,19 @@ func (cnt *depthCounter) Valid() bool {
 	return cnt.arrayDepth <= 32 && cnt.structDepth <= 32 && cnt.dictEntryDepth <= 32
 }
 
-func (cnt depthCounter) EnterArray() *depthCounter {
+func (cnt *depthCounter) EnterArray() *depthCounter {
 	cnt.arrayDepth++
-	return &cnt
+	return cnt
 }
 
-func (cnt depthCounter) EnterStruct() *depthCounter {
+func (cnt *depthCounter) EnterStruct() *depthCounter {
 	cnt.structDepth++
-	return &cnt
+	return cnt
 }
 
-func (cnt depthCounter) EnterDictEntry() *depthCounter {
+func (cnt *depthCounter) EnterDictEntry() *depthCounter {
 	cnt.dictEntryDepth++
-	return &cnt
+	return cnt
 }
 
 // Try to read a single type from this string. If it was successful, err is nil
@@ -221,6 +221,9 @@ func validSingle(s string, depth *depthCounter) (err error, rem string) {
 			i++
 			rem = s[i+1:]
 			s = s[2:i]
+			if len(s) == 0 {
+				return SignatureError{Sig: s, Reason: "empty dict"}, ""
+			}
 			if err, _ = validSingle(s[:1], depth.EnterArray().EnterDictEntry()); err != nil {
 				return err, ""
 			}

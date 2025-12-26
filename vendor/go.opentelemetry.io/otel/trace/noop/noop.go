@@ -51,7 +51,7 @@ type Tracer struct{ embedded.Tracer }
 // If ctx contains a span context, the returned span will also contain that
 // span context. If the span context in ctx is for a non-recording span, that
 // span instance will be returned directly.
-func (t Tracer) Start(ctx context.Context, _ string, _ ...trace.SpanStartOption) (context.Context, trace.Span) {
+func (Tracer) Start(ctx context.Context, _ string, _ ...trace.SpanStartOption) (context.Context, trace.Span) {
 	span := trace.SpanFromContext(ctx)
 
 	// If the parent context contains a non-zero span context, that span

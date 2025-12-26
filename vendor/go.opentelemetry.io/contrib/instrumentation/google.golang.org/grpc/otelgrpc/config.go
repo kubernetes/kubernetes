@@ -4,23 +4,18 @@
 package otelgrpc // import "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 
 import (
-	"google.golang.org/grpc/stats"
+	"context"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
-	"go.opentelemetry.io/otel/metric/noop"
 	"go.opentelemetry.io/otel/propagation"
-	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 	"go.opentelemetry.io/otel/trace"
+	"google.golang.org/grpc/stats"
 )
 
-const (
-	// ScopeName is the instrumentation scope name.
-	ScopeName = "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
-	// GRPCStatusCodeKey is convention for numeric status code of a gRPC request.
-	GRPCStatusCodeKey = attribute.Key("rpc.grpc.status_code")
-)
+// ScopeName is the instrumentation scope name.
+const ScopeName = "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 
 // InterceptorFilter is a predicate used to determine whether a given request in
 // interceptor info should be instrumented. A InterceptorFilter must return true if
@@ -45,17 +40,11 @@ type config struct {
 	SpanAttributes    []attribute.KeyValue
 	MetricAttributes  []attribute.KeyValue
 
+	PublicEndpoint   bool
+	PublicEndpointFn func(ctx context.Context, info *stats.RPCTagInfo) bool
+
 	ReceivedEvent bool
 	SentEvent     bool
-
-	tracer trace.Tracer
-	meter  metric.Meter
-
-	rpcDuration    metric.Float64Histogram
-	rpcInBytes     metric.Int64Histogram
-	rpcOutBytes    metric.Int64Histogram
-	rpcInMessages  metric.Int64Histogram
-	rpcOutMessages metric.Int64Histogram
 }
 
 // Option applies an option value for a config.
@@ -64,7 +53,7 @@ type Option interface {
 }
 
 // newConfig returns a config configured with all the passed Options.
-func newConfig(opts []Option, role string) *config {
+func newConfig(opts []Option) *config {
 	c := &config{
 		Propagators:    otel.GetTextMapPropagator(),
 		TracerProvider: otel.GetTracerProvider(),
@@ -73,88 +62,39 @@ func newConfig(opts []Option, role string) *config {
 	for _, o := range opts {
 		o.apply(c)
 	}
-
-	c.tracer = c.TracerProvider.Tracer(
-		ScopeName,
-		trace.WithInstrumentationVersion(SemVersion()),
-	)
-
-	c.meter = c.MeterProvider.Meter(
-		ScopeName,
-		metric.WithInstrumentationVersion(Version()),
-		metric.WithSchemaURL(semconv.SchemaURL),
-	)
-
-	var err error
-	c.rpcDuration, err = c.meter.Float64Histogram("rpc."+role+".duration",
-		metric.WithDescription("Measures the duration of inbound RPC."),
-		metric.WithUnit("ms"))
-	if err != nil {
-		otel.Handle(err)
-		if c.rpcDuration == nil {
-			c.rpcDuration = noop.Float64Histogram{}
-		}
-	}
-
-	rpcRequestSize, err := c.meter.Int64Histogram("rpc."+role+".request.size",
-		metric.WithDescription("Measures size of RPC request messages (uncompressed)."),
-		metric.WithUnit("By"))
-	if err != nil {
-		otel.Handle(err)
-		if rpcRequestSize == nil {
-			rpcRequestSize = noop.Int64Histogram{}
-		}
-	}
-
-	rpcResponseSize, err := c.meter.Int64Histogram("rpc."+role+".response.size",
-		metric.WithDescription("Measures size of RPC response messages (uncompressed)."),
-		metric.WithUnit("By"))
-	if err != nil {
-		otel.Handle(err)
-		if rpcResponseSize == nil {
-			rpcResponseSize = noop.Int64Histogram{}
-		}
-	}
-
-	rpcRequestsPerRPC, err := c.meter.Int64Histogram("rpc."+role+".requests_per_rpc",
-		metric.WithDescription("Measures the number of messages received per RPC. Should be 1 for all non-streaming RPCs."),
-		metric.WithUnit("{count}"))
-	if err != nil {
-		otel.Handle(err)
-		if rpcRequestsPerRPC == nil {
-			rpcRequestsPerRPC = noop.Int64Histogram{}
-		}
-	}
-
-	rpcResponsesPerRPC, err := c.meter.Int64Histogram("rpc."+role+".responses_per_rpc",
-		metric.WithDescription("Measures the number of messages received per RPC. Should be 1 for all non-streaming RPCs."),
-		metric.WithUnit("{count}"))
-	if err != nil {
-		otel.Handle(err)
-		if rpcResponsesPerRPC == nil {
-			rpcResponsesPerRPC = noop.Int64Histogram{}
-		}
-	}
-
-	switch role {
-	case "client":
-		c.rpcInBytes = rpcResponseSize
-		c.rpcInMessages = rpcResponsesPerRPC
-		c.rpcOutBytes = rpcRequestSize
-		c.rpcOutMessages = rpcRequestsPerRPC
-	case "server":
-		c.rpcInBytes = rpcRequestSize
-		c.rpcInMessages = rpcRequestsPerRPC
-		c.rpcOutBytes = rpcResponseSize
-		c.rpcOutMessages = rpcResponsesPerRPC
-	default:
-		c.rpcInBytes = noop.Int64Histogram{}
-		c.rpcInMessages = noop.Int64Histogram{}
-		c.rpcOutBytes = noop.Int64Histogram{}
-		c.rpcOutMessages = noop.Int64Histogram{}
-	}
-
 	return c
+}
+
+type publicEndpointOption struct{ p bool }
+
+func (o publicEndpointOption) apply(c *config) {
+	c.PublicEndpoint = o.p
+}
+
+// WithPublicEndpoint configures the Handler to link the span with an incoming
+// span context. If this option is not provided, then the association is a child
+// association instead of a link.
+func WithPublicEndpoint() Option {
+	return publicEndpointOption{p: true}
+}
+
+type publicEndpointFnOption struct {
+	fn func(context.Context, *stats.RPCTagInfo) bool
+}
+
+func (o publicEndpointFnOption) apply(c *config) {
+	if o.fn != nil {
+		c.PublicEndpointFn = o.fn
+	}
+}
+
+// WithPublicEndpointFn runs with every request, and allows conditionally
+// configuring the Handler to link the span with an incoming span context. If
+// this option is not provided or returns false, then the association is a
+// child association instead of a link.
+// Note: WithPublicEndpoint takes precedence over WithPublicEndpointFn.
+func WithPublicEndpointFn(fn func(context.Context, *stats.RPCTagInfo) bool) Option {
+	return publicEndpointFnOption{fn: fn}
 }
 
 type propagatorsOption struct{ p propagation.TextMapPropagator }
@@ -274,6 +214,8 @@ func (o spanStartOption) apply(c *config) {
 
 // WithSpanOptions configures an additional set of
 // trace.SpanOptions, which are applied to each new span.
+//
+// Deprecated: It is only used by the deprecated interceptor, and is unused by [NewClientHandler] and [NewServerHandler].
 func WithSpanOptions(opts ...trace.SpanStartOption) Option {
 	return spanStartOption{opts}
 }

@@ -466,6 +466,7 @@ type ServerConfig struct {
 	MaxHeaderListSize     *uint32
 	HeaderTableSize       *uint32
 	BufferPool            mem.BufferPool
+	StaticWindowSize      bool
 }
 
 // ConnectOptions covers all relevant options for communicating with the server.
@@ -504,6 +505,8 @@ type ConnectOptions struct {
 	MaxHeaderListSize *uint32
 	// The mem.BufferPool to use when reading/writing to the wire.
 	BufferPool mem.BufferPool
+	// StaticWindowSize controls whether dynamic window sizing is enabled.
+	StaticWindowSize bool
 }
 
 // WriteOptions provides additional hints and information for message
@@ -540,6 +543,11 @@ type CallHdr struct {
 	PreviousAttempts int // value of grpc-previous-rpc-attempts header to set
 
 	DoneFunc func() // called when the stream is finished
+
+	// Authority is used to explicitly override the `:authority` header. If set,
+	// this value takes precedence over the Host field and will be used as the
+	// value for the `:authority` header.
+	Authority string
 }
 
 // ClientTransport is the common interface for all gRPC client-side transport

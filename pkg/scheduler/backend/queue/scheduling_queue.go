@@ -1302,6 +1302,8 @@ func (p *PriorityQueue) PodsInBackoffQ() []*v1.Pod {
 
 // UnschedulablePods returns all the pods in unschedulable state.
 func (p *PriorityQueue) UnschedulablePods() []*v1.Pod {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
 	var result []*v1.Pod
 	for _, pInfo := range p.unschedulablePods.podInfoMap {
 		result = append(result, pInfo.Pod)
