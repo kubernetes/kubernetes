@@ -32,6 +32,7 @@ import (
 type Decoder struct {
 	decoder         streaming.Decoder
 	embeddedDecoder runtime.Decoder
+	internalEvent   metav1.WatchEvent
 }
 
 // NewDecoder creates an Decoder for the given writer and codec.
@@ -45,25 +46,25 @@ func NewDecoder(decoder streaming.Decoder, embeddedDecoder runtime.Decoder) *Dec
 // Decode blocks until it can return the next object in the reader. Returns an error
 // if the reader is closed or an object can't be decoded.
 func (d *Decoder) Decode() (watch.EventType, runtime.Object, error) {
-	var got metav1.WatchEvent
-	res, _, err := d.decoder.Decode(nil, &got)
+	d.internalEvent.Reset()
+	res, _, err := d.decoder.Decode(nil, &d.internalEvent)
 	if err != nil {
 		return "", nil, err
 	}
-	if res != &got {
+	if res != &d.internalEvent {
 		return "", nil, fmt.Errorf("unable to decode to metav1.WatchEvent")
 	}
-	switch got.Type {
+	switch d.internalEvent.Type {
 	case string(watch.Added), string(watch.Modified), string(watch.Deleted), string(watch.Error), string(watch.Bookmark):
 	default:
-		return "", nil, fmt.Errorf("got invalid watch event type: %v", got.Type)
+		return "", nil, fmt.Errorf("got invalid watch event type: %v", d.internalEvent.Type)
 	}
 
-	obj, err := runtime.Decode(d.embeddedDecoder, got.Object.Raw)
+	obj, err := runtime.Decode(d.embeddedDecoder, d.internalEvent.Object.Raw)
 	if err != nil {
 		return "", nil, fmt.Errorf("unable to decode watch event: %v", err)
 	}
-	return watch.EventType(got.Type), obj, nil
+	return watch.EventType(d.internalEvent.Type), obj, nil
 }
 
 // Close closes the underlying r.
