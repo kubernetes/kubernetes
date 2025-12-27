@@ -3797,6 +3797,29 @@ func TestConvertToAPIContainerStatuses(t *testing.T) {
 		},
 		RestartPolicy: v1.RestartPolicyAlways,
 	}
+	desiredStateWithInitContainer := v1.PodSpec{
+		NodeName: "machine",
+		InitContainers: []v1.Container{
+			{Name: "init-1"},
+		},
+		Containers: []v1.Container{
+			{Name: "containerA"},
+		},
+		RestartPolicy: v1.RestartPolicyAlways,
+	}
+	desiredStateWithSidecarContainer := v1.PodSpec{
+		NodeName: "machine",
+		InitContainers: []v1.Container{
+			{
+				Name:          "sidecar-1",
+				RestartPolicy: ptr.To(v1.ContainerRestartPolicyAlways),
+			},
+		},
+		Containers: []v1.Container{
+			{Name: "containerA"},
+		},
+		RestartPolicy: v1.RestartPolicyAlways,
+	}
 	now := metav1.Now()
 
 	tests := []struct {
@@ -4057,6 +4080,81 @@ func TestConvertToAPIContainerStatuses(t *testing.T) {
 				withRestartCount(failedStateWithExitCode("containerA", 1), 1),
 				withRestartCount(waitingStateWithRestartingAllContainers("containerB"), 1),
 			},
+		},
+		{
+			name: "Unable to get init container status from container runtime and pod has been initialized, treat it as exited normally",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-pod",
+				},
+				Spec: desiredStateWithInitContainer,
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{},
+				},
+			},
+			currentStatus: &kubecontainer.PodStatus{
+				ContainerStatuses: []*kubecontainer.Status{
+					{
+						ID:        kubecontainer.ContainerID{ID: "foo"},
+						Name:      "containerA",
+						StartedAt: time.Unix(1, 0).UTC(),
+						State:     kubecontainer.ContainerStateRunning,
+					},
+				},
+			},
+			previousStatus: []v1.ContainerStatus{},
+			containers:     desiredStateWithInitContainer.InitContainers,
+			expected: []v1.ContainerStatus{
+				{
+					Name: "init-1",
+					State: v1.ContainerState{
+						Terminated: &v1.ContainerStateTerminated{
+							Reason:   "Completed",
+							Message:  "Unable to get init container status from container runtime and pod has been initialized, treat it as exited normally",
+							ExitCode: 0,
+						},
+					},
+				},
+			},
+			hasInitContainers: true,
+			isInitContainer:   true,
+		},
+		{
+			name: "Unable to get sidecar container status from container runtime and pod has been initialized, sidecar container should be waiting",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-pod",
+				},
+				Spec: desiredStateWithSidecarContainer,
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{},
+				},
+			},
+			currentStatus: &kubecontainer.PodStatus{
+				ContainerStatuses: []*kubecontainer.Status{
+					{
+						ID:        kubecontainer.ContainerID{ID: "foo"},
+						Name:      "containerA",
+						StartedAt: time.Unix(1, 0).UTC(),
+						State:     kubecontainer.ContainerStateRunning,
+					},
+				},
+			},
+			previousStatus: []v1.ContainerStatus{},
+			containers:     desiredStateWithSidecarContainer.InitContainers,
+			expected: []v1.ContainerStatus{
+				{
+					Name: "sidecar-1",
+					State: v1.ContainerState{
+						Waiting: &v1.ContainerStateWaiting{
+							Reason:  "PodInitializing",
+							Message: "",
+						},
+					},
+				},
+			},
+			hasInitContainers: true,
+			isInitContainer:   true,
 		},
 	}
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{

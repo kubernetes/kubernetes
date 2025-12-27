@@ -28,6 +28,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -43,9 +45,6 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
-
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
 )
 
 var _ = SIGDescribe(feature.StandaloneMode, framework.WithFeatureGate(features.EnvFiles), func() {
@@ -332,6 +331,79 @@ var _ = SIGDescribe(feature.StandaloneMode, func() {
 				}
 				return fmt.Errorf("pod (%v/%v) still exists", ns, staticPodName)
 			}).Should(gomega.Succeed())
+		})
+
+		f.Context("when the static pod has init container", f.WithSerial(), func() {
+			f.It("should be ready after init container is removed and kubelet restarts", func(ctx context.Context) {
+				ginkgo.By("create static pod")
+				staticPod := &v1.Pod{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "Pod",
+						APIVersion: "v1",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "static",
+						Namespace: f.Namespace.Name,
+					},
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
+							{
+								Name:  "main",
+								Image: imageutils.GetE2EImage(imageutils.Pause),
+							},
+						},
+						InitContainers: []v1.Container{
+							{
+								Name:    "init",
+								Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+								Command: []string{"ls"},
+							},
+						},
+					},
+				}
+				staticPodName = staticPod.Name
+				podPath = kubeletCfg.StaticPodPath
+				ns = staticPod.Namespace
+				err := scheduleStaticPod(podPath, staticPod.Name, ns, staticPod)
+				framework.ExpectNoError(err)
+
+				var initCtrID string
+				var startTime *metav1.Time
+				ginkgo.By("wait for the mirror pod to be updated")
+				gomega.Eventually(ctx, func(g gomega.Gomega) {
+					pod, err := getPodFromStandaloneKubelet(ctx, staticPod.Namespace, staticPod.Name)
+					g.Expect(err).Should(gomega.Succeed())
+					g.Expect(pod.Status.InitContainerStatuses).To(gomega.HaveLen(1))
+					cstatus := pod.Status.InitContainerStatuses[0]
+					// Wait until the init container is terminated.
+					g.Expect(cstatus.State.Terminated).NotTo(gomega.BeNil())
+					g.Expect(cstatus.State.Terminated.ContainerID).NotTo(gomega.BeEmpty())
+					initCtrID = cstatus.ContainerID
+					startTime = pod.Status.StartTime
+				}, 2*time.Minute, 5*time.Second).Should(gomega.Succeed())
+
+				ginkgo.By("remove init container")
+				removeInitContainer(ctx, initCtrID)
+
+				ginkgo.By("restart kubelet")
+				restartKubelet(ctx, true)
+				gomega.Eventually(ctx, func() bool {
+					return kubeletHealthCheck(kubeletHealthCheckURL)
+				}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeTrueBecause("kubelet should be started"))
+
+				ginkgo.By("wait for the mirror pod to be updated")
+				gomega.Eventually(ctx, func(g gomega.Gomega) {
+					pod, err := getPodFromStandaloneKubelet(ctx, staticPod.Namespace, staticPod.Name)
+					g.Expect(pod.Status.StartTime).NotTo(gomega.Equal(startTime))
+					g.Expect(err).Should(gomega.Succeed())
+					g.Expect(pod.Status.InitContainerStatuses).To(gomega.HaveLen(1))
+					cstatus := pod.Status.InitContainerStatuses[0]
+					// Init container should be completed.
+					g.Expect(cstatus.State.Terminated).NotTo(gomega.BeNil())
+					g.Expect(cstatus.State.Terminated.Reason).To(gomega.Equal("Completed"))
+					g.Expect(cstatus.State.Terminated.ExitCode).To(gomega.BeZero())
+				}, 2*time.Minute, 5*time.Second).Should(gomega.Succeed())
+			})
 		})
 	})
 })
