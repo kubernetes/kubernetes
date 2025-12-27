@@ -532,8 +532,6 @@ func clearNominatedNodeName(ctx context.Context, cs clientset.Interface, apiCach
 //
 // See http://kep.k8s.io/4832 for how the async preemption works.
 func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName string) {
-	metrics.PreemptionVictims.Observe(float64(len(c.Victims().Pods)))
-
 	// Intentionally create a new context, not using a ctx from the scheduling cycle, to create ctx,
 	// because this process could continue even after this scheduling cycle finishes.
 	ctx, cancel := context.WithCancel(context.Background())
@@ -568,9 +566,18 @@ func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName 
 	go func() {
 		logger := klog.FromContext(ctx)
 		startTime := time.Now()
+
+		var preemptionFailed bool
+		defer func() {
+			if !preemptionFailed {
+				metrics.PreemptionVictims.Observe(float64(len(c.Victims().Pods)))
+			}
+		}()
+
 		result := metrics.GoroutineResultSuccess
 		defer metrics.PreemptionGoroutinesDuration.WithLabelValues(result).Observe(metrics.SinceInSeconds(startTime))
 		defer metrics.PreemptionGoroutinesExecutionTotal.WithLabelValues(result).Inc()
+
 		defer func() {
 			if result == metrics.GoroutineResultError {
 				// When API call isn't successful, the Pod may get stuck in the unschedulable pod pool in the worst case.
@@ -609,6 +616,7 @@ func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName 
 				utilruntime.HandleErrorWithContext(ctx, err, "Error occurred during async preemption")
 				result = metrics.GoroutineResultError
 				preemptLastVictim = false
+				preemptionFailed = true
 			}
 		}
 
@@ -624,6 +632,7 @@ func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName 
 			if err := ev.PreemptPod(ctx, c, pod, lastVictim, pluginName); err != nil {
 				utilruntime.HandleErrorWithContext(ctx, err, "Error occurred during async preemption of the last victim")
 				result = metrics.GoroutineResultError
+				preemptionFailed = true
 			}
 		}
 		ev.mu.Lock()
