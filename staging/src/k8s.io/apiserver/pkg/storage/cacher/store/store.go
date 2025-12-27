@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cacher
+package store
 
 import (
 	"fmt"
@@ -60,7 +60,7 @@ const (
 	btreeDegree = 16
 )
 
-type storeIndexer interface {
+type Indexer interface {
 	Add(obj interface{}) error
 	Update(obj interface{}) error
 	Delete(obj interface{}) error
@@ -72,17 +72,17 @@ type storeIndexer interface {
 	ByIndex(indexName, indexedValue string) ([]interface{}, error)
 }
 
-type orderedLister interface {
+type OrderedLister interface {
 	ListPrefix(prefix, continueKey string) []interface{}
 	Count(prefix, continueKey string) (count int)
-	Clone() orderedLister
+	Clone() OrderedLister
 }
 
-func newStoreIndexer(indexers *cache.Indexers) storeIndexer {
+func NewIndexer(indexers *cache.Indexers) Indexer {
 	if utilfeature.DefaultFeatureGate.Enabled(features.BtreeWatchCache) {
-		return newThreadedBtreeStoreIndexer(storeElementIndexers(indexers), btreeDegree)
+		return newThreadedBtreeStoreIndexer(ElementIndexers(indexers), btreeDegree)
 	}
-	return cache.NewIndexer(storeElementKey, storeElementIndexers(indexers))
+	return cache.NewIndexer(ElementKey, ElementIndexers(indexers))
 }
 
 // Computing a key of an object is generally non-trivial (it performs
@@ -90,32 +90,32 @@ func newStoreIndexer(indexers *cache.Indexers) storeIndexer {
 // labels. To avoid computing them multiple times (to serve the event
 // in different List/Watch requests), in the underlying store we are
 // keeping structs (key, object, labels, fields).
-type storeElement struct {
+type Element struct {
 	Key    string
 	Object runtime.Object
 	Labels labels.Set
 	Fields fields.Set
 }
 
-func storeElementKey(obj interface{}) (string, error) {
-	elem, ok := obj.(*storeElement)
+func ElementKey(obj interface{}) (string, error) {
+	elem, ok := obj.(*Element)
 	if !ok {
 		return "", fmt.Errorf("not a storeElement: %v", obj)
 	}
 	return elem.Key, nil
 }
 
-func storeElementObject(obj interface{}) (runtime.Object, error) {
-	elem, ok := obj.(*storeElement)
+func ElementObject(obj interface{}) (runtime.Object, error) {
+	elem, ok := obj.(*Element)
 	if !ok {
 		return nil, fmt.Errorf("not a storeElement: %v", obj)
 	}
 	return elem.Object, nil
 }
 
-func storeElementIndexFunc(objIndexFunc cache.IndexFunc) cache.IndexFunc {
+func ElementIndexFunc(objIndexFunc cache.IndexFunc) cache.IndexFunc {
 	return func(obj interface{}) (strings []string, e error) {
-		seo, err := storeElementObject(obj)
+		seo, err := ElementObject(obj)
 		if err != nil {
 			return nil, err
 		}
@@ -123,13 +123,13 @@ func storeElementIndexFunc(objIndexFunc cache.IndexFunc) cache.IndexFunc {
 	}
 }
 
-func storeElementIndexers(indexers *cache.Indexers) cache.Indexers {
+func ElementIndexers(indexers *cache.Indexers) cache.Indexers {
 	if indexers == nil {
 		return cache.Indexers{}
 	}
 	ret := cache.Indexers{}
 	for indexName, indexFunc := range *indexers {
-		ret[indexName] = storeElementIndexFunc(indexFunc)
+		ret[indexName] = ElementIndexFunc(indexFunc)
 	}
 	return ret
 }
