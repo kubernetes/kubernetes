@@ -90,25 +90,8 @@ type peerProxyHandler struct {
 	peerLeaseQueue            workqueue.TypedRateLimitingInterface[string]
 	serializer                runtime.NegotiatedSerializer
 	cacheInvalidationCallback atomic.Pointer[func()]
-	// Exclusion set for groups that should not be included in peer proxying
-	// or peer-aggregated discovery (e.g., CRDs/APIServices)
-	//
-	// This map has three states for a group:
-	// - Not in map: Group is not excluded.
-	// - In map, value is nil: Group is actively excluded.
-	// - In map, value is non-nil: Group is pending deletion (grace period).
-	excludedGVs         map[schema.GroupVersion]*time.Time
-	excludedGVsMu       sync.RWMutex
-	crdInformer         cache.SharedIndexInformer
-	crdExtractor        GVExtractor
-	apiServiceInformer  cache.SharedIndexInformer
-	apiServiceExtractor GVExtractor
-
-	exclusionGracePeriod time.Duration
-	reaperCheckInterval  time.Duration
-
-	// Worker queue for processing GV deletions asynchronously
-	gvDeletionQueue workqueue.TypedRateLimitingInterface[string]
+	// Manager for GV exclusions (CRDs/APIServices)
+	gvExclusionManager *GVExclusionManager
 }
 
 // PeerDiscoveryCacheEntry holds the GVRs and group-level discovery info for a peer.
@@ -141,12 +124,10 @@ func (h *peerProxyHandler) WaitForCacheSync(stopCh <-chan struct{}) error {
 		return fmt.Errorf("error while waiting for peer-identity-lease event handler registration sync")
 	}
 
-	if h.crdInformer != nil && !cache.WaitForNamedCacheSync("peer-discovery-crd-informer", stopCh, h.crdInformer.HasSynced) {
-		return fmt.Errorf("error while waiting for crd informer sync")
-	}
-
-	if h.apiServiceInformer != nil && !cache.WaitForNamedCacheSync("peer-discovery-api-service-informer", stopCh, h.apiServiceInformer.HasSynced) {
-		return fmt.Errorf("error while waiting for apiservice informer sync")
+	if h.gvExclusionManager != nil {
+		if !h.gvExclusionManager.WaitForCacheSync(stopCh) {
+			return fmt.Errorf("error while waiting for gv exclusion manager cache sync")
+		}
 	}
 
 	// Wait for localDiscoveryInfoCache to be populated.
