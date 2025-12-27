@@ -4350,6 +4350,9 @@ func ValidateHostAliases(hostAliases []core.HostAlias, fldPath *field.Path) fiel
 	for i, hostAlias := range hostAliases {
 		allErrs = append(allErrs, IsValidIPForLegacyField(fldPath.Index(i).Child("ip"), hostAlias.IP, nil)...)
 		for j, hostname := range hostAlias.Hostnames {
+			if strings.HasSuffix(hostname, ".") {
+				hostname = hostname[:len(hostname)-1]
+			}
 			allErrs = append(allErrs, ValidateDNS1123Subdomain(hostname, fldPath.Index(i).Child("hostnames").Index(j))...)
 		}
 	}
