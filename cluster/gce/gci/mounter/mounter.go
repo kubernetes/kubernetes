@@ -26,13 +26,14 @@ import (
 
 const (
 	// Location of the mount file to use
-	chrootCmd        = "chroot"
-	mountCmd         = "mount"
-	mountBin         = "/bin/mount"
-	rootfs           = "rootfs"
-	nfsRPCBindErrMsg = "mount.nfs: rpc.statd is not running but is required for remote locking.\nmount.nfs: Either use '-o nolock' to keep locks local, or start statd.\nmount.nfs: an incorrect mount option was specified\n"
-	rpcBindCmd       = "/sbin/rpcbind"
-	defaultRootfs    = "/home/kubernetes/containerized_mounter/rootfs"
+	chrootCmd                      = "chroot"
+	mountCmd                       = "mount"
+	mountBin                       = "/bin/mount"
+	rootfs                         = "rootfs"
+	nfsRPCBindNotRunningErrMsg     = "mount.nfs: rpc.statd is not running but is required for remote locking.\nmount.nfs: Either use '-o nolock' to keep locks local, or start statd.\nmount.nfs: an incorrect mount option was specified\n"
+	nfsRPCBindAlreadyRunningErrMsg = "rpcbind: another rpcbind is already running. Aborting\n"
+	rpcBindCmd                     = "/sbin/rpcbind"
+	defaultRootfs                  = "/home/kubernetes/containerized_mounter/rootfs"
 )
 
 func main() {
@@ -72,14 +73,17 @@ func mountInChroot(rootfsPath string, args []string) error {
 		return nil
 	}
 
-	if !strings.EqualFold(string(output), nfsRPCBindErrMsg) {
+	if !strings.EqualFold(string(output), nfsRPCBindNotRunningErrMsg) {
 		// Mount failed but not because of RPC bind error
 		return fmt.Errorf("mount failed: %v\nMounting command: %s\nMounting arguments: %v\nOutput: %s", err, chrootCmd, args, string(output))
 	}
 
 	// Mount failed because it is NFS V3 and we need to run rpcBind
 	output, err = exec.Command(chrootCmd, rootfsPath, rpcBindCmd, "-w").CombinedOutput()
-	if err != nil {
+	// There is a race condition where multiple pods are scheduled on the same node and the rpcbind command is executed
+	// at the same time, which causes the unexpected setup failure for the second and subsequent pods.
+	// Let's ignore this error and try to mount again.
+	if err != nil && !strings.EqualFold(string(output), nfsRPCBindAlreadyRunningErrMsg) {
 		return fmt.Errorf("mount issued for NFS V3 but unable to run rpcbind:\n Output: %s\n Error: %v", string(output), err)
 	}
 
