@@ -180,7 +180,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			// Create an nfs PV, then a claim that matches the PV, and a pod that
 			// contains the claim. Verify that the PV and PVC bind correctly, and
 			// that the pod can write to the nfs volume.
-			ginkgo.It("should create a non-pre-bound PV and PVC: test write access ", func(ctx context.Context) {
+			ginkgo.It("should create a non-pre-bound PV and PVC: test write access", func(ctx context.Context) {
 				pv, pvc, err = e2epv.CreatePVPVC(ctx, c, f.Timeouts, pvConfig, pvcConfig, ns, false)
 				framework.ExpectNoError(err)
 				completeTest(ctx, f, c, ns, pv, pvc)

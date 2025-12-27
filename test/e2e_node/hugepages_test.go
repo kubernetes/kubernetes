@@ -387,7 +387,7 @@ var _ = SIGDescribe("HugePages", framework.WithSerial(), feature.HugePages, func
 			waitForHugepages(f, ctx, hugepages)
 		})
 
-		ginkgo.Context("with the resources requests that contain only one hugepages resource ", func() {
+		ginkgo.Context("with the resources requests that contain only one hugepages resource", func() {
 			ginkgo.Context("with the backward compatible API", func() {
 				ginkgo.BeforeEach(func() {
 					expectedHugepageLimits = v1.ResourceList{
@@ -461,7 +461,7 @@ var _ = SIGDescribe("HugePages", framework.WithSerial(), feature.HugePages, func
 			})
 		})
 
-		ginkgo.Context("with the resources requests that contain multiple hugepages resources ", func() {
+		ginkgo.Context("with the resources requests that contain multiple hugepages resources", func() {
 			ginkgo.BeforeEach(func() {
 				hugepages = map[string]int{
 					hugepagesResourceName2Mi: 5,
