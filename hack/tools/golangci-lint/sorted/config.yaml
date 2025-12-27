@@ -1,5 +1,6 @@
 files:
   - cmd/kubeadm/app/features/features.go
+  - pkg/controller/apis/config/types.go
   - pkg/features/kube_features.go
   - staging/src/k8s.io/apiserver/pkg/features/kube_features.go
   - staging/src/k8s.io/client-go/features/known_features.go
