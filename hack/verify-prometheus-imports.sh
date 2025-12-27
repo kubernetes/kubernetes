@@ -58,6 +58,7 @@ allowed_prometheus_importers=(
   ./staging/src/k8s.io/component-base/metrics/legacyregistry/registry.go
   ./staging/src/k8s.io/component-base/metrics/metric.go
   ./staging/src/k8s.io/component-base/metrics/opts.go
+  ./staging/src/k8s.io/component-base/metrics/options_test.go
   ./staging/src/k8s.io/component-base/metrics/processstarttime_others.go
   ./staging/src/k8s.io/component-base/metrics/registry.go
   ./staging/src/k8s.io/component-base/metrics/registry_test.go
