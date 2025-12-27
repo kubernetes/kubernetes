@@ -191,12 +191,13 @@ func newPodWithPort(hostPorts ...int) *v1.Pod {
 
 func TestGeneralPredicates(t *testing.T) {
 	resourceTests := []struct {
-		pod        *v1.Pod
-		nodeInfo   *schedulerframework.NodeInfo
-		cachedNode *v1.Node
-		syncNode   *v1.Node
-		name       string
-		reasons    []PredicateFailureReason
+		pod                 *v1.Pod
+		nodeInfo            *schedulerframework.NodeInfo
+		cachedNode          *v1.Node
+		syncNode            *v1.Node
+		name                string
+		skipIgnorableChecks bool
+		reasons             []PredicateFailureReason
 	}{
 		{
 			pod: &v1.Pod{},
@@ -521,6 +522,96 @@ func TestGeneralPredicates(t *testing.T) {
 			},
 			name: "node affinity failure on fresh node, but not the cached one",
 		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						types.ConfigSourceAnnotationKey: types.FileSource,
+					},
+				},
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{
+												Key:      "foo",
+												Operator: v1.NodeSelectorOpExists,
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			nodeInfo: schedulerframework.NewNodeInfo(),
+			cachedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
+				Spec:       v1.NodeSpec{},
+				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
+			},
+			syncNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
+				Spec:       v1.NodeSpec{},
+				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
+			},
+			name:                "node affinity failure but skip ignorable checks",
+			skipIgnorableChecks: true,
+			reasons:             nil,
+		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						types.ConfigSourceAnnotationKey: types.FileSource,
+					},
+				},
+				Spec: v1.PodSpec{
+					NodeName: "some-node-name",
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{
+												Key:      "foo",
+												Operator: v1.NodeSelectorOpExists,
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			nodeInfo: schedulerframework.NewNodeInfo(),
+			cachedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
+				Spec:       v1.NodeSpec{},
+				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
+			},
+			syncNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "machine1",
+					Labels: map[string]string{
+						"foo": "bar",
+					},
+				},
+				Spec:   v1.NodeSpec{},
+				Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
+			},
+			skipIgnorableChecks: true,
+			name:                "node affinity failure on cached node and node name doesn't match but skip ignorable checks",
+			reasons: []PredicateFailureReason{
+				&PredicateFailureError{nodename.Name, nodename.ErrReason},
+			},
+		},
 	}
 	for _, test := range resourceTests {
 		t.Run(test.name, func(t *testing.T) {
@@ -531,7 +622,7 @@ func TestGeneralPredicates(t *testing.T) {
 				}
 				return test.syncNode, nil
 			}}
-			reasons := w.generalFilter(context.Background(), test.pod, test.nodeInfo)
+			reasons := w.generalFilter(context.Background(), test.pod, test.nodeInfo, test.skipIgnorableChecks)
 			if diff := cmp.Diff(test.reasons, reasons); diff != "" {
 				t.Errorf("unexpected failure reasons (-want, +got):\n%s", diff)
 			}
