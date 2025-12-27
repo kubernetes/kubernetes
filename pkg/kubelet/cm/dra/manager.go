@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"time"
 
@@ -69,6 +70,39 @@ const defaultReconcilePeriod = 60 * time.Second
 // If a DRA driver wants to be sure that slices don't get wiped,
 // it should use rolling updates.
 const defaultWipingDelay = 30 * time.Second
+
+// defaultTombstoneGracePeriod is the duration to keep tombstoned claim info
+// in the cache after a pod has been unprepared. This allows post-mortem
+// health updates to be processed for terminated pods.
+//
+// This addresses the race condition described in issue #132978 where:
+// 1. Pod terminates
+// 2. UnprepareResources is called, which would normally delete ClaimInfo
+// 3. Health update arrives after cleanup
+// 4. Without tombstoning, the update cannot find which pod used the device
+//
+// The tombstone mechanism ensures that pod.status.allocatedResourcesStatus
+// can be updated even after a pod has terminated, by keeping the device-to-pod
+// mapping available for a grace period.
+//
+// 5 minutes provides a reasonable window for:
+// - DRA drivers to report final health status (drivers may have delays)
+// - Debugging and troubleshooting failed pods
+// - Avoiding excessive memory usage from tombstoned entries
+const defaultTombstoneGracePeriod = 5 * time.Minute
+
+// maxTombstones is the maximum number of tombstoned claims to keep in the cache.
+// This prevents unbounded memory growth from accumulating tombstones.
+// When this limit is reached, the oldest tombstones are removed first (LRU).
+//
+// The limit of 1000 is chosen to:
+// - Support clusters with high pod churn rates
+// - Prevent memory leaks in pathological cases (e.g., stuck drivers)
+// - Maintain reasonable memory usage (each tombstone is relatively small)
+//
+// In normal operation, tombstones are cleaned up after the grace period,
+// so this limit is primarily a safety mechanism.
+const maxTombstones = 1000
 
 // ActivePodsFunc is a function that returns a list of pods to reconcile.
 type ActivePodsFunc func() []*v1.Pod
@@ -171,6 +205,13 @@ func (m *Manager) initDRAPluginManager(ctx context.Context, getNode GetNodeFunc,
 }
 
 // reconcileLoop ensures that any stale state in the manager's claimInfoCache gets periodically reconciled.
+// This includes:
+// - Unpreparing resources for pods that are no longer running
+// - Cleaning up expired tombstones after the grace period
+// - Enforcing the maxTombstones limit using LRU eviction
+//
+// The tombstone cleanup is essential for preventing memory leaks while still allowing
+// health updates for recently terminated pods (issue #132978).
 func (m *Manager) reconcileLoop(ctx context.Context) {
 	logger := klog.FromContext(ctx)
 	// Only once all sources are ready do we attempt to reconcile.
@@ -195,6 +236,12 @@ func (m *Manager) reconcileLoop(ctx context.Context) {
 	inactivePodClaims := make(map[string]*podClaims)
 	m.cache.RLock()
 	for _, claimInfo := range m.cache.claimInfo {
+		// Skip tombstoned claims - they've already been unprepared and are only
+		// kept for health status updates. Attempting to unprepare them again
+		// would cause unnecessary NodeUnprepareResources calls every reconcile cycle.
+		if claimInfo.isTombstoned() {
+			continue
+		}
 		for podUID := range claimInfo.PodUIDs {
 			if activePods.Has(podUID) {
 				continue
@@ -217,6 +264,136 @@ func (m *Manager) reconcileLoop(ctx context.Context) {
 			logger.Info("Unpreparing pod resources in reconcile loop failed, will retry", "podUID", podClaims.uid, "err", err)
 		}
 	}
+
+	// Clean up expired tombstones to prevent resource leaks.
+	// This is the second phase of the two-phase cleanup process:
+	// 1. UnprepareResources tombstones claims instead of deleting them
+	// 2. reconcileLoop removes tombstones after the grace period
+	//
+	// This ensures health updates can still be processed for terminated pods
+	// while preventing unbounded memory growth.
+	expiredTombstones := []struct {
+		namespace string
+		claimName string
+	}{}
+	allTombstones := []struct {
+		namespace     string
+		claimName     string
+		tombstoneTime metav1.Time
+	}{}
+	now := time.Now()
+
+	// Find all tombstones and expired tombstones
+	m.cache.RLock()
+	for _, claimInfo := range m.cache.claimInfo {
+		if claimInfo.isTombstoned() {
+			tombstoneEntry := struct {
+				namespace     string
+				claimName     string
+				tombstoneTime metav1.Time
+			}{
+				namespace:     claimInfo.Namespace,
+				claimName:     claimInfo.ClaimName,
+				tombstoneTime: claimInfo.tombstoneTime,
+			}
+			allTombstones = append(allTombstones, tombstoneEntry)
+
+			if claimInfo.shouldExpire(defaultTombstoneGracePeriod) {
+				expiredTombstones = append(expiredTombstones, struct {
+					namespace string
+					claimName string
+				}{
+					namespace: claimInfo.Namespace,
+					claimName: claimInfo.ClaimName,
+				})
+			}
+		}
+	}
+	m.cache.RUnlock()
+
+	totalTombstones := len(allTombstones)
+
+	// Implement LRU eviction if we exceed the maximum tombstones limit
+	lruEvictions := []struct {
+		namespace string
+		claimName string
+	}{}
+	if totalTombstones > maxTombstones {
+		// Sort tombstones by age (oldest first)
+		sort.Slice(allTombstones, func(i, j int) bool {
+			return allTombstones[i].tombstoneTime.Before(&allTombstones[j].tombstoneTime)
+		})
+
+		// Calculate how many to evict to get back under the limit
+		evictCount := totalTombstones - maxTombstones
+		if evictCount > 0 {
+			for i := 0; i < evictCount && i < len(allTombstones); i++ {
+				lruEvictions = append(lruEvictions, struct {
+					namespace string
+					claimName string
+				}{
+					namespace: allTombstones[i].namespace,
+					claimName: allTombstones[i].claimName,
+				})
+			}
+			logger.Info("Tombstone limit exceeded, will evict oldest entries",
+				"totalTombstones", totalTombstones,
+				"maxTombstones", maxTombstones,
+				"evictCount", evictCount)
+		}
+	}
+
+	// Log tombstone statistics
+	if totalTombstones > 0 || len(expiredTombstones) > 0 {
+		logger.V(5).Info("Tombstone statistics",
+			"totalTombstones", totalTombstones,
+			"expiredTombstones", len(expiredTombstones),
+			"lruEvictions", len(lruEvictions),
+			"gracePeriod", defaultTombstoneGracePeriod)
+	}
+
+	// Remove expired and LRU-evicted tombstones
+	// Combine expired tombstones and LRU evictions into a single slice
+	tombstonesToRemove := make([]struct {
+		namespace string
+		claimName string
+	}, 0, len(expiredTombstones)+len(lruEvictions))
+	tombstonesToRemove = append(tombstonesToRemove, expiredTombstones...)
+	tombstonesToRemove = append(tombstonesToRemove, lruEvictions...)
+	if len(tombstonesToRemove) > 0 {
+		removedCount := 0
+		err := m.cache.withLock(func() error {
+			for _, tombstone := range tombstonesToRemove {
+				claimInfo, exists := m.cache.get(tombstone.claimName, tombstone.namespace)
+				if !exists || !claimInfo.isTombstoned() {
+					// Already removed or no longer tombstoned
+					continue
+				}
+
+				m.cache.delete(tombstone.claimName, tombstone.namespace)
+				removedCount++
+				logger.V(5).Info("Removed tombstone",
+					"claim", klog.KRef(tombstone.namespace, tombstone.claimName),
+					"age", now.Sub(claimInfo.tombstoneTime.Time).Round(time.Second),
+					"expired", claimInfo.shouldExpire(defaultTombstoneGracePeriod))
+			}
+
+			// Sync the cache to checkpoint after cleanup
+			if err := m.cache.syncToCheckpoint(); err != nil {
+				return fmt.Errorf("checkpoint ResourceClaim state after tombstone cleanup: %w", err)
+			}
+			return nil
+		})
+
+		if err != nil {
+			logger.Error(err, "Failed to clean up tombstones")
+		} else if removedCount > 0 {
+			logger.V(4).Info("Cleaned up tombstones",
+				"removedCount", removedCount,
+				"expiredCount", len(expiredTombstones),
+				"lruEvictedCount", len(lruEvictions))
+		}
+	}
 }
 
 // PrepareResources attempts to prepare all of the required resources
@@ -236,6 +413,59 @@ func (m *Manager) PrepareResources(ctx context.Context, pod *v1.Pod) error {
 func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 	var err error
 	logger := klog.FromContext(ctx)
+
+	// Handle pod UID reuse: clear any tombstoned claims that reference this pod UID
+	// This prevents stale tombstones from interfering with new pods that reuse the UID
+	tombstonedClaimsCleared := 0
+	err = m.cache.withLock(func() error {
+		var claimsToCheck []struct {
+			namespace string
+			claimName string
+		}
+
+		// First pass: identify tombstoned claims with this pod UID
+		for _, claimInfo := range m.cache.claimInfo {
+			if claimInfo.isTombstoned() && claimInfo.hasPodReference(pod.UID) {
+				claimsToCheck = append(claimsToCheck, struct {
+					namespace string
+					claimName string
+				}{
+					namespace: claimInfo.Namespace,
+					claimName: claimInfo.ClaimName,
+				})
+			}
+		}
+
+		// Second pass: clear the tombstones
+		for _, claim := range claimsToCheck {
+			claimInfo, exists := m.cache.get(claim.claimName, claim.namespace)
+			if exists && claimInfo.isTombstoned() {
+				claimInfo.clearTombstone()
+				tombstonedClaimsCleared++
+				logger.V(4).Info("Cleared tombstone for pod UID reuse",
+					"pod", klog.KObj(pod),
+					"claim", klog.KRef(claim.namespace, claim.claimName))
+			}
+		}
+
+		// Sync checkpoint if we cleared any tombstones
+		if tombstonedClaimsCleared > 0 {
+			if err := m.cache.syncToCheckpoint(); err != nil {
+				return fmt.Errorf("checkpoint ResourceClaim state after clearing tombstones: %w", err)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to clear tombstones for pod UID reuse: %w", err)
+	}
+
+	if tombstonedClaimsCleared > 0 {
+		logger.Info("Cleared tombstoned claims for pod UID reuse",
+			"pod", klog.KObj(pod),
+			"clearedCount", tombstonedClaimsCleared)
+	}
+
 	batches := make(map[*draplugin.DRAPlugin][]*drapb.Claim)
 	resourceClaims := make(map[types.UID]*resourceapi.ResourceClaim)
 
@@ -343,7 +573,24 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 				logger.V(6).Info("Created new claim info cache entry", "pod", klog.KObj(pod), "podClaim", podClaim.Name, "claim", klog.KObj(resourceClaim), "claimInfoEntry", claimInfo)
 			} else {
 				if claimInfo.ClaimUID != resourceClaim.UID {
-					return fmt.Errorf("old ResourceClaim with same name %s and different UID %s still exists (previous pod force-deleted?!)", resourceClaim.Name, claimInfo.ClaimUID)
+					// If the existing claim is tombstoned, it's safe to remove it and proceed
+					// with the new claim. This handles the force-delete scenario where the old
+					// claim has been unprepared (tombstoned) but a new claim with the same name
+					// is being prepared.
+					if claimInfo.isTombstoned() {
+						logger.V(5).Info("Removing tombstoned claim with different UID to allow new claim",
+							"pod", klog.KObj(pod),
+							"claim", klog.KObj(resourceClaim),
+							"oldClaimUID", claimInfo.ClaimUID,
+							"newClaimUID", resourceClaim.UID)
+						m.cache.delete(resourceClaim.Name, resourceClaim.Namespace)
+						// Now add the new claim
+						claimInfo = infos[i].claimInfo
+						m.cache.add(claimInfo)
+						logger.V(6).Info("Created new claim info cache entry after removing tombstone", "pod", klog.KObj(pod), "podClaim", podClaim.Name, "claim", klog.KObj(resourceClaim), "claimInfoEntry", claimInfo)
+					} else {
+						return fmt.Errorf("old ResourceClaim with same name %s and different UID %s still exists (previous pod force-deleted?!)", resourceClaim.Name, claimInfo.ClaimUID)
+					}
 				}
 				logger.V(6).Info("Found existing claim info cache entry", "pod", klog.KObj(pod), "podClaim", podClaim.Name, "claim", klog.KObj(resourceClaim), "claimInfoEntry", claimInfo)
 			}
@@ -551,6 +798,12 @@ func (m *Manager) GetResources(pod *v1.Pod, container *v1.Container) (*Container
 // This function is idempotent and may be called multiple times against the same pod.
 // As such, calls to the underlying NodeUnprepareResource API are skipped for claims that have
 // already been successfully unprepared.
+//
+// Instead of immediately deleting the claim information from the cache, this function
+// tombstones the claims. This allows late-arriving health status updates from DRA drivers
+// to still be processed and reflected in the terminated pod's status. The tombstoned
+// claims are retained for defaultTombstoneGracePeriod before being cleaned up by the
+// reconcileLoop.
 func (m *Manager) UnprepareResources(ctx context.Context, pod *v1.Pod) error {
 	startTime := time.Now()
 	err := m.unprepareResourcesForPod(ctx, pod)
@@ -669,17 +922,25 @@ func (m *Manager) unprepareResources(ctx context.Context, podUID types.UID, name
 
 	// Atomically perform some operations on the claimInfo cache.
 	err := m.cache.withLock(func() error {
-		// TODO(#132978): Re-evaluate this logic to support post-mortem health updates.
-		// As of the initial implementation, we immediately delete the claim info upon
-		// unprepare. This means a late-arriving health update for a terminated pod
-		// will be missed. A future enhancement could be to "tombstone" this entry for
-		// a grace period instead of deleting it.
+		// Implementation of #132978: Instead of immediately deleting the claim info,
+		// we now tombstone it to allow post-mortem health updates for terminated pods.
+		// The tombstoned entries will be cleaned up after a grace period by the
+		// reconcileLoop.
 
-		// Delete all claimInfos from the cache that have just been unprepared.
+		// Tombstone all claimInfos that have just been unprepared.
 		for _, claimName := range claimNamesMap {
-			claimInfo, _ := m.cache.get(claimName, namespace)
-			m.cache.delete(claimName, namespace)
-			logger.V(6).Info("Deleted claim info cache entry", "claim", klog.KRef(namespace, claimName), "claimInfoEntry", claimInfo)
+			claimInfo, exists := m.cache.get(claimName, namespace)
+			if !exists {
+				// Claim was already removed, nothing to do
+				continue
+			}
+
+			// Mark as tombstone instead of deleting
+			claimInfo.markAsTombstone()
+			logger.V(5).Info("Tombstoned claim info cache entry",
+				"claim", klog.KRef(namespace, claimName),
+				"podUIDs", claimInfo.PodUIDs.UnsortedList(),
+				"tombstoneTime", claimInfo.tombstoneTime.Time)
 		}
 
 		// Atomically sync the cache back to the checkpoint.
@@ -829,6 +1090,15 @@ func (m *Manager) UpdateAllocatedResourcesStatus(pod *v1.Pod, status *v1.PodStat
 					return
 				}
 
+				// Track if we're processing a tombstoned claim for debugging
+				if claimInfo.isTombstoned() {
+					logger.V(5).Info("Processing health update for tombstoned claim",
+						"pod", klog.KObj(pod),
+						"claim", klog.KRef(claimInfo.Namespace, claimInfo.ClaimName),
+						"container", containerSpec.Name,
+						"podPhase", status.Phase)
+				}
+
 				resourceName := v1.ResourceName(fmt.Sprintf("claim:%s", claim.Name))
 				if claim.Request != "" {
 					resourceName = v1.ResourceName(fmt.Sprintf("claim:%s/%s", claim.Name, claim.Request))
@@ -872,6 +1142,19 @@ func (m *Manager) UpdateAllocatedResourcesStatus(pod *v1.Pod, status *v1.PodStat
 						} else {
 							resourceHealth.ResourceID = v1.ResourceID(fmt.Sprintf("%s/%s/%s", driverName, device.PoolName, device.DeviceName))
 						}
+
+						// Log health updates for tombstoned claims (post-mortem updates)
+						if claimInfo.isTombstoned() {
+							logger.V(4).Info("Applying health status to tombstoned claim",
+								"pod", klog.KObj(pod),
+								"claim", klog.KRef(claimInfo.Namespace, claimInfo.ClaimName),
+								"container", containerSpec.Name,
+								"resourceID", resourceHealth.ResourceID,
+								"health", health,
+								"tombstoneAge", time.Since(claimInfo.tombstoneTime.Time).Round(time.Second))
+						}
+
+						// Append the health status for this specific device/resource ID
 						resStatus.Resources = append(resStatus.Resources, resourceHealth)
 					}
 				}
@@ -965,14 +1248,28 @@ func (m *Manager) HandleWatchResourcesStream(ctx context.Context, stream draheal
 			logger.V(4).Info("Health info changed, checking affected pods", "pluginName", pluginName, "changedDevicesCount", len(changedDevices))
 
 			podsToUpdate := sets.New[string]()
+			tombstonedPods := sets.New[string]()
 
 			m.cache.RLock()
 			for _, dev := range changedDevices {
 				for _, cInfo := range m.cache.claimInfo {
+					// Include both active and tombstoned claims to ensure health updates
+					// are processed for terminated pods (fixes #132978)
 					if driverState, ok := cInfo.DriverState[pluginName]; ok {
 						for _, allocatedDevice := range driverState.Devices {
 							if allocatedDevice.PoolName == dev.PoolName && allocatedDevice.DeviceName == dev.DeviceName {
-								podsToUpdate.Insert(cInfo.PodUIDs.UnsortedList()...)
+								podUIDs := cInfo.PodUIDs.UnsortedList()
+								podsToUpdate.Insert(podUIDs...)
+
+								// Track tombstoned claims for debugging
+								if cInfo.isTombstoned() {
+									tombstonedPods.Insert(podUIDs...)
+									logger.V(5).Info("Health update for tombstoned claim",
+										"claim", klog.KRef(cInfo.Namespace, cInfo.ClaimName),
+										"podUIDs", podUIDs,
+										"device", fmt.Sprintf("%s/%s", dev.PoolName, dev.DeviceName),
+										"newHealth", dev.Health)
+								}
 								break
 							}
 						}
