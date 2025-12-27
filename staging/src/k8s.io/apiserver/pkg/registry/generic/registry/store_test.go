@@ -2435,7 +2435,7 @@ func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheE
 	newListFunc := func() runtime.Object { return &example.PodList{} }
 
 	sc.Codec = apitesting.TestStorageCodec(codecs, examplev1.SchemeGroupVersion)
-	s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "pods"}), newFunc, newListFunc, "/pods")
+	s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "pods"}), newFunc, newListFunc, NamespaceReverseKeyFunc(podPrefix), podPrefix)
 	if err != nil {
 		t.Fatalf("Error creating storage: %v", err)
 	}
@@ -2490,10 +2490,11 @@ func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheE
 			return podPrefix
 		},
 		KeyFunc: func(ctx context.Context, id string) (string, error) {
-			if _, ok := genericapirequest.NamespaceFrom(ctx); !ok {
+			if namespace, ok := genericapirequest.NamespaceFrom(ctx); !ok {
 				return "", fmt.Errorf("namespace is required")
+			} else {
+				return path.Join(podPrefix, namespace, id), nil
 			}
-			return path.Join(podPrefix, id), nil
 		},
 		ObjectNameFunc: func(obj runtime.Object) (string, error) { return obj.(*example.Pod).Name, nil },
 		PredicateFunc: func(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
@@ -3058,4 +3059,42 @@ func TestStoreCreateGenerateNameConflict(t *testing.T) {
 		t.Errorf("Unexpected object: %+v", objB)
 	}
 
+}
+
+func TestReverseKeyFunc(t *testing.T) {
+	keyPrefix := "/example"
+	testcases := []struct {
+		name           string
+		pod            *example.Pod
+		keyFunc        func(ctx context.Context, prefix string, name string) (string, error)
+		reverseKeyFunc storage.ReverseKeyFunc
+	}{
+		{
+			name:           "NamespaceReverseKeyFunc should work",
+			pod:            &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test"}},
+			keyFunc:        NamespaceKeyFunc,
+			reverseKeyFunc: NamespaceReverseKeyFunc(keyPrefix),
+		},
+		{
+			name:           "NoNamespaceReverseKeyFunc should work",
+			pod:            &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
+			keyFunc:        NoNamespaceKeyFunc,
+			reverseKeyFunc: NoNamespaceReverseKeyFunc(keyPrefix),
+		},
+	}
+
+	for _, tc := range testcases {
+		ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), tc.pod.Namespace)
+		key, err := tc.keyFunc(ctx, keyPrefix, tc.pod.Name)
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		name, namespace, err := tc.reverseKeyFunc(key)
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		if name != tc.pod.Name || namespace != tc.pod.Namespace {
+			t.Errorf("Expected name=%#v, namespace=%#v, got name=%#v namespace=%#v", tc.pod.Name, tc.pod.Namespace, name, namespace)
+		}
+	}
 }
