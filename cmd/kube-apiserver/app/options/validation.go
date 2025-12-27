@@ -48,6 +48,10 @@ func validateClusterIPFlags(options Extra) []error {
 		errs = append(errs, errors.New("--service-cluster-ip-range must not contain more than two entries"))
 	}
 
+	if !options.PrimaryServiceClusterIPRange.IP.IsGlobalUnicast() {
+		errs = append(errs, errors.New("--service-cluster-ip-range[0] must be unicast cidr"))
+	}
+
 	// Complete() expected to have set Primary* and Secondary
 	if !utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRServiceAllocator) ||
 		!utilfeature.DefaultFeatureGate.Enabled(features.DisableAllocatorDualWrite) {
@@ -77,6 +81,9 @@ func validateClusterIPFlags(options Extra) []error {
 			if err := validateMaxCIDRRange(options.SecondaryServiceClusterIPRange, maxCIDRBits, "--service-cluster-ip-range[1]"); err != nil {
 				errs = append(errs, err)
 			}
+		}
+		if !options.SecondaryServiceClusterIPRange.IP.IsGlobalUnicast() {
+			errs = append(errs, errors.New("--service-cluster-ip-range[1] must be unicast cidr"))
 		}
 	}
 
