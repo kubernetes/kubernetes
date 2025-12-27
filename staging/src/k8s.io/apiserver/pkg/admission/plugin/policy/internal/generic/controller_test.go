@@ -117,7 +117,7 @@ func setupTest(ctx context.Context, customReconciler func(string, string, runtim
 			return tracker.List(fakeGVR, fakeGVK, "")
 		},
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			return tracker.Watch(fakeGVR, "")
+			return tracker.Watch(fakeGVR, "", options)
 		},
 	}, tracker), &unstructured.Unstructured{}, 30*time.Second, nil)}
 
