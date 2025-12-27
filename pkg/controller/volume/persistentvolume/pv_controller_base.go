@@ -657,7 +657,9 @@ func (ctrl *PersistentVolumeController) resync(ctx context.Context) {
 		return
 	}
 	for _, pvc := range pvcs {
-		ctrl.enqueueWork(ctx, ctrl.claimQueue, pvc)
+		if pvc.Status.Phase != v1.ClaimBound {
+			ctrl.enqueueWork(ctx, ctrl.claimQueue, pvc)
+		}
 	}
 
 	pvs, err := ctrl.volumeLister.List(labels.NewSelector())
@@ -666,7 +668,9 @@ func (ctrl *PersistentVolumeController) resync(ctx context.Context) {
 		return
 	}
 	for _, pv := range pvs {
-		ctrl.enqueueWork(ctx, ctrl.volumeQueue, pv)
+		if pv.Status.Phase != v1.VolumeBound {
+			ctrl.enqueueWork(ctx, ctrl.volumeQueue, pv)
+		}
 	}
 }
 
