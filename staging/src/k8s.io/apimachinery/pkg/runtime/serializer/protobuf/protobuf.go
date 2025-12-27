@@ -181,6 +181,7 @@ func (s *Serializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, i
 
 // EncodeWithAllocator writes an object to the provided writer.
 // In addition, it allows for providing a memory allocator for efficient memory usage during object serialization.
+// the memory allocator will only be used when `StreamingCollectionsEncoding` not set when encode list objects
 func (s *Serializer) EncodeWithAllocator(obj runtime.Object, w io.Writer, memAlloc runtime.MemoryAllocator) error {
 	return s.encode(obj, w, memAlloc)
 }
@@ -229,7 +230,7 @@ func (s *Serializer) doEncode(obj runtime.Object, w io.Writer, memAlloc runtime.
 		listData, err := getStreamingListData(obj)
 		if err == nil {
 			// Doesn't honor custom proto marshaling methods (like json streaming), because all proto objects implement proto methods.
-			return streamingEncodeUnknownList(w, unk, listData, memAlloc)
+			return streamingEncodeUnknownList(w, unk, listData)
 		}
 	}
 
@@ -470,7 +471,7 @@ func (s *RawSerializer) doEncode(obj runtime.Object, w io.Writer, memAlloc runti
 	return err
 }
 
-func doEncodeWithHeader(obj any, w io.Writer, field byte, precomputedSize int, memAlloc runtime.MemoryAllocator) (size int, err error) {
+func doEncodeWithHeader(obj any, w io.Writer, field byte, precomputedSize int) (size int, err error) {
 	// Field identifier
 	n, err := w.Write([]byte{field})
 	size += n
@@ -484,6 +485,8 @@ func doEncodeWithHeader(obj any, w io.Writer, field byte, precomputedSize int, m
 		return size, err
 	}
 	// Obj
+	memAlloc := runtime.AllocatorPool.Get().(*runtime.Allocator)
+	defer runtime.AllocatorPool.Put(memAlloc)
 	n, err = doEncode(obj, w, &precomputedSize, memAlloc)
 	size += n
 	if err != nil {
