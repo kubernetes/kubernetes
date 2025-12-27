@@ -1032,7 +1032,11 @@ func (m *manager) syncBatch(ctx context.Context, all bool) int {
 func (m *manager) syncPod(ctx context.Context, uid types.UID, status versionedPodStatus) {
 	logger := klog.FromContext(ctx)
 	// TODO: make me easier to express from client code
-	pod, err := m.kubeClient.CoreV1().Pods(status.podNamespace).Get(ctx, status.podName, metav1.GetOptions{})
+	// Use ResourceVersion=0 to fetch Pod from APIServer's in-memory cache instead of etcd.
+	// This reduces etcd load since kubelet syncs Pod status frequently.
+	pod, err := m.kubeClient.CoreV1().Pods(status.podNamespace).Get(ctx, status.podName, metav1.GetOptions{
+		ResourceVersion: "0",
+	})
 	if errors.IsNotFound(err) {
 		logger.V(3).Info("Pod does not exist on the server",
 			"podUID", uid,
