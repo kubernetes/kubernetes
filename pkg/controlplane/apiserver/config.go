@@ -330,7 +330,9 @@ func CreateConfig(
 				opts.PeerAdvertiseAddress,
 				genericConfig.APIServerID,
 				config.Extra.PeerEndpointLeaseReconciler,
-				config.Generic.Serializer)
+				config.Generic.Serializer,
+				config.Generic.EgressSelector,
+			)
 			if err != nil {
 				return nil, nil, err
 			}
