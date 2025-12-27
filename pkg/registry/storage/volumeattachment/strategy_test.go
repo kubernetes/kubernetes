@@ -24,12 +24,15 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/ptr"
 )
 
 func getValidVolumeAttachment(name string) *storage.VolumeAttachment {
@@ -338,6 +341,139 @@ func TestVolumeAttachmentValidation(t *testing.T) {
 			}
 			if len(err) == 0 && test.expectError {
 				t.Errorf("Validation of object unexpectedly succeeded")
+			}
+		})
+	}
+}
+
+func TestMatchVolumeAttachment(t *testing.T) {
+	testCases := []struct {
+		name          string
+		in            *storage.VolumeAttachment
+		fieldSelector fields.Selector
+		expectMatch   bool
+	}{
+		{
+			name: "match on name",
+			in: &storage.VolumeAttachment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: "testns",
+				},
+				Spec: storage.VolumeAttachmentSpec{},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("metadata.name=test"),
+			expectMatch:   true,
+		},
+		{
+			name: "no match on name",
+			in: &storage.VolumeAttachment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: "testns",
+				},
+				Spec: storage.VolumeAttachmentSpec{},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("metadata.name=nomatch"),
+			expectMatch:   false,
+		},
+		{
+			name: "match on node name",
+			in: &storage.VolumeAttachment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: "testns",
+				},
+				Spec: storage.VolumeAttachmentSpec{NodeName: "node1"},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("spec.nodeName=node1"),
+			expectMatch:   true,
+		},
+		{
+			name: "no match on node name",
+			in: &storage.VolumeAttachment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: "testns",
+				},
+				Spec: storage.VolumeAttachmentSpec{NodeName: "node2"},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("spec.nodeName=node1"),
+			expectMatch:   false,
+		},
+		{
+			name: "match on persistent volume name",
+			in: &storage.VolumeAttachment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: "testns",
+				},
+				Spec: storage.VolumeAttachmentSpec{Source: storage.VolumeAttachmentSource{
+					PersistentVolumeName: ptr.To("pvc-00000000-0000-0000-0000-000000000000")}},
+			},
+			fieldSelector: fields.OneTermEqualSelector("spec.persistentVolumeName", "pvc-00000000-0000-0000-0000-000000000000"),
+			expectMatch:   true,
+		},
+		{
+			name: "no match on persistent volume name",
+			in: &storage.VolumeAttachment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: "testns",
+				},
+				Spec: storage.VolumeAttachmentSpec{Source: storage.VolumeAttachmentSource{
+					PersistentVolumeName: ptr.To("pvc-00000000-0000-0000-0000-000000000000")}},
+			},
+			fieldSelector: fields.OneTermEqualSelector("spec.persistentVolumeName", "pvc-00000000-0000-0000-0000-000000000001"),
+			expectMatch:   false,
+		},
+		{
+			name: "no match on persistent volume name not exist",
+			in: &storage.VolumeAttachment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: "testns",
+				},
+				Spec: storage.VolumeAttachmentSpec{Source: storage.VolumeAttachmentSource{
+					PersistentVolumeName: nil}},
+			},
+			fieldSelector: fields.OneTermEqualSelector("spec.persistentVolumeName", "pvc-00000000-0000-0000-0000-000000000000"),
+			expectMatch:   false,
+		},
+		{
+			name: "match on attacher",
+			in: &storage.VolumeAttachment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: "testns",
+				},
+				Spec: storage.VolumeAttachmentSpec{Attacher: "attach"},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("spec.attacher=attach"),
+			expectMatch:   true,
+		},
+		{
+			name: "no match on attacher",
+			in: &storage.VolumeAttachment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: "testns",
+				},
+				Spec: storage.VolumeAttachmentSpec{Attacher: "attach"},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("spec.attacher=attach1"),
+			expectMatch:   false,
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			m := Matcher(labels.Everything(), testCase.fieldSelector)
+			result, err := m.Matches(testCase.in)
+			if err != nil {
+				t.Errorf("Unexpected error %v", err)
+			}
+			if result != testCase.expectMatch {
+				t.Errorf("Result %v, Expected %v, Selector: %v, VolumeAttachment: %v", result, testCase.expectMatch, testCase.fieldSelector.String(), testCase.in)
 			}
 		})
 	}
