@@ -66,7 +66,7 @@ var (
 		kubectl autoscale deployment bar --min=3 --max=6 --cpu=500m --memory=200Mi
 		
 		# Auto scale a deployment "bar", with the number of pods between 2 and 8, target CPU utilization 60% and memory utilization 70%
-        kubectl autoscale deployment bar --min=3 --max=6 --cpu=60% --memory=70%`))
+        kubectl autoscale deployment bar --min=2 --max=8 --cpu=60% --memory=70%`))
 )
 
 // AutoscaleOptions declares the arguments accepted by the Autoscale command
