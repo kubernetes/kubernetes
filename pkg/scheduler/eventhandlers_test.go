@@ -695,7 +695,6 @@ func TestAddAllEventHandlers(t *testing.T) {
 func TestAdmissionCheck(t *testing.T) {
 	nodeaffinityError := AdmissionResult{Name: nodeaffinity.Name, Reason: nodeaffinity.ErrReasonPod}
 	nodenameError := AdmissionResult{Name: nodename.Name, Reason: nodename.ErrReason}
-	nodeportsError := AdmissionResult{Name: nodeports.Name, Reason: nodeports.ErrReason}
 	podOverheadError := AdmissionResult{InsufficientResource: &noderesources.InsufficientResource{ResourceName: v1.ResourceCPU, Reason: "Insufficient cpu", Requested: 2000, Used: 7000, Capacity: 8000}}
 	cpu := map[v1.ResourceName]string{v1.ResourceCPU: "8"}
 	tests := []struct {
@@ -712,7 +711,7 @@ func TestAdmissionCheck(t *testing.T) {
 			existingPods: []*v1.Pod{
 				st.MakePod().Name("pod1").HostPort(80).Obj(),
 			},
-			wantAdmissionResults: [][]AdmissionResult{{nodeaffinityError, nodeportsError}, {nodeaffinityError}},
+			wantAdmissionResults: [][]AdmissionResult{{nodeaffinityError, AdmissionResult{Name: nodeports.Name, Reason: "node(s) port conflict for the requested pod ports (/:80)"}}, {nodeaffinityError}},
 		},
 		{
 			name: "check PodOverhead and nodeAffinity, PodOverhead need fail quickly if includeAllFailures is false",
@@ -730,7 +729,7 @@ func TestAdmissionCheck(t *testing.T) {
 			existingPods: []*v1.Pod{
 				st.MakePod().Name("pod1").HostPort(80).Node("fake-node").Obj(),
 			},
-			wantAdmissionResults: [][]AdmissionResult{{nodenameError, nodeportsError}, {nodenameError}},
+			wantAdmissionResults: [][]AdmissionResult{{nodenameError, AdmissionResult{Name: nodeports.Name, Reason: "node(s) port conflict for the requested pod ports (/:80)"}}, {nodenameError}},
 		},
 	}
 	for _, tt := range tests {
