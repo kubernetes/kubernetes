@@ -1221,3 +1221,10 @@ func (m *ManagerImpl) isContainerAlreadyRunning(logger klog.Logger, podUID, cntN
 	logger.V(4).Info("Container found in the initial set, assumed running", "podUID", podUID, "containerName", cntName, "containerID", cntID)
 	return true
 }
+
+func (m *ManagerImpl) CanAllocateExclusively(res v1.ResourceName) bool {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	_, ok := m.healthyDevices[string(res)]
+	return ok
+}
