@@ -20,8 +20,10 @@ import (
 	"context"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol"
@@ -85,7 +87,9 @@ func (flowSchemaStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime
 
 // Validate validates a new flow-schema.
 func (flowSchemaStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
-	return validation.ValidateFlowSchema(obj.(*flowcontrol.FlowSchema))
+    flowschema := obj.(*flowcontrol.FlowSchema)
+    allErrs := validation.ValidateFlowSchema(flowschema)
+    return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, flowschema, nil, allErrs, operation.Create)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
