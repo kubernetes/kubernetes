@@ -4451,3 +4451,72 @@ func TestValidateScheduleFormatNormalCases(t *testing.T) {
 		})
 	}
 }
+
+// TestCronJobScheduleRequiredDeclarative verifies that the CronJob
+// spec.schedule field is enforced via declarative validation.
+func TestCronJobScheduleRequiredDeclarative(t *testing.T) {
+	validPodTemplateSpec := getValidPodTemplateSpecForGenerated(getValidGeneratedSelector())
+	validPodTemplateSpec.Labels = map[string]string{}
+
+	baseSpec := batch.CronJobSpec{
+		Schedule:          "0 * * * *",
+		ConcurrencyPolicy: batch.AllowConcurrent,
+		JobTemplate: batch.JobTemplateSpec{
+			Spec: batch.JobSpec{
+				Template: validPodTemplateSpec,
+			},
+		},
+	}
+
+	tests := []struct {
+		name      string
+		tweak     func(*batch.CronJobSpec)
+		expectErr bool
+	}{
+		{
+			name: "missing schedule",
+			tweak: func(spec *batch.CronJobSpec) {
+				spec.Schedule = ""
+			},
+			expectErr: true,
+		},
+		{
+			name:      "valid schedule",
+			tweak:     func(spec *batch.CronJobSpec) {},
+			expectErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			spec := baseSpec
+			tt.tweak(&spec)
+
+			errs := validateCronJobSpec(
+				&spec,
+				nil, // create
+				field.NewPath("spec"),
+				corevalidation.PodValidationOptions{},
+			)
+
+			if tt.expectErr {
+				if len(errs) == 0 {
+					t.Fatalf("expected error but got none")
+				}
+
+				found := false
+				for _, err := range errs {
+					if err.Field == "spec.schedule" {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Fatalf("expected error on field spec.schedule, got: %v", errs)
+				}
+			} else if len(errs) != 0 {
+				t.Fatalf("unexpected error: %v", errs)
+			}
+		})
+	}
+}
