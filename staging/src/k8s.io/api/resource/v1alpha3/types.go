@@ -201,6 +201,7 @@ type DeviceTaintRule struct {
 	// Spec specifies the selector and one taint.
 	//
 	// Changing the spec automatically increments the metadata.generation number.
+	// +required
 	Spec DeviceTaintRuleSpec `json:"spec" protobuf:"bytes,2,name=spec"`
 
 	// Status provides information about what was requested in the spec.
