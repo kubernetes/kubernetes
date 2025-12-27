@@ -149,6 +149,24 @@ func TestConsistencyCheckerDigest(t *testing.T) {
 			},
 			expectConsistent: false,
 		},
+		{
+			desc:            "watch missed delete event",
+			resourceVersion: "3",
+			cacherReady:     true,
+			cacherItems: []example.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Namespace: "Default", Name: "pod", ResourceVersion: "2"}},
+				{ObjectMeta: metav1.ObjectMeta{Namespace: "Default", Name: "pod", ResourceVersion: "3"}},
+			},
+			etcdItems: []example.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Namespace: "Default", Name: "pod", ResourceVersion: "2"}},
+			},
+			expectDigest: storageDigest{
+				ResourceVersion: "3",
+				CacheDigest:     "11d147fc800df0e0",
+				EtcdDigest:      "1859bac707c2cb2b",
+			},
+			expectConsistent: false,
+		},
 	}
 
 	for _, tc := range testCases {
