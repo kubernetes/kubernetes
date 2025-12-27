@@ -276,7 +276,7 @@ func TestAttach(t *testing.T) {
 			attachPath:   "/api/" + version + "/namespaces/test/pods/foo/attach",
 			pod:          attachPod(),
 			container:    "foo",
-			expectedErr:  "cannot attach to the container: container foo not found in pod foo",
+			expectedErr:  "cannot attach to the container: container foo not found in pod foo out of: bar, debugger (ephem), initfoo (init)",
 		},
 	}
 	for _, test := range tests {
