@@ -111,6 +111,9 @@ func getTestPod() *v1.Pod {
 		Name: testContainerName,
 	}
 	pod := v1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			Kind: "Pod",
+		},
 		Spec: v1.PodSpec{
 			Containers:    []v1.Container{container},
 			RestartPolicy: v1.RestartPolicyNever,
@@ -165,23 +168,24 @@ func newTestManager() *manager {
 		&record.FakeRecorder{},
 	).(*manager)
 	// Don't actually execute probes.
-	m.prober.exec = fakeExecProber{probe.Success, nil}
+	m.prober.exec = fakeExecProber{probe.Success, "", nil}
 	return m
 }
 
 func newTestWorker(m *manager, probeType probeType, probeSpec v1.Probe) *worker {
 	pod := getTestPod()
 	setTestProbe(pod, probeType, probeSpec)
-	return newWorker(m, probeType, pod, pod.Spec.Containers[0])
+	return newWorker(m, m.recorder, probeType, pod, pod.Spec.Containers[0])
 }
 
 type fakeExecProber struct {
 	result probe.Result
+	output string
 	err    error
 }
 
 func (p fakeExecProber) Probe(c exec.Cmd) (probe.Result, string, error) {
-	return p.result, "", p.err
+	return p.result, p.output, p.err
 }
 
 type syncExecProber struct {
