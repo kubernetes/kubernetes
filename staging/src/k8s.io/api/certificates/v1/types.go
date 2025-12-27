@@ -123,6 +123,8 @@ type CertificateSigningRequestSpec struct {
 	//  "ipsec end system", "ipsec tunnel", "ipsec user",
 	//  "timestamping", "ocsp signing", "microsoft sgc", "netscape sgc"
 	// +listType=atomic
+	// +required
+	// +k8s:required
 	Usages []KeyUsage `json:"usages,omitempty" protobuf:"bytes,5,opt,name=usages"`
 
 	// username contains the name of the user that created the CertificateSigningRequest.
