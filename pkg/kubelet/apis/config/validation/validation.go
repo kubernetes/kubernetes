@@ -99,9 +99,6 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 	if kc.ImageMaximumGCAge.Duration < 0 {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: imageMaximumGCAge %v must not be negative", kc.ImageMaximumGCAge.Duration))
 	}
-	if kc.ImageMaximumGCAge.Duration > 0 && kc.ImageMaximumGCAge.Duration <= kc.ImageMinimumGCAge.Duration {
-		allErrors = append(allErrors, fmt.Errorf("invalid configuration: imageMaximumGCAge %v must be greater than imageMinimumGCAge %v", kc.ImageMaximumGCAge.Duration, kc.ImageMinimumGCAge.Duration))
-	}
 	if utilvalidation.IsInRange(int(kc.IPTablesDropBit), 0, 31) != nil {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: iptablesDropBit (--iptables-drop-bit) %v must be between 0 and 31, inclusive", kc.IPTablesDropBit))
 	}
