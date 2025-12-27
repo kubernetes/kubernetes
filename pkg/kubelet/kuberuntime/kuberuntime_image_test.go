@@ -340,6 +340,7 @@ func TestPullWithSecrets(t *testing.T) {
 
 		fakeManager.imagePuller = images.NewImageManager(
 			fakeManager.recorder,
+			nil,
 			builtInKeyRing,
 			fakeManager,
 			imagePullManager,
@@ -430,6 +431,7 @@ func TestPullWithSecretsWithError(t *testing.T) {
 
 			fakeManager.imagePuller = images.NewImageManager(
 				fakeManager.recorder,
+				nil,
 				&credentialprovider.BasicDockerKeyring{},
 				fakeManager,
 				imagePullManager,
