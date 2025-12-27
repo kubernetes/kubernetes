@@ -939,7 +939,7 @@ func validateValidationActions(va []admissionregistration.ValidationAction, fldP
 		allErrors = append(allErrors, field.Invalid(fldPath, va, "must not contain both Deny and Warn (repeating the same validation failure information in the API response and headers serves no purpose)"))
 	}
 	if len(actions) == 0 {
-		allErrors = append(allErrors, field.Required(fldPath, "at least one validation action is required"))
+		allErrors = append(allErrors, field.Required(fldPath, "at least one validation action is required")).MarkCoveredByDeclarative()
 	}
 	return allErrors
 }
