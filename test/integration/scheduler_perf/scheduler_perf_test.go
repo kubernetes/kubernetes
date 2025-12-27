@@ -496,3 +496,196 @@ func TestFeatureGatesMerge(t *testing.T) {
 		})
 	}
 }
+
+func TestCompareMetricWithThreshold(t *testing.T) {
+	tests := []struct {
+		name      string
+		items     []DataItem
+		threshold float64
+		selector  thresholdMetricSelector
+		wantErr   bool
+	}{
+		{
+			name:      "no items, should pass",
+			items:     []DataItem{},
+			threshold: 50,
+			selector: thresholdMetricSelector{
+				Name:       "TargetMetric",
+				DataBucket: "Average",
+			},
+			wantErr: false,
+		},
+		{
+			name: "zero threshold, should always pass",
+			items: []DataItem{
+				{
+					Labels: map[string]string{"Metric": "TargetMetric"},
+					Data:   map[string]float64{"Average": 10},
+				},
+			},
+			threshold: 0,
+			selector: thresholdMetricSelector{
+				Name:        "TargetMetric",
+				DataBucket:  "Average",
+				ExpectLower: true,
+			},
+			wantErr: false,
+		},
+		{
+			name: "metric not found in items, should pass (ignored)",
+			items: []DataItem{
+				{
+					Labels: map[string]string{"Metric": "OtherMetric"},
+					Data:   map[string]float64{"Average": 10},
+				},
+			},
+			threshold: 50,
+			selector: thresholdMetricSelector{
+				Name:       "TargetMetric",
+				DataBucket: "Average",
+			},
+			wantErr: false,
+		},
+		{
+			name: "labels do not match, should pass (ignored)",
+			items: []DataItem{
+				{
+					Labels: map[string]string{"Metric": "TargetMetric", "plugin": "foo"},
+					Data:   map[string]float64{"Average": 10},
+				},
+			},
+			threshold: 50,
+			selector: thresholdMetricSelector{
+				Name:       "TargetMetric",
+				Labels:     map[string]string{"plugin": "bar"},
+				DataBucket: "Average",
+			},
+			wantErr: false,
+		},
+		{
+			name: "labels match, value lower than threshold (ExpectLower=false), should fail",
+			items: []DataItem{
+				{
+					Labels: map[string]string{"Metric": "TargetMetric", "plugin": "foo"},
+					Data:   map[string]float64{"Average": 10},
+				},
+			},
+			threshold: 50,
+			selector: thresholdMetricSelector{
+				Name:       "TargetMetric",
+				Labels:     map[string]string{"plugin": "foo"},
+				DataBucket: "Average",
+			},
+			wantErr: true,
+		},
+		{
+			name: "missing data bucket in item, should fail",
+			items: []DataItem{
+				{
+					Labels: map[string]string{"Metric": "TargetMetric"},
+					Data:   map[string]float64{"Average": 100},
+				},
+			},
+			threshold: 50,
+			selector: thresholdMetricSelector{
+				Name:       "TargetMetric",
+				DataBucket: "99Perc",
+			},
+			wantErr: true,
+		},
+		{
+			name: "value higher than threshold (ExpectLower=false), should pass",
+			items: []DataItem{
+				{
+					Labels: map[string]string{"Metric": "Throughput"},
+					Data:   map[string]float64{"Average": 100},
+				},
+			},
+			threshold: 50,
+			selector: thresholdMetricSelector{
+				Name:        "Throughput",
+				DataBucket:  "Average",
+				ExpectLower: false,
+			},
+			wantErr: false,
+		},
+		{
+			name: "value lower than threshold (ExpectLower=false), should fail",
+			items: []DataItem{
+				{
+					Labels: map[string]string{"Metric": "Throughput"},
+					Data:   map[string]float64{"Average": 10},
+				},
+			},
+			threshold: 50,
+			selector: thresholdMetricSelector{
+				Name:        "Throughput",
+				DataBucket:  "Average",
+				ExpectLower: false,
+			},
+			wantErr: true,
+		},
+		{
+			name: "value lower than threshold (ExpectLower=true), should pass",
+			items: []DataItem{
+				{
+					Labels: map[string]string{"Metric": "Latency"},
+					Data:   map[string]float64{"Average": 10},
+				},
+			},
+			threshold: 50,
+			selector: thresholdMetricSelector{
+				Name:        "Latency",
+				DataBucket:  "Average",
+				ExpectLower: true,
+			},
+			wantErr: false,
+		},
+		{
+			name: "value higher than threshold (ExpectLower=true), should fail",
+			items: []DataItem{
+				{
+					Labels: map[string]string{"Metric": "Latency"},
+					Data:   map[string]float64{"Average": 100},
+				},
+			},
+			threshold: 50,
+			selector: thresholdMetricSelector{
+				Name:        "Latency",
+				DataBucket:  "Average",
+				ExpectLower: true,
+			},
+			wantErr: true,
+		},
+		{
+			name: "value exactly equals threshold, should fail",
+			items: []DataItem{
+				{
+					Labels: map[string]string{"Metric": "Throughput"},
+					Data:   map[string]float64{"Average": 50},
+				},
+			},
+			threshold: 50,
+			selector: thresholdMetricSelector{
+				Name:       "Throughput",
+				DataBucket: "Average",
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := compareMetricWithThreshold(tt.items, tt.threshold, tt.selector)
+			if err != nil {
+				if !tt.wantErr {
+					t.Errorf("Expected no error in compareMetricWithThreshold, but got: %v", err)
+				}
+			} else {
+				if tt.wantErr {
+					t.Errorf("Expected error %v in compareMetricWithThreshold, but got nil", tt.wantErr)
+				}
+			}
+		})
+	}
+}
