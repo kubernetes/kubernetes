@@ -151,6 +151,16 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	newReq, cancelFn := apiserverproxyutil.NewRequestForProxy(location, req)
 	defer cancelFn()
 
+	// For HTTP/2.0 requests, we need to define GetBody to replay
+	// the request body after GOAWAY errors are received
+	// For more info see the issue: https://issue.k8s.io/135285
+	if newReq.GetBody == nil && newReq.Body != nil && newReq.Body != http.NoBody {
+		newReq.Body, newReq.GetBody = wrapBodyForRetry(newReq.Body, defaultRetryableBodyConfig())
+		// Closing original body when the request is resolved
+		// This will avoid any leaks for the NopCloser of the wrapped body
+		defer func() { _ = req.Body.Close() }()
+	}
+
 	if handlingInfo.proxyRoundTripper == nil {
 		proxyError(w, req, "", http.StatusNotFound)
 		return
