@@ -17,6 +17,7 @@ limitations under the License.
 package queue
 
 import (
+	"sync/atomic"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -27,6 +28,26 @@ import (
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
+
+type mockMetricRecorder struct {
+	val atomic.Int64
+}
+
+func (m *mockMetricRecorder) Inc() {
+	m.val.Add(1)
+}
+
+func (m *mockMetricRecorder) Dec() {
+	m.val.Add(-1)
+}
+
+func (m *mockMetricRecorder) Clear() {
+	m.val.Store(0)
+}
+
+func (m *mockMetricRecorder) Value() int64 {
+	return m.val.Load()
+}
 
 func TestUnschedulablePods(t *testing.T) {
 	var pods = []*v1.Pod{
@@ -40,14 +61,22 @@ func TestUnschedulablePods(t *testing.T) {
 	updatedPods[1] = pods[1].DeepCopy()
 	updatedPods[3] = pods[3].DeepCopy()
 
+	gated := func(p *v1.Pod, upm *unschedulablePods) bool {
+		pInfo := upm.get(p)
+		return pInfo != nil && pInfo.Gated()
+	}
+
 	tests := []struct {
-		name                   string
-		podsToAdd              []*v1.Pod
-		expectedMapAfterAdd    map[string]*framework.QueuedPodInfo
-		podsToUpdate           []*v1.Pod
-		expectedMapAfterUpdate map[string]*framework.QueuedPodInfo
-		podsToDelete           []*v1.Pod
-		expectedMapAfterDelete map[string]*framework.QueuedPodInfo
+		name                         string
+		podsToAdd                    []*v1.Pod
+		gatedPodsToAdd               []*v1.Pod
+		expectedMapAfterAdd          map[string]*framework.QueuedPodInfo
+		podsToUpdate                 []*v1.Pod
+		expectedMapAfterUpdate       map[string]*framework.QueuedPodInfo
+		podsToDelete                 []*v1.Pod
+		expectedMapAfterDelete       map[string]*framework.QueuedPodInfo
+		exptectedUnschedulableMetric int64
+		exptectedGatedMetric         int64
 	}{
 		{
 			name:      "create, update, delete subset of pods",
@@ -70,6 +99,8 @@ func TestUnschedulablePods(t *testing.T) {
 				util.GetPodFullName(pods[2]): {PodInfo: mustNewTestPodInfo(t, pods[2]), UnschedulablePlugins: sets.New[string]()},
 				util.GetPodFullName(pods[3]): {PodInfo: mustNewTestPodInfo(t, pods[3]), UnschedulablePlugins: sets.New[string]()},
 			},
+			exptectedUnschedulableMetric: 2,
+			exptectedGatedMetric:         0,
 		},
 		{
 			name:      "create, update, delete all",
@@ -83,8 +114,10 @@ func TestUnschedulablePods(t *testing.T) {
 				util.GetPodFullName(pods[0]): {PodInfo: mustNewTestPodInfo(t, pods[0]), UnschedulablePlugins: sets.New[string]()},
 				util.GetPodFullName(pods[3]): {PodInfo: mustNewTestPodInfo(t, updatedPods[3]), UnschedulablePlugins: sets.New[string]()},
 			},
-			podsToDelete:           []*v1.Pod{pods[0], pods[3]},
-			expectedMapAfterDelete: map[string]*framework.QueuedPodInfo{},
+			podsToDelete:                 []*v1.Pod{pods[0], pods[3]},
+			expectedMapAfterDelete:       map[string]*framework.QueuedPodInfo{},
+			exptectedUnschedulableMetric: 0,
+			exptectedGatedMetric:         0,
 		},
 		{
 			name:      "delete non-existing and existing pods",
@@ -102,14 +135,66 @@ func TestUnschedulablePods(t *testing.T) {
 			expectedMapAfterDelete: map[string]*framework.QueuedPodInfo{
 				util.GetPodFullName(pods[1]): {PodInfo: mustNewTestPodInfo(t, updatedPods[1]), UnschedulablePlugins: sets.New[string]()},
 			},
+			exptectedUnschedulableMetric: 1,
+			exptectedGatedMetric:         0,
+		},
+		{
+			name:           "add/delete gated pods",
+			gatedPodsToAdd: []*v1.Pod{pods[0], pods[1]},
+			expectedMapAfterAdd: map[string]*framework.QueuedPodInfo{
+				util.GetPodFullName(pods[0]): {PodInfo: mustNewTestPodInfo(t, pods[0]), GatingPlugin: "test", UnschedulablePlugins: sets.New[string]("test")},
+				util.GetPodFullName(pods[1]): {PodInfo: mustNewTestPodInfo(t, pods[1]), GatingPlugin: "test", UnschedulablePlugins: sets.New[string]("test")},
+			},
+			podsToDelete: []*v1.Pod{pods[0]},
+			expectedMapAfterDelete: map[string]*framework.QueuedPodInfo{
+				util.GetPodFullName(pods[1]): {PodInfo: mustNewTestPodInfo(t, pods[1]), GatingPlugin: "test", UnschedulablePlugins: sets.New[string]("test")},
+			},
+			exptectedUnschedulableMetric: 0,
+			exptectedGatedMetric:         1,
+		},
+		{
+			name:           "add gated and non-gated pods, then delete",
+			podsToAdd:      []*v1.Pod{pods[0]},
+			gatedPodsToAdd: []*v1.Pod{pods[1]},
+			expectedMapAfterAdd: map[string]*framework.QueuedPodInfo{
+				util.GetPodFullName(pods[0]): {PodInfo: mustNewTestPodInfo(t, pods[0]), UnschedulablePlugins: sets.New[string]()},
+				util.GetPodFullName(pods[1]): {PodInfo: mustNewTestPodInfo(t, pods[1]), GatingPlugin: "test", UnschedulablePlugins: sets.New[string]("test")},
+			},
+			podsToDelete:                 []*v1.Pod{pods[0], pods[1]},
+			expectedMapAfterDelete:       map[string]*framework.QueuedPodInfo{},
+			exptectedUnschedulableMetric: 0,
+			exptectedGatedMetric:         0,
+		},
+		{
+			name:           "add gated pod, update it to non-gated",
+			gatedPodsToAdd: []*v1.Pod{pods[0]},
+			expectedMapAfterAdd: map[string]*framework.QueuedPodInfo{
+				util.GetPodFullName(pods[0]): {PodInfo: mustNewTestPodInfo(t, pods[0]), GatingPlugin: "test", UnschedulablePlugins: sets.New[string]("test")},
+			},
+			podsToUpdate: []*v1.Pod{updatedPods[0]},
+			expectedMapAfterUpdate: map[string]*framework.QueuedPodInfo{
+				util.GetPodFullName(pods[0]): {PodInfo: mustNewTestPodInfo(t, updatedPods[0]), UnschedulablePlugins: sets.New[string]()},
+			},
+			podsToDelete:                 []*v1.Pod{pods[0]},
+			expectedMapAfterDelete:       map[string]*framework.QueuedPodInfo{},
+			exptectedUnschedulableMetric: 0,
+			exptectedGatedMetric:         0,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			upm := newUnschedulablePods(nil, nil)
+			unschedulableRecorder := &mockMetricRecorder{}
+			gatedRecorder := &mockMetricRecorder{}
+			upm := newUnschedulablePods(unschedulableRecorder, gatedRecorder)
 			for _, p := range test.podsToAdd {
 				upm.addOrUpdate(newQueuedPodInfoForLookup(p), false, framework.EventUnscheduledPodAdd.Label())
+			}
+			for _, p := range test.gatedPodsToAdd {
+				pInfo := newQueuedPodInfoForLookup(p)
+				pInfo.GatingPlugin = "test"
+				pInfo.UnschedulablePlugins.Insert("test")
+				upm.addOrUpdate(pInfo, false, framework.EventUnscheduledPodAdd.Label())
 			}
 			if diff := cmp.Diff(test.expectedMapAfterAdd, upm.podInfoMap, cmpopts.IgnoreUnexported(framework.PodInfo{})); diff != "" {
 				t.Errorf("Unexpected map after adding pods(-want, +got):\n%s", diff)
@@ -117,21 +202,33 @@ func TestUnschedulablePods(t *testing.T) {
 
 			if len(test.podsToUpdate) > 0 {
 				for _, p := range test.podsToUpdate {
-					upm.addOrUpdate(newQueuedPodInfoForLookup(p), false, framework.EventUnscheduledPodUpdate.Label())
+					upm.addOrUpdate(newQueuedPodInfoForLookup(p), gated(p, upm), framework.EventUnscheduledPodUpdate.Label())
 				}
 				if diff := cmp.Diff(test.expectedMapAfterUpdate, upm.podInfoMap, cmpopts.IgnoreUnexported(framework.PodInfo{})); diff != "" {
 					t.Errorf("Unexpected map after updating pods (-want, +got):\n%s", diff)
 				}
 			}
 			for _, p := range test.podsToDelete {
-				upm.delete(p, false)
+				upm.delete(p, gated(p, upm))
 			}
 			if diff := cmp.Diff(test.expectedMapAfterDelete, upm.podInfoMap, cmpopts.IgnoreUnexported(framework.PodInfo{})); diff != "" {
 				t.Errorf("Unexpected map after deleting pods (-want, +got):\n%s", diff)
 			}
+			if unschedulableRecorder.Value() != test.exptectedUnschedulableMetric {
+				t.Errorf("Expected unschedulable metric to be %d, but got %d", test.exptectedUnschedulableMetric, unschedulableRecorder.Value())
+			}
+			if gatedRecorder.Value() != test.exptectedGatedMetric {
+				t.Errorf("Expected gated metric to be %d, but got %d", test.exptectedGatedMetric, gatedRecorder.Value())
+			}
 			upm.clear()
 			if len(upm.podInfoMap) != 0 {
 				t.Errorf("Expected the map to be empty, but has %v elements.", len(upm.podInfoMap))
+			}
+			if unschedulableRecorder.Value() != 0 {
+				t.Errorf("Expected unschedulable metric to be cleared, but got %d", unschedulableRecorder.Value())
+			}
+			if gatedRecorder.Value() != 0 {
+				t.Errorf("Expected gated metric to be cleared, but got %d", gatedRecorder.Value())
 			}
 		})
 	}
