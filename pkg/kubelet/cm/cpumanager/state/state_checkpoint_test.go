@@ -423,6 +423,67 @@ func TestCheckpointStateClear(t *testing.T) {
 	}
 }
 
+func TestCheckpointStateAllocateAndReclaim(t *testing.T) {
+	testCases := []struct {
+		description   string
+		defaultCPUset cpuset.CPUSet
+		assignments   map[string]map[string]cpuset.CPUSet
+	}{
+		{
+			description:   "One container",
+			defaultCPUset: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8),
+			assignments: map[string]map[string]cpuset.CPUSet{
+				"pod": {
+					"c1": cpuset.New(0, 1),
+				},
+			},
+		},
+	}
+
+	// create temp dir
+	testingDir := t.TempDir()
+
+	cpm, err := checkpointmanager.NewCheckpointManager(testingDir)
+	require.NoError(t, err, "could not create testing checkpoint manager")
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			// ensure there is no previous checkpoint
+			require.NoError(t, cpm.RemoveCheckpoint(testingCheckpoint), "could not remove previous checkpoint")
+
+			logger, _ := ktesting.NewTestContext(t)
+			state, err := NewCheckpointState(logger, testingDir, testingCheckpoint, "none", nil)
+			require.NoError(t, err, "could not create testing checkpointState instance")
+
+			defaultCPUset := tc.defaultCPUset
+			assignments := tc.assignments
+			state.SetDefaultCPUSet(defaultCPUset)
+
+			for pod := range assignments {
+				for container, set := range assignments[pod] {
+					state.Allocate(pod, container, set)
+
+					var cpus cpuset.CPUSet
+					cpus, _ = state.GetCPUSet(pod, container)
+
+					require.True(t, cpus.Equals(set))
+
+					require.True(t, cpus.Intersection(state.GetDefaultCPUSet()).IsEmpty())
+
+					require.True(t, cpus.Union(state.GetDefaultCPUSet()).Equals(defaultCPUset))
+
+					state.Reclaim(pod, container, defaultCPUset)
+
+					_, ok := state.GetCPUSet(pod, container)
+					require.False(t, ok)
+
+					require.True(t, state.GetDefaultCPUSet().Equals(defaultCPUset))
+				}
+			}
+		})
+	}
+}
+
 func AssertStateEqual(t *testing.T, sf State, sm State) {
 	cpusetSf := sf.GetDefaultCPUSet()
 	cpusetSm := sm.GetDefaultCPUSet()
