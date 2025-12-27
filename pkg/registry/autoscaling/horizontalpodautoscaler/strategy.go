@@ -18,6 +18,8 @@ package horizontalpodautoscaler
 
 import (
 	"context"
+	"k8s.io/apimachinery/pkg/api/operation"
+	"k8s.io/apiserver/pkg/registry/rest"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -74,7 +76,9 @@ func (autoscalerStrategy) PrepareForCreate(ctx context.Context, obj runtime.Obje
 func (autoscalerStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	autoscaler := obj.(*autoscaling.HorizontalPodAutoscaler)
 	opts := validationOptionsForHorizontalPodAutoscaler(autoscaler, nil)
-	return validation.ValidateHorizontalPodAutoscaler(autoscaler, opts)
+	allErrs := validation.ValidateHorizontalPodAutoscaler(autoscaler, opts)
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, obj, nil, allErrs, operation.Create)
+
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -106,7 +110,9 @@ func (autoscalerStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.O
 	newHPA := obj.(*autoscaling.HorizontalPodAutoscaler)
 	oldHPA := old.(*autoscaling.HorizontalPodAutoscaler)
 	opts := validationOptionsForHorizontalPodAutoscaler(newHPA, oldHPA)
-	return validation.ValidateHorizontalPodAutoscalerUpdate(newHPA, oldHPA, opts)
+	allErrs := validation.ValidateHorizontalPodAutoscalerUpdate(newHPA, oldHPA, opts)
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newHPA, oldHPA, allErrs, operation.Update)
+
 }
 
 // WarningsOnUpdate returns warnings for the given update.
