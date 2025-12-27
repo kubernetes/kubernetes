@@ -367,6 +367,49 @@ func newFakeNodeSelectorDependOnPodAnnotation(_ context.Context, _ runtime.Objec
 	return &fakeNodeSelectorDependOnPodAnnotation{}, nil
 }
 
+type CancelPodPreBindPlugin struct {
+	handle fwk.Handle
+}
+
+func (p *CancelPodPreBindPlugin) Name() string { return "CancelPodPreBindPlugin" }
+
+func (p *CancelPodPreBindPlugin) PreBind(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
+	if bp := p.handle.GetPodInPrebind(pod.UID); bp != nil {
+		bp.CancelPod("cancel")
+	}
+	return nil
+}
+
+func (p *CancelPodPreBindPlugin) PreBindPreFlight(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
+	return nil
+}
+
+func NewCancelPodPreBindPlugin(_ context.Context, _ runtime.Object, h fwk.Handle) (fwk.Plugin, error) {
+	return &CancelPodPreBindPlugin{handle: h}, nil
+}
+
+var blockingPreBindStartCh = make(chan struct{}, 1)
+
+type BlockingPreBindPlugin struct {
+	handle fwk.Handle
+}
+
+func (p *BlockingPreBindPlugin) Name() string { return "BlockingPreBindPlugin" }
+
+func (p *BlockingPreBindPlugin) PreBind(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
+	go func() { blockingPreBindStartCh <- struct{}{} }()
+	<-ctx.Done()
+	return fwk.AsStatus(ctx.Err())
+}
+
+func (p *BlockingPreBindPlugin) PreBindPreFlight(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
+	return nil
+}
+
+func NewBlockingPreBindPlugin(_ context.Context, _ runtime.Object, h fwk.Handle) (fwk.Plugin, error) {
+	return &BlockingPreBindPlugin{handle: h}, nil
+}
+
 type TestPlugin struct {
 	name string
 }
@@ -715,6 +758,8 @@ func TestSchedulerScheduleOne(t *testing.T) {
 		nominatedNodeNameForExpectationEnabled *bool
 		// If nil, the test case is run with both enabled and disabled
 		asyncAPICallsEnabled *bool
+		// postSchedule is run after ScheduleOne returns but before waiting for the event
+		postSchedule func(context.Context, *Scheduler)
 	}{
 		{
 			name:                  "schedule pod failed",
@@ -891,6 +936,29 @@ func TestSchedulerScheduleOne(t *testing.T) {
 			eventReason:             "FailedScheduling",
 		},
 		{
+			name:    "prebind pod cancelled during prebind (external preemption)",
+			sendPod: testPod,
+			registerPluginFuncs: []tf.RegisterPluginFunc{
+				tf.RegisterPreBindPlugin("BlockingPreBindPlugin", NewBlockingPreBindPlugin),
+			},
+			mockScheduleResult: scheduleResultOk,
+			postSchedule: func(ctx context.Context, sched *Scheduler) {
+				<-blockingPreBindStartCh // Wait for plugin to start
+				// Trigger preemption from "outside"
+				if bp := sched.Profiles[testSchedulerName].GetPodInPrebind(testPod.UID); bp != nil {
+					bp.CancelPod("context cancelled externally")
+				}
+			},
+			nominatedNodeNameForExpectationEnabled: ptr.To(true),
+			expectAssumedPod:                       assignedTestPod,
+			expectErrorPod:                         assignedTestPod,
+			expectForgetPod:                        assignedTestPod,
+			expectNominatedNodeName:                testNode.Name,
+			expectPodInBackoffQ:                    testPod,
+			expectError:                            fmt.Errorf(`running PreBind plugin "BlockingPreBindPlugin": context cancelled externally`),
+			eventReason:                            "FailedScheduling",
+		},
+		{
 			name:                "binding failed",
 			sendPod:             testPod,
 			injectBindError:     bindingErr,
@@ -937,6 +1005,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 				p.Status.NominatedNodeName = "existing-node"
 				return p
 			}(),
+
 			// Depending on the timing, if asyncAPICallsEnabled, the NNN update might not be sent yet while checking the expectNominatedNodeName.
 			// So, asyncAPICallsEnabled is set to false.
 			asyncAPICallsEnabled:    ptr.To(false),
@@ -1049,6 +1118,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 							frameworkruntime.WithAPIDispatcher(apiDispatcher),
 							frameworkruntime.WithEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, testSchedulerName)),
 							frameworkruntime.WithWaitingPods(frameworkruntime.NewWaitingPodsMap()),
+							frameworkruntime.WithPodsInPrebind(frameworkruntime.NewPodsInPrebindMap()),
 							frameworkruntime.WithInformerFactory(informerFactory),
 						)
 						if err != nil {
@@ -1097,6 +1167,10 @@ func TestSchedulerScheduleOne(t *testing.T) {
 						informerFactory.WaitForCacheSync(ctx.Done())
 						sched.nodeInfoSnapshot = internalcache.NewEmptySnapshot()
 						sched.ScheduleOne(ctx)
+
+						if item.postSchedule != nil {
+							item.postSchedule(ctx, sched)
+						}
 
 						if item.podToAdmit != nil {
 							for {
@@ -1620,6 +1694,7 @@ func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {
 						frameworkruntime.WithAPIDispatcher(apiDispatcher),
 						frameworkruntime.WithEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, testSchedulerName)),
 						frameworkruntime.WithWaitingPods(frameworkruntime.NewWaitingPodsMap()),
+						frameworkruntime.WithPodsInPrebind(frameworkruntime.NewPodsInPrebindMap()),
 					)
 					if err != nil {
 						t.Fatal(err)
@@ -4729,6 +4804,7 @@ func setupTestScheduler(ctx context.Context, t *testing.T, client clientset.Inte
 		frameworkruntime.WithInformerFactory(informerFactory),
 		frameworkruntime.WithPodNominator(schedulingQueue),
 		frameworkruntime.WithWaitingPods(waitingPods),
+		frameworkruntime.WithPodsInPrebind(frameworkruntime.NewPodsInPrebindMap()),
 		frameworkruntime.WithSnapshotSharedLister(snapshot),
 	)
 	if apiDispatcher != nil {

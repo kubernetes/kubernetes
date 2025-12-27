@@ -278,8 +278,9 @@ func (sched *Scheduler) bindingCycle(
 
 	assumedPod := assumedPodInfo.Pod
 
+	var preFlightStatus *fwk.Status
 	if sched.nominatedNodeNameForExpectationEnabled {
-		preFlightStatus := schedFramework.RunPreBindPreFlights(ctx, state, assumedPod, scheduleResult.SuggestedHost)
+		preFlightStatus = schedFramework.RunPreBindPreFlights(ctx, state, assumedPod, scheduleResult.SuggestedHost)
 		if preFlightStatus.Code() == fwk.Error ||
 			// Unschedulable status is not supported in PreBindPreFlight and hence we regard it as an error.
 			preFlightStatus.IsRejected() {
@@ -323,9 +324,24 @@ func (sched *Scheduler) bindingCycle(
 	// we can free the cluster events stored in the scheduling queue sooner, which is worth for busy clusters memory consumption wise.
 	sched.SchedulingQueue.Done(assumedPod.UID)
 
+	// If we are going to run prebind plugins we put the pod in binding map to optimize preemption.
+	if preFlightStatus.IsSuccess() {
+		var podInPreBindCancel context.CancelCauseFunc
+		ctx, podInPreBindCancel = context.WithCancelCause(ctx)
+		defer podInPreBindCancel(nil)
+		defer schedFramework.RemovePodInPrebind(assumedPod.UID)
+		schedFramework.AddPodInPrebind(assumedPod.UID, podInPreBindCancel)
+	}
 	// Run "prebind" plugins.
 	if status := schedFramework.RunPreBindPlugins(ctx, state, assumedPod, scheduleResult.SuggestedHost); !status.IsSuccess() {
 		return status
+	}
+
+	// Verify that pod was not preempted during prebinding
+	bindingPod := schedFramework.GetPodInPrebind(assumedPod.UID)
+	if bindingPod != nil && !bindingPod.MarkPrebound() {
+		err := context.Cause(ctx)
+		return fwk.AsStatus(err)
 	}
 
 	// Run "bind" plugins.
@@ -1047,6 +1063,7 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, fwk framewo
 	}()
 
 	logger := klog.FromContext(ctx)
+	logger.Info("Inside handleSchedulingFailure")
 	reason := v1.PodReasonSchedulerError
 	if status.IsRejected() {
 		reason = v1.PodReasonUnschedulable
@@ -1117,6 +1134,7 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, fwk framewo
 	}
 
 	msg := truncateMessage(errMsg)
+	logger.Info("Calling update pod with pod scheduled false")
 	fwk.EventRecorder().Eventf(pod, nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", msg)
 	if err := updatePod(ctx, sched.client, fwk.APICacher(), pod, &v1.PodCondition{
 		Type:               v1.PodScheduled,
