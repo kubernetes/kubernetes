@@ -11,7 +11,7 @@ linters:
     # - "maxlength" # Ensure all strings and arrays have maximum lengths/maximum items. ONLY for CRDs until declarative markers exist in core types.
     # - "nobools" # Bools do not evolve over time, should use enums instead.
     # - "nofloats" # Ensure floats are not used.
-    # - "nomaps" # Ensure maps are not used, unless they are `map[string]string` (for labels/annotations/etc).
+    - "nomaps" # Ensure maps are not used, unless they are `map[string]string` (for labels/annotations/etc).
     # - "nophase" # Ensure field names do not have the word "phase" in them.
     - "notimestamp" # Ensure fields are not named "timestamp", prefer "time".
     # - "optionalfields" # Ensure fields marked optional have omitempty and pointers.
