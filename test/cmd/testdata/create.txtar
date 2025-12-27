@@ -1,0 +1,198 @@
+# Copyright The Kubernetes Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Test kubectl create command variations
+
+####################
+# Create Dry-Run Tests
+####################
+
+# Pre-condition: no PODs exist
+kubectl get pods -o jsonpath='{range.items}{.metadata.name}{end}'
+! stdout '.'
+
+# Test: Dry-run create (client-side) - should not create pod
+kubectl create --dry-run=client -f hack/testdata/pod.yaml
+stdout 'pod/test-pod created'
+stdout 'dry run'
+
+# Verify no POD was created
+kubectl get pods -o jsonpath='{range.items}{.metadata.name}{end}'
+! stdout 'test-pod'
+
+# Test: Dry-run create (server-side) - should not create pod
+kubectl create --dry-run=server -f hack/testdata/pod.yaml
+stdout 'pod/test-pod created'
+stdout 'server dry run'
+
+# Verify no POD was created
+kubectl get pods -o jsonpath='{range.items}{.metadata.name}{end}'
+! stdout 'test-pod'
+
+####################
+# Create with Label Selector Tests
+####################
+
+# Pre-condition: no PODs exist
+kubectl get pods -o jsonpath='{range.items}{.metadata.name}{end}'
+! stdout '.'
+
+# Test: Create with label selector should only create matching objects
+kubectl create -l unique-label=bingbang -f hack/testdata/filter
+stdout 'created'
+
+# Verify the matching pod was created
+kubectl get pods selector-test-pod -o jsonpath='{.metadata.labels.name}'
+stdout 'selector-test-pod'
+
+# Verify the non-matching pod was NOT created
+! kubectl get pods selector-test-pod-dont-apply
+stderr 'pods "selector-test-pod-dont-apply" not found'
+
+# Cleanup
+kubectl delete pods selector-test-pod
+stdout 'pod "selector-test-pod" deleted'
+
+####################
+# Create Error Tests
+####################
+
+# Test: kubectl create with no arguments should fail
+! kubectl create
+stderr 'must specify'
+
+# Test: Posting a pod to namespaces endpoint should fail (using --raw)
+! kubectl create --raw /api/v1/namespaces -f test/fixtures/doc-yaml/admin/limitrange/valid-pod.yaml
+stderr 'the object provided is unrecognized'
+
+# Test: --raw and --edit are mutually exclusive
+! kubectl create --raw /api/v1/namespaces -f test/fixtures/doc-yaml/admin/limitrange/valid-pod.yaml --edit
+stderr 'raw and --edit are mutually exclusive'
+
+####################
+# Create Job Tests
+####################
+
+# Test: Create job with image
+kubectl create job test-job --image=registry.k8s.io/nginx:test-cmd
+stdout 'job.batch/test-job created'
+
+# Verify job image
+kubectl get job test-job -o jsonpath='{.spec.template.spec.containers[0].image}'
+stdout 'registry.k8s.io/nginx:test-cmd'
+
+# Cleanup
+kubectl delete job test-job
+stdout 'deleted'
+
+# Test: Create job with command
+kubectl create job test-job-pi --image=${IMAGE_PERL} -- perl -Mbignum=bpi -wle 'print bpi(20)'
+stdout 'job.batch/test-job-pi created'
+
+# Verify job image
+kubectl get job test-job-pi -o jsonpath='{.spec.template.spec.containers[0].image}'
+stdout 'registry.k8s.io/perl'
+
+# Cleanup
+kubectl delete job test-job-pi
+stdout 'deleted'
+
+# Test: Create job from cronjob
+# First create a cronjob
+kubectl create cronjob test-pi --schedule='* */5 * * *' --image=${IMAGE_PERL} -- perl -Mbignum=bpi -wle 'print bpi(10)'
+stdout 'cronjob.batch/test-pi created'
+
+# Create job from the cronjob
+kubectl create job my-pi --from=cronjob/test-pi
+stdout 'job.batch/my-pi created'
+
+# Verify the job command contains the expected command from cronjob
+kubectl get job my-pi -o jsonpath='{.spec.template.spec.containers[0].command}'
+stdout 'perl'
+stdout 'bpi'
+
+# Cleanup
+kubectl delete job my-pi
+kubectl delete cronjob test-pi
+
+####################
+# Create Kustomization Directory Tests
+####################
+
+# Pre-condition: No resources exist
+kubectl get configmaps --field-selector=metadata.name=test-the-map -o jsonpath='{range.items}{.metadata.name}{end}'
+! stdout 'test-the-map'
+
+kubectl get deployment -o jsonpath='{range.items}{.metadata.name}{end}'
+! stdout 'test-the-deployment'
+
+kubectl get services -o jsonpath='{range.items}{.metadata.name}{end}'
+! stdout 'test-the-service'
+
+# Test: Create resources from kustomization directory
+kubectl create -k hack/testdata/kustomize
+stdout 'created'
+
+# Verify all resources were created
+kubectl get configmap test-the-map -o jsonpath='{.metadata.name}'
+stdout 'test-the-map'
+
+kubectl get deployment test-the-deployment -o jsonpath='{.metadata.name}'
+stdout 'test-the-deployment'
+
+kubectl get service test-the-service -o jsonpath='{.metadata.name}'
+stdout 'test-the-service'
+
+# Cleanup
+kubectl delete -k hack/testdata/kustomize
+stdout 'deleted'
+
+####################
+# Create Validate Tests
+####################
+
+# Test: --validate with no value (defaults to strict)
+! kubectl create -f hack/testdata/invalid-deployment-unknown-and-duplicate-fields.yaml --validate
+stderr 'error'
+
+# Test: --validate=true
+! kubectl create -f hack/testdata/invalid-deployment-unknown-and-duplicate-fields.yaml --validate=true
+stderr 'error'
+
+# Test: --validate=false (should succeed despite invalid fields)
+kubectl create -f hack/testdata/invalid-deployment-unknown-and-duplicate-fields.yaml --validate=false
+stdout 'deployment.apps/invalid-nginx-deployment created'
+kubectl delete deployment invalid-nginx-deployment
+
+# Test: --validate=strict (should fail)
+! kubectl create -f hack/testdata/invalid-deployment-unknown-and-duplicate-fields.yaml --validate=strict
+stderr 'error'
+
+# Test: --validate=warn (should succeed with warning)
+kubectl create -f hack/testdata/invalid-deployment-unknown-and-duplicate-fields.yaml --validate=warn
+stdout 'deployment.apps/invalid-nginx-deployment created'
+kubectl delete deployment invalid-nginx-deployment
+
+# Test: --validate=ignore (should succeed)
+kubectl create -f hack/testdata/invalid-deployment-unknown-and-duplicate-fields.yaml --validate=ignore
+stdout 'deployment.apps/invalid-nginx-deployment created'
+kubectl delete deployment invalid-nginx-deployment
+
+# Test: Default validation (should be strict)
+! kubectl create -f hack/testdata/invalid-deployment-unknown-and-duplicate-fields.yaml
+stderr 'error'
+
+# Test: Invalid validate value
+! kubectl create -f hack/testdata/invalid-deployment-unknown-and-duplicate-fields.yaml --validate=foo
+stderr 'invalid - validate option "foo"'

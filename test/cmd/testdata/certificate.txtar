@@ -1,0 +1,137 @@
+# Copyright The Kubernetes Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Test CertificateSigningRequest (CSR) approval and denial
+
+####################
+# CSR Approval Tests
+####################
+
+# Test: Approve CSR by name
+# Create CSR
+kubectl create -f hack/testdata/csr.yml
+stdout 'certificatesigningrequest.certificates.k8s.io/foo created'
+
+# Pre-condition: CSR has no status conditions yet
+kubectl get csr/foo -o jsonpath='{range.status.conditions}{.type}{end}'
+! stdout 'Approved'
+! stdout 'Denied'
+
+# Approve the CSR by name
+kubectl certificate approve foo
+stdout 'certificatesigningrequest.certificates.k8s.io/foo approved'
+
+# Verify the approval was recorded (check for Approved condition in YAML output)
+kubectl get csr/foo -o yaml
+stdout 'type: Approved'
+
+# Verify CSR appears in list
+kubectl get csr -o json
+stdout 'foo'
+
+# Cleanup
+kubectl delete -f hack/testdata/csr.yml
+stdout 'certificatesigningrequest.certificates.k8s.io "foo" deleted'
+
+# Verify CSR is deleted
+kubectl get csr -o jsonpath='{range.items}{.metadata.name}{end}'
+! stdout 'foo'
+
+# Test: Approve CSR by file
+kubectl create -f hack/testdata/csr.yml
+stdout 'certificatesigningrequest.certificates.k8s.io/foo created'
+
+# Pre-condition: CSR has no status conditions
+kubectl get csr/foo -o jsonpath='{range.status.conditions}{.type}{end}'
+! stdout 'Approved'
+
+# Approve the CSR using -f flag
+kubectl certificate approve -f hack/testdata/csr.yml
+stdout 'certificatesigningrequest.certificates.k8s.io/foo approved'
+
+# Verify the approval was recorded (check for Approved condition in YAML output)
+kubectl get csr/foo -o yaml
+stdout 'type: Approved'
+
+# Verify CSR appears in list
+kubectl get csr -o json
+stdout 'foo'
+
+# Cleanup
+kubectl delete -f hack/testdata/csr.yml
+stdout 'certificatesigningrequest.certificates.k8s.io "foo" deleted'
+
+# Verify CSR is deleted
+kubectl get csr -o jsonpath='{range.items}{.metadata.name}{end}'
+! stdout 'foo'
+
+####################
+# CSR Denial Tests
+####################
+
+# Test: Deny CSR by name
+kubectl create -f hack/testdata/csr.yml
+stdout 'certificatesigningrequest.certificates.k8s.io/foo created'
+
+# Pre-condition: CSR has no status conditions
+kubectl get csr/foo -o jsonpath='{range.status.conditions}{.type}{end}'
+! stdout 'Denied'
+
+# Deny the CSR by name
+kubectl certificate deny foo
+stdout 'certificatesigningrequest.certificates.k8s.io/foo denied'
+
+# Verify the denial was recorded (check for Denied condition in YAML output)
+kubectl get csr/foo -o yaml
+stdout 'type: Denied'
+
+# Verify CSR appears in list
+kubectl get csr -o json
+stdout 'foo'
+
+# Cleanup
+kubectl delete -f hack/testdata/csr.yml
+stdout 'certificatesigningrequest.certificates.k8s.io "foo" deleted'
+
+# Verify CSR is deleted
+kubectl get csr -o jsonpath='{range.items}{.metadata.name}{end}'
+! stdout 'foo'
+
+# Test: Deny CSR by file
+kubectl create -f hack/testdata/csr.yml
+stdout 'certificatesigningrequest.certificates.k8s.io/foo created'
+
+# Pre-condition: CSR has no status conditions
+kubectl get csr/foo -o jsonpath='{range.status.conditions}{.type}{end}'
+! stdout 'Denied'
+
+# Deny the CSR using -f flag
+kubectl certificate deny -f hack/testdata/csr.yml
+stdout 'certificatesigningrequest.certificates.k8s.io/foo denied'
+
+# Verify the denial was recorded (check for Denied condition in YAML output)
+kubectl get csr/foo -o yaml
+stdout 'type: Denied'
+
+# Verify CSR appears in list
+kubectl get csr -o json
+stdout 'foo'
+
+# Cleanup
+kubectl delete -f hack/testdata/csr.yml
+stdout 'certificatesigningrequest.certificates.k8s.io "foo" deleted'
+
+# Verify CSR is deleted
+kubectl get csr -o jsonpath='{range.items}{.metadata.name}{end}'
+! stdout 'foo'

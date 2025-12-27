@@ -1,0 +1,99 @@
+# Copyright The Kubernetes Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Test authorization and impersonation features
+
+####################
+# Authorization Tests
+####################
+
+# Test: Create SubjectAccessReview
+# Note: kubectl create for SubjectAccessReview just validates and submits the request
+# The API server evaluates it and returns the result immediately (doesn't persist it)
+kubectl create -f test/fixtures/pkg/kubectl/cmd/create/sar-v1.json --validate=false
+stdout 'subjectaccessreview.authorization.k8s.io/.* created'
+
+####################
+# Impersonation Tests
+####################
+
+# Test: --as-group without --as should fail
+! kubectl get pods --as-group=foo
+stderr 'without impersonating a user'
+
+# Test: --as-uid without --as should fail
+! kubectl get pods --as-uid=abc123
+stderr 'without impersonating a user'
+
+# Test: --as flag (impersonate user)
+# Create a CSR (CertificateSigningRequest) with --as=user1
+kubectl create -f hack/testdata/csr.yml --as=user1
+kubectl get csr/foo -o jsonpath='{.spec.username}'
+stdout 'user'
+
+# Verify groups include system:authenticated (added automatically)
+kubectl get csr/foo -o jsonpath='{range .spec.groups}{@}{end}'
+stdout 'system:authenticated'
+
+# Cleanup
+kubectl delete -f hack/testdata/csr.yml
+
+# Test: --as with multiple --as-group flags
+kubectl create -f hack/testdata/csr.yml --as=user1 --as-group=group2 --as-group=group1 --as-group=',,,chameleon'
+
+# Verify all groups are present (3 custom + system:authenticated automatically added)
+kubectl get csr/foo -o jsonpath='{range .spec.groups}{@} {end}'
+stdout 'group2'
+stdout 'group1'
+stdout ',,,chameleon'
+stdout 'system:authenticated'
+
+# Cleanup
+kubectl delete -f hack/testdata/csr.yml
+
+# Test: --as with --as-uid
+kubectl create -f hack/testdata/csr.yml --as=user1 --as-uid=abc123
+
+kubectl get csr/foo -o jsonpath='{.spec.username}'
+stdout 'user1'
+
+kubectl get csr/foo -o jsonpath='{.spec.uid}'
+stdout 'abc123'
+
+# Cleanup
+kubectl delete -f hack/testdata/csr.yml
+
+# Test: --as with --as-user-extra (multiple values for same key)
+kubectl create -f hack/testdata/csr.yml --as=user1 --as-uid=abc123 --as-user-extra 'key1=hello there' --as-user-extra 'key1=one,two' --as-user-extra 'key1=pandas are' --as-user-extra 'key1=the best' --as-user-extra key2=val3
+
+# Verify username and uid
+kubectl get csr/foo -o jsonpath='{.spec.username}'
+stdout 'user1'
+
+kubectl get csr/foo -o jsonpath='{.spec.uid}'
+stdout 'abc123'
+
+# Verify extra key1 has all 4 values
+kubectl get csr/foo -o jsonpath='{range .spec.extra.key1}{@} {end}'
+stdout 'hello there'
+stdout 'one,two'
+stdout 'pandas are'
+stdout 'the best'
+
+# Verify extra key2 has its value
+kubectl get csr/foo -o jsonpath='{range .spec.extra.key2}{@} {end}'
+stdout 'val3'
+
+# Cleanup
+kubectl delete -f hack/testdata/csr.yml
