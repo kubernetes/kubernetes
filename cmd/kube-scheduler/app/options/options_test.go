@@ -272,6 +272,20 @@ profiles:
 		t.Fatal(err)
 	}
 
+	// tuned metric config profile config
+	tunedMetricConfigProfileConfig := filepath.Join(tmpDir, "tuned-metrics-config.yaml")
+	if err := os.WriteFile(tunedMetricConfigProfileConfig, []byte(fmt.Sprintf(`
+apiVersion: kubescheduler.config.k8s.io/v1
+kind: KubeSchedulerConfiguration
+clientConnection:
+  kubeconfig: '%s'
+metric:
+  metricsAsyncRecorderBufferSize: 5000
+  metricsAsyncRecorderFlushInterval: 0s
+`, configKubeconfig)), os.FileMode(0600)); err != nil {
+		t.Fatal(err)
+	}
+
 	// Insulate this test from picking up in-cluster config when run inside a pod
 	// We can't assume we have permissions to write to /var/run/secrets/... from a unit test to mock in-cluster config for testing
 	if len(os.Getenv("KUBERNETES_SERVICE_HOST")) > 0 {
@@ -362,6 +376,11 @@ profiles:
 						Plugins:       defaults.PluginsV1,
 						PluginConfig:  defaults.PluginConfigsV1,
 					},
+				},
+				Metric: kubeschedulerconfig.KubeSchedulerMetricConfiguration{
+					PluginMetricsSamplePercent:        10,
+					MetricsAsyncRecorderBufferSize:    1000,
+					MetricsAsyncRecorderFlushInterval: metav1.Duration{Duration: time.Second},
 				},
 			},
 		},
@@ -470,6 +489,11 @@ profiles:
 						PluginConfig:  defaults.PluginConfigsV1,
 					},
 				},
+				Metric: kubeschedulerconfig.KubeSchedulerMetricConfiguration{
+					PluginMetricsSamplePercent:        10,
+					MetricsAsyncRecorderBufferSize:    1000,
+					MetricsAsyncRecorderFlushInterval: metav1.Duration{Duration: time.Second},
+				},
 			},
 		},
 		{
@@ -541,6 +565,11 @@ profiles:
 						Plugins:       defaults.PluginsV1,
 						PluginConfig:  defaults.PluginConfigsV1,
 					},
+				},
+				Metric: kubeschedulerconfig.KubeSchedulerMetricConfiguration{
+					PluginMetricsSamplePercent:        10,
+					MetricsAsyncRecorderBufferSize:    1000,
+					MetricsAsyncRecorderFlushInterval: metav1.Duration{Duration: time.Second},
 				},
 			},
 			expectedUsername: "none, http",
@@ -670,6 +699,11 @@ profiles:
 						},
 					},
 				},
+				Metric: kubeschedulerconfig.KubeSchedulerMetricConfiguration{
+					PluginMetricsSamplePercent:        10,
+					MetricsAsyncRecorderBufferSize:    1000,
+					MetricsAsyncRecorderFlushInterval: metav1.Duration{Duration: time.Second},
+				},
 			},
 		},
 		{
@@ -791,6 +825,11 @@ profiles:
 							},
 						},
 					},
+				},
+				Metric: kubeschedulerconfig.KubeSchedulerMetricConfiguration{
+					PluginMetricsSamplePercent:        10,
+					MetricsAsyncRecorderBufferSize:    1000,
+					MetricsAsyncRecorderFlushInterval: metav1.Duration{Duration: time.Second},
 				},
 			},
 		},
@@ -931,6 +970,88 @@ profiles:
 							},
 						},
 					},
+				},
+				Metric: kubeschedulerconfig.KubeSchedulerMetricConfiguration{
+					PluginMetricsSamplePercent:        10,
+					MetricsAsyncRecorderBufferSize:    1000,
+					MetricsAsyncRecorderFlushInterval: metav1.Duration{Duration: time.Second},
+				},
+			},
+		}, {
+			name: "tuned metrics config",
+			options: &Options{
+				ConfigFile: tunedMetricConfigProfileConfig,
+				ComponentConfig: func() *kubeschedulerconfig.KubeSchedulerConfiguration {
+					cfg := configtesting.V1ToInternalWithDefaults(t, v1.KubeSchedulerConfiguration{})
+					return cfg
+				}(),
+				SecureServing: (&apiserveroptions.SecureServingOptions{
+					ServerCert: apiserveroptions.GeneratableKeyCert{
+						CertDirectory: "/a/b/c",
+						PairName:      "kube-scheduler",
+					},
+					HTTP2MaxStreamsPerConnection: 47,
+				}),
+				Authentication: &apiserveroptions.DelegatingAuthenticationOptions{
+					CacheTTL:   10 * time.Second,
+					ClientCert: apiserveroptions.ClientCertAuthenticationOptions{},
+					RequestHeader: apiserveroptions.RequestHeaderAuthenticationOptions{
+						UsernameHeaders:     []string{"x-remote-user"},
+						GroupHeaders:        []string{"x-remote-group"},
+						ExtraHeaderPrefixes: []string{"x-remote-extra-"},
+					},
+					RemoteKubeConfigFileOptional: true,
+				},
+				Authorization: &apiserveroptions.DelegatingAuthorizationOptions{
+					AllowCacheTTL:                10 * time.Second,
+					DenyCacheTTL:                 10 * time.Second,
+					RemoteKubeConfigFileOptional: true,
+					AlwaysAllowPaths:             []string{"/healthz", "/readyz", "/livez"}, // note: this does not match /healthz/ or /healthz/*
+					AlwaysAllowGroups:            []string{"system:masters"},
+				},
+				Logs:                     logs.NewOptions(),
+				ComponentGlobalsRegistry: componentGlobalsRegistry,
+			},
+			expectedUsername: "config",
+			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: v1.SchemeGroupVersion.String(),
+				},
+				Parallelism:           16,
+				DelayCacheUntilActive: false,
+				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
+					EnableProfiling:           true,
+					EnableContentionProfiling: true,
+				},
+				LeaderElection: componentbaseconfig.LeaderElectionConfiguration{
+					LeaderElect:       true,
+					LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
+					RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
+					RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
+					ResourceLock:      "leases",
+					ResourceNamespace: "kube-system",
+					ResourceName:      "kube-scheduler",
+				},
+				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
+					Kubeconfig:  configKubeconfig,
+					QPS:         50,
+					Burst:       100,
+					ContentType: "application/vnd.kubernetes.protobuf",
+				},
+				PercentageOfNodesToScore: defaultPercentageOfNodesToScore,
+				PodInitialBackoffSeconds: defaultPodInitialBackoffSeconds,
+				PodMaxBackoffSeconds:     defaultPodMaxBackoffSeconds,
+				Profiles: []kubeschedulerconfig.KubeSchedulerProfile{
+					{
+						SchedulerName: "default-scheduler",
+						Plugins:       defaults.PluginsV1,
+						PluginConfig:  defaults.PluginConfigsV1,
+					},
+				},
+				Metric: kubeschedulerconfig.KubeSchedulerMetricConfiguration{
+					PluginMetricsSamplePercent:        10,
+					MetricsAsyncRecorderBufferSize:    5000,
+					MetricsAsyncRecorderFlushInterval: metav1.Duration{Duration: 0},
 				},
 			},
 		},
