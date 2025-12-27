@@ -386,9 +386,9 @@ var _ = SIGDescribe("GracefulNodeShutdown", framework.WithSerial(), feature.Grac
 		)
 
 		var (
-			customClassA = getPriorityClass("custom-class-a", 100000)
-			customClassB = getPriorityClass("custom-class-b", 10000)
-			customClassC = getPriorityClass("custom-class-c", 1000)
+			customClassA = newPriorityClass("custom-class-a", 100000)
+			customClassB = newPriorityClass("custom-class-b", 10000)
+			customClassC = newPriorityClass("custom-class-c", 1000)
 		)
 
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
@@ -568,20 +568,6 @@ var _ = SIGDescribe("GracefulNodeShutdown", framework.WithSerial(), feature.Grac
 		})
 	})
 })
-
-func getPriorityClass(name string, value int32) *schedulingv1.PriorityClass {
-	priority := &schedulingv1.PriorityClass{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "PriorityClass",
-			APIVersion: "scheduling.k8s.io/v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-		},
-		Value: value,
-	}
-	return priority
-}
 
 // getGracePeriodOverrideTestPod returns a new Pod object containing a container
 // runs a shell script, hangs the process until a SIGTERM signal is received.
