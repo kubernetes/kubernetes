@@ -38,7 +38,6 @@ import (
 	clientscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/util/retry"
 	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
-	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -262,7 +261,7 @@ var _ = SIGDescribe("Namespaces", framework.WithSerial(), func() {
 	})
 
 	// On hold until etcd3; see #7372
-	f.It("should always delete fast (ALL of 100 namespaces in 150 seconds)", feature.ComprehensiveNamespaceDraining, func(ctx context.Context) {
+	f.It("should always delete fast (ALL of 100 namespaces in 150 seconds)", func(ctx context.Context) {
 		extinguish(ctx, f, 100, 0, 150)
 	})
 
