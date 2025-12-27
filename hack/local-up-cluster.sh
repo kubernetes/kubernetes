@@ -724,6 +724,9 @@ EOF
     # Grant kubelets permission to request client certificates
     run kubectl "" "${KUBECTL}" --kubeconfig "${CERT_DIR}/admin.kubeconfig" create clusterrolebinding kubelet-csr --clusterrole=system:certificates.k8s.io:certificatesigningrequests:selfnodeclient --group=system:nodes
 
+    # Grant kubelets permission to request serving certificates
+    run kubectl "" "${KUBECTL}" --kubeconfig "${CERT_DIR}/admin.kubeconfig" create clusterrolebinding kubelet-serving-csr --clusterrole=system:certificates.k8s.io:certificatesigningrequests:selfnodeserving --group=system:nodes
+
     ${CONTROLPLANE_SUDO} cp "${CERT_DIR}/admin.kubeconfig" "${CERT_DIR}/admin-kube-aggregator.kubeconfig"
     ${CONTROLPLANE_SUDO} chown -R "$(whoami)" "${CERT_DIR}"
     run kubectl "" "${KUBECTL}" config set-cluster local-up-cluster --kubeconfig="${CERT_DIR}/admin-kube-aggregator.kubeconfig" --server="https://${API_HOST_IP}:31090"
@@ -793,20 +796,6 @@ function start_cloud_controller_manager {
       --leader-elect="${LEADER_ELECT}" \
       --master="https://${API_HOST}:${API_SECURE_PORT}" >"${CLOUD_CTLRMGR_LOG}" 2>&1 &
     export CLOUD_CTLRMGR_PID=$!
-}
-
-function wait_node_csr() {
-  local interval_time=2
-  local csr_approved_time=300
-  local newline='"\n"'
-  local unapproved_csr_names="--field-selector='spec.signerName=kubernetes.io/kubelet-serving' -o go-template='{{range .items}}{{if not .status}}{{.metadata.name}}{{${newline}}}{{end}}{{end}}"
-  local csr_approved="${KUBECTL} --kubeconfig '${CERT_DIR}/admin.kubeconfig' get csr ${unapproved_csr_names}' | xargs --no-run-if-empty ${KUBECTL} --kubeconfig '${CERT_DIR}/admin.kubeconfig' certificate approve | grep csr"
-  kube::util::wait_for_success "$csr_approved_time" "$interval_time" "$csr_approved"
-  if [ $? == "1" ]; then
-    echo "time out on waiting for CSR approval"
-    exit 1
-  fi
-  echo "kubelet CSR approved"
 }
 
 function wait_node_ready(){
@@ -1473,7 +1462,6 @@ if [[ "${START_MODE}" != *"nokubelet"* ]]; then
       Linux)
         install_cni_if_needed
         start_kubelet
-        wait_node_csr
         ;;
       *)
         print_color "Unsupported host OS.  Must be Linux or Mac OS X, kubelet aborted."
