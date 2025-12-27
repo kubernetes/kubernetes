@@ -91,6 +91,20 @@ func TestRemoveMissingExtendedResources(t *testing.T) {
 				v1.ResourceList{}, // Limits
 			),
 		},
+		{
+			desc: "requests for implicit DRA extended resources unavailable in node should be removed",
+			pod: makeTestPod(
+				v1.ResourceList{"deviceclass.resource.kubernetes.io/bar": quantity}, // Requests
+				v1.ResourceList{}, // Limits
+			),
+			node: makeTestNode(
+				v1.ResourceList{"foo.com/baz": quantity}, // Allocatable
+			),
+			expectedPod: makeTestPod(
+				v1.ResourceList{}, // Requests
+				v1.ResourceList{}, // Limits
+			),
+		},
 	} {
 		nodeInfo := schedulerframework.NewNodeInfo()
 		nodeInfo.SetNode(test.node)
