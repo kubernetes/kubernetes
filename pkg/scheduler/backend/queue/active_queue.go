@@ -42,6 +42,7 @@ type activeQueuer interface {
 	list() []*v1.Pod
 	len() int
 	has(pInfo *framework.QueuedPodInfo) bool
+	add(logger klog.Logger, pInfo *framework.QueuedPodInfo, event string)
 
 	listInFlightEvents() []interface{}
 	listInFlightPods() []*v1.Pod
@@ -352,6 +353,13 @@ func (aq *activeQueue) has(pInfo *framework.QueuedPodInfo) bool {
 	aq.lock.RLock()
 	defer aq.lock.RUnlock()
 	return aq.queue.Has(pInfo)
+}
+
+func (aq *activeQueue) add(logger klog.Logger, pInfo *framework.QueuedPodInfo, event string) {
+	aq.lock.Lock()
+	defer aq.lock.Unlock()
+
+	aq.unlockedQueue.add(logger, pInfo, event)
 }
 
 // listInFlightEvents returns all inFlightEvents.
