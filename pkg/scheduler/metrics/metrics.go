@@ -203,25 +203,27 @@ func InitMetrics() {
 			Subsystem: SchedulerSubsystem,
 			Name:      "event_handling_duration_seconds",
 			Help:      "Event handling latency in seconds.",
-			// Start with 0.1ms with the last bucket being [~200ms, Inf)
-			Buckets:        metrics.ExponentialBuckets(0.0001, 2, 12),
+			// Start with 0.001ms (1 microsecond) with the last bucket being [~120ms, Inf)
+			Buckets:        metrics.ExponentialBuckets(0.000001, 1.5, 30),
 			StabilityLevel: metrics.ALPHA,
 		}, []string{"event"})
 
 	schedulingLatency = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
-			Subsystem:      SchedulerSubsystem,
-			Name:           "scheduling_attempt_duration_seconds",
-			Help:           "Scheduling attempt latency in seconds (scheduling algorithm + binding)",
+			Subsystem: SchedulerSubsystem,
+			Name:      "scheduling_attempt_duration_seconds",
+			Help:      "Scheduling attempt latency in seconds (scheduling algorithm + binding)",
+			// Start with 1ms with the last bucket being [~16s, Inf)
 			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
 			StabilityLevel: metrics.STABLE,
 		}, []string{"result", "profile"})
 	SchedulingAlgorithmLatency = metrics.NewHistogram(
 		&metrics.HistogramOpts{
-			Subsystem:      SchedulerSubsystem,
-			Name:           "scheduling_algorithm_duration_seconds",
-			Help:           "Scheduling algorithm latency in seconds",
-			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
+			Subsystem: SchedulerSubsystem,
+			Name:      "scheduling_algorithm_duration_seconds",
+			Help:      "Scheduling algorithm latency in seconds",
+			// Start with 0.1ms with the last bucket being [~1.6s, Inf)
+			Buckets:        metrics.ExponentialBuckets(0.0001, 2, 15),
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
@@ -310,8 +312,8 @@ func InitMetrics() {
 			Subsystem: SchedulerSubsystem,
 			Name:      "framework_extension_point_duration_seconds",
 			Help:      "Latency for running all plugins of a specific extension point.",
-			// Start with 0.1ms with the last bucket being [~200ms, Inf)
-			Buckets:        metrics.ExponentialBuckets(0.0001, 2, 12),
+			// Start with 0.0001ms (0.1 microsecond) with the last bucket being [~1,6s, Inf)
+			Buckets:        metrics.ExponentialBuckets(0.0000001, 2, 25),
 			StabilityLevel: metrics.STABLE,
 		},
 		[]string{"extension_point", "status", "profile"})
@@ -321,9 +323,9 @@ func InitMetrics() {
 			Subsystem: SchedulerSubsystem,
 			Name:      "plugin_execution_duration_seconds",
 			Help:      "Duration for running a plugin at a specific extension point.",
-			// Start with 0.01ms with the last bucket being [~22ms, Inf). We use a small factor (1.5)
+			// Start with 0.0001ms (0.1 microsecond) with the last bucket being [~97ms, Inf). We use a small factor (1.5)
 			// so that we have better granularity since plugin latency is very sensitive.
-			Buckets:        metrics.ExponentialBuckets(0.00001, 1.5, 20),
+			Buckets:        metrics.ExponentialBuckets(0.0000001, 1.5, 35),
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"plugin", "extension_point", "status"})
@@ -334,9 +336,9 @@ func InitMetrics() {
 			Subsystem: SchedulerSubsystem,
 			Name:      "queueing_hint_execution_duration_seconds",
 			Help:      "Duration for running a queueing hint function of a plugin.",
-			// Start with 0.01ms with the last bucket being [~22ms, Inf). We use a small factor (1.5)
+			// Start with 0.001ms (1 microsecond) with the last bucket being [~16ms, Inf). We use a small factor (1.5)
 			// so that we have better granularity since plugin latency is very sensitive.
-			Buckets:        metrics.ExponentialBuckets(0.00001, 1.5, 20),
+			Buckets:        metrics.ExponentialBuckets(0.000001, 1.5, 25),
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"plugin", "event", "hint"})
@@ -385,10 +387,11 @@ func InitMetrics() {
 
 	PreemptionGoroutinesDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
-			Subsystem:      SchedulerSubsystem,
-			Name:           "preemption_goroutines_duration_seconds",
-			Help:           "Duration in seconds for running goroutines for the preemption.",
-			Buckets:        metrics.ExponentialBuckets(0.01, 2, 20),
+			Subsystem: SchedulerSubsystem,
+			Name:      "preemption_goroutines_duration_seconds",
+			Help:      "Duration in seconds for running goroutines for the preemption.",
+			// Start with 0.001ms (1 microsecond) with the last bucket being [~0.5s, Inf)
+			Buckets:        metrics.ExponentialBuckets(0.000001, 2, 20),
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"result"})
