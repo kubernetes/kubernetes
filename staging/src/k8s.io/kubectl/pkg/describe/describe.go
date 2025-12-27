@@ -98,7 +98,7 @@ const (
 
 var (
 	// globally skipped annotations
-	skipAnnotations = sets.New[string](corev1.LastAppliedConfigAnnotation)
+	skipAnnotations = sets.New(corev1.LastAppliedConfigAnnotation)
 
 	// DescriberFn gives a way to easily override the function for unit testing if needed
 	DescriberFn DescriberFunc = Describer
@@ -316,7 +316,7 @@ func printUnstructuredContent(w PrefixWriter, level int, content map[string]inte
 		switch typedValue := value.(type) {
 		case map[string]interface{}:
 			skipExpr := fmt.Sprintf("%s.%s", skipPrefix, field)
-			if slice.Contains[string](skip, skipExpr, nil) {
+			if slice.Contains(skip, skipExpr, nil) {
 				continue
 			}
 			w.Write(level, "%s:\n", smartLabelFor(field))
@@ -324,7 +324,7 @@ func printUnstructuredContent(w PrefixWriter, level int, content map[string]inte
 
 		case []interface{}:
 			skipExpr := fmt.Sprintf("%s.%s", skipPrefix, field)
-			if slice.Contains[string](skip, skipExpr, nil) {
+			if slice.Contains(skip, skipExpr, nil) {
 				continue
 			}
 			w.Write(level, "%s:\n", smartLabelFor(field))
@@ -339,7 +339,7 @@ func printUnstructuredContent(w PrefixWriter, level int, content map[string]inte
 
 		default:
 			skipExpr := fmt.Sprintf("%s.%s", skipPrefix, field)
-			if slice.Contains[string](skip, skipExpr, nil) {
+			if slice.Contains(skip, skipExpr, nil) {
 				continue
 			}
 			w.Write(level, "%s:\t%v\n", smartLabelFor(field), typedValue)
@@ -1816,7 +1816,7 @@ func describeContainers(label string, containers []corev1.Container, containerSt
 		describeResources(&container.Resources, w, LEVEL_2)
 		describeContainerProbe(container, w)
 		if len(container.EnvFrom) > 0 {
-			describeContainerEnvFrom(container, resolverFn, w)
+			describeContainerEnvFrom(container, w)
 		}
 		describeContainerEnvVars(container, resolverFn, w)
 		describeContainerVolumes(container, w)
@@ -2029,7 +2029,7 @@ func describeContainerEnvVars(container corev1.Container, resolverFn EnvVarResol
 	}
 }
 
-func describeContainerEnvFrom(container corev1.Container, resolverFn EnvVarResolverFunc, w PrefixWriter) {
+func describeContainerEnvFrom(container corev1.Container, w PrefixWriter) {
 	none := ""
 	if len(container.EnvFrom) == 0 {
 		none = "\t<none>"
