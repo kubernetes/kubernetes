@@ -168,7 +168,17 @@ func (sched *Scheduler) updatePod(oldObj, newObj interface{}) {
 	} else if assignedPod(newPod) {
 		// This update means binding operation. We can treat it as adding the pod to a cache
 		// (addition to the cache will handle this binding appropriately).
+		// Get the assumed pod from the cache before it is updated.
+		assumedPod, err := sched.Cache.GetPod(oldPod)
+		if err == nil && assumedPod.Spec.NodeName != newPod.Spec.NodeName {
+			// The pod was assumed on a different node. Wake up pods waiting for resources on the old node.
+			sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.EventAssignedPodDelete, assumedPod, nil, nil)
+		} else if oldPod.Status.NominatedNodeName != "" && oldPod.Status.NominatedNodeName != newPod.Spec.NodeName {
+			// The pod was nominated for a different node. Wake up pods waiting for resources on the nominated node.
+			sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.EventAssignedPodDelete, oldPod, nil, getLEPriorityPreCheck(corev1helpers.PodPriority(oldPod)))
+		}
 		sched.addAssignedPodToCache(newPod)
+
 		if responsibleForPod(oldPod, sched.Profiles) {
 			// Pod shouldn't be in the scheduling queue, but in unlikely event that the pod has been bound
 			// by another component, it should be removed from scheduling queue for correctness.
@@ -353,9 +363,7 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(pod *v1.Pod, inBinding bool
 	sched.SchedulingQueue.Delete(pod)
 	if inBinding {
 		// In the case of a binding, the rest can be skipped because it is not really a pod removal operation, but a binding.
-		// Any necessary notifications will be sent by the binding process, unless it was an unlikely external binding.
-		// In that case, we need to notify about the release of resources that were held by different assume/nomination
-		// once the https://github.com/kubernetes/kubernetes/issues/134859 is fixed.
+		// Any necessary notifications will be sent by the binding process, including external binding.
 		return
 	}
 	isAssumed, err := sched.Cache.IsAssumedPod(pod)
