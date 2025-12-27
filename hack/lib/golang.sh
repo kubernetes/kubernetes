@@ -327,6 +327,7 @@ readonly KUBE_STATIC_BINARIES=(
   kubeadm
   kubectl
   kubectl-convert
+  kubelet
   kubemark
   mounter
 )
