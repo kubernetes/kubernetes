@@ -23,11 +23,19 @@ import (
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2"
 	utiltrace "k8s.io/utils/trace"
 )
 
 // RealFIFOOptions is the configuration parameters for RealFIFO.
 type RealFIFOOptions struct {
+	// If set, log output will go to this logger instead of klog.Background().
+	// The name of the fifo gets added automatically.
+	Logger *klog.Logger
+
+	// Name can be used to override the default "RealFIFO" name for the new instance.
+	Name string
+
 	// KeyFunction is used to figure out what key an object should have. (It's
 	// exposed in the returned RealFIFO's keyOf() method, with additional
 	// handling around deleted objects and queue state).
@@ -57,10 +65,22 @@ var _ QueueWithBatch = &RealFIFO{}
 // 1. delivers notifications for items that have been deleted
 // 2. delivers multiple notifications per item instead of simply the most recent value
 type RealFIFO struct {
+	// logger is a per-instance logger. This gets chosen when constructing
+	// the instance, with klog.Background() as default.
+	logger klog.Logger
+
+	// name is the name of the fifo. It is included in the logger.
+	name string
+
 	lock sync.RWMutex
 	cond sync.Cond
 
 	items []Delta
+
+	// synced is initially an open channel. It gets closed (once!) by checkSynced
+	// as soon as the initial sync is considered complete.
+	synced       chan struct{}
+	syncedClosed bool
 
 	// populated is true if the first batch of items inserted by Replace() has been populated
 	// or Delete/Add/Update was called first.
@@ -91,6 +111,7 @@ type RealFIFO struct {
 var (
 	_ = Queue(&RealFIFO{})             // RealFIFO is a Queue
 	_ = TransformingStore(&RealFIFO{}) // RealFIFO implements TransformingStore to allow memory optimizations
+	_ = DoneChecker(&RealFIFO{})       // RealFIFO and implements DoneChecker.
 )
 
 // Close the queue.
@@ -127,11 +148,37 @@ func (f *RealFIFO) HasSynced() bool {
 	return f.hasSynced_locked()
 }
 
-// ignoring lint to reduce delta to the original for review.  It's ok adjust later.
-//
-//lint:file-ignore ST1003: should not use underscores in Go names
+// HasSyncedChecker is done if an Add/Update/Delete/AddIfNotPresent are called first,
+// or the first batch of items inserted by Replace() has been popped.
+func (f *RealFIFO) HasSyncedChecker() DoneChecker {
+	return f
+}
+
+// Name implements [DoneChecker.Name]
+func (f *RealFIFO) Name() string {
+	return f.name
+}
+
+// Done implements [DoneChecker.Done]
+func (f *RealFIFO) Done() <-chan struct{} {
+	return f.synced
+}
+
+// hasSynced_locked returns the result of a prior checkSynced call.
 func (f *RealFIFO) hasSynced_locked() bool {
-	return f.populated && f.initialPopulationCount == 0
+	return f.syncedClosed
+}
+
+// checkSynced checks whether the initial batch of items (set via Replace) has been delivered
+// and closes the synced channel as needed. It must be called after changing f.populated and/or
+// f.initialPopulationCount while the mutex is still locked.
+func (f *RealFIFO) checkSynced() {
+	synced := f.populated && f.initialPopulationCount == 0
+	if synced && !f.syncedClosed {
+		// Initial sync is complete.
+		f.syncedClosed = true
+		close(f.synced)
+	}
 }
 
 // addToItems_locked appends to the delta list.
@@ -180,6 +227,7 @@ func (f *RealFIFO) Add(obj interface{}) error {
 	defer f.lock.Unlock()
 
 	f.populated = true
+	f.checkSynced()
 	retErr := f.addToItems_locked(Added, false, obj)
 
 	return retErr
@@ -191,6 +239,7 @@ func (f *RealFIFO) Update(obj interface{}) error {
 	defer f.lock.Unlock()
 
 	f.populated = true
+	f.checkSynced()
 	retErr := f.addToItems_locked(Updated, false, obj)
 
 	return retErr
@@ -204,6 +253,7 @@ func (f *RealFIFO) Delete(obj interface{}) error {
 	defer f.lock.Unlock()
 
 	f.populated = true
+	f.checkSynced()
 	retErr := f.addToItems_locked(Deleted, false, obj)
 
 	return retErr
@@ -243,6 +293,8 @@ func (f *RealFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 	f.items = f.items[1:]
 	if f.initialPopulationCount > 0 {
 		f.initialPopulationCount--
+		// Must be done *after* process has completed.
+		defer f.checkSynced()
 	}
 
 	// Only log traces if the queue depth is greater than 10 and it takes more than
@@ -310,6 +362,7 @@ func (f *RealFIFO) PopBatch(process ProcessBatchFunc) error {
 	}
 	if f.initialPopulationCount > 0 {
 		f.initialPopulationCount -= len(deltas)
+		defer f.checkSynced()
 	}
 	f.items = f.items[len(deltas):]
 
@@ -409,10 +462,10 @@ func (f *RealFIFO) Replace(newItems []interface{}, resourceVersion string) error
 		deletedObj, exists, err := f.knownObjects.GetByKey(knownKey)
 		if err != nil {
 			deletedObj = nil
-			utilruntime.HandleError(fmt.Errorf("error during lookup, placing DeleteFinalStateUnknown marker without object: key=%q, err=%w", knownKey, err))
+			utilruntime.HandleErrorWithLogger(f.logger, err, "Error during lookup, placing DeleteFinalStateUnknown marker without object", "key", knownKey)
 		} else if !exists {
 			deletedObj = nil
-			utilruntime.HandleError(fmt.Errorf("key does not exist in known objects store, placing DeleteFinalStateUnknown marker without object: key=%q", knownKey))
+			utilruntime.HandleErrorWithLogger(f.logger, nil, "Key does not exist in known objects store, placing DeleteFinalStateUnknown marker without object", "key", knownKey)
 		}
 		retErr := f.addToItems_locked(Deleted, false, DeletedFinalStateUnknown{
 			Key: knownKey,
@@ -434,6 +487,7 @@ func (f *RealFIFO) Replace(newItems []interface{}, resourceVersion string) error
 	if !f.populated {
 		f.populated = true
 		f.initialPopulationCount = len(f.items)
+		f.checkSynced()
 	}
 
 	return nil
@@ -471,10 +525,10 @@ func (f *RealFIFO) Resync() error {
 
 		knownObj, exists, err := f.knownObjects.GetByKey(knownKey)
 		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("unable to queue object for sync: key=%q, err=%w", knownKey, err))
+			utilruntime.HandleErrorWithLogger(f.logger, err, "Unable to queue object for sync", "key", knownKey)
 			continue
 		} else if !exists {
-			utilruntime.HandleError(fmt.Errorf("key does not exist in known objects store, unable to queue object for sync: key=%q", knownKey))
+			utilruntime.HandleErrorWithLogger(f.logger, nil, "Key does not exist in known objects store, unable to queue object for sync", "key", knownKey)
 			continue
 		}
 
@@ -514,13 +568,22 @@ func NewRealFIFOWithOptions(opts RealFIFOOptions) *RealFIFO {
 	}
 
 	f := &RealFIFO{
+		logger:       klog.Background(),
+		name:         opts.Name,
 		items:        make([]Delta, 0, 10),
+		synced:       make(chan struct{}),
 		keyFunc:      opts.KeyFunction,
 		knownObjects: opts.KnownObjects,
 		transformer:  opts.Transformer,
 		batchSize:    defaultBatchSize,
 	}
-
+	if opts.Logger != nil {
+		f.logger = *opts.Logger
+	}
+	if opts.Name != "" {
+		f.name = opts.Name
+	}
+	f.logger = klog.LoggerWithName(f.logger, f.name)
 	f.cond.L = &f.lock
 	return f
 }
