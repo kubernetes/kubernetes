@@ -51,6 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	apicalls "k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
@@ -120,6 +121,10 @@ type SchedulingQueue interface {
 	// (e.g., filter Pods based on added/updated Node's capacity, etc.)
 	// We know currently some do, but we'll eventually remove them in favor of the scheduling queue hint.
 	MoveAllToActiveOrBackoffQueue(logger klog.Logger, event fwk.ClusterEvent, oldObj, newObj interface{}, preCheck PreEnqueueCheck)
+	// MovePodsToActiveOrBackoffQueueForGangScheduling moves unschedulable pods based on a specific plugin's QueueingHint,
+	// without triggering QueueingHintFn for other plugins. This is useful for plugins that need
+	// targeted pod movement (e.g., GangScheduling).
+	MovePodsToActiveOrBackoffQueueForGangScheduling(logger klog.Logger, event fwk.ClusterEvent, oldObj, newObj interface{})
 	AssignedPodAdded(logger klog.Logger, pod *v1.Pod)
 	AssignedPodUpdated(logger klog.Logger, oldPod, newPod *v1.Pod, event fwk.ClusterEvent)
 
@@ -1191,6 +1196,17 @@ func (p *PriorityQueue) MoveAllToActiveOrBackoffQueue(logger klog.Logger, event 
 	p.moveAllToActiveOrBackoffQueue(logger, event, oldObj, newObj, preCheck)
 }
 
+// MovePodsToActiveOrBackoffQueueForGangScheduling moves unschedulable pods based on a specific plugin's QueueingHint.
+// Unlike MoveAllToActiveOrBackoffQueue, this only runs QueueingHintFn for the specified plugin,
+// avoiding unnecessary wakeups of other plugins. This is useful for plugins like GangScheduling
+// that need targeted pod movement without triggering all plugins.
+// pluginName should match the plugin's Name() return value (e.g., "GangScheduling").
+func (p *PriorityQueue) MovePodsToActiveOrBackoffQueueForGangScheduling(logger klog.Logger, event fwk.ClusterEvent, oldObj, newObj interface{}) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	p.movePodsToActiveOrBackoffQueueForGangScheduling(logger, event, oldObj, newObj)
+}
+
 // requeuePodWithQueueingStrategy tries to requeue Pod to activeQ, backoffQ or unschedulable pod pool based on schedulingHint.
 // It returns the queue name Pod goes.
 //
@@ -1262,6 +1278,112 @@ func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(logger klog.Logger, podIn
 	if activated {
 		p.activeQ.broadcast()
 	}
+}
+
+// MovePodsToActiveOrBackoffQueueForGangScheduling checks relevant unschedulable pods.
+// Unlike MoveAllToActiveOrBackoffQueue, this only runs QueueingHintFn for "GangScheduling" plugin.
+// NOTE: this function assumes lock has been acquired in caller
+func (p *PriorityQueue) movePodsToActiveOrBackoffQueueForGangScheduling(logger klog.Logger, event fwk.ClusterEvent, oldObj, newObj interface{}) {
+	activated := false
+
+	// Now iterate through all unschedulable pods and call the SAME function
+	for _, pInfo := range p.unschedulablePods.podInfoMap {
+
+		// Check if any of this pod gating plugins are interested in this event
+		if pInfo.Gated() && !framework.MatchAnyClusterEvent(event, pInfo.GatingPluginEvents) {
+			continue
+		}
+
+		// Check if the GangScheduling plugin has rejected this pod previously.
+		rejectorPlugins := pInfo.UnschedulablePlugins.Union(pInfo.PendingPlugins)
+		if !rejectorPlugins.Has(names.GangScheduling) {
+			continue
+		}
+
+		// Evaluate the QueueingHintFn for GangScheduling plugin only.
+		schedulingHint := p.isPodWorthRequeuingForGangScheduling(logger, pInfo, event, oldObj, newObj)
+
+		// Process the hint
+		if schedulingHint == queueSkip {
+			logger.V(5).Info("Event is not making pod schedulable by plugin", "pod", klog.KObj(pInfo.Pod), "event", event.Label(), "plugin", names.GangScheduling)
+			continue
+		}
+
+		// Move the pod based on the hint
+		p.unschedulablePods.delete(pInfo.Pod, pInfo.Gated())
+		queue := p.requeuePodWithQueueingStrategy(logger, pInfo, schedulingHint, event.Label())
+		if queue == activeQ || (p.isPopFromBackoffQEnabled && queue == backoffQ) {
+			activated = true
+		}
+	}
+
+	p.moveRequestCycle = p.activeQ.schedulingCycle()
+
+	if p.isSchedulingQueueHintEnabled {
+		if added := p.activeQ.addEventIfAnyInFlight(oldObj, newObj, event); added {
+			logger.V(5).Info("Event received while pods are in flight", "event", event.Label())
+		}
+	}
+
+	if activated {
+		p.activeQ.broadcast()
+	}
+}
+
+// isPodWorthRequeuingForGangScheduling checks for every whether it is worth requeuing based on GangScheduling plugin's QueueingHintFn.
+func (p *PriorityQueue) isPodWorthRequeuingForGangScheduling(logger klog.Logger, pInfo *framework.QueuedPodInfo, event fwk.ClusterEvent, oldObj, newObj interface{}) queueingStrategy {
+
+	hintMap, ok := p.queueingHintMap[pInfo.Pod.Spec.SchedulerName]
+	if !ok {
+		utilruntime.HandleErrorWithLogger(logger, nil, "No QueueingHintMap is registered for this profile", "profile", pInfo.Pod.Spec.SchedulerName, "pod", klog.KObj(pInfo.Pod))
+		return queueAfterBackoff
+	}
+
+	pod := pInfo.Pod
+
+	hintfn := findQueueingHintFnForGangScheduling(hintMap, event)
+	if hintfn == nil {
+		logger.V(5).Info("GangScheduling QueueingHintFn not found", "pod", klog.KObj(pod))
+		return queueAfterBackoff
+	}
+
+	start := time.Now()
+	hint, err := hintfn.QueueingHintFn(logger, pod, oldObj, newObj)
+	if err != nil {
+		oldObjMeta, newObjMeta, asErr := util.As[klog.KMetadata](oldObj, newObj)
+		if asErr != nil {
+			utilruntime.HandleErrorWithLogger(logger, err, "QueueingHintFn returns error", "event", event, "plugin", hintfn.PluginName, "pod", klog.KObj(pod))
+		} else {
+			utilruntime.HandleErrorWithLogger(logger, err, "QueueingHintFn returns error", "event", event, "plugin", hintfn.PluginName, "pod", klog.KObj(pod), "oldObj", klog.KObj(oldObjMeta), "newObj", klog.KObj(newObjMeta))
+		}
+		hint = fwk.Queue
+	}
+	p.metricsRecorder.ObserveQueueingHintDurationAsync(hintfn.PluginName, event.Label(), queueingHintToLabel(hint, err), metrics.SinceInSeconds(start))
+
+	if hint == fwk.QueueSkip {
+		return queueSkip
+	} else if pInfo.PendingPlugins.Has(hintfn.PluginName) {
+		return queueImmediately
+	} else if pInfo.PendingPlugins.Len() == 0 {
+		return queueAfterBackoff
+	} else {
+		return queueSkip
+	}
+}
+
+func findQueueingHintFnForGangScheduling(hintMap QueueingHintMap, event fwk.ClusterEvent) *QueueingHintFunction {
+	for eventToMatch, hintfns := range hintMap {
+		if !framework.MatchClusterEvents(eventToMatch, event) {
+			continue
+		}
+		for _, hintfn := range hintfns {
+			if hintfn.PluginName == names.GangScheduling {
+				return hintfn
+			}
+		}
+		break
+	}
+	return nil
 }
 
 // getUnschedulablePodsWithCrossTopologyTerm returns unschedulable pods which either of following conditions is met:

@@ -4647,3 +4647,121 @@ func TestPriorityQueue_GetPod(t *testing.T) {
 		})
 	}
 }
+
+func TestPriorityQueue_MovePodsToActiveOrBackoffQueueForGangScheduling(t *testing.T) {
+	tests := []struct {
+		name                         string
+		podsRejectedByGangScheduling []string
+		podsRejectedByTheOtherPlugin []string
+		workloadReference            *v1.WorkloadReference
+		expectMovedToActive          sets.Set[string]
+		expectRemainUnscheduled      sets.Set[string]
+	}{
+		{
+			name:                         "requeue pods immediately to active queue because they were rejected previously by GangScheduling plugin",
+			podsRejectedByGangScheduling: []string{"pod1", "pod2", "pod3"},
+			workloadReference:            &v1.WorkloadReference{Name: "workload-1", PodGroup: "pg-1"},
+			expectMovedToActive:          sets.New("pod1", "pod2", "pod3"),
+			expectRemainUnscheduled:      sets.New[string](),
+		},
+		{
+			name:                         "skip pods because they were rejected previously by another plugin",
+			podsRejectedByTheOtherPlugin: []string{"pod1", "pod2"},
+			workloadReference:            &v1.WorkloadReference{Name: "workload-1", PodGroup: "pg-1"},
+			expectMovedToActive:          sets.New[string](),
+			expectRemainUnscheduled:      sets.New("pod1", "pod2"),
+		},
+
+		{
+			name:                         "keep pods unscheduled when they don't belong to any gang workload",
+			podsRejectedByGangScheduling: []string{"pod1", "pod2"},
+			workloadReference:            nil,
+			expectMovedToActive:          sets.New[string](),
+			expectRemainUnscheduled:      sets.New("pod1", "pod2"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := testingclock.NewFakeClock(time.Now())
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			m := makeEmptyQueueingHintMapPerProfile()
+			gangSchedulingCalled := false
+			otherPluginCalled := false
+
+			// Register QueueingHints for multiple plugins on the same event
+			m[""][nodeAdd] = []*QueueingHintFunction{
+				{
+					PluginName: "GangScheduling",
+					QueueingHintFn: func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+						gangSchedulingCalled = true
+						if pod.Spec.WorkloadRef == nil || pod.Spec.WorkloadRef != tt.workloadReference {
+							return fwk.QueueSkip, nil
+						}
+						return fwk.Queue, nil
+					},
+				},
+				{
+					PluginName: "OtherPlugin",
+					QueueingHintFn: func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+						otherPluginCalled = true
+						return fwk.Queue, nil
+					},
+				},
+			}
+
+			q := NewTestQueue(ctx, newDefaultQueueSort(), WithClock(c), WithQueueingHintMapPerProfile(m))
+
+			// Setup pods rejected by GangScheduling
+			for _, podName := range tt.podsRejectedByGangScheduling {
+				podBuilder := st.MakePod().Name(podName)
+				if tt.workloadReference != nil {
+					podBuilder = podBuilder.WorkloadRef(tt.workloadReference)
+				}
+				pod := podBuilder.Obj()
+				q.unschedulablePods.addOrUpdate(q.newQueuedPodInfo(pod, "GangScheduling"), framework.EventUnscheduledPodAdd.Label())
+			}
+			// Setup pods rejected by OtherPlugin
+			for _, podName := range tt.podsRejectedByTheOtherPlugin {
+				pod := st.MakePod().Name(podName).Obj()
+				q.unschedulablePods.addOrUpdate(q.newQueuedPodInfo(pod, "OtherPlugin"), framework.EventUnscheduledPodAdd.Label())
+			}
+
+			// Invoke function in test
+			q.MovePodsToActiveOrBackoffQueueForGangScheduling(logger, nodeAdd, nil, nil)
+
+			// Verify that only gang scheduling plugin's queuing hint function is called when there are pods previously rejected by it
+			if len(tt.podsRejectedByGangScheduling) > 0 {
+				if !gangSchedulingCalled {
+					t.Errorf("Expected GangScheduling QueueingHintFn to be called")
+				}
+			}
+
+			// Verify that other plugin's queuing hint function is not called
+			if otherPluginCalled {
+				t.Errorf("Expected OtherPlugin QueueingHintFn to not be called, but it was")
+			}
+
+			// Verify correct queue movements to active queue if any
+			activePodsList := q.activeQ.list()
+			activePodsSet := sets.New[string]()
+			for _, pod := range activePodsList {
+				activePodsSet.Insert(pod.Name)
+			}
+			if diff := cmp.Diff(tt.expectMovedToActive, activePodsSet); diff != "" {
+				t.Errorf("Unexpected pods in active queue (-want, +got):\n%s", diff)
+			}
+
+			// Verify remaining unschedulable pods if any
+			remainingPodNames := sets.New[string]()
+			for _, podInfo := range q.unschedulablePods.podInfoMap {
+				remainingPodNames.Insert(podInfo.Pod.Name)
+			}
+			if diff := cmp.Diff(tt.expectRemainUnscheduled, remainingPodNames); diff != "" {
+				t.Errorf("Unexpected pods remaining in unschedulable pool (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
