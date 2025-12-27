@@ -64,9 +64,20 @@ func (p *v1PodResourcesServer) List(ctx context.Context, req *podresourcesv1.Lis
 
 	var pods []*v1.Pod
 	if p.useActivePods {
+		// GetActivePods already filters out terminal pods, so no need for additional filtering.
 		pods = p.podsProvider.GetActivePods()
 	} else {
-		pods = p.podsProvider.GetPods()
+		// GetPods may include terminal pods, so we filter them out ourselves.
+		allPods := p.podsProvider.GetPods()
+		pods = make([]*v1.Pod, 0, len(allPods))
+		for _, pod := range allPods {
+			// Skip terminal pods (Failed or Succeeded).
+			// Terminal pods should not appear in podresources as they no longer consume resources.
+			if pod.Status.Phase == v1.PodFailed || pod.Status.Phase == v1.PodSucceeded {
+				continue
+			}
+			pods = append(pods, pod)
+		}
 	}
 
 	podResources := make([]*podresourcesv1.PodResources, len(pods))
