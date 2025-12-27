@@ -22,6 +22,8 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -52,6 +54,26 @@ var CmdFakeRegistryServer = &cobra.Command{
 }
 
 func main(cmd *cobra.Command, args []string) {
+	// Set registryDir relative to the executable location if not explicitly set
+	if registryDir == "/var/registry" {
+		if exePath, err := os.Executable(); err == nil {
+			exeDir := filepath.Dir(exePath)
+			registryDir = filepath.Join(exeDir, "var", "registry")
+		}
+	}
+
+	log.Printf("Registry server starting with registry directory: %s", registryDir)
+
+	// Check if directory exists and list contents
+	if entries, err := os.ReadDir(registryDir); err != nil {
+		log.Printf("WARNING: Cannot read registry directory %s: %v", registryDir, err)
+	} else {
+		log.Printf("Found %d entries in registry directory:", len(entries))
+		for _, entry := range entries {
+			log.Printf("  - %s (isDir: %v)", entry.Name(), entry.IsDir())
+		}
+	}
+
 	registryMux := NewRegistryServerMux(private)
 
 	addr := fmt.Sprintf(":%d", port)
@@ -88,7 +110,9 @@ func auth(h http.Handler) http.Handler {
 
 // handleBlobs serves blob requests
 func handleBlobs(w http.ResponseWriter, r *http.Request, imageName, identifier string) {
-	filePath := fmt.Sprintf("%s/%s/blobs/%s", registryDir, imageName, identifier)
+	// On Windows, filenames use underscores instead of colons
+	fileIdentifier := toFilename(identifier)
+	filePath := fmt.Sprintf("%s/%s/blobs/%s", registryDir, imageName, fileIdentifier)
 	w.Header().Set("Content-Type", "application/octet-stream")
 	log.Printf("Serving blob: %s", filePath)
 	http.ServeFile(w, r, filePath)
@@ -98,23 +122,32 @@ func handleBlobs(w http.ResponseWriter, r *http.Request, imageName, identifier s
 // based on the manifest's mediaType field. If the identifier is a tag, it
 // reads the digest from the tag file and issues a redirect.
 func handleManifests(w http.ResponseWriter, r *http.Request, imageName, identifier string) {
-	filePath := fmt.Sprintf("%s/%s/manifests/%s", registryDir, imageName, identifier)
+	// On Windows, filenames use underscores instead of colons
+	fileIdentifier := toFilename(identifier)
+	filePath := fmt.Sprintf("%s/%s/manifests/%s", registryDir, imageName, fileIdentifier)
 
 	// if the identifier is not a digest, assume it's a tag and perform a redirect.
 	if !strings.HasPrefix(identifier, "sha256:") {
+		log.Printf("Looking for tag file: %s", filePath)
 		digest, err := os.ReadFile(filePath)
 		if err != nil {
+			log.Printf("Tag file not found: %s, error: %v", filePath, err)
 			http.NotFound(w, r)
 			return
 		}
-		redirectURL := strings.Replace(r.URL.String(), identifier, strings.TrimSpace(string(digest)), 1)
+		digestStr := strings.TrimSpace(string(digest))
+		log.Printf("Tag file contains digest: %s", digestStr)
+		redirectURL := strings.Replace(r.URL.String(), identifier, digestStr, 1)
+		log.Printf("Redirecting from %s to %s", r.URL.String(), redirectURL)
 		w.Header().Set("Location", redirectURL)
 		w.WriteHeader(http.StatusTemporaryRedirect)
 		return
 	}
 
+	log.Printf("Serving manifest: %s", filePath)
 	manifestContent, err := os.ReadFile(filePath)
 	if err != nil {
+		log.Printf("Manifest file not found: %s, error: %v", filePath, err)
 		http.NotFound(w, r)
 		return
 	}
@@ -158,4 +191,13 @@ func handleV2(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.NotFound(w, r)
 	}
+}
+
+// toFilename converts an identifier to a valid filename for the current OS.
+// On Windows, colons in sha256 digests are replaced with underscores.
+func toFilename(identifier string) string {
+	if runtime.GOOS == "windows" {
+		return strings.ReplaceAll(identifier, ":", "_")
+	}
+	return identifier
 }
