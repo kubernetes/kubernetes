@@ -1166,7 +1166,7 @@ func AddPodControllerIndexer(podInformer cache.SharedIndexInformer) error {
 }
 
 // FilterPodsByOwner gets the Pods managed by an owner or orphan Pods in the owner's namespace
-func FilterPodsByOwner(podIndexer cache.Indexer, owner *metav1.ObjectMeta, ownerKind string, includeOrphanedPods bool) ([]*v1.Pod, error) {
+func FilterPodsByOwner(ctx context.Context, podIndexer cache.Indexer, owner *metav1.ObjectMeta, ownerKind string, includeOrphanedPods bool) ([]*v1.Pod, error) {
 	result := []*v1.Pod{}
 
 	if len(owner.Namespace) == 0 {
@@ -1195,7 +1195,7 @@ func FilterPodsByOwner(podIndexer cache.Indexer, owner *metav1.ObjectMeta, owner
 		for _, obj := range pods {
 			pod, ok := obj.(*v1.Pod)
 			if !ok {
-				utilruntime.HandleError(fmt.Errorf("unexpected object type in pod indexer: %v", obj))
+				utilruntime.HandleErrorWithContext(ctx, nil, "unexpected object type in pod indexer")
 				continue
 			}
 			result = append(result, pod)
