@@ -569,7 +569,9 @@ func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName 
 		logger := klog.FromContext(ctx)
 		startTime := time.Now()
 		result := metrics.GoroutineResultSuccess
-		defer metrics.PreemptionGoroutinesDuration.WithLabelValues(result).Observe(metrics.SinceInSeconds(startTime))
+		defer func() {
+			metrics.PreemptionGoroutinesDuration.WithLabelValues(result).Observe(metrics.SinceInSeconds(startTime))
+		}()
 		defer metrics.PreemptionGoroutinesExecutionTotal.WithLabelValues(result).Inc()
 		defer func() {
 			if result == metrics.GoroutineResultError {
