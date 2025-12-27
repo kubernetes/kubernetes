@@ -308,7 +308,7 @@ func (ctrl *PersistentVolumeController) deleteClaim(ctx context.Context, claim *
 
 // Run starts all of this controller's control loops
 func (ctrl *PersistentVolumeController) Run(ctx context.Context) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	// Start events processing pipeline.
 	ctrl.eventBroadcaster.StartStructuredLogging(3)

@@ -17,6 +17,7 @@ limitations under the License.
 package filters
 
 import (
+	"context"
 	"net/http"
 
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -65,7 +66,7 @@ func WithHTTPLogging(handler http.Handler) http.Handler {
 
 func withPanicRecovery(handler http.Handler, crashHandler func(http.ResponseWriter, *http.Request, interface{})) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		defer runtime.HandleCrash(func(err interface{}) {
+		defer runtime.HandleCrashWithContext(req.Context(), func(ctx context.Context, err interface{}) {
 			crashHandler(w, req, err)
 		})
 

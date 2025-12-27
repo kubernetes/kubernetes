@@ -77,7 +77,7 @@ func (ow *realWatcher) Start(ctx context.Context, ref *v1.ObjectReference) error
 
 	go func() {
 		logger := klog.FromContext(ctx)
-		defer runtime.HandleCrash()
+		defer runtime.HandleCrashWithContext(ctx)
 
 		for event := range outStream {
 			if event.VictimContainerName == recordEventContainerName {
