@@ -44,6 +44,8 @@ type CPUTopology struct {
 	NumSockets     int
 	NumNUMANodes   int
 	CPUDetails     CPUDetails
+	// NUMANodesWithMemory tracks NUMA IDs that report local memory.
+	NUMANodesWithMemory cpuset.CPUSet
 }
 
 // CPUsPerCore returns the number of logical CPUs are associated with
@@ -345,8 +347,12 @@ func Discover(logger logr.Logger, machineInfo *cadvisorapi.MachineInfo) (*CPUTop
 
 	CPUDetails := CPUDetails{}
 	numPhysicalCores := 0
+	numaNodesWithMemory := cpuset.New()
 
 	for _, node := range machineInfo.Topology {
+		if node.Memory > 0 {
+			numaNodesWithMemory = numaNodesWithMemory.Union(cpuset.New(node.Id))
+		}
 		numPhysicalCores += len(node.Cores)
 		for _, core := range node.Cores {
 			if coreID, err := getUniqueCoreID(core.Threads); err == nil {
@@ -372,6 +378,12 @@ func Discover(logger logr.Logger, machineInfo *cadvisorapi.MachineInfo) (*CPUTop
 		NumNUMANodes:   CPUDetails.NUMANodes().Size(),
 		NumUncoreCache: CPUDetails.UncoreCaches().Size(),
 		CPUDetails:     CPUDetails,
+		NUMANodesWithMemory: func() cpuset.CPUSet {
+			if numaNodesWithMemory.Size() == 0 {
+				return CPUDetails.NUMANodes()
+			}
+			return numaNodesWithMemory
+		}(),
 	}, nil
 }
 
