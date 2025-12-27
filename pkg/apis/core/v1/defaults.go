@@ -262,11 +262,6 @@ func SetDefaults_DownwardAPIVolumeSource(obj *v1.DownwardAPIVolumeSource) {
 		obj.DefaultMode = &perm
 	}
 }
-func SetDefaults_Secret(obj *v1.Secret) {
-	if obj.Type == "" {
-		obj.Type = v1.SecretTypeOpaque
-	}
-}
 func SetDefaults_ProjectedVolumeSource(obj *v1.ProjectedVolumeSource) {
 	if obj.DefaultMode == nil {
 		perm := int32(v1.ProjectedVolumeSourceDefaultMode)
