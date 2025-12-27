@@ -697,13 +697,16 @@ func TestAdmissionCheck(t *testing.T) {
 	nodenameError := AdmissionResult{Name: nodename.Name, Reason: nodename.ErrReason}
 	nodeportsError := AdmissionResult{Name: nodeports.Name, Reason: nodeports.ErrReason}
 	podOverheadError := AdmissionResult{InsufficientResource: &noderesources.InsufficientResource{ResourceName: v1.ResourceCPU, Reason: "Insufficient cpu", Requested: 2000, Used: 7000, Capacity: 8000}}
+	extendedResourceError := AdmissionResult{InsufficientResource: &noderesources.InsufficientResource{ResourceName: "foo.com/bar", Reason: "Insufficient foo.com/bar", Requested: 1, Unresolvable: true}}
 	cpu := map[v1.ResourceName]string{v1.ResourceCPU: "8"}
+	extendedResource := map[v1.ResourceName]string{"foo.com/bar": "1"}
 	tests := []struct {
-		name                 string
-		node                 *v1.Node
-		existingPods         []*v1.Pod
-		pod                  *v1.Pod
-		wantAdmissionResults [][]AdmissionResult
+		name                      string
+		node                      *v1.Node
+		existingPods              []*v1.Pod
+		pod                       *v1.Pod
+		wantAdmissionResults      [][]AdmissionResult
+		enableDRAExtendedResource bool
 	}{
 		{
 			name: "check nodeAffinity and nodeports, nodeAffinity need fail quickly if includeAllFailures is false",
@@ -732,9 +735,23 @@ func TestAdmissionCheck(t *testing.T) {
 			},
 			wantAdmissionResults: [][]AdmissionResult{{nodenameError, nodeportsError}, {nodenameError}},
 		},
+		{
+			name:                 "check extended resource handling when node Allocatable doesn't have the resource",
+			node:                 st.MakeNode().Name("fake-node").Obj(),
+			pod:                  st.MakePod().Name("pod1").Req(extendedResource).Obj(),
+			wantAdmissionResults: [][]AdmissionResult{{extendedResourceError}, {extendedResourceError}},
+		},
+		{
+			name:                      "check extended resource handling when node Allocatable doesn't have the resource and DRAExtendedResource is enabled",
+			node:                      st.MakeNode().Name("fake-node").Obj(),
+			pod:                       st.MakePod().Name("pod1").Req(extendedResource).Obj(),
+			wantAdmissionResults:      [][]AdmissionResult{{extendedResourceError}, {extendedResourceError}},
+			enableDRAExtendedResource: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, tt.enableDRAExtendedResource)
 			nodeInfo := framework.NewNodeInfo(tt.existingPods...)
 			nodeInfo.SetNode(tt.node)
 
