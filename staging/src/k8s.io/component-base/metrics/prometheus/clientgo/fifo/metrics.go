@@ -1,0 +1,56 @@
+/*
+Copyright 2025 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package fifo
+
+import (
+	"k8s.io/client-go/tools/cache"
+	k8smetrics "k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
+)
+
+var (
+	fifoQueuedItems = k8smetrics.NewGaugeVec(
+		&k8smetrics.GaugeOpts{
+			Name:           "fifo_queued_items",
+			Help:           "Number of items currently queued in the FIFO.",
+			StabilityLevel: k8smetrics.ALPHA,
+		},
+		[]string{"name", "item_type"},
+	)
+)
+
+func init() {
+	legacyregistry.MustRegister(fifoQueuedItems)
+}
+
+type fifoMetricsProvider struct{}
+
+func (fifoMetricsProvider) NewQueuedItemMetric(id *cache.Identifier) cache.GaugeMetric {
+	return fifoQueuedItems.WithLabelValues(id.Name(), id.ItemType())
+}
+
+// MetricsProvider is the Prometheus implementation of cache.FIFOMetricsProvider.
+// Consumers MUST pass this to RealFIFOOptions.MetricsProvider to enable FIFO metrics.
+// Without this, metrics will be no-ops and queue depth will not be observable.
+//
+// Example usage:
+//
+//	opts := cache.RealFIFOOptions{
+//	    MetricsProvider: fifo.MetricsProvider,
+//	    // ...
+//	}
+var MetricsProvider cache.FIFOMetricsProvider = fifoMetricsProvider{}
