@@ -594,10 +594,11 @@ func TestStatuszRegistryReceivesListedPaths(t *testing.T) {
 	m := newFakeMux(wantPaths)
 
 	reg := statusz.NewRegistry(
+		"kube-proxy",
 		compatibility.DefaultBuildEffectiveVersion(),
 		statusz.WithListedPaths(m.ListedPaths()),
 	)
-	statusz.Install(m, "kube-proxy", reg)
+	statusz.Install(m, reg)
 
 	h, ok := m.handlers[statusz.DefaultStatuszPath]
 	if !ok {
