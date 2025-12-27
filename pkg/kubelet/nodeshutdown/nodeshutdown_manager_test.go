@@ -17,6 +17,7 @@ limitations under the License.
 package nodeshutdown
 
 import (
+	"math"
 	"testing"
 	"time"
 
@@ -151,6 +152,12 @@ func Test_groupByPriority(t *testing.T) {
 						makePod("critical-pod", scheduling.SystemCriticalPriority, nil),
 					},
 				},
+				{
+					ShutdownGracePeriodByPodPriority: kubeletconfig.ShutdownGracePeriodByPodPriority{
+						Priority:                   int32(math.MaxInt32),
+						ShutdownGracePeriodSeconds: 120,
+					},
+				},
 			},
 		},
 		{
@@ -220,6 +227,12 @@ func Test_groupByPriority(t *testing.T) {
 					Pods: []*v1.Pod{
 						makePod("pod-4", 4, nil),
 						makePod("pod-5", 5, nil),
+					},
+				},
+				{
+					ShutdownGracePeriodByPodPriority: kubeletconfig.ShutdownGracePeriodByPodPriority{
+						Priority:                   int32(math.MaxInt32),
+						ShutdownGracePeriodSeconds: 40,
 					},
 				},
 			},
