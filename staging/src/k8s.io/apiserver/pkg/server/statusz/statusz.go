@@ -26,15 +26,18 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/runtime/serializer/cbor"
 	"k8s.io/component-base/compatibility"
 
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server/statusz/negotiate"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	v1alpha1 "k8s.io/apiserver/pkg/server/statusz/api/v1alpha1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
 var (
@@ -60,7 +63,11 @@ const headerFmt = `
 Warning: This endpoint is not meant to be machine parseable, has no formatting compatibility guarantees and is for debugging purposes only.
 `
 
-var schemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: Version}
+// statuszCodecFactory wraps a CodecFactory to filter out unsupported media types (like protobuf)
+// from the supported media types list, so error messages only show actually supported types.
+type statuszCodecFactory struct {
+	serializer.CodecFactory
+}
 
 type mux interface {
 	Handle(path string, handler http.Handler)
@@ -82,8 +89,7 @@ func NewRegistry(effectiveVersion compatibility.EffectiveVersion, opts ...Option
 func Install(m mux, componentName string, reg statuszRegistry) {
 	scheme := runtime.NewScheme()
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
-	codecFactory := serializer.NewCodecFactory(
-		scheme,
+	codecFactoryOpts := []serializer.CodecFactoryOptionsMutator{
 		serializer.WithSerializer(func(_ runtime.ObjectCreater, _ runtime.ObjectTyper) runtime.SerializerInfo {
 			textSerializer := statuszTextSerializer{componentName, reg}
 			return runtime.SerializerInfo{
@@ -95,8 +101,28 @@ func Install(m mux, componentName string, reg statuszRegistry) {
 				PrettySerializer: textSerializer,
 			}
 		}),
-	)
-	m.Handle(DefaultStatuszPath, handleStatusz(componentName, reg, codecFactory, negotiate.StatuszEndpointRestrictions{}))
+	}
+	// TODO: remove this explicit check when https://github.com/kubernetes/enhancements/pull/5740 is implemented.
+	if utilfeature.DefaultFeatureGate.Enabled(features.CBORServingAndStorage) {
+		codecFactoryOpts = append(codecFactoryOpts, serializer.WithSerializer(cbor.NewSerializerInfo))
+	}
+
+	codecFactory := serializer.NewCodecFactory(scheme, codecFactoryOpts...)
+	// Wrap to filter out unsupported media types (e.g., protobuf)
+	filteredCodecFactory := &statuszCodecFactory{codecFactory}
+	m.Handle(DefaultStatuszPath, handleStatusz(componentName, reg, filteredCodecFactory, negotiate.StatuszEndpointRestrictions{}))
+}
+
+func (f *statuszCodecFactory) SupportedMediaTypes() []runtime.SerializerInfo {
+	allTypes := f.CodecFactory.SupportedMediaTypes()
+	filtered := make([]runtime.SerializerInfo, 0, len(allTypes))
+	for _, info := range allTypes {
+		if info.MediaType == runtime.ContentTypeProtobuf {
+			continue
+		}
+		filtered = append(filtered, info)
+	}
+	return filtered
 }
 
 func handleStatusz(componentName string, reg statuszRegistry, serializer runtime.NegotiatedSerializer, restrictions negotiate.StatuszEndpointRestrictions) http.HandlerFunc {
@@ -123,9 +149,9 @@ func handleStatusz(componentName string, reg statuszRegistry, serializer runtime
 
 		var targetGV schema.GroupVersion
 		switch serializerInfo.MediaType {
-		case "application/json":
+		case "application/json", "application/yaml", "application/cbor":
 			if mediaType.Convert == nil {
-				err := fmt.Errorf("content negotiation failed: mediaType.Convert is nil for application/json")
+				err := fmt.Errorf("content negotiation failed: mediaType.Convert is nil for %s", serializerInfo.MediaType)
 				utilruntime.HandleError(err)
 				responsewriters.ErrorNegotiated(
 					err,
@@ -141,13 +167,11 @@ func handleStatusz(componentName string, reg statuszRegistry, serializer runtime
 			if deprecated {
 				w.Header().Set("Warning", `299 - "This version of the statusz endpoint is deprecated. Please use a newer version."`)
 			}
+			writeStructuredResponse(obj, serializer, targetGV, restrictions, w, r)
 		case "text/plain":
-			// Even though text/plain serialization does not use the group/version,
-			// the serialization machinery expects a non-zero schema.GroupVersion to be passed.
-			// Passing the zero value can cause errors or unexpected behavior in the negotiation logic.
-			targetGV = schemeGroupVersion
+			writePlainTextResponse(obj, serializer, w)
 		default:
-			err = fmt.Errorf("content negotiation failed: unsupported media type '%s'", serializerInfo.MediaType)
+			err := fmt.Errorf("unsupported media type: %s/%s", serializerInfo.MediaType, serializerInfo.MediaTypeSubType)
 			utilruntime.HandleError(err)
 			responsewriters.ErrorNegotiated(
 				err,
@@ -156,14 +180,10 @@ func handleStatusz(componentName string, reg statuszRegistry, serializer runtime
 				w,
 				r,
 			)
-			return
 		}
-
-		writeResponse(obj, serializer, targetGV, restrictions, w, r)
 	}
 }
 
-// writePlainTextResponse writes the statusz response as text/plain using the registered serializer.
 func writePlainTextResponse(obj runtime.Object, serializer runtime.NegotiatedSerializer, w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	// Find the text/plain serializer
@@ -185,7 +205,7 @@ func writePlainTextResponse(obj runtime.Object, serializer runtime.NegotiatedSer
 	}
 }
 
-func writeResponse(obj runtime.Object, serializer runtime.NegotiatedSerializer, targetGV schema.GroupVersion, restrictions negotiate.StatuszEndpointRestrictions, w http.ResponseWriter, r *http.Request) {
+func writeStructuredResponse(obj runtime.Object, serializer runtime.NegotiatedSerializer, targetGV schema.GroupVersion, restrictions negotiate.StatuszEndpointRestrictions, w http.ResponseWriter, r *http.Request) {
 	responsewriters.WriteObjectNegotiated(
 		serializer,
 		restrictions,
