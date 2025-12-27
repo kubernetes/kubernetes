@@ -223,7 +223,7 @@ func (st *HPAScaleTest) run(ctx context.Context, name string, kind schema.GroupV
 
 	rc.WaitForReplicas(ctx, st.firstScale, timeToWait)
 	if st.firstScaleStasis > 0 {
-		rc.EnsureDesiredReplicasInRange(ctx, st.firstScale, st.firstScale+1, st.firstScaleStasis, hpa.Name)
+		rc.EnsureDesiredReplicasInRange(ctx, st.firstScale, int(st.maxPods)-1, st.firstScaleStasis, hpa.Name)
 	}
 	if st.resourceType == cpuResource && st.cpuBurst > 0 && st.secondScale > 0 {
 		rc.ConsumeCPU(st.cpuBurst)
