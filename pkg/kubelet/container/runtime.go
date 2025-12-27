@@ -625,12 +625,15 @@ type RuntimeHandler struct {
 	// SupportsUserNamespaces is true if the handler has support for
 	// user namespaces.
 	SupportsUserNamespaces bool
+	// SupportsUserNamespacesHostNetwork is true if the handler has support for
+	// user namespaces with host network simultaneously.
+	SupportsUserNamespacesHostNetwork bool
 }
 
 // String formats the runtime handler into human readable string.
 func (h *RuntimeHandler) String() string {
-	return fmt.Sprintf("Name=%s SupportsRecursiveReadOnlyMounts: %v SupportsUserNamespaces: %v",
-		h.Name, h.SupportsRecursiveReadOnlyMounts, h.SupportsUserNamespaces)
+	return fmt.Sprintf("Name=%s SupportsRecursiveReadOnlyMounts: %v SupportsUserNamespaces: %v SupportsUserNamespacesHostNetwork: %v",
+		h.Name, h.SupportsRecursiveReadOnlyMounts, h.SupportsUserNamespaces, h.SupportsUserNamespacesHostNetwork)
 }
 
 // RuntimeCondition contains condition information for the runtime.

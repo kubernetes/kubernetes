@@ -20,6 +20,7 @@ import (
 	"k8s.io/component-helpers/nodedeclaredfeatures"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/inplacepodresize"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/restartallcontainers"
+	"k8s.io/component-helpers/nodedeclaredfeatures/features/usernamespaceshostnetwork"
 )
 
 // AllFeatures is the central registry for all declared features.
@@ -29,4 +30,5 @@ var AllFeatures = []nodedeclaredfeatures.Feature{
 	restartallcontainers.Feature,
 	inplacepodresize.GuaranteedQoSPodCPUResizeFeature,
 	inplacepodresize.PodLevelResourcesResizeFeature,
+	usernamespaceshostnetwork.Feature,
 }

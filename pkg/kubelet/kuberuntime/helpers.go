@@ -242,14 +242,17 @@ func toKubeRuntimeStatus(status *runtimeapi.RuntimeStatus, handlers []*runtimeap
 	for i, h := range handlers {
 		supportsRRO := false
 		supportsUserns := false
+		supportsUsernsHostNet := false
 		if h.Features != nil {
 			supportsRRO = h.Features.RecursiveReadOnlyMounts
 			supportsUserns = h.Features.UserNamespaces
+			supportsUsernsHostNet = h.Features.UserNamespacesHostNetwork
 		}
 		retHandlers[i] = kubecontainer.RuntimeHandler{
-			Name:                            h.Name,
-			SupportsRecursiveReadOnlyMounts: supportsRRO,
-			SupportsUserNamespaces:          supportsUserns,
+			Name:                              h.Name,
+			SupportsRecursiveReadOnlyMounts:   supportsRRO,
+			SupportsUserNamespaces:            supportsUserns,
+			SupportsUserNamespacesHostNetwork: supportsUsernsHostNet,
 		}
 	}
 	var retFeatures *kubecontainer.RuntimeFeatures
