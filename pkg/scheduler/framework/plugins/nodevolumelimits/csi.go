@@ -64,10 +64,9 @@ type CSILimits struct {
 	vaLister        storagelisters.VolumeAttachmentLister
 	csiDriverLister storagelisters.CSIDriverLister
 
-	enableCSIMigrationPortworx bool
-	randomVolumeIDPrefix       string
-	enableVolumeLimitScaling   bool
-	translator                 InTreeToCSITranslator
+	randomVolumeIDPrefix     string
+	enableVolumeLimitScaling bool
+	translator               InTreeToCSITranslator
 }
 
 var _ fwk.PreFilterPlugin = &CSILimits{}
@@ -458,7 +457,7 @@ func (pl *CSILimits) checkAttachableInlineVolume(logger klog.Logger, vol *v1.Vol
 	if err != nil {
 		return fmt.Errorf("looking up provisioner name for volume %s: %w", vol.Name, err)
 	}
-	if !isCSIMigrationOn(csiNode, inTreeProvisionerName, pl.enableCSIMigrationPortworx) {
+	if !isCSIMigrationOn(csiNode, inTreeProvisionerName) {
 		csiNodeName := ""
 		if csiNode != nil {
 			csiNodeName = csiNode.Name
@@ -519,7 +518,7 @@ func (pl *CSILimits) getCSIDriverInfo(logger klog.Logger, csiNode *storagev1.CSI
 			return "", ""
 		}
 
-		if !isCSIMigrationOn(csiNode, pluginName, pl.enableCSIMigrationPortworx) {
+		if !isCSIMigrationOn(csiNode, pluginName) {
 			logger.V(5).Info("CSI Migration of plugin is not enabled", "plugin", pluginName)
 			return "", ""
 		}
@@ -567,7 +566,7 @@ func (pl *CSILimits) getCSIDriverInfoFromSC(logger klog.Logger, csiNode *storage
 
 	provisioner := storageClass.Provisioner
 	if pl.translator.IsMigratableIntreePluginByName(provisioner) {
-		if !isCSIMigrationOn(csiNode, provisioner, pl.enableCSIMigrationPortworx) {
+		if !isCSIMigrationOn(csiNode, provisioner) {
 			logger.V(5).Info("CSI Migration of provisioner is not enabled", "provisioner", provisioner)
 			return "", ""
 		}
@@ -594,16 +593,15 @@ func NewCSI(_ context.Context, _ runtime.Object, handle fwk.Handle, fts feature.
 	csiTranslator := csitrans.New()
 
 	return &CSILimits{
-		csiManager:                 handle.SharedCSIManager(),
-		pvLister:                   pvLister,
-		pvcLister:                  pvcLister,
-		scLister:                   scLister,
-		vaLister:                   vaLister,
-		csiDriverLister:            csiDriverLister,
-		enableCSIMigrationPortworx: fts.EnableCSIMigrationPortworx,
-		enableVolumeLimitScaling:   fts.EnableVolumeLimitScaling,
-		randomVolumeIDPrefix:       rand.String(32),
-		translator:                 csiTranslator,
+		csiManager:               handle.SharedCSIManager(),
+		pvLister:                 pvLister,
+		pvcLister:                pvcLister,
+		scLister:                 scLister,
+		vaLister:                 vaLister,
+		csiDriverLister:          csiDriverLister,
+		enableVolumeLimitScaling: fts.EnableVolumeLimitScaling,
+		randomVolumeIDPrefix:     rand.String(32),
+		translator:               csiTranslator,
 	}, nil
 }
 

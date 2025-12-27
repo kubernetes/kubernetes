@@ -583,7 +583,7 @@ func TestAnnealMigrationAnnotations(t *testing.T) {
 	}
 
 	translator := csitrans.New()
-	cmpm := csimigration.NewPluginManager(translator, utilfeature.DefaultFeatureGate)
+	cmpm := csimigration.NewPluginManager(translator)
 	logger, _ := ktesting.NewTestContext(t)
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -745,7 +745,7 @@ func TestModifyDeletionFinalizers(t *testing.T) {
 	}
 
 	translator := csitrans.New()
-	cmpm := csimigration.NewPluginManager(translator, utilfeature.DefaultFeatureGate)
+	cmpm := csimigration.NewPluginManager(translator)
 	logger, _ := ktesting.NewTestContext(t)
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
