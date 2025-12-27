@@ -1481,6 +1481,17 @@ func compareMetricWithThreshold(items []DataItem, threshold float64, metricSelec
 	return nil
 }
 
+func addThresholdToData(items []DataItem, threshold float64, metricSelector thresholdMetricSelector) {
+	if threshold == 0 {
+		return
+	}
+	for _, item := range items {
+		if item.Labels["Metric"] == metricSelector.Name && labelsMatch(item.Labels, metricSelector.Labels) {
+			item.Data["Threshold"] = threshold
+		}
+	}
+}
+
 func checkEmptyInFlightEvents() error {
 	labels := append(schedframework.AllClusterEventLabels(), metrics.PodPoppedInFlightEvent)
 	for _, label := range labels {
@@ -1545,6 +1556,7 @@ func stopCollectingMetrics(tCtx ktesting.TContext, collectorCtx ktesting.TContex
 		if err != nil {
 			tCtx.Errorf("op %d: %s", opIndex, err)
 		}
+		addThresholdToData(items, threshold, tms)
 	}
 	tCtx.Log("Stopped metrics collection")
 	return dataItems, nil
@@ -2013,7 +2025,8 @@ type testDataCollector interface {
 	collect() []DataItem
 }
 
-func getTestDataCollectors(podInformer coreinformers.PodInformer, name string, namespaces []string, labelSelector map[string]string, mcc *metricsCollectorConfig, throughputErrorMargin float64) []testDataCollector {
+// var for mocking in tests.
+var getTestDataCollectors = func(podInformer coreinformers.PodInformer, name string, namespaces []string, labelSelector map[string]string, mcc *metricsCollectorConfig, throughputErrorMargin float64) []testDataCollector {
 	if mcc == nil {
 		mcc = &defaultMetricsCollectorConfig
 	}
