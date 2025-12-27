@@ -33,6 +33,8 @@ type GenericControllerManagerConfigurationOptions struct {
 	Debugging *DebuggingOptions
 	// LeaderMigration is the options for leader migration, a nil indicates default options should be applied.
 	LeaderMigration *migration.LeaderMigrationOptions
+	// ControllerListFormatter is used to format controller lists e.g. in command help.
+	ControllerListFormatter func([]string) string
 }
 
 // NewGenericControllerManagerConfigurationOptions returns generic configuration default values for both
@@ -46,6 +48,17 @@ func NewGenericControllerManagerConfigurationOptions(cfg *cmconfig.GenericContro
 	}
 
 	return o
+}
+
+func defaultControllerListFormatter(controllers []string) string {
+	return strings.Join(controllers, ", ")
+}
+
+func (o *GenericControllerManagerConfigurationOptions) formatControllers(controllers []string) string {
+	if o.ControllerListFormatter == nil {
+		return defaultControllerListFormatter(controllers)
+	}
+	return o.ControllerListFormatter(controllers)
 }
 
 // AddFlags adds flags related to generic for controller manager to the specified FlagSet.
@@ -64,8 +77,8 @@ func (o *GenericControllerManagerConfigurationOptions) AddFlags(fss *cliflag.Nam
 	genericfs.DurationVar(&o.ControllerStartInterval.Duration, "controller-start-interval", o.ControllerStartInterval.Duration, "Interval between starting controller managers.")
 	genericfs.StringSliceVar(&o.Controllers, "controllers", o.Controllers, fmt.Sprintf(""+
 		"A list of controllers to enable. '*' enables all on-by-default controllers, 'foo' enables the controller "+
-		"named 'foo', '-foo' disables the controller named 'foo'.\nAll controllers: %s\nDisabled-by-default controllers: %s",
-		strings.Join(allControllers, ", "), strings.Join(disabledByDefaultControllers, ", ")))
+		"named 'foo', '-foo' disables the controller named 'foo'.\n\nAll controllers: %s\nDisabled-by-default controllers: %s",
+		o.formatControllers(allControllers), o.formatControllers(disabledByDefaultControllers)))
 
 	options.BindLeaderElectionFlags(&o.LeaderElection, genericfs)
 }
