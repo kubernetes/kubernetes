@@ -178,7 +178,7 @@ func (e Equalities) deepValueEqual(v1, v2 reflect.Value, visited map[visit]bool,
 			}
 
 			// Two lists that are both empty and both non nil are equal
-			if v1.Len() == 0 || v2.Len() == 0 {
+			if v1.Len() == 0 && v2.Len() == 0 {
 				return true
 			}
 		}
@@ -229,7 +229,7 @@ func (e Equalities) deepValueEqual(v1, v2 reflect.Value, visited map[visit]bool,
 			}
 
 			// Two maps that are both empty and both non nil are equal
-			if v1.Len() == 0 || v2.Len() == 0 {
+			if v1.Len() == 0 && v2.Len() == 0 {
 				return true
 			}
 		}
