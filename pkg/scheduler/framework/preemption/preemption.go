@@ -180,8 +180,8 @@ func NewEvaluator(pluginName string, fh fwk.Handle, i Interface, enableAsyncPree
 		// If the victim is a WaitingPod, send a reject message to the PermitPlugin.
 		// Otherwise we should delete the victim.
 		if waitingPod := ev.Handler.GetWaitingPod(victim.UID); waitingPod != nil {
-			waitingPod.Reject(pluginName, "preempted")
-			logger.V(2).Info("Preemptor pod rejected a waiting pod", "preemptor", klog.KObj(preemptor), "waitingPod", klog.KObj(victim), "node", c.Name())
+			waitingPod.Preempt(pluginName, "preempted")
+			logger.V(2).Info("Preemptor pod preempted a waiting pod", "preemptor", klog.KObj(preemptor), "waitingPod", klog.KObj(victim), "node", c.Name())
 		} else {
 			condition := &v1.PodCondition{
 				Type:               v1.DisruptionTarget,
