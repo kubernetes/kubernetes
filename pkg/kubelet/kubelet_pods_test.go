@@ -45,7 +45,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	core "k8s.io/client-go/testing"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/testutil"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -1977,7 +1977,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			fakeRecorder := record.NewFakeRecorder(1)
+			fakeRecorder := events.NewFakeRecorder(1)
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 			testKubelet.kubelet.recorder = fakeRecorder
 			defer testKubelet.Cleanup()
@@ -7395,7 +7395,7 @@ func testMetric(t *testing.T, metricName string, expectedMetric string) {
 
 func TestGetNonExistentImagePullSecret(t *testing.T) {
 	secrets := make([]*v1.Secret, 0)
-	fakeRecorder := record.NewFakeRecorder(1)
+	fakeRecorder := events.NewFakeRecorder(1)
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	testKubelet.kubelet.recorder = fakeRecorder
 	testKubelet.kubelet.secretManager = secret.NewFakeManagerWithSecrets(secrets)
