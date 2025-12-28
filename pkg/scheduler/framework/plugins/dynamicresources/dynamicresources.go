@@ -655,7 +655,11 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 			// If the claim is not ready yet (ready false, no error) and binding has timed out
 			// or binding has failed (err non-nil), then the scheduler should consider deallocating this
 			// claim in PostFilter to unblock trying other devices.
-			if err != nil || !ready && pl.isClaimTimeout(claim) {
+			if err != nil {
+				logger.V(5).Info("Claim failed binding conditions check", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaim", klog.KObj(claim), "err", err)
+				unavailableClaims = append(unavailableClaims, index)
+			} else if !ready && pl.isClaimTimeout(claim) {
+				logger.V(5).Info("Claim timed out waiting for binding conditions", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaim", klog.KObj(claim))
 				unavailableClaims = append(unavailableClaims, index)
 			}
 		}
