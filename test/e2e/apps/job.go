@@ -1377,6 +1377,203 @@ done`}
 		gomega.Expect(job.Status.Ready).Should(gomega.Equal(ptr.To[int32](0)))
 		gomega.Expect(job.Status.Terminating).Should(gomega.Equal(ptr.To[int32](0)))
 	})
+
+	/*
+		Testname: Allow updating pod resources for suspended Jobs
+		Description: Create a suspended Job with initial container resources.
+		Update the container resources while the job is suspended.
+		Unsuspend the job and verify that pods are created with the updated resources.
+		This verifies KEP-5440: Mutable Job Pod Resource Updates.
+	*/
+	framework.It("should allow updating pod resources for a suspended job", framework.WithFeatureGate(features.MutablePodResourcesForSuspendedJobs), func(ctx context.Context) {
+		jobName := "e2e-mutable-resources" + utilrand.String(5)
+
+		parallelism := int32(1)
+		completions := int32(1)
+		backoffLimit := int32(6)
+
+		initialCPU := resource.MustParse("100m")
+		initialMemory := resource.MustParse("128Mi")
+		updatedCPU := resource.MustParse("200m")
+		updatedMemory := resource.MustParse("256Mi")
+
+		ginkgo.By("Creating a suspended job with initial resources")
+		job := e2ejob.NewTestJob("succeed", jobName, v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
+		job.Spec.Suspend = ptr.To(true)
+		for i := range job.Spec.Template.Spec.Containers {
+			job.Spec.Template.Spec.Containers[i].Resources = v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    initialCPU,
+					v1.ResourceMemory: initialMemory,
+				},
+			}
+		}
+		job, err := e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
+		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Verifying job is suspended and no pods are created")
+		err = e2ejob.WaitForJobSuspend(ctx, f.ClientSet, f.Namespace.Name, jobName)
+		framework.ExpectNoError(err, "failed to verify job is suspended")
+		pods, err := e2ejob.GetJobPods(ctx, f.ClientSet, f.Namespace.Name, jobName)
+		framework.ExpectNoError(err, "failed to get pods for job")
+		gomega.Expect(pods.Items).To(gomega.BeEmpty(), "expected no pods while job is suspended")
+
+		ginkgo.By("Updating container resources while job is suspended")
+		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			job, err = e2ejob.GetJob(ctx, f.ClientSet, f.Namespace.Name, jobName)
+			if err != nil {
+				return err
+			}
+			for i := range job.Spec.Template.Spec.Containers {
+				job.Spec.Template.Spec.Containers[i].Resources = v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    updatedCPU,
+						v1.ResourceMemory: updatedMemory,
+					},
+				}
+			}
+			job, err = e2ejob.UpdateJob(ctx, f.ClientSet, f.Namespace.Name, job)
+			return err
+		})
+		framework.ExpectNoError(err, "failed to update job resources")
+
+		ginkgo.By("Unsuspending the job")
+		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			job, err = e2ejob.GetJob(ctx, f.ClientSet, f.Namespace.Name, jobName)
+			if err != nil {
+				return err
+			}
+			job.Spec.Suspend = ptr.To(false)
+			job, err = e2ejob.UpdateJob(ctx, f.ClientSet, f.Namespace.Name, job)
+			return err
+		})
+		framework.ExpectNoError(err, "failed to unsuspend job")
+
+		ginkgo.By("Waiting for job to complete")
+		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, jobName, batchv1.JobReasonCompletionsReached, completions)
+		framework.ExpectNoError(err, "failed to wait for job completion")
+
+		ginkgo.By("Verifying pods were created with updated resources")
+		pods, err = e2ejob.GetJobPods(ctx, f.ClientSet, f.Namespace.Name, jobName)
+		framework.ExpectNoError(err, "failed to get pods for job")
+		gomega.Expect(pods.Items).NotTo(gomega.BeEmpty(), "expected at least one pod")
+
+		for _, pod := range pods.Items {
+			for _, container := range pod.Spec.Containers {
+				cpuRequest := container.Resources.Requests[v1.ResourceCPU]
+				memoryRequest := container.Resources.Requests[v1.ResourceMemory]
+				gomega.Expect(cpuRequest.Equal(updatedCPU)).To(gomega.BeTrueBecause(
+					"expected CPU request %v, got %v", updatedCPU.String(), cpuRequest.String()))
+				gomega.Expect(memoryRequest.Equal(updatedMemory)).To(gomega.BeTrueBecause(
+					"expected memory request %v, got %v", updatedMemory.String(), memoryRequest.String()))
+			}
+		}
+	})
+
+	/*
+		Testname: Allow updating pod resources for a job that started and was suspended
+		Description: Create a job that starts running, suspend it, update the
+		container resources while suspended, then unsuspend and verify that newly
+		created pods have the updated resources. This verifies that resource updates
+		are allowed even for jobs that have previously started.
+	*/
+	framework.It("should allow updating pod resources for a job that started and then was suspended", framework.WithFeatureGate(features.MutablePodResourcesForSuspendedJobs), func(ctx context.Context) {
+		jobName := "e2e-start-suspend" + utilrand.String(5)
+
+		parallelism := int32(2)
+		completions := int32(4)
+		backoffLimit := int32(6)
+
+		initialCPU := resource.MustParse("100m")
+		initialMemory := resource.MustParse("128Mi")
+		updatedCPU := resource.MustParse("200m")
+		updatedMemory := resource.MustParse("256Mi")
+
+		ginkgo.By("Creating a running job with initial resources")
+		job := e2ejob.NewTestJob("notTerminate", jobName, v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
+		job.Spec.Suspend = ptr.To(false)
+		for i := range job.Spec.Template.Spec.Containers {
+			job.Spec.Template.Spec.Containers[i].Resources = v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    initialCPU,
+					v1.ResourceMemory: initialMemory,
+				},
+			}
+		}
+		job, err := e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
+		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Waiting for pods to be running")
+		err = e2ejob.WaitForJobPodsRunning(ctx, f.ClientSet, f.Namespace.Name, jobName, parallelism)
+		framework.ExpectNoError(err, "failed to wait for job pods to be running")
+
+		ginkgo.By("Suspending the running job")
+		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			job, err = e2ejob.GetJob(ctx, f.ClientSet, f.Namespace.Name, jobName)
+			if err != nil {
+				return err
+			}
+			job.Spec.Suspend = ptr.To(true)
+			job, err = e2ejob.UpdateJob(ctx, f.ClientSet, f.Namespace.Name, job)
+			return err
+		})
+		framework.ExpectNoError(err, "failed to suspend job")
+
+		ginkgo.By("Waiting for all pods to be deleted after suspension")
+		err = e2ejob.WaitForAllJobPodsGone(ctx, f.ClientSet, f.Namespace.Name, jobName)
+		framework.ExpectNoError(err, "failed to wait for pods to be deleted after suspension")
+
+		ginkgo.By("Updating container resources while job is suspended")
+		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			job, err = e2ejob.GetJob(ctx, f.ClientSet, f.Namespace.Name, jobName)
+			if err != nil {
+				return err
+			}
+			for i := range job.Spec.Template.Spec.Containers {
+				job.Spec.Template.Spec.Containers[i].Resources = v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    updatedCPU,
+						v1.ResourceMemory: updatedMemory,
+					},
+				}
+			}
+			job, err = e2ejob.UpdateJob(ctx, f.ClientSet, f.Namespace.Name, job)
+			return err
+		})
+		framework.ExpectNoError(err, "failed to update job resources")
+
+		ginkgo.By("Unsuspending the job")
+		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			job, err = e2ejob.GetJob(ctx, f.ClientSet, f.Namespace.Name, jobName)
+			if err != nil {
+				return err
+			}
+			job.Spec.Suspend = ptr.To(false)
+			job, err = e2ejob.UpdateJob(ctx, f.ClientSet, f.Namespace.Name, job)
+			return err
+		})
+		framework.ExpectNoError(err, "failed to unsuspend job")
+
+		ginkgo.By("Waiting for new pods to be running with updated resources")
+		err = e2ejob.WaitForJobPodsRunning(ctx, f.ClientSet, f.Namespace.Name, jobName, parallelism)
+		framework.ExpectNoError(err, "failed to wait for job pods to be running after unsuspending")
+
+		ginkgo.By("Verifying newly created pods have updated resources")
+		pods, err := e2ejob.GetJobPods(ctx, f.ClientSet, f.Namespace.Name, jobName)
+		framework.ExpectNoError(err, "failed to get pods for job")
+		gomega.Expect(pods.Items).NotTo(gomega.BeEmpty(), "expected at least one pod")
+
+		for _, pod := range pods.Items {
+			for _, container := range pod.Spec.Containers {
+				cpuRequest := container.Resources.Requests[v1.ResourceCPU]
+				memoryRequest := container.Resources.Requests[v1.ResourceMemory]
+				gomega.Expect(cpuRequest.Equal(updatedCPU)).To(gomega.BeTrueBecause(
+					"expected CPU request %v, got %v", updatedCPU.String(), cpuRequest.String()))
+				gomega.Expect(memoryRequest.Equal(updatedMemory)).To(gomega.BeTrueBecause(
+					"expected memory request %v, got %v", updatedMemory.String(), memoryRequest.String()))
+			}
+		}
+	})
 })
 
 func updateJobSuspendWithRetries(ctx context.Context, f *framework.Framework, job *batchv1.Job, suspend *bool) error {
