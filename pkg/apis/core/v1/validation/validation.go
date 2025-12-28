@@ -102,14 +102,14 @@ func ValidateResourceQuantityValue(resource core.ResourceName, value resource.Qu
 	// This prevents confusing runtime errors like "no space left on device" when mounting
 	// tmpfs volumes (e.g., projected service account tokens) with extremely small memory limits.
 	// Common mistake: using decimal CPU suffix "m" (milliunits) for memory, e.g., "512m" = 0.512 bytes.
-	// The minimum practical memory allocation is one page (typically 4096 bytes on Linux).
+	// The minimum practical memory allocation is 512 bytes.
 	if resource == core.ResourceMemory {
-		// Allow zero (for BestEffort pods) but reject positive values less than 4Ki (4096 bytes)
-		const minMemoryBytes = 4096
+		// Allow zero (for BestEffort pods) but reject positive values less than 512 bytes
+		const minMemoryBytes = 512
 		byteValue := value.Value()
 		if byteValue > 0 && byteValue < minMemoryBytes {
 			allErrs = append(allErrs, field.Invalid(fldPath, value.String(),
-				fmt.Sprintf("must be at least 4Ki. Memory was %s (%d bytes). Use Ki/Mi/Gi suffixes for memory, not 'm'",
+				fmt.Sprintf("must be at least 512 bytes. Memory was %s (%d bytes). Use Ki/Mi/Gi suffixes for memory, not 'm'",
 					value.String(), byteValue)))
 		}
 	}

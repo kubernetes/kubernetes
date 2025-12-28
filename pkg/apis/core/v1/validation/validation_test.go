@@ -177,7 +177,11 @@ func TestValidateResourceQuantityValue(t *testing.T) {
 	}, {
 		name:         "Memory with exact minimum bytes",
 		resourceName: core.ResourceMemory,
-		value:        "4096",
+		value:        "512",
+	}, {
+		name:         "Memory above minimum",
+		resourceName: core.ResourceMemory,
+		value:        "1024",
 	}, {
 		name:         "Memory zero value (BestEffort pods)",
 		resourceName: core.ResourceMemory,
@@ -211,7 +215,7 @@ func TestValidateResourceQuantityValue(t *testing.T) {
 		name:         "Memory with milli suffix (common mistake)",
 		resourceName: core.ResourceMemory,
 		value:        "512m",
-		expectedErr:  "must be at least 4Ki",
+		expectedErr:  "must be at least 512 bytes",
 	}, {
 		name:         "Memory with very small value (1 byte)",
 		resourceName: core.ResourceMemory,
@@ -221,17 +225,22 @@ func TestValidateResourceQuantityValue(t *testing.T) {
 		name:         "Memory with very small value (3 bytes)",
 		resourceName: core.ResourceMemory,
 		value:        "3",
-		expectedErr:  "must be at least 4Ki",
+		expectedErr:  "must be at least 512 bytes",
 	}, {
 		name:         "Memory with small milli value",
 		resourceName: core.ResourceMemory,
 		value:        "100m",
 		expectedErr:  "not 'm'",
 	}, {
-		name:         "Memory below 4096 bytes",
+		name:         "Memory below 512 bytes",
 		resourceName: core.ResourceMemory,
-		value:        "4095",
-		expectedErr:  "4095 bytes",
+		value:        "511",
+		expectedErr:  "511 bytes",
+	}, {
+		name:         "Memory with 100 bytes",
+		resourceName: core.ResourceMemory,
+		value:        "100",
+		expectedErr:  "must be at least 512 bytes",
 	}}
 
 	for _, tc := range errorCase {
