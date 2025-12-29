@@ -171,6 +171,17 @@ else
 fi
 set -- "${testcases[@]+${testcases[@]}}"
 
+# Running tool commands (compilation, linking) under nice when available
+# reduces the risk that those commands steal CPU time from test binaries
+# running in parallel. Test binaries are sometimes sensitive to real-world
+# time and flake when blocked from running for too long.
+#
+# When used on a desktop system it keeps the desktop environment more
+# responsive.
+if command -v nice >/dev/null 2>&1; then
+  goflags+=(-toolexec nice)
+fi
+
 if [[ -n "${KUBE_RACE}" ]] ; then
   goflags+=("${KUBE_RACE}")
 fi
