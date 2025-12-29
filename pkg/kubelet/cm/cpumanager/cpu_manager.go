@@ -427,15 +427,18 @@ func (m *manager) isAllInitContainerTerminated(rootLogger logr.Logger, pod *v1.P
 		return false
 	}
 	for _, container := range pod.Spec.InitContainers {
-		logger := klog.LoggerWithValues(podLogger, "containerName", container.Name)
-		cstatus, err := findContainerStatusByName(&pstatus, container.Name)
-		if err != nil {
-			logger.V(5).Info("skipping container; ID not found in pod status", "err", err)
-			return false
-		}
+		if !podutil.IsRestartableInitContainer(&container){
+			logger := klog.LoggerWithValues(podLogger, "containerName", container.Name)
 
-		if cstatus.State.Terminated == nil {
-			return false
+			cstatus, err := findContainerStatusByName(&pstatus, container.Name)
+			if err != nil {
+				logger.V(5).Info("skipping container; ID not found in pod status", "err", err)
+				return false
+			}
+
+			if cstatus.State.Terminated == nil {
+				return false
+			}
 		}
 	}
 	return true
