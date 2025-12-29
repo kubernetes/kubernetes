@@ -28,6 +28,8 @@ import (
 
 type AdmissionregistrationV1Interface interface {
 	RESTClient() rest.Interface
+	MutatingAdmissionPoliciesGetter
+	MutatingAdmissionPolicyBindingsGetter
 	MutatingWebhookConfigurationsGetter
 	ValidatingAdmissionPoliciesGetter
 	ValidatingAdmissionPolicyBindingsGetter
@@ -37,6 +39,14 @@ type AdmissionregistrationV1Interface interface {
 // AdmissionregistrationV1Client is used to interact with features provided by the admissionregistration.k8s.io group.
 type AdmissionregistrationV1Client struct {
 	restClient rest.Interface
+}
+
+func (c *AdmissionregistrationV1Client) MutatingAdmissionPolicies() MutatingAdmissionPolicyInterface {
+	return newMutatingAdmissionPolicies(c)
+}
+
+func (c *AdmissionregistrationV1Client) MutatingAdmissionPolicyBindings() MutatingAdmissionPolicyBindingInterface {
+	return newMutatingAdmissionPolicyBindings(c)
 }
 
 func (c *AdmissionregistrationV1Client) MutatingWebhookConfigurations() MutatingWebhookConfigurationInterface {
