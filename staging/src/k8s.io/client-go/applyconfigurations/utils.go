@@ -130,18 +130,32 @@ import (
 func ForKind(kind schema.GroupVersionKind) interface{} {
 	switch kind {
 	// Group=admissionregistration.k8s.io, Version=v1
+	case v1.SchemeGroupVersion.WithKind("ApplyConfiguration"):
+		return &admissionregistrationv1.ApplyConfigurationApplyConfiguration{}
 	case v1.SchemeGroupVersion.WithKind("AuditAnnotation"):
 		return &admissionregistrationv1.AuditAnnotationApplyConfiguration{}
 	case v1.SchemeGroupVersion.WithKind("ExpressionWarning"):
 		return &admissionregistrationv1.ExpressionWarningApplyConfiguration{}
+	case v1.SchemeGroupVersion.WithKind("JSONPatch"):
+		return &admissionregistrationv1.JSONPatchApplyConfiguration{}
 	case v1.SchemeGroupVersion.WithKind("MatchCondition"):
 		return &admissionregistrationv1.MatchConditionApplyConfiguration{}
 	case v1.SchemeGroupVersion.WithKind("MatchResources"):
 		return &admissionregistrationv1.MatchResourcesApplyConfiguration{}
+	case v1.SchemeGroupVersion.WithKind("MutatingAdmissionPolicy"):
+		return &admissionregistrationv1.MutatingAdmissionPolicyApplyConfiguration{}
+	case v1.SchemeGroupVersion.WithKind("MutatingAdmissionPolicyBinding"):
+		return &admissionregistrationv1.MutatingAdmissionPolicyBindingApplyConfiguration{}
+	case v1.SchemeGroupVersion.WithKind("MutatingAdmissionPolicyBindingSpec"):
+		return &admissionregistrationv1.MutatingAdmissionPolicyBindingSpecApplyConfiguration{}
+	case v1.SchemeGroupVersion.WithKind("MutatingAdmissionPolicySpec"):
+		return &admissionregistrationv1.MutatingAdmissionPolicySpecApplyConfiguration{}
 	case v1.SchemeGroupVersion.WithKind("MutatingWebhook"):
 		return &admissionregistrationv1.MutatingWebhookApplyConfiguration{}
 	case v1.SchemeGroupVersion.WithKind("MutatingWebhookConfiguration"):
 		return &admissionregistrationv1.MutatingWebhookConfigurationApplyConfiguration{}
+	case v1.SchemeGroupVersion.WithKind("Mutation"):
+		return &admissionregistrationv1.MutationApplyConfiguration{}
 	case v1.SchemeGroupVersion.WithKind("NamedRuleWithOperations"):
 		return &admissionregistrationv1.NamedRuleWithOperationsApplyConfiguration{}
 	case v1.SchemeGroupVersion.WithKind("ParamKind"):
