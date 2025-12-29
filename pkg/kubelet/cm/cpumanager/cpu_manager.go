@@ -30,6 +30,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
@@ -38,7 +39,6 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/utils/cpuset"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
 
 // ActivePodsFunc is a function that returns a list of pods to reconcile.
@@ -427,15 +427,18 @@ func (m *manager) isAllInitContainerTerminated(rootLogger logr.Logger, pod *v1.P
 		return false
 	}
 	for _, container := range pod.Spec.InitContainers {
-		logger := klog.LoggerWithValues(podLogger, "containerName", container.Name)
-		cstatus, err := findContainerStatusByName(&pstatus, container.Name)
-		if err != nil {
-			logger.V(5).Info("skipping container; ID not found in pod status", "err", err)
-			return false
-		}
+		if !podutil.IsRestartableInitContainer(&container) {
+			logger := klog.LoggerWithValues(podLogger, "containerName", container.Name)
 
-		if cstatus.State.Terminated == nil {
-			return false
+			cstatus, err := findContainerStatusByName(&pstatus, container.Name)
+			if err != nil {
+				logger.V(5).Info("skipping container; ID not found in pod status", "err", err)
+				return false
+			}
+
+			if cstatus.State.Terminated == nil {
+				return false
+			}
 		}
 	}
 	return true

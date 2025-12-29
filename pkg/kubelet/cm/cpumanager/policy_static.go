@@ -462,7 +462,7 @@ func (p *staticPolicy) ReleaseLeakedCPUs(logger logr.Logger, s state.State, pod 
 			leakedCPUsNumber = unallocatedReusableCPUs.Size()
 		}
 		// Get the keeped CPUs in unallocatedReusableCPUs
-		keepCPUs, err := p.takeByTopology(logger, unallocatedReusableCPUs, unallocatedReusableCPUs.Size() - leakedCPUsNumber)
+		keepCPUs, err := p.takeByTopology(logger, unallocatedReusableCPUs, unallocatedReusableCPUs.Size()-leakedCPUsNumber)
 		if err != nil {
 			return leakedCPUs
 		}
@@ -473,11 +473,11 @@ func (p *staticPolicy) ReleaseLeakedCPUs(logger logr.Logger, s state.State, pod 
 		p.deleteCPUsInCpusToReuse(pod, leakedCPUs)
 		p.updateMetricsOnRelease(logger, s, leakedCPUs)
 		logger.Info("Static policy: ReleaseLeakedCPUs, release leaked CPUs to DefaultCPUSet", "leakedCPUsNumber", leakedCPUsNumber, "leakedCPUs", leakedCPUs)
-    }
-    return leakedCPUs
+	}
+	return leakedCPUs
 }
 
-// Check whether the assigned CPUs of the InitContainer are released into the default cpuset, 
+// Check whether the assigned CPUs of the InitContainer are released into the default cpuset,
 // if yes, reallocate the CPUs (which assigned to the pod) to the InitContainer
 func (p *staticPolicy) UpdateCPUsForInitC(logger logr.Logger, s state.State, pod *v1.Pod, containerName string, leakedCPUs cpuset.CPUSet) {
 	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", containerName)
@@ -490,7 +490,7 @@ func (p *staticPolicy) UpdateCPUsForInitC(logger logr.Logger, s state.State, pod
 		sidecarCPUsBeforeInit := p.getSidecarCPUsBeforeInit(s, pod, containerName)
 		allocatedCPUs, err := p.takeByTopology(logger, podCPUSet.Difference(leakedCPUs).Difference(sidecarCPUsBeforeInit), cset.Size())
 		if err != nil {
-			return 
+			return
 		}
 		s.SetCPUSet(string(pod.UID), containerName, allocatedCPUs)
 		logger.Info("Static policy: ReplaceLeakedCPUs", "cset before update", cset, "cset after update", allocatedCPUs)
@@ -505,7 +505,7 @@ func (p *staticPolicy) getSidecarCPUsBeforeInit(s state.State, pod *v1.Pod, cont
 		if containerName == initContainer.Name {
 			break
 		}
-		if podutil.IsRestartableInitContainer(&initContainer){
+		if podutil.IsRestartableInitContainer(&initContainer) {
 			cset, _ := s.GetCPUSet(string(pod.UID), initContainer.Name)
 			sidecarCPUs = sidecarCPUs.Union(cset)
 		}
