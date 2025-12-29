@@ -12,7 +12,6 @@ const defaultSystemBusAddress = "unix:path=/opt/local/var/run/dbus/system_bus_so
 func getSessionBusPlatformAddress() (string, error) {
 	cmd := exec.Command("launchctl", "getenv", "DBUS_LAUNCHD_SESSION_BUS_SOCKET")
 	b, err := cmd.CombinedOutput()
-
 	if err != nil {
 		return "", err
 	}

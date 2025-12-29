@@ -293,7 +293,7 @@ type testCase struct {
 	Labels []string
 	// DefaultThresholdMetricSelector defines default metric used for threshold comparison.
 	// It is only populated to workloads without their ThresholdMetricSelector set.
-	// If nil, the default metric is set to "SchedulingThroughput".
+	// If nil, the default metric is set to "SchedulingThroughput" with "Average" data bucket.
 	// Optional
 	DefaultThresholdMetricSelector *thresholdMetricSelector
 }
@@ -372,9 +372,10 @@ func (w *workload) setDefaults(testCaseThresholdMetricSelector *thresholdMetricS
 		w.ThresholdMetricSelector = testCaseThresholdMetricSelector
 		return
 	}
-	// By default, SchedulingThroughput should be compared with the threshold.
+	// By default, SchedulingThroughput Average should be compared with the threshold.
 	w.ThresholdMetricSelector = &thresholdMetricSelector{
-		Name: "SchedulingThroughput",
+		Name:       "SchedulingThroughput",
+		DataBucket: "Average",
 	}
 }
 
@@ -406,6 +407,8 @@ type thresholdMetricSelector struct {
 	Name string
 	// Labels of the metric. All of them needs to match the metric's labels to assume equality.
 	Labels map[string]string
+	// DataBucket specifies which data bucket should be compared against the threshold.
+	DataBucket string
 	// ExpectLower defines whether the threshold should denote the maximum allowable value of the metric.
 	// If false, the threshold defines minimum allowable value.
 	// Optional
@@ -413,6 +416,9 @@ type thresholdMetricSelector struct {
 }
 
 func (ms thresholdMetricSelector) isValid(mcc *metricsCollectorConfig) error {
+	if ms.DataBucket == "" {
+		return fmt.Errorf("dataBucket should be set for metric %v", ms.Name)
+	}
 	if ms.Name == "SchedulingThroughput" {
 		return nil
 	}
@@ -1149,6 +1155,9 @@ func setupTestCase(t testing.TB, tc *testCase, featureGates map[featuregate.Feat
 	if qhEnabled, exists := featureGates[features.SchedulerQueueingHints]; exists && !qhEnabled {
 		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
 	} else if _, found := featureGates[features.OpportunisticBatching]; !found {
+		if featureGates == nil {
+			featureGates = map[featuregate.Feature]bool{}
+		}
 		featureGates[features.OpportunisticBatching] = false
 	}
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featureGates)
@@ -1467,12 +1476,20 @@ func compareMetricWithThreshold(items []DataItem, threshold float64, metricSelec
 	if threshold == 0 {
 		return nil
 	}
+	dataBucket := metricSelector.DataBucket
 	for _, item := range items {
-		if item.Labels["Metric"] == metricSelector.Name && labelsMatch(item.Labels, metricSelector.Labels) && !valueWithinThreshold(item.Data["Average"], threshold, metricSelector.ExpectLower) {
+		if item.Labels["Metric"] != metricSelector.Name || !labelsMatch(item.Labels, metricSelector.Labels) {
+			continue
+		}
+		dataItem, ok := item.Data[dataBucket]
+		if !ok {
+			return fmt.Errorf("%s: no data present for %q metric %q bucket", item.Labels["Name"], metricSelector.Name, dataBucket)
+		}
+		if !valueWithinThreshold(dataItem, threshold, metricSelector.ExpectLower) {
 			if metricSelector.ExpectLower {
-				return fmt.Errorf("%s: expected %s Average to be lower: got %f, want %f", item.Labels["Name"], metricSelector.Name, item.Data["Average"], threshold)
+				return fmt.Errorf("%s: expected %q %q to be lower: got %f, want %f", item.Labels["Name"], metricSelector.Name, dataBucket, dataItem, threshold)
 			}
-			return fmt.Errorf("%s: expected %s Average to be higher: got %f, want %f", item.Labels["Name"], metricSelector.Name, item.Data["Average"], threshold)
+			return fmt.Errorf("%s: expected %q %q to be higher: got %f, want %f", item.Labels["Name"], metricSelector.Name, dataBucket, dataItem, threshold)
 		}
 	}
 	return nil
@@ -2018,6 +2035,7 @@ func getTestDataCollectors(podInformer coreinformers.PodInformer, name string, n
 		newThroughputCollector(podInformer, map[string]string{"Name": name}, labelSelector, namespaces, throughputErrorMargin),
 		newMetricsCollector(mcc, map[string]string{"Name": name}),
 		newMemoryCollector(map[string]string{"Name": name}, 500*time.Millisecond),
+		newSchedulingDurationCollector(map[string]string{"Name": name}),
 	}
 }
 

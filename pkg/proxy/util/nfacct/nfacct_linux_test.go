@@ -1,5 +1,4 @@
 //go:build linux && !s390x
-// +build linux,!s390x
 
 /*
 Copyright 2024 The Kubernetes Authors.

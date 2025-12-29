@@ -32,16 +32,13 @@ import (
 	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/admission/plugin/resourcequota"
 	resourcequotaapi "k8s.io/apiserver/pkg/admission/plugin/resourcequota/apis/resourcequota"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	testcore "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	controlplaneadmission "k8s.io/kubernetes/pkg/controlplane/apiserver/admission"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/quota/v1/install"
 )
 
@@ -110,7 +107,10 @@ func createHandlerWithConfig(kubeClient kubernetes.Interface, informerFactory in
 	if config == nil {
 		config = &resourcequotaapi.Configuration{}
 	}
-	quotaConfiguration := install.NewQuotaConfigurationForAdmission(nil)
+	quotaConfiguration, err := install.NewQuotaConfigurationForAdmission(nil)
+	if err != nil {
+		return nil, err
+	}
 
 	handler, err := resourcequota.NewResourceQuota(config, 5)
 	if err != nil {
@@ -990,8 +990,6 @@ func TestAdmitBelowTerminatingQuotaLimitWhenPodScopeUpdated(t *testing.T) {
 // It creates a glod and silver quota, and creates a pvc with the glod class.
 // It ensures that the glod quota is incremented, and the silver quota is not.
 func TestAdmitBelowVolumeAttributesClassQuotaLimit(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, true)
-
 	classGold := "gold"
 	classSilver := "silver"
 
@@ -1124,8 +1122,6 @@ func TestAdmitBelowVolumeAttributesClassQuotaLimit(t *testing.T) {
 // use to lower / free the reserved quota. We need always overcount in the admission plugin if something later causes
 // the request to be rejected, so you can not reduce quota with requests that aren't completed.
 func TestAdmitBelowVolumeAttributesClassQuotaLimitWhenPVCScopeUpdated(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, true)
-
 	classGold := "gold"
 	classSilver := "silver"
 	classCopper := "copper"

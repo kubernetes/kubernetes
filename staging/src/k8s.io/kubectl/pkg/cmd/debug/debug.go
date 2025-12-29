@@ -54,7 +54,6 @@ import (
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/interrupt"
 	"k8s.io/kubectl/pkg/util/templates"
-	"k8s.io/kubectl/pkg/util/term"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/yaml"
 )
@@ -268,7 +267,7 @@ func (o *DebugOptions) Complete(restClientGetter genericclioptions.RESTClientGet
 
 	// Set default WarningPrinter
 	if o.WarningPrinter == nil {
-		o.WarningPrinter = printers.NewWarningPrinter(o.ErrOut, printers.WarningPrinterOptions{Color: term.AllowsColorOutput(o.ErrOut)})
+		o.WarningPrinter = printers.NewWarningPrinter(o.ErrOut, printers.WarningPrinterOptions{Color: printers.AllowsColorOutput(o.ErrOut)})
 	}
 
 	if o.Applier == nil {

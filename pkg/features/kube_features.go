@@ -131,7 +131,7 @@ const (
 	// owner: @HirazawaUi
 	//
 	// Enabling this feature gate will cause the pod's status to change due to a kubelet restart.
-	ChangeContainerStatusOnKubeletRestart = "ChangeContainerStatusOnKubeletRestart"
+	ChangeContainerStatusOnKubeletRestart featuregate.Feature = "ChangeContainerStatusOnKubeletRestart"
 
 	// owner: @sanposhiho @wojtek-t
 	// kep: https://kep.k8s.io/5278
@@ -387,6 +387,12 @@ const (
 	//
 	// Enables the image volume source.
 	ImageVolume featuregate.Feature = "ImageVolume"
+
+	// owner: @iholder101
+	// kep: https://kep.k8s.io/4639
+	//
+	// Enables adding the ImageVolume's digest to the pod's status.
+	ImageVolumeWithDigest featuregate.Feature = "ImageVolumeWithDigest"
 
 	// owner: @ndixita
 	// kep: https://kep.k8s.io/5419
@@ -962,7 +968,7 @@ const (
 	//
 	// Mitigates spurious statefulset rollouts due to controller revision comparison mismatches
 	// which are not semantically significant (e.g. serialization differences or missing defaulted fields).
-	StatefulSetSemanticRevisionComparison = "StatefulSetSemanticRevisionComparison"
+	StatefulSetSemanticRevisionComparison featuregate.Feature = "StatefulSetSemanticRevisionComparison"
 
 	// owner: @cupnes
 	// kep: https://kep.k8s.io/4049
@@ -1369,6 +1375,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	ImageVolumeWithDigest: {
+		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	InPlacePodLevelResourcesVerticalScaling: {
 		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -1748,7 +1758,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	SchedulerAsyncAPICalls: {
 		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	SchedulerAsyncPreemption: {
@@ -1902,6 +1911,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA},
+		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	},
 
 	VolumeLimitScaling: {
@@ -2268,6 +2278,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	ImageMaximumGCAge: {},
 
 	ImageVolume: {},
+
+	ImageVolumeWithDigest: {ImageVolume},
 
 	InPlacePodLevelResourcesVerticalScaling: {InPlacePodVerticalScaling, PodLevelResources, NodeDeclaredFeatures},
 

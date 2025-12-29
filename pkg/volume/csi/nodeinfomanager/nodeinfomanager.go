@@ -41,7 +41,6 @@ import (
 	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 const (
@@ -116,7 +115,6 @@ func (nim *nodeInfoManager) InstallCSIDriver(driverName string, driverNodeID str
 	}
 
 	nodeUpdateFuncs := []nodeUpdateFunc{
-		removeMaxAttachLimit(driverName), // remove in 1.35 due to the version skew policy, we have to keep it for 3 releases
 		updateNodeIDInNode(driverName, driverNodeID),
 		updateTopologyLabels(topology),
 	}
@@ -154,7 +152,6 @@ func (nim *nodeInfoManager) UninstallCSIDriver(driverName string) error {
 	}
 
 	err = nim.updateNode(
-		removeMaxAttachLimit(driverName), // remove it when this function is removed from nodeUpdateFuncs
 		removeNodeIDFromNode(driverName),
 	)
 	if err != nil {
@@ -712,36 +709,4 @@ func (nim *nodeInfoManager) tryUninstallDriverFromCSINode(
 
 	return err // do not wrap error
 
-}
-
-func removeMaxAttachLimit(driverName string) nodeUpdateFunc {
-	return func(node *v1.Node) (*v1.Node, bool, error) {
-		limitKey := v1.ResourceName(util.GetCSIAttachLimitKey(driverName))
-
-		capacityExists := false
-		if node.Status.Capacity != nil {
-			_, capacityExists = node.Status.Capacity[limitKey]
-		}
-
-		allocatableExists := false
-		if node.Status.Allocatable != nil {
-			_, allocatableExists = node.Status.Allocatable[limitKey]
-		}
-
-		if !capacityExists && !allocatableExists {
-			return node, false, nil
-		}
-
-		delete(node.Status.Capacity, limitKey)
-		if len(node.Status.Capacity) == 0 {
-			node.Status.Capacity = nil
-		}
-
-		delete(node.Status.Allocatable, limitKey)
-		if len(node.Status.Allocatable) == 0 {
-			node.Status.Allocatable = nil
-		}
-
-		return node, true, nil
-	}
 }

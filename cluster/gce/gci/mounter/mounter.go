@@ -28,6 +28,7 @@ const (
 	// Location of the mount file to use
 	chrootCmd        = "chroot"
 	mountCmd         = "mount"
+	mountBin         = "/bin/mount"
 	rootfs           = "rootfs"
 	nfsRPCBindErrMsg = "mount.nfs: rpc.statd is not running but is required for remote locking.\nmount.nfs: Either use '-o nolock' to keep locks local, or start statd.\nmount.nfs: an incorrect mount option was specified\n"
 	rpcBindCmd       = "/sbin/rpcbind"
@@ -60,12 +61,12 @@ func main() {
 	}
 }
 
-// MountInChroot is to run mount within chroot with the passing root directory
+// mountInChroot runs mount within chroot with the passing root directory
 func mountInChroot(rootfsPath string, args []string) error {
 	if _, err := os.Stat(rootfsPath); os.IsNotExist(err) {
 		return fmt.Errorf("path <%s> does not exist", rootfsPath)
 	}
-	args = append([]string{rootfsPath, mountCmd}, args...)
+	args = append([]string{rootfsPath, mountBin}, args...)
 	output, err := exec.Command(chrootCmd, args...).CombinedOutput()
 	if err == nil {
 		return nil

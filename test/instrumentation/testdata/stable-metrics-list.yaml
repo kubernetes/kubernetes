@@ -256,6 +256,79 @@
   - 1310.72
   - 2621.44
   - 5242.88
+- name: adds_total
+  subsystem: workqueue
+  help: Total number of adds handled by workqueue
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - name
+- name: depth
+  subsystem: workqueue
+  help: Current depth of workqueue
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - name
+- name: longest_running_processor_seconds
+  subsystem: workqueue
+  help: How many seconds has the longest running processor for workqueue been running.
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - name
+- name: queue_duration_seconds
+  subsystem: workqueue
+  help: How long in seconds an item stays in workqueue before being requested.
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - name
+  buckets:
+  - 1e-08
+  - 1e-07
+  - 1e-06
+  - 9.999999999999999e-06
+  - 9.999999999999999e-05
+  - 0.001
+  - 0.01
+  - 0.1
+  - 1
+  - 10
+- name: retries_total
+  subsystem: workqueue
+  help: Total number of retries handled by workqueue
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - name
+- name: unfinished_work_seconds
+  subsystem: workqueue
+  help: How many seconds of work has done that is in progress and hasn't been observed
+    by work_duration. Large values indicate stuck threads. One can deduce the number
+    of stuck threads by observing the rate at which this increases.
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - name
+- name: work_duration_seconds
+  subsystem: workqueue
+  help: How long in seconds processing an item from workqueue takes.
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - name
+  buckets:
+  - 1e-08
+  - 1e-07
+  - 1e-06
+  - 9.999999999999999e-06
+  - 9.999999999999999e-05
+  - 0.001
+  - 0.01
+  - 0.1
+  - 1
+  - 10
 - name: controller_admission_duration_seconds
   subsystem: admission
   namespace: apiserver

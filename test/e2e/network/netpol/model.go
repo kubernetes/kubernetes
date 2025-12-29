@@ -35,20 +35,15 @@ type Model struct {
 	Protocols  []v1.Protocol
 }
 
-// NewWindowsModel returns a model specific to windows testing.
-func NewWindowsModel(namespaceBaseNames []string, podNames []string, ports []int32) *Model {
-	return NewModel(namespaceBaseNames, podNames, ports, []v1.Protocol{v1.ProtocolTCP, v1.ProtocolUDP})
-}
-
 // NewModel instantiates a model based on:
-// - namespaceBaseNames
+// - namespaceNames
 // - pods
 // - ports to listen on
 // - protocols to listen on
 // The total number of pods is the number of namespaces x the number of pods per namespace.
 // The number of containers per pod is the number of ports x the number of protocols.
 // The *total* number of containers is namespaces x pods x ports x protocols.
-func NewModel(namespaceBaseNames []string, podNames []string, ports []int32, protocols []v1.Protocol) *Model {
+func NewModel(namespaceNames []string, podNames []string, ports []int32, protocols []v1.Protocol) *Model {
 	model := &Model{
 		PodNames:  podNames,
 		Ports:     ports,
@@ -57,7 +52,7 @@ func NewModel(namespaceBaseNames []string, podNames []string, ports []int32, pro
 
 	// build the entire "model" for the overall test, which means, building
 	// namespaces, pods, containers for each protocol.
-	for _, ns := range namespaceBaseNames {
+	for _, ns := range namespaceNames {
 		var pods []*Pod
 		for _, podName := range podNames {
 			var containers []*Container
@@ -75,8 +70,8 @@ func NewModel(namespaceBaseNames []string, podNames []string, ports []int32, pro
 			})
 		}
 		model.Namespaces = append(model.Namespaces, &Namespace{
-			BaseName: ns,
-			Pods:     pods,
+			Name: ns,
+			Pods: pods,
 		})
 	}
 	return model
@@ -85,8 +80,8 @@ func NewModel(namespaceBaseNames []string, podNames []string, ports []int32, pro
 // Namespace is the abstract representation of what matters to network policy
 // tests for a namespace; i.e. it ignores kube implementation details
 type Namespace struct {
-	BaseName string
-	Pods     []*Pod
+	Name string
+	Pods []*Pod
 }
 
 // Pod is the abstract representation of what matters to network policy tests for

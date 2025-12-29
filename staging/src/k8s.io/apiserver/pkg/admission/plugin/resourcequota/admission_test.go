@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
-	v1 "k8s.io/apiserver/pkg/admission/plugin/resourcequota/apis/resourcequota/v1"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
 )
 
@@ -149,7 +148,7 @@ func TestExcludedOperations(t *testing.T) {
 		},
 		{
 			"namespace creation",
-			admission.NewAttributesRecord(nil, nil, v1.SchemeGroupVersion.WithKind("Namespace"), "namespace", "namespace", schema.GroupVersionResource{}, "", admission.Create, nil, false, nil),
+			admission.NewAttributesRecord(nil, nil, corev1.SchemeGroupVersion.WithKind("Namespace"), "namespace", "namespace", schema.GroupVersionResource{}, "", admission.Create, nil, false, nil),
 		},
 	}
 	for _, test := range testCases {

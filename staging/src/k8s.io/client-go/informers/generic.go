@@ -30,8 +30,6 @@ import (
 	v1beta2 "k8s.io/api/apps/v1beta2"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	v2 "k8s.io/api/autoscaling/v2"
-	v2beta1 "k8s.io/api/autoscaling/v2beta1"
-	v2beta2 "k8s.io/api/autoscaling/v2beta2"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	certificatesv1 "k8s.io/api/certificates/v1"
@@ -174,14 +172,6 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		// Group=autoscaling, Version=v2
 	case v2.SchemeGroupVersion.WithResource("horizontalpodautoscalers"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Autoscaling().V2().HorizontalPodAutoscalers().Informer()}, nil
-
-		// Group=autoscaling, Version=v2beta1
-	case v2beta1.SchemeGroupVersion.WithResource("horizontalpodautoscalers"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Autoscaling().V2beta1().HorizontalPodAutoscalers().Informer()}, nil
-
-		// Group=autoscaling, Version=v2beta2
-	case v2beta2.SchemeGroupVersion.WithResource("horizontalpodautoscalers"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Autoscaling().V2beta2().HorizontalPodAutoscalers().Informer()}, nil
 
 		// Group=batch, Version=v1
 	case batchv1.SchemeGroupVersion.WithResource("cronjobs"):

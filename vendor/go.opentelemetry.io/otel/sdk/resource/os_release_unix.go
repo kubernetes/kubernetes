@@ -63,12 +63,12 @@ func parseOSReleaseFile(file io.Reader) map[string]string {
 	return values
 }
 
-// skip returns true if the line is blank or starts with a '#' character, and
+// skip reports whether the line is blank or starts with a '#' character, and
 // therefore should be skipped from processing.
 func skip(line string) bool {
 	line = strings.TrimSpace(line)
 
-	return len(line) == 0 || strings.HasPrefix(line, "#")
+	return line == "" || strings.HasPrefix(line, "#")
 }
 
 // parse attempts to split the provided line on the first '=' character, and then
@@ -76,7 +76,7 @@ func skip(line string) bool {
 func parse(line string) (string, string, bool) {
 	k, v, found := strings.Cut(line, "=")
 
-	if !found || len(k) == 0 {
+	if !found || k == "" {
 		return "", "", false
 	}
 

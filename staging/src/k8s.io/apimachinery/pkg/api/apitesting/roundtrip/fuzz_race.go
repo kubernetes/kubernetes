@@ -1,5 +1,4 @@
 //go:build race
-// +build race
 
 /*
 Copyright 2021 The Kubernetes Authors.

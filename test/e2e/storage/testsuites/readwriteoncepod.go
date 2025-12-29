@@ -130,7 +130,7 @@ func (t *readWriteOncePodTestSuite) DefineTests(driver storageframework.TestDriv
 		ginkgo.DeferCleanup(cleanup)
 	})
 
-	ginkgo.It("should preempt lower priority pods using ReadWriteOncePod volumes", func(ctx context.Context) {
+	f.It("should preempt lower priority pods using ReadWriteOncePod volumes", f.WithSerial(), func(ctx context.Context) {
 		// Create the ReadWriteOncePod PVC.
 		accessModes := []v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}
 		l.volume = storageframework.CreateVolumeResourceWithAccessModes(ctx, driver, l.config, pattern, t.GetTestSuiteInfo().SupportedSizeRange, accessModes, nil)

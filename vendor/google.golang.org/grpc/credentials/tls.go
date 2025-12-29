@@ -22,6 +22,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"net"
 	"net/url"
@@ -48,6 +49,21 @@ type TLSInfo struct {
 // AuthType returns the type of TLSInfo as a string.
 func (t TLSInfo) AuthType() string {
 	return "tls"
+}
+
+// ValidateAuthority validates the provided authority being used to override the
+// :authority header by verifying it against the peer certificates. It returns a
+// non-nil error if the validation fails.
+func (t TLSInfo) ValidateAuthority(authority string) error {
+	var errs []error
+	for _, cert := range t.State.PeerCertificates {
+		var err error
+		if err = cert.VerifyHostname(authority); err == nil {
+			return nil
+		}
+		errs = append(errs, err)
+	}
+	return fmt.Errorf("credentials: invalid authority %q: %v", authority, errors.Join(errs...))
 }
 
 // cipherSuiteLookup returns the string version of a TLS cipher suite ID.
@@ -94,14 +110,14 @@ func (c tlsCreds) Info() ProtocolInfo {
 func (c *tlsCreds) ClientHandshake(ctx context.Context, authority string, rawConn net.Conn) (_ net.Conn, _ AuthInfo, err error) {
 	// use local cfg to avoid clobbering ServerName if using multiple endpoints
 	cfg := credinternal.CloneTLSConfig(c.config)
-	if cfg.ServerName == "" {
-		serverName, _, err := net.SplitHostPort(authority)
-		if err != nil {
-			// If the authority had no host port or if the authority cannot be parsed, use it as-is.
-			serverName = authority
-		}
-		cfg.ServerName = serverName
+
+	serverName, _, err := net.SplitHostPort(authority)
+	if err != nil {
+		// If the authority had no host port or if the authority cannot be parsed, use it as-is.
+		serverName = authority
 	}
+	cfg.ServerName = serverName
+
 	conn := tls.Client(rawConn, cfg)
 	errChannel := make(chan error, 1)
 	go func() {
@@ -243,9 +259,11 @@ func applyDefaults(c *tls.Config) *tls.Config {
 // certificates to establish the identity of the client need to be included in
 // the credentials (eg: for mTLS), use NewTLS instead, where a complete
 // tls.Config can be specified.
-// serverNameOverride is for testing only. If set to a non empty string,
-// it will override the virtual host name of authority (e.g. :authority header
-// field) in requests.
+//
+// serverNameOverride is for testing only. If set to a non empty string, it will
+// override the virtual host name of authority (e.g. :authority header field) in
+// requests.  Users should use grpc.WithAuthority passed to grpc.NewClient to
+// override the authority of the client instead.
 func NewClientTLSFromCert(cp *x509.CertPool, serverNameOverride string) TransportCredentials {
 	return NewTLS(&tls.Config{ServerName: serverNameOverride, RootCAs: cp})
 }
@@ -255,9 +273,11 @@ func NewClientTLSFromCert(cp *x509.CertPool, serverNameOverride string) Transpor
 // certificates to establish the identity of the client need to be included in
 // the credentials (eg: for mTLS), use NewTLS instead, where a complete
 // tls.Config can be specified.
-// serverNameOverride is for testing only. If set to a non empty string,
-// it will override the virtual host name of authority (e.g. :authority header
-// field) in requests.
+//
+// serverNameOverride is for testing only. If set to a non empty string, it will
+// override the virtual host name of authority (e.g. :authority header field) in
+// requests.  Users should use grpc.WithAuthority passed to grpc.NewClient to
+// override the authority of the client instead.
 func NewClientTLSFromFile(certFile, serverNameOverride string) (TransportCredentials, error) {
 	b, err := os.ReadFile(certFile)
 	if err != nil {

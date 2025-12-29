@@ -7,39 +7,41 @@
 
 package dbus
 
-/*
-const int sizeofPtr = sizeof(void*);
-#define _WANT_UCRED
-#include <sys/types.h>
-#include <sys/ucred.h>
-*/
-import "C"
-
 import (
 	"io"
 	"os"
 	"syscall"
 	"unsafe"
+
+	"golang.org/x/sys/unix"
 )
 
 // http://golang.org/src/pkg/syscall/ztypes_linux_amd64.go
 // https://golang.org/src/syscall/ztypes_freebsd_amd64.go
+//
+// Note: FreeBSD actually uses a 'struct cmsgcred' which starts with
+// these fields and adds a list of the additional groups for the
+// sender.
 type Ucred struct {
-	Pid int32
-	Uid uint32
-	Gid uint32
+	Pid  int32
+	Uid  uint32
+	Euid uint32
+	Gid  uint32
 }
 
-// http://golang.org/src/pkg/syscall/types_linux.go
-// https://golang.org/src/syscall/types_freebsd.go
-// https://github.com/freebsd/freebsd/blob/master/sys/sys/ucred.h
+// https://github.com/freebsd/freebsd/blob/master/sys/sys/socket.h
+//
+// The cmsgcred structure contains the above four fields, followed by
+// a uint16 count of additional groups, uint16 padding to align and a
+// 16 element array of uint32 for the additional groups. The size is
+// the same across all supported platforms.
 const (
-	SizeofUcred = C.sizeof_struct_ucred
+	SizeofCmsgcred = 84 // 4*4 + 2*2 + 16*4
 )
 
 // http://golang.org/src/pkg/syscall/sockcmsg_unix.go
 func cmsgAlignOf(salen int) int {
-	salign := C.sizeofPtr
+	salign := unix.SizeofPtr
 
 	return (salen + salign - 1) & ^(salign - 1)
 }
@@ -54,11 +56,11 @@ func cmsgData(h *syscall.Cmsghdr) unsafe.Pointer {
 // for sending to another process. This can be used for
 // authentication.
 func UnixCredentials(ucred *Ucred) []byte {
-	b := make([]byte, syscall.CmsgSpace(SizeofUcred))
+	b := make([]byte, syscall.CmsgSpace(SizeofCmsgcred))
 	h := (*syscall.Cmsghdr)(unsafe.Pointer(&b[0]))
 	h.Level = syscall.SOL_SOCKET
 	h.Type = syscall.SCM_CREDS
-	h.SetLen(syscall.CmsgLen(SizeofUcred))
+	h.SetLen(syscall.CmsgLen(SizeofCmsgcred))
 	*((*Ucred)(cmsgData(h))) = *ucred
 	return b
 }

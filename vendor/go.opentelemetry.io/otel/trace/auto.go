@@ -20,7 +20,7 @@ import (
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
-	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
 	"go.opentelemetry.io/otel/trace/embedded"
 	"go.opentelemetry.io/otel/trace/internal/telemetry"
 )
@@ -39,7 +39,7 @@ type autoTracerProvider struct{ embedded.TracerProvider }
 
 var _ TracerProvider = autoTracerProvider{}
 
-func (p autoTracerProvider) Tracer(name string, opts ...TracerOption) Tracer {
+func (autoTracerProvider) Tracer(name string, opts ...TracerOption) Tracer {
 	cfg := NewTracerConfig(opts...)
 	return autoTracer{
 		name:      name,
@@ -81,7 +81,7 @@ func (t autoTracer) Start(ctx context.Context, name string, opts ...SpanStartOpt
 // Expected to be implemented in eBPF.
 //
 //go:noinline
-func (t *autoTracer) start(
+func (*autoTracer) start(
 	ctx context.Context,
 	spanPtr *autoSpan,
 	psc *SpanContext,
