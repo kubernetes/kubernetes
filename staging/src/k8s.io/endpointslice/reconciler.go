@@ -270,8 +270,7 @@ func (r *Reconciler) reconcileByAddressType(logger klog.Logger, service *corev1.
 	if len(existingSlices) == len(slicesToDelete) && len(slicesToCreate) < 1 {
 		// Check for existing placeholder slice outside of the core control flow
 		placeholderSlice := newEndpointSlice(logger, service, &endpointMeta{ports: []discovery.EndpointPort{}, addressType: addressType}, r.controllerName)
-		if len(slicesToDelete) == 1 && placeholderSliceCompare.DeepEqual(slicesToDelete[0], placeholderSlice) {
-			// We are about to unnecessarily delete/recreate the placeholder, remove it now.
+		if len(slicesToDelete) == 1 && placeholderSliceCompare.DeepEqual(slicesToDelete[0], placeholderSlice) && slicesToDelete[0].Endpoints != nil {
 			slicesToDelete = slicesToDelete[:0]
 		} else {
 			slicesToCreate = append(slicesToCreate, placeholderSlice)
