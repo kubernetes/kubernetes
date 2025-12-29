@@ -284,6 +284,8 @@ func withPodName(pod *v1.Pod, name string) *v1.Pod {
 }
 
 func TestPreCheckForNode(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
 	cpu4 := map[v1.ResourceName]string{v1.ResourceCPU: "4"}
 	cpu8 := map[v1.ResourceName]string{v1.ResourceCPU: "8"}
 	cpu16 := map[v1.ResourceName]string{v1.ResourceCPU: "16"}
@@ -421,7 +423,7 @@ func TestPreCheckForNode(t *testing.T) {
 
 			nodeInfo := framework.NewNodeInfo(tt.existingPods...)
 			nodeInfo.SetNode(tt.nodeFn())
-			preCheckFn := preCheckForNode(nodeInfo)
+			preCheckFn := preCheckForNode(logger, nodeInfo)
 
 			got := make([]bool, 0, len(tt.pods))
 			for _, pod := range tt.pods {

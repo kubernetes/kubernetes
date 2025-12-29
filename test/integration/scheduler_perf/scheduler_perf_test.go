@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/component-base/featuregate"
 	testutils "k8s.io/kubernetes/test/utils"
 	ktesting "k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
@@ -415,4 +416,276 @@ func createObjTemplateFile(t *testing.T, obj any) *string {
 		t.Fatalf("Unsupported object type for template file: %T", obj)
 	}
 	return &templateFile
+}
+
+func TestFeatureGatesMerge(t *testing.T) {
+	const (
+		FeatureA featuregate.Feature = "FeatureA"
+		FeatureB featuregate.Feature = "FeatureB"
+		FeatureC featuregate.Feature = "FeatureC"
+	)
+
+	tests := []struct {
+		name      string
+		src       map[featuregate.Feature]bool
+		overrides map[featuregate.Feature]bool
+		want      map[featuregate.Feature]bool
+	}{
+		{
+			name:      "both nil, return empty map",
+			src:       nil,
+			overrides: nil,
+			want:      map[featuregate.Feature]bool{},
+		},
+		{
+			name:      "both empty, return empty map",
+			src:       map[featuregate.Feature]bool{},
+			overrides: map[featuregate.Feature]bool{},
+			want:      map[featuregate.Feature]bool{},
+		},
+		{
+			name:      "nil src, valid overrides",
+			src:       nil,
+			overrides: map[featuregate.Feature]bool{FeatureA: true},
+			want:      map[featuregate.Feature]bool{FeatureA: true},
+		},
+		{
+			name:      "valid src, nil overrides",
+			src:       map[featuregate.Feature]bool{FeatureA: true},
+			overrides: nil,
+			want:      map[featuregate.Feature]bool{FeatureA: true},
+		},
+		{
+			name:      "distinct features merged",
+			src:       map[featuregate.Feature]bool{FeatureA: true},
+			overrides: map[featuregate.Feature]bool{FeatureB: false},
+			want:      map[featuregate.Feature]bool{FeatureA: true, FeatureB: false},
+		},
+		{
+			name:      "overlap with the same value",
+			src:       map[featuregate.Feature]bool{FeatureA: true, FeatureB: true},
+			overrides: map[featuregate.Feature]bool{FeatureB: true},
+			want:      map[featuregate.Feature]bool{FeatureA: true, FeatureB: true},
+		},
+		{
+			name:      "overlap with override (true to false)",
+			src:       map[featuregate.Feature]bool{FeatureA: true},
+			overrides: map[featuregate.Feature]bool{FeatureA: false},
+			want:      map[featuregate.Feature]bool{FeatureA: false},
+		},
+		{
+			name:      "overlap with override (false to true)",
+			src:       map[featuregate.Feature]bool{FeatureA: false},
+			overrides: map[featuregate.Feature]bool{FeatureA: true},
+			want:      map[featuregate.Feature]bool{FeatureA: true},
+		},
+		{
+			name:      "mixed distinct and overlap",
+			src:       map[featuregate.Feature]bool{FeatureA: true, FeatureB: true},
+			overrides: map[featuregate.Feature]bool{FeatureB: false, FeatureC: true},
+			want:      map[featuregate.Feature]bool{FeatureA: true, FeatureB: false, FeatureC: true},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := featureGatesMerge(tt.src, tt.overrides)
+			if diff := cmp.Diff(tt.want, got); diff != "" {
+				t.Errorf("Unexpected featureGatesMerge result (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestCompareMetricWithThreshold(t *testing.T) {
+	tests := []struct {
+		name      string
+		items     []DataItem
+		threshold float64
+		selector  thresholdMetricSelector
+		wantErr   bool
+	}{
+		{
+			name:      "no items, should pass",
+			items:     []DataItem{},
+			threshold: 50,
+			selector: thresholdMetricSelector{
+				Name:       "TargetMetric",
+				DataBucket: "Average",
+			},
+			wantErr: false,
+		},
+		{
+			name: "zero threshold, should always pass",
+			items: []DataItem{
+				{
+					Labels: map[string]string{"Metric": "TargetMetric"},
+					Data:   map[string]float64{"Average": 10},
+				},
+			},
+			threshold: 0,
+			selector: thresholdMetricSelector{
+				Name:        "TargetMetric",
+				DataBucket:  "Average",
+				ExpectLower: true,
+			},
+			wantErr: false,
+		},
+		{
+			name: "metric not found in items, should pass (ignored)",
+			items: []DataItem{
+				{
+					Labels: map[string]string{"Metric": "OtherMetric"},
+					Data:   map[string]float64{"Average": 10},
+				},
+			},
+			threshold: 50,
+			selector: thresholdMetricSelector{
+				Name:       "TargetMetric",
+				DataBucket: "Average",
+			},
+			wantErr: false,
+		},
+		{
+			name: "labels do not match, should pass (ignored)",
+			items: []DataItem{
+				{
+					Labels: map[string]string{"Metric": "TargetMetric", "plugin": "foo"},
+					Data:   map[string]float64{"Average": 10},
+				},
+			},
+			threshold: 50,
+			selector: thresholdMetricSelector{
+				Name:       "TargetMetric",
+				Labels:     map[string]string{"plugin": "bar"},
+				DataBucket: "Average",
+			},
+			wantErr: false,
+		},
+		{
+			name: "labels match, value lower than threshold (ExpectLower=false), should fail",
+			items: []DataItem{
+				{
+					Labels: map[string]string{"Metric": "TargetMetric", "plugin": "foo"},
+					Data:   map[string]float64{"Average": 10},
+				},
+			},
+			threshold: 50,
+			selector: thresholdMetricSelector{
+				Name:       "TargetMetric",
+				Labels:     map[string]string{"plugin": "foo"},
+				DataBucket: "Average",
+			},
+			wantErr: true,
+		},
+		{
+			name: "missing data bucket in item, should fail",
+			items: []DataItem{
+				{
+					Labels: map[string]string{"Metric": "TargetMetric"},
+					Data:   map[string]float64{"Average": 100},
+				},
+			},
+			threshold: 50,
+			selector: thresholdMetricSelector{
+				Name:       "TargetMetric",
+				DataBucket: "99Perc",
+			},
+			wantErr: true,
+		},
+		{
+			name: "value higher than threshold (ExpectLower=false), should pass",
+			items: []DataItem{
+				{
+					Labels: map[string]string{"Metric": "Throughput"},
+					Data:   map[string]float64{"Average": 100},
+				},
+			},
+			threshold: 50,
+			selector: thresholdMetricSelector{
+				Name:        "Throughput",
+				DataBucket:  "Average",
+				ExpectLower: false,
+			},
+			wantErr: false,
+		},
+		{
+			name: "value lower than threshold (ExpectLower=false), should fail",
+			items: []DataItem{
+				{
+					Labels: map[string]string{"Metric": "Throughput"},
+					Data:   map[string]float64{"Average": 10},
+				},
+			},
+			threshold: 50,
+			selector: thresholdMetricSelector{
+				Name:        "Throughput",
+				DataBucket:  "Average",
+				ExpectLower: false,
+			},
+			wantErr: true,
+		},
+		{
+			name: "value lower than threshold (ExpectLower=true), should pass",
+			items: []DataItem{
+				{
+					Labels: map[string]string{"Metric": "Latency"},
+					Data:   map[string]float64{"Average": 10},
+				},
+			},
+			threshold: 50,
+			selector: thresholdMetricSelector{
+				Name:        "Latency",
+				DataBucket:  "Average",
+				ExpectLower: true,
+			},
+			wantErr: false,
+		},
+		{
+			name: "value higher than threshold (ExpectLower=true), should fail",
+			items: []DataItem{
+				{
+					Labels: map[string]string{"Metric": "Latency"},
+					Data:   map[string]float64{"Average": 100},
+				},
+			},
+			threshold: 50,
+			selector: thresholdMetricSelector{
+				Name:        "Latency",
+				DataBucket:  "Average",
+				ExpectLower: true,
+			},
+			wantErr: true,
+		},
+		{
+			name: "value exactly equals threshold, should fail",
+			items: []DataItem{
+				{
+					Labels: map[string]string{"Metric": "Throughput"},
+					Data:   map[string]float64{"Average": 50},
+				},
+			},
+			threshold: 50,
+			selector: thresholdMetricSelector{
+				Name:       "Throughput",
+				DataBucket: "Average",
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := compareMetricWithThreshold(tt.items, tt.threshold, tt.selector)
+			if err != nil {
+				if !tt.wantErr {
+					t.Errorf("Expected no error in compareMetricWithThreshold, but got: %v", err)
+				}
+			} else {
+				if tt.wantErr {
+					t.Errorf("Expected error %v in compareMetricWithThreshold, but got nil", tt.wantErr)
+				}
+			}
+		})
+	}
 }

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/opencontainers/cgroups"
@@ -81,6 +82,18 @@ func (m *Manager) Apply(pid int) error {
 		return err
 	}
 	return nil
+}
+
+// AddPid adds a process with a given pid to an existing cgroup.
+// The subcgroup argument is either empty, or a path relative to
+// a cgroup under under the manager's cgroup.
+func (m *Manager) AddPid(subcgroup string, pid int) error {
+	path := filepath.Join(m.dirPath, subcgroup)
+	if !strings.HasPrefix(path, m.dirPath) {
+		return fmt.Errorf("bad sub cgroup path: %s", subcgroup)
+	}
+
+	return cgroups.WriteCgroupProc(path, pid)
 }
 
 func (m *Manager) GetPids() ([]int, error) {

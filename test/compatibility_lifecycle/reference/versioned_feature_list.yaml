@@ -719,6 +719,18 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.35"
+- name: ImageVolumeWithDigest
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.35"
+- name: InPlacePodLevelResourcesVerticalScaling
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.35"
 - name: InPlacePodVerticalScaling
   versionedSpecs:
   - default: false
@@ -861,6 +873,10 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.33"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.35"
 - name: KubeletFineGrainedAuthz
   versionedSpecs:
   - default: false
@@ -1209,6 +1225,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.24"
+- name: OpportunisticBatching
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.35"
 - name: OrderedNamespaceDeletion
   versionedSpecs:
   - default: false
@@ -1459,10 +1481,6 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.34"
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: "1.35"
 - name: ReloadKubeletServerCertificateFile
   versionedSpecs:
   - default: true
@@ -1495,6 +1513,12 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.31"
+- name: RestartAllContainersOnContainerExits
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.35"
 - name: RetryGenerateName
   versionedSpecs:
   - default: false
@@ -1531,10 +1555,6 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.34"
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: "1.35"
 - name: SchedulerAsyncPreemption
   versionedSpecs:
   - default: false
@@ -1857,6 +1877,12 @@
     lockToDefault: true
     preRelease: GA
     version: "1.35"
+- name: TaintTolerationComparisonOperators
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.35"
 - name: TokenRequestServiceAccountUIDValidation
   versionedSpecs:
   - default: true
@@ -1971,6 +1997,10 @@
     lockToDefault: false
     preRelease: GA
     version: "1.34"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.36"
 - name: VolumeLimitScaling
   versionedSpecs:
   - default: false

@@ -90,8 +90,8 @@ type Resources struct {
 	// Cgroup's SCHED_IDLE value.
 	CPUIdle *int64 `json:"cpu_idle,omitempty"`
 
-	// Process limit; set <= `0' to disable limit.
-	PidsLimit int64 `json:"pids_limit,omitempty"`
+	// Process limit; set < `0' to disable limit. `nil` means "keep current limit".
+	PidsLimit *int64 `json:"pids_limit,omitempty"`
 
 	// Specifies per cgroup weight, range is from 10 to 1000.
 	BlkioWeight uint16 `json:"blkio_weight,omitempty"`

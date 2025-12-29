@@ -2,5 +2,8 @@ http://localhost
 http://jaeger-collector
 https://github.com/open-telemetry/opentelemetry-go/milestone/
 https://github.com/open-telemetry/opentelemetry-go/projects
+# Weaver model URL for semantic-conventions repository.
+https?:\/\/github\.com\/open-telemetry\/semantic-conventions\/archive\/refs\/tags\/[^.]+\.zip\[[^]]+]
 file:///home/runner/work/opentelemetry-go/opentelemetry-go/libraries
 file:///home/runner/work/opentelemetry-go/opentelemetry-go/manual
+http://4.3.2.1:78/user/123

@@ -95,6 +95,8 @@ var (
 	ErrKillPodSandbox = errors.New("KillPodSandboxError")
 	// ErrResizePodInPlace returned when runtime failed to resize a pod.
 	ErrResizePodInPlace = errors.New("ResizePodInPlaceError")
+	// ErrRemoveContainer returned when runtime failed to remove a container.
+	ErrRemoveContainer = errors.New("RemoveContainerError")
 )
 
 // SyncAction indicates different kind of actions in SyncPod() and KillPod(). Now there are only actions
@@ -120,6 +122,8 @@ const (
 	KillPodSandbox SyncAction = "KillPodSandbox"
 	// ResizePodInPlace action is included whenever any containers in the pod are resized without restart
 	ResizePodInPlace SyncAction = "ResizePodInPlace"
+	// RemoveContainer action
+	RemoveContainer SyncAction = "RemoveContainer"
 )
 
 // SyncResult is the result of sync action.

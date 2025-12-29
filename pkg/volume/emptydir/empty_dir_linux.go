@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2015 The Kubernetes Authors.
@@ -29,12 +28,6 @@ import (
 	"k8s.io/mount-utils"
 
 	"k8s.io/api/core/v1"
-)
-
-// Defined by Linux - the type number for tmpfs mounts.
-const (
-	linuxTmpfsMagic     = 0x01021994
-	linuxHugetlbfsMagic = 0x958458f6
 )
 
 // realMountDetector implements mountDetector in terms of syscalls.
@@ -98,9 +91,9 @@ func (m *realMountDetector) GetMountMedium(path string, requestedMedium v1.Stora
 
 	klog.V(3).Infof("Statfs_t of %v: %+v", path, buf)
 
-	if buf.Type == linuxTmpfsMagic {
+	if buf.Type == unix.TMPFS_MAGIC {
 		return v1.StorageMediumMemory, !notMnt, nil, nil
-	} else if int64(buf.Type) == linuxHugetlbfsMagic {
+	} else if int64(buf.Type) == unix.HUGETLBFS_MAGIC {
 		// Skip page size detection if requested medium doesn't have size specified
 		if requestedMedium == v1.StorageMediumHugePages {
 			return v1.StorageMediumHugePages, !notMnt, nil, nil

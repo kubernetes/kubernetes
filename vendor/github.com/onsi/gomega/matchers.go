@@ -515,8 +515,8 @@ func HaveExistingField(field string) types.GomegaMatcher {
 // and even interface values.
 //
 //	actual := 42
-//	Expect(actual).To(HaveValue(42))
-//	Expect(&actual).To(HaveValue(42))
+//	Expect(actual).To(HaveValue(Equal(42)))
+//	Expect(&actual).To(HaveValue(Equal(42)))
 func HaveValue(matcher types.GomegaMatcher) types.GomegaMatcher {
 	return &matchers.HaveValueMatcher{
 		Matcher: matcher,

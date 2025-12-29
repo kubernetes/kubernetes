@@ -238,12 +238,11 @@ func TestNodeSyncResync(t *testing.T) {
 	sync := New(fake, fake, fake, SyncFromCluster, "node1", cidr)
 	doneChan := make(chan struct{})
 	go sync.Loop(logger, doneChan)
+	// Wait for the first resync to complete
 	<-fake.reportChan
+	// Close the operation channel to stop the loop
 	close(sync.opChan)
-	// Unblock loop().
-	go func() {
-		<-fake.reportChan
-	}()
+	// Wait for the loop to complete
 	<-doneChan
 	fake.dumpTrace()
 }

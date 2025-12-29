@@ -356,19 +356,43 @@ func smartLabelFor(field string) string {
 		return field
 	}
 
-	commonAcronyms := []string{"API", "URL", "UID", "OSB", "GUID"}
+	commonAcronyms := []string{"API", "URL", "UID", "GUID"}
 	parts := camelcase.Split(field)
-	result := make([]string, 0, len(parts))
-	for _, part := range parts {
+
+	mergedParts := make([]string, 0, len(parts))
+	for i := 0; i < len(parts); i++ {
+		part := parts[i]
+		if i < len(parts)-1 {
+			nextPart := parts[i+1]
+			// Merge if current part is 2+ uppercase letters and next starts with uppercase
+			allUpper := true
+			for _, r := range part {
+				if unicode.IsLetter(r) && !unicode.IsUpper(r) {
+					allUpper = false
+					break
+				}
+			}
+			if len(part) >= 2 && allUpper && len(nextPart) > 0 && unicode.IsUpper(rune(nextPart[0])) {
+				mergedParts = append(mergedParts, part+nextPart)
+				i++
+				continue
+			}
+		}
+		mergedParts = append(mergedParts, part)
+	}
+
+	result := make([]string, 0, len(mergedParts))
+	for _, part := range mergedParts {
 		if part == "_" {
 			continue
 		}
 
-		if slice.Contains[string](commonAcronyms, strings.ToUpper(part), nil) {
+		if slice.Contains(commonAcronyms, strings.ToUpper(part), nil) {
 			part = strings.ToUpper(part)
-		} else {
+		} else if strings.ToLower(part) == part {
 			part = cases.Title(language.English).String(part)
 		}
+
 		result = append(result, part)
 	}
 
@@ -734,33 +758,6 @@ type PodDescriber struct {
 func (d *PodDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	pod, err := d.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
-		if describerSettings.ShowEvents {
-			eventsInterface := d.CoreV1().Events(namespace)
-			selector := eventsInterface.GetFieldSelector(&name, &namespace, nil, nil)
-			initialOpts := metav1.ListOptions{
-				FieldSelector: selector.String(),
-				Limit:         describerSettings.ChunkSize,
-			}
-			events := &corev1.EventList{}
-			err2 := runtimeresource.FollowContinue(&initialOpts,
-				func(options metav1.ListOptions) (runtime.Object, error) {
-					newList, err := eventsInterface.List(context.TODO(), options)
-					if err != nil {
-						return nil, runtimeresource.EnhanceListError(err, options, "events")
-					}
-					events.Items = append(events.Items, newList.Items...)
-					return newList, nil
-				})
-
-			if err2 == nil && len(events.Items) > 0 {
-				return tabbedString(func(out io.Writer) error {
-					w := NewPrefixWriter(out)
-					w.Write(LEVEL_0, "Pod '%v': error '%v', but found events.\n", name, err)
-					DescribeEvents(events, w)
-					return nil
-				})
-			}
-		}
 		return "", err
 	}
 

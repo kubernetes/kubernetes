@@ -33,7 +33,7 @@ type varNode interface {
 	Infer() (Signature, error)
 	String() string
 	Sigs() sigSet
-	Value(Signature) (interface{}, error)
+	Value(Signature) (any, error)
 }
 
 func varMakeNode(p *varParser) (varNode, error) {
@@ -134,7 +134,7 @@ func (s sigSet) ToArray() sigSet {
 type numNode struct {
 	sig Signature
 	str string
-	val interface{}
+	val any
 }
 
 var numSigSet = sigSet{
@@ -169,7 +169,7 @@ func (n numNode) Sigs() sigSet {
 	return numSigSet
 }
 
-func (n numNode) Value(sig Signature) (interface{}, error) {
+func (n numNode) Value(sig Signature) (any, error) {
 	if n.sig.str != "" && n.sig != sig {
 		return nil, varTypeError{n.str, sig}
 	}
@@ -190,7 +190,7 @@ func varMakeNumNode(tok varToken, sig Signature) (varNode, error) {
 	return numNode{sig: sig, val: num}, nil
 }
 
-func varNumAs(s string, sig Signature) (interface{}, error) {
+func varNumAs(s string, sig Signature) (any, error) {
 	isUnsigned := false
 	size := 32
 	switch sig.str {
@@ -220,20 +220,20 @@ func varNumAs(s string, sig Signature) (interface{}, error) {
 		return nil, varTypeError{s, sig}
 	}
 	base := 10
-	if strings.HasPrefix(s, "0x") {
+	if after, ok := strings.CutPrefix(s, "0x"); ok {
 		base = 16
-		s = s[2:]
+		s = after
 	}
-	if strings.HasPrefix(s, "0") && len(s) != 1 {
+	if after, ok := strings.CutPrefix(s, "0"); ok && len(s) != 1 {
 		base = 8
-		s = s[1:]
+		s = after
 	}
 	if isUnsigned {
 		i, err := strconv.ParseUint(s, base, size)
 		if err != nil {
 			return nil, err
 		}
-		var v interface{} = i
+		var v any = i
 		switch sig.str {
 		case "y":
 			v = byte(i)
@@ -248,7 +248,7 @@ func varNumAs(s string, sig Signature) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	var v interface{} = i
+	var v any = i
 	switch sig.str {
 	case "n":
 		v = int16(i)
@@ -260,8 +260,8 @@ func varNumAs(s string, sig Signature) (interface{}, error) {
 
 type stringNode struct {
 	sig Signature
-	str string      // parsed
-	val interface{} // has correct type
+	str string // parsed
+	val any    // has correct type
 }
 
 var stringSigSet = sigSet{
@@ -285,7 +285,7 @@ func (n stringNode) Sigs() sigSet {
 	return stringSigSet
 }
 
-func (n stringNode) Value(sig Signature) (interface{}, error) {
+func (n stringNode) Value(sig Signature) (any, error) {
 	if n.sig.str != "" && n.sig != sig {
 		return nil, varTypeError{n.str, sig}
 	}
@@ -407,7 +407,7 @@ func (boolNode) Sigs() sigSet {
 	return boolSigSet
 }
 
-func (b boolNode) Value(sig Signature) (interface{}, error) {
+func (b boolNode) Value(sig Signature) (any, error) {
 	if sig.str != "b" {
 		return nil, varTypeError{b.String(), sig}
 	}
@@ -417,7 +417,6 @@ func (b boolNode) Value(sig Signature) (interface{}, error) {
 type arrayNode struct {
 	set      sigSet
 	children []varNode
-	val      interface{}
 }
 
 func (n arrayNode) Infer() (Signature, error) {
@@ -446,7 +445,7 @@ func (n arrayNode) Sigs() sigSet {
 	return n.set
 }
 
-func (n arrayNode) Value(sig Signature) (interface{}, error) {
+func (n arrayNode) Value(sig Signature) (any, error) {
 	if n.set.Empty() {
 		// no type information whatsoever, so this must be an empty slice
 		return reflect.MakeSlice(typeFor(sig.str), 0, 0).Interface(), nil
@@ -537,7 +536,7 @@ func (variantNode) Sigs() sigSet {
 	return variantSet
 }
 
-func (n variantNode) Value(sig Signature) (interface{}, error) {
+func (n variantNode) Value(sig Signature) (any, error) {
 	if sig.str != "v" {
 		return nil, varTypeError{n.String(), sig}
 	}
@@ -574,7 +573,6 @@ type dictEntry struct {
 type dictNode struct {
 	kset, vset sigSet
 	children   []dictEntry
-	val        interface{}
 }
 
 func (n dictNode) Infer() (Signature, error) {
@@ -614,7 +612,7 @@ func (n dictNode) Sigs() sigSet {
 	return r
 }
 
-func (n dictNode) Value(sig Signature) (interface{}, error) {
+func (n dictNode) Value(sig Signature) (any, error) {
 	set := n.Sigs()
 	if set.Empty() {
 		// no type information -> empty dict
@@ -749,7 +747,7 @@ func (b byteStringNode) Sigs() sigSet {
 	return byteStringSet
 }
 
-func (b byteStringNode) Value(sig Signature) (interface{}, error) {
+func (b byteStringNode) Value(sig Signature) (any, error) {
 	if sig.str != "ay" {
 		return nil, varTypeError{b.String(), sig}
 	}

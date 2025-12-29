@@ -18,6 +18,7 @@ package runtimeclass
 
 import (
 	"context"
+	"k8s.io/apimachinery/pkg/api/operation"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -70,7 +71,9 @@ func (strategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 // Validate validates a new RuntimeClass. Validation must check for a correct signature.
 func (strategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	runtimeClass := obj.(*node.RuntimeClass)
-	return validation.ValidateRuntimeClass(runtimeClass)
+	allErrs := validation.ValidateRuntimeClass(runtimeClass)
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, runtimeClass, nil, allErrs, operation.Create, rest.WithNormalizationRules(validation.NodeNormalizationRules))
+
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -87,7 +90,9 @@ func (strategy) Canonicalize(obj runtime.Object) {
 func (strategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newObj := obj.(*node.RuntimeClass)
 	errorList := validation.ValidateRuntimeClass(newObj)
-	return append(errorList, validation.ValidateRuntimeClassUpdate(newObj, old.(*node.RuntimeClass))...)
+	errorList = append(errorList, validation.ValidateRuntimeClassUpdate(newObj, old.(*node.RuntimeClass))...)
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newObj, old, errorList, operation.Update, rest.WithNormalizationRules(validation.NodeNormalizationRules))
+
 }
 
 // WarningsOnUpdate returns warnings for the given update.

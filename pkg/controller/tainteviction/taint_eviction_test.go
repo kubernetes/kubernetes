@@ -211,6 +211,8 @@ func TestCreatePod(t *testing.T) {
 			controller.PodUpdated(nil, item.pod)
 
 			verifyPodActions(t, item.description, fakeClientset, item.expectPatch, item.expectDelete)
+
+			cancel()
 		})
 	}
 }
@@ -329,6 +331,7 @@ func TestUpdatePod(t *testing.T) {
 			controller.PodUpdated(item.prevPod, item.newPod)
 
 			verifyPodActions(t, item.description, fakeClientset, item.expectPatch, item.expectDelete)
+			cancel()
 		})
 	}
 }
@@ -391,6 +394,8 @@ func TestCreateNode(t *testing.T) {
 			controller.NodeUpdated(nil, item.node)
 
 			verifyPodActions(t, item.description, fakeClientset, item.expectPatch, item.expectDelete)
+
+			cancel()
 		})
 	}
 }
