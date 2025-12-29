@@ -299,7 +299,9 @@ func ParseQuantity(str string) (Quantity, error) {
 	switch format {
 	case DecimalExponent, DecimalSI:
 		scale = exponent
-		precision = maxInt64Factors - int32(len(num)+len(denom))
+		precision = maxInt64Factors - int32(len(num)+len(denom)) //not making sense if large number then this will always be less than 0
+		//here precision tells how much capacity is left before int64 overflow
+
 	case BinarySI:
 		scale = 0
 		switch {
@@ -314,6 +316,8 @@ func ParseQuantity(str string) (Quantity, error) {
 	}
 
 	if precision >= 0 {
+		/* Basically if we have enough room in int64 without any problem (overflow) then proceed else store in dec
+		   format*/
 		// if we have a denominator, shift the entire value to the left by the number of places in the
 		// denominator
 		scale -= int32(len(denom))
@@ -344,6 +348,13 @@ func ParseQuantity(str string) (Quantity, error) {
 			}
 		}
 	}
+	/*
+		TODO: ADD A CHECK HERE FOR NUMBERS WHO ARE > or < range but are inside i
+		also check if the number is >nano, beacuse there might be numbers who are 0.1231313...10^19 value
+		which can go beyond range but we might miscalculate them
+		so if a number is not a decimal number, 0.12313 and is not out of the nano scale, then we can do calcs
+
+	*/
 
 	amount := new(inf.Dec)
 	if _, ok := amount.SetString(value); !ok {
@@ -515,10 +526,60 @@ func (q *Quantity) AsFloat64Slow() float64 {
 // AsInt64 returns a representation of the current value as an int64 if a fast conversion
 // is possible. If false is returned, callers must use the inf.Dec form of this quantity.
 func (q *Quantity) AsInt64() (int64, bool) {
+
 	if q.d.Dec != nil {
 		return 0, false
 	}
 	return q.i.AsInt64()
+}
+
+// AsInt64OrMax returns the quantity as an int64 when an exact integer
+// representation is possible.
+//
+// If the quantity’s numeric value exceeds the maximum magnitude that Kubernetes
+// safely supports for internal decimal operations, the result is clamped to the
+// nearest supported boundary and ok is returned as true.
+//
+// This method explicitly opts into saturation semantics. Unlike AsInt64, it may
+// return a clamped value for quantities that are outside the supported range.
+// AsInt64 never performs rounding or clamping and only reports whether an exact
+// int64 representation is possible.
+//
+// The clamping boundary used here is ±(10^18 − 1), which represents the largest
+// magnitude Kubernetes considers safe for internal decimal canonicalization.
+// Values within the numeric range but lacking sufficient internal headroom are
+// preserved exactly and are not clamped.
+//
+// Callers should use this method only when saturation behavior is acceptable and
+// loss of exact numeric ordering for out-of-range values is understood.
+func (q *Quantity) AsInt64OrMax() (int64, bool) {
+
+	// Fast path: exact integer conversion already supported
+	if v, ok := q.AsInt64(); ok {
+		return v, true
+	}
+
+	const maxBoundaryInt64 = int64(999_999_999_999_999_999)
+	const minBoundaryInt64 = int64(-999_999_999_999_999_999)
+
+	maxBoundary := inf.NewDec(maxBoundaryInt64, 0)
+	minBoundary := inf.NewDec(minBoundaryInt64, 0)
+
+	if q.d.Dec == nil {
+		return 0, false
+	}
+
+	d := new(inf.Dec).Set(q.d.Dec)
+
+	if d.Cmp(maxBoundary) > 0 {
+		return maxBoundaryInt64, true
+	}
+
+	if d.Cmp(minBoundary) < 0 {
+		return minBoundaryInt64, true
+	}
+
+	return 0, false
 }
 
 // ToDec promotes the quantity in place to use an inf.Dec representation and returns itself.
