@@ -1075,6 +1075,7 @@ func Test_UnionedGVKs(t *testing.T) {
 				fwk.ResourceClaim:         fwk.All - fwk.Delete,
 				fwk.ResourceSlice:         fwk.All - fwk.Delete,
 				fwk.Workload:              fwk.Add,
+				fwk.EventResource("UnschedulablePod"): fwk.Add,
 			},
 			enableGangScheduling:            true,
 			enableInPlacePodVerticalScaling: true,
