@@ -234,7 +234,7 @@ func genAvailableUpgrade(up *upgrade.Upgrade, etcdUpgrade bool) outputapiv1alpha
 
 // sortedSliceFromStringStringArrayMap returns a slice of the keys in the map sorted alphabetically
 func sortedSliceFromStringStringArrayMap(strMap map[string][]string) []string {
-	strSlice := []string{}
+	strSlice := make([]string, 0, len(strMap))
 	for k := range strMap {
 		strSlice = append(strSlice, k)
 	}
