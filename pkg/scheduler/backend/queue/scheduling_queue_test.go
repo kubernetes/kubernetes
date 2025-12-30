@@ -3182,6 +3182,9 @@ var (
 	add = func(t *testing.T, logger klog.Logger, queue *PriorityQueue, pInfo *framework.QueuedPodInfo) {
 		queue.Add(logger, pInfo.Pod)
 	}
+	pop = func(_ *testing.T, logger klog.Logger, queue *PriorityQueue, _ *framework.QueuedPodInfo) {
+		queue.Pop(logger)
+	}
 	popAndRequeueAsUnschedulable = func(t *testing.T, logger klog.Logger, queue *PriorityQueue, pInfo *framework.QueuedPodInfo) {
 		// To simulate the pod is failed in scheduling in the real world, Pop() the pod from activeQ before AddUnschedulableIfNotPresent() below.
 		// UnschedulablePlugins will get cleared by Pop, so make a copy first.
@@ -3362,8 +3365,8 @@ func TestPodTimestamp(t *testing.T) {
 	}
 }
 
-// TestPendingPodsMetric tests Prometheus metrics related with pending pods
-func TestPendingPodsMetric(t *testing.T) {
+// TestSchedulerPodsMetric tests Prometheus metrics
+func TestSchedulerPodsMetric(t *testing.T) {
 	timestamp := time.Now()
 	preenqueuePluginName := "preEnqueuePlugin"
 	metrics.Register()
@@ -4643,6 +4646,157 @@ func TestPriorityQueue_GetPod(t *testing.T) {
 
 			if !cmp.Equal(pInfo.Pod, tt.expectedPod) {
 				t.Errorf("Expected pod=%v, but got pod=%v", tt.expectedPod, pInfo.Pod)
+			}
+		})
+	}
+}
+
+func TestUnschedulablePodsMetric(t *testing.T) {
+	preenqueuePluginName := "preEnqueuePlugin"
+	queueable := "queueable"
+	timestamp := time.Now()
+	pInfos := makeQueuedPodInfos(30, "x", queueable, timestamp)
+
+	makeGated := func(pInfos []*framework.QueuedPodInfo) []*framework.QueuedPodInfo {
+		for _, pInfo := range pInfos {
+			setQueuedPodInfoGated(pInfo, preenqueuePluginName, []fwk.ClusterEvent{framework.EventUnschedulableTimeout})
+		}
+		return pInfos
+	}
+
+	tests := []struct {
+		name           string
+		operations     []operation
+		operands       [][]*framework.QueuedPodInfo
+		expectedMetric int
+	}{
+		{
+			name: "Unschedulable pods metric must be 0 after a pod is gated, ungated, re-queued, and eventually popped from the scheduling queue",
+			operations: []operation{
+				updatePluginToGateAllPods,
+				add,
+				moveAllToActiveOrBackoffQ,
+				moveAllToActiveOrBackoffQ,
+				updatePluginToUngateAllPods,
+				moveAllToActiveOrBackoffQ,
+				pop,
+			},
+			operands: [][]*framework.QueuedPodInfo{
+				{nil},
+				pInfos[:1],
+				{nil},
+				{nil},
+				{nil},
+				{nil},
+				{nil},
+			},
+			expectedMetric: 0,
+		},
+		{
+			name: "Unschedulable pods metric must be 0 after pod is gated and then deleted",
+			operations: []operation{
+				updatePluginToGateAllPods,
+				add,
+				moveAllToActiveOrBackoffQ,
+				moveAllToActiveOrBackoffQ,
+				deletePod,
+			},
+			operands: [][]*framework.QueuedPodInfo{
+				{nil},
+				pInfos[:1],
+				{nil},
+				{nil},
+				pInfos[:1],
+			},
+			expectedMetric: 0,
+		},
+		{
+			name: "Unschedulable pods metric must be 1 after pod is gated multiple time by simillar plugin",
+			operations: []operation{
+				updatePluginToGateAllPods,
+				add,
+				moveAllToActiveOrBackoffQ,
+				moveAllToActiveOrBackoffQ,
+			},
+			operands: [][]*framework.QueuedPodInfo{
+				{nil},
+				pInfos[:1],
+				{nil},
+				{nil},
+			},
+			expectedMetric: 1,
+		},
+		{
+			name: "Unshedulable pods metric must be 0 after non gated pods is added and then deleted",
+			operations: []operation{
+				add,
+				deletePod,
+			},
+			operands: [][]*framework.QueuedPodInfo{
+				pInfos[:1],
+				pInfos[:1],
+			},
+			expectedMetric: 0,
+		},
+		{
+			name: "Unschedulable pods metric should not be duplicate if gated pods added and then gated with the same plugin again",
+			operations: []operation{
+				updatePluginToGateAllPods,
+				add,
+				moveAllToActiveOrBackoffQ,
+			},
+			operands: [][]*framework.QueuedPodInfo{
+				{nil},
+				makeGated(pInfos[:10]),
+				{nil},
+			},
+			expectedMetric: 10,
+		},
+	}
+
+	resetMetrics := func() {
+		metrics.UnschedulableReason(preenqueuePluginName, "").Set(0)
+	}
+	resetPodInfos := func() {
+		for i := range pInfos {
+			pInfos[i].Attempts = 0
+			pInfos[i].UnschedulableCount = 0
+		}
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			resetMetrics()
+			resetPodInfos()
+
+			m := makeEmptyQueueingHintMapPerProfile()
+			m[""][framework.EventUnschedulableTimeout] = []*QueueingHintFunction{
+				{
+					PluginName:     preenqueuePluginName,
+					QueueingHintFn: queueHintReturnQueue,
+				},
+			}
+
+			preenq := map[string]map[string]fwk.PreEnqueuePlugin{"": {(&preEnqueuePlugin{}).Name(): &preEnqueuePlugin{allowlists: []string{queueable}}}}
+			recorder := metrics.NewMetricsAsyncRecorder(3, 20*time.Microsecond, ctx.Done())
+			queue := NewTestQueue(ctx, newDefaultQueueSort(), WithClock(testingclock.NewFakeClock(timestamp)), WithPreEnqueuePluginMap(preenq), WithMetricsRecorder(recorder), WithQueueingHintMapPerProfile(m))
+
+			for i, op := range tt.operations {
+				for _, pInfo := range tt.operands[i] {
+					op(t, logger, queue, pInfo)
+				}
+			}
+
+			val, err := testutil.GetGaugeMetricValue(metrics.UnschedulableReason(preenqueuePluginName, ""))
+
+			if err != nil {
+				t.Errorf("Error while collection metric value:\n%s", err)
+			}
+			if int(val) != tt.expectedMetric {
+				t.Errorf("Unexpected metric result expected %d, actual %d", tt.expectedMetric, int(val))
 			}
 		})
 	}

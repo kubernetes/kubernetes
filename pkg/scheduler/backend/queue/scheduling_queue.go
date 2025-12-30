@@ -1133,6 +1133,10 @@ func (p *PriorityQueue) Delete(pod *v1.Pod) {
 	}
 	if pInfo = p.unschedulablePods.get(pod); pInfo != nil {
 		p.unschedulablePods.delete(pod, pInfo.Gated())
+		// Drop metric for deleted pod.
+		for plugin := range pInfo.UnschedulablePlugins.Union(pInfo.PendingPlugins) {
+			metrics.UnschedulableReason(plugin, pInfo.Pod.Spec.SchedulerName).Dec()
+		}
 	}
 }
 
