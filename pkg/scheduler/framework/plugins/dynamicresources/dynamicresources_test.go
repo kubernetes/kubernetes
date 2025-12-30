@@ -958,43 +958,53 @@ type prepare struct {
 	postfilter change
 }
 
+type testPluginCase struct {
+	// patchTestCase gets called right before the test case is tested.
+	// It can be used to update time stamps in those test cases
+	// which are sensitive to the current time.
+	patchTestCase func(tc *testPluginCase)
+
+	args    *config.DynamicResourcesArgs
+	nodes   []*v1.Node // default if unset is workerNode
+	pod     *v1.Pod
+	claims  []*resourceapi.ResourceClaim
+	classes []*resourceapi.DeviceClass
+
+	// objs get stored directly in the fake client, without passing
+	// through reactors, in contrast to the types above.
+	objs []apiruntime.Object
+
+	prepare prepare
+	want    want
+
+	// Invoke Filter with a canceled context.
+	cancelFilter bool
+
+	// enableDRAAdminAccess is set to true if the DRAAdminAccess feature gate is enabled.
+	enableDRAAdminAccess bool
+	// enableDRADeviceBindingConditions is set to true if the DRADeviceBindingConditions feature gate is enabled.
+	enableDRADeviceBindingConditions bool
+	// EnableDRAResourceClaimDeviceStatus is set to true if the DRAResourceClaimDeviceStatus feature gate is enabled.
+	enableDRAResourceClaimDeviceStatus bool
+	// Feature gates. False is chosen so that the uncommon case
+	// doesn't need to be set.
+	disableDRA bool
+
+	enableDRAExtendedResource        bool
+	enableDRAPrioritizedList         bool
+	enableDRADeviceTaints            bool
+	disableDRASchedulerFilterTimeout bool
+	skipOnWindows                    string
+	failPatch                        bool
+	reactors                         []cgotesting.Reactor
+	metrics                          func(ktesting.TContext, compbasemetrics.Gatherer)
+}
+
 func TestPlugin(t *testing.T) {
-	testcases := map[string]struct {
-		args    *config.DynamicResourcesArgs
-		nodes   []*v1.Node // default if unset is workerNode
-		pod     *v1.Pod
-		claims  []*resourceapi.ResourceClaim
-		classes []*resourceapi.DeviceClass
-
-		// objs get stored directly in the fake client, without passing
-		// through reactors, in contrast to the types above.
-		objs []apiruntime.Object
-
-		prepare prepare
-		want    want
-
-		// Invoke Filter with a canceled context.
-		cancelFilter bool
-
-		// enableDRAAdminAccess is set to true if the DRAAdminAccess feature gate is enabled.
-		enableDRAAdminAccess bool
-		// enableDRADeviceBindingConditions is set to true if the DRADeviceBindingConditions feature gate is enabled.
-		enableDRADeviceBindingConditions bool
-		// EnableDRAResourceClaimDeviceStatus is set to true if the DRAResourceClaimDeviceStatus feature gate is enabled.
-		enableDRAResourceClaimDeviceStatus bool
-		// Feature gates. False is chosen so that the uncommon case
-		// doesn't need to be set.
-		disableDRA bool
-
-		enableDRAExtendedResource        bool
-		enableDRAPrioritizedList         bool
-		enableDRADeviceTaints            bool
-		disableDRASchedulerFilterTimeout bool
-		skipOnWindows                    string
-		failPatch                        bool
-		reactors                         []cgotesting.Reactor
-		metrics                          func(*testing.T, compbasemetrics.Gatherer)
-	}{
+	testPlugin(ktesting.Init(t))
+}
+func testPlugin(tCtx ktesting.TContext) {
+	testcases := map[string]testPluginCase{
 		"empty": {
 			pod: st.MakePod().Name("foo").Namespace("default").Obj(),
 			want: want{
@@ -1636,9 +1646,9 @@ func TestPlugin(t *testing.T) {
 			pod:                                podWithExtendedResourceName,
 			classes:                            []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
 			want:                               want{},
-			metrics: func(t *testing.T, g compbasemetrics.Gatherer) {
+			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
 				_, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
-				require.ErrorContains(t, err, "not found")
+				require.ErrorContains(tCtx, err, "not found")
 			},
 		},
 		"extended-resource-one-device-plugin-one-dra": {
@@ -1708,9 +1718,9 @@ func TestPlugin(t *testing.T) {
 					status: fwk.NewStatus(fwk.Unschedulable, `still not schedulable`),
 				},
 			},
-			metrics: func(t *testing.T, g compbasemetrics.Gatherer) {
+			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
 				_, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
-				require.ErrorContains(t, err, "not found")
+				require.ErrorContains(tCtx, err, "not found")
 			},
 		},
 		"extended-resource-name-with-resources": {
@@ -1730,10 +1740,10 @@ func TestPlugin(t *testing.T) {
 					assumedClaim: reserve(extendedResourceClaim, podWithExtendedResourceName),
 				},
 			},
-			metrics: func(t *testing.T, g compbasemetrics.Gatherer) {
+			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
 				metric, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
-				require.NoError(t, err)
-				require.Equal(t, 1, int(metric["success"]))
+				require.NoError(tCtx, err)
+				require.Equal(tCtx, 1, int(metric["success"]))
 			},
 		},
 		"implicit-extended-resource-name-with-resources": {
@@ -1753,10 +1763,10 @@ func TestPlugin(t *testing.T) {
 					assumedClaim: reserve(implicitExtendedResourceClaim, podWithImplicitExtendedResourceName),
 				},
 			},
-			metrics: func(t *testing.T, g compbasemetrics.Gatherer) {
+			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
 				metric, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
-				require.NoError(t, err)
-				require.Equal(t, 1, int(metric["success"]))
+				require.NoError(tCtx, err)
+				require.Equal(tCtx, 1, int(metric["success"]))
 			},
 		},
 		"implicit-extended-resource-name-two-containers-with-resources": {
@@ -1776,10 +1786,10 @@ func TestPlugin(t *testing.T) {
 					assumedClaim: reserve(implicitExtendedResourceClaimTwoContainers, podWithImplicitExtendedResourceNameTwoContainers),
 				},
 			},
-			metrics: func(t *testing.T, g compbasemetrics.Gatherer) {
+			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
 				metric, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
-				require.NoError(t, err)
-				require.Equal(t, 1, int(metric["success"]))
+				require.NoError(tCtx, err)
+				require.Equal(tCtx, 1, int(metric["success"]))
 			},
 		},
 		"extended-resource-name-with-resources-fail-patch": {
@@ -1801,10 +1811,10 @@ func TestPlugin(t *testing.T) {
 					assumedClaim: reserve(extendedResourceClaim, podWithExtendedResourceName),
 				},
 			},
-			metrics: func(t *testing.T, g compbasemetrics.Gatherer) {
+			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
 				metric, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
-				require.NoError(t, err)
-				require.Equal(t, 1, int(metric["success"]))
+				require.NoError(tCtx, err)
+				require.Equal(tCtx, 1, int(metric["success"]))
 			},
 		},
 		"extended-resource-name-with-resources-has-claim": {
@@ -1824,9 +1834,9 @@ func TestPlugin(t *testing.T) {
 					removed: []metav1.Object{extendedResourceClaim},
 				},
 			},
-			metrics: func(t *testing.T, g compbasemetrics.Gatherer) {
+			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
 				_, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
-				require.ErrorContains(t, err, "not found")
+				require.ErrorContains(tCtx, err, "not found")
 			},
 		},
 		"extended-resource-name-with-resources-delete-claim": {
@@ -1846,9 +1856,9 @@ func TestPlugin(t *testing.T) {
 					removed: []metav1.Object{extendedResourceClaimNode2},
 				},
 			},
-			metrics: func(t *testing.T, g compbasemetrics.Gatherer) {
+			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
 				_, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
-				require.ErrorContains(t, err, "not found")
+				require.ErrorContains(tCtx, err, "not found")
 			},
 		},
 		"extended-resource-name-bind-failure": {
@@ -1868,10 +1878,10 @@ func TestPlugin(t *testing.T) {
 					removed: []metav1.Object{reserve(extendedResourceClaim, podWithExtendedResourceName)},
 				},
 			},
-			metrics: func(t *testing.T, g compbasemetrics.Gatherer) {
+			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
 				metric, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
-				require.NoError(t, err)
-				require.Equal(t, 1, int(metric["success"]))
+				require.NoError(tCtx, err)
+				require.Equal(tCtx, 1, int(metric["success"]))
 			},
 		},
 		"extended-resource-name-skip-bind": {
@@ -1885,10 +1895,10 @@ func TestPlugin(t *testing.T) {
 				},
 				unreserveBeforePreBind: &result{},
 			},
-			metrics: func(t *testing.T, g compbasemetrics.Gatherer) {
+			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
 				metric, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
-				require.NoError(t, err)
-				require.Equal(t, 1, int(metric["success"]))
+				require.NoError(tCtx, err)
+				require.Equal(tCtx, 1, int(metric["success"]))
 			},
 		},
 		"extended-resource-name-claim-creation-failure": {
@@ -1916,10 +1926,10 @@ func TestPlugin(t *testing.T) {
 					},
 				},
 			},
-			metrics: func(t *testing.T, g compbasemetrics.Gatherer) {
+			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
 				metric, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
-				require.NoError(t, err)
-				require.Equal(t, 1, int(metric["failure"]))
+				require.NoError(tCtx, err)
+				require.Equal(tCtx, 1, int(metric["failure"]))
 			},
 		},
 		"canceled": {
@@ -2110,17 +2120,22 @@ func TestPlugin(t *testing.T) {
 			},
 		},
 		"prebind-fail-with-binding-timeout": {
-			enableDRADeviceBindingConditions:   true,
-			enableDRAResourceClaimDeviceStatus: true,
-			args: &config.DynamicResourcesArgs{
-				BindingTimeout: &metav1.Duration{Duration: 600 * time.Second},
-			},
-			pod: podWithClaimName,
-			claims: func() []*resourceapi.ResourceClaim {
+			patchTestCase: func(tc *testPluginCase) {
+				// The time stamps must be injected into the test case right
+				// before it starts to get tested.
+				now := time.Now()
+
+				// Set the allocation time so that the claim is not timed out
+				// yet when the test starts, but then times out relatively quickly (the 10 seconds)
+				// when the test executes PreBind.
+				bindingTimeout := tc.args.BindingTimeout.Duration
+				timeoutAfter := 10 * time.Second
+				allocatedAt := now.Add(-bindingTimeout).Add(timeoutAfter)
+
 				claim := allocatedClaim.DeepCopy()
 				claim.Status.Allocation = allocationResultWithBindingConditions.DeepCopy()
 				// This claim has binding conditions but is not timed out.
-				claim.Status.Allocation.AllocationTimestamp = ptr.To(metav1.NewTime(time.Now().Add(-9*time.Minute - 50*time.Second)))
+				claim.Status.Allocation.AllocationTimestamp = ptr.To(metav1.NewTime(allocatedAt))
 				claim.Status.Devices = []resourceapi.AllocatedDeviceStatus{
 					{
 						Driver: driver,
@@ -2128,24 +2143,29 @@ func TestPlugin(t *testing.T) {
 						Device: "instance-1",
 					},
 				}
-				return []*resourceapi.ResourceClaim{claim}
-			}(),
+				tc.claims = []*resourceapi.ResourceClaim{claim}
+
+				claim = claim.DeepCopy()
+				claim.Status.Devices = []resourceapi.AllocatedDeviceStatus{
+					{
+						Driver: driver,
+						Pool:   nodeName,
+						Device: "instance-1",
+					},
+				}
+				tc.want.prebind.assumedClaim = reserve(claim, podWithClaimName)
+			},
+
+			enableDRADeviceBindingConditions:   true,
+			enableDRAResourceClaimDeviceStatus: true,
+			args: &config.DynamicResourcesArgs{
+				BindingTimeout: &metav1.Duration{Duration: 600 * time.Second},
+			},
+			pod:    podWithClaimName,
+			claims: nil, // Set in patchTestCase.
 			want: want{
 				prebind: result{
-					assumedClaim: reserve(func() *resourceapi.ResourceClaim {
-						claim := allocatedClaim.DeepCopy()
-						claim.Status.Allocation = allocationResultWithBindingConditions.DeepCopy()
-						// This claim has binding conditions but is not timed out.
-						claim.Status.Allocation.AllocationTimestamp = ptr.To(metav1.NewTime(time.Now().Add(-9*time.Minute - 50*time.Second)))
-						claim.Status.Devices = []resourceapi.AllocatedDeviceStatus{
-							{
-								Driver: driver,
-								Pool:   nodeName,
-								Device: "instance-1",
-							},
-						}
-						return claim
-					}(), podWithClaimName),
+					assumedClaim: nil, // Set in patchTestCase.
 					changes: change{
 						claim: func(in *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
 							return st.FromResourceClaim(in).
@@ -2441,10 +2461,13 @@ func TestPlugin(t *testing.T) {
 
 	for name, tc := range testcases {
 		if len(tc.skipOnWindows) > 0 && goruntime.GOOS == "windows" {
-			t.Skipf("Skipping '%s' test case on Windows, reason: %s", name, tc.skipOnWindows)
+			tCtx.Skipf("Skipping '%s' test case on Windows, reason: %s", name, tc.skipOnWindows)
 		}
-		tc := tc
-		t.Run(name, func(t *testing.T) {
+		tCtx.Run(name, func(tCtx ktesting.TContext) {
+			if tc.patchTestCase != nil {
+				tc.patchTestCase(&tc)
+			}
+
 			nodes := tc.nodes
 			if nodes == nil {
 				nodes = []*v1.Node{workerNode}
@@ -2460,47 +2483,48 @@ func TestPlugin(t *testing.T) {
 				EnableDRAExtendedResource:          tc.enableDRAExtendedResource,
 			}
 
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, tc.enableDRAExtendedResource)
-			testCtx := setup(t, tc.args, nodes, tc.claims, tc.classes, tc.objs, feats, tc.failPatch, tc.reactors)
-			initialObjects := testCtx.listAll(t)
+			featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, tc.enableDRAExtendedResource)
+			testCtx := setup(tCtx, tc.args, nodes, tc.claims, tc.classes, tc.objs, feats, tc.failPatch, tc.reactors)
+			initialObjects := testCtx.listAll(tCtx)
 			var registry compbasemetrics.KubeRegistry
 			if tc.metrics != nil {
 				registry = setupMetrics(feats)
 			}
 
-			status := testCtx.p.PreEnqueue(testCtx.ctx, tc.pod)
-			t.Run("PreEnqueue", func(t *testing.T) {
-				testCtx.verify(t, tc.want.preenqueue, initialObjects, nil, status)
+			status := testCtx.p.PreEnqueue(tCtx, tc.pod)
+			tCtx.Run("PreEnqueue", func(tCtx ktesting.TContext) {
+				testCtx.verify(tCtx, tc.want.preenqueue, initialObjects, nil, status)
 			})
 			if !status.IsSuccess() {
 				return
 			}
 
 			nodeInfo := framework.NewNodeInfo()
-			result, status := testCtx.p.PreFilter(testCtx.ctx, testCtx.state, tc.pod, []fwk.NodeInfo{nodeInfo})
-			t.Run("prefilter", func(t *testing.T) {
-				assert.Equal(t, tc.want.preFilterResult, result)
-				testCtx.verify(t, tc.want.prefilter, initialObjects, result, status)
+			result, status := testCtx.p.PreFilter(tCtx, testCtx.state, tc.pod, []fwk.NodeInfo{nodeInfo})
+			tCtx.Run("prefilter", func(tCtx ktesting.TContext) {
+				assert.Equal(tCtx, tc.want.preFilterResult, result)
+				testCtx.verify(tCtx, tc.want.prefilter, initialObjects, result, status)
 			})
 			unschedulable := status.IsRejected()
 
 			var potentialNodes []fwk.NodeInfo
 
-			initialObjects = testCtx.listAll(t)
-			testCtx.updateAPIServer(t, initialObjects, tc.prepare.filter)
+			initialObjects = testCtx.listAll(tCtx)
+			testCtx.updateAPIServer(tCtx, initialObjects, tc.prepare.filter)
 			if !unschedulable {
 				for _, nodeInfo := range testCtx.nodeInfos {
-					initialObjects = testCtx.listAll(t)
-					ctx := testCtx.ctx
-					if tc.cancelFilter {
-						c, cancel := context.WithCancelCause(ctx)
-						ctx = c
-						cancel(errors.New("test canceling Filter"))
-					}
-					status := testCtx.p.Filter(ctx, testCtx.state, tc.pod, nodeInfo)
-					nodeName := nodeInfo.Node().Name
-					t.Run(fmt.Sprintf("filter/%s", nodeInfo.Node().Name), func(t *testing.T) {
-						testCtx.verify(t, tc.want.filter.forNode(nodeName), initialObjects, nil, status)
+					var status *fwk.Status
+					tCtx.Run(fmt.Sprintf("filter/%s", nodeInfo.Node().Name), func(tCtx ktesting.TContext) {
+						initialObjects = testCtx.listAll(tCtx)
+						ctx := context.Context(tCtx)
+						if tc.cancelFilter {
+							c, cancel := context.WithCancelCause(ctx)
+							ctx = c
+							cancel(errors.New("test canceling Filter"))
+						}
+						status = testCtx.p.Filter(ctx, testCtx.state, tc.pod, nodeInfo)
+						nodeName := nodeInfo.Node().Name
+						testCtx.verify(tCtx, tc.want.filter.forNode(nodeName), initialObjects, nil, status)
 					})
 					if status.Code() == fwk.Success {
 						potentialNodes = append(potentialNodes, nodeInfo)
@@ -2517,25 +2541,25 @@ func TestPlugin(t *testing.T) {
 
 			var scores fwk.NodeScoreList
 			if !unschedulable && len(potentialNodes) > 1 {
-				initialObjects = testCtx.listAll(t)
-				initialObjects = testCtx.updateAPIServer(t, initialObjects, tc.prepare.prescore)
+				initialObjects = testCtx.listAll(tCtx)
+				initialObjects = testCtx.updateAPIServer(tCtx, initialObjects, tc.prepare.prescore)
 
 				for _, potentialNode := range potentialNodes {
-					initialObjects = testCtx.listAll(t)
-					score, status := testCtx.p.Score(testCtx.ctx, testCtx.state, tc.pod, potentialNode)
+					initialObjects = testCtx.listAll(tCtx)
+					score, status := testCtx.p.Score(tCtx, testCtx.state, tc.pod, potentialNode)
 					nodeName := potentialNode.Node().Name
-					t.Run(fmt.Sprintf("score/%s", nodeName), func(t *testing.T) {
-						assert.Equal(t, tc.want.scoreResult.forNode(nodeName), score)
-						testCtx.verify(t, tc.want.score.forNode(nodeName), initialObjects, nil, status)
+					tCtx.Run(fmt.Sprintf("score/%s", nodeName), func(tCtx ktesting.TContext) {
+						assert.Equal(tCtx, tc.want.scoreResult.forNode(nodeName), score)
+						testCtx.verify(tCtx, tc.want.score.forNode(nodeName), initialObjects, nil, status)
 					})
 					scores = append(scores, fwk.NodeScore{Name: nodeName, Score: score})
 				}
 
-				initialObjects = testCtx.listAll(t)
-				status := testCtx.p.NormalizeScore(testCtx.ctx, testCtx.state, tc.pod, scores)
-				t.Run("normalizeScore", func(t *testing.T) {
-					assert.Equal(t, tc.want.normalizeScoreResult, scores)
-					testCtx.verify(t, tc.want.normalizeScore, initialObjects, nil, status)
+				initialObjects = testCtx.listAll(tCtx)
+				status := testCtx.p.NormalizeScore(tCtx, testCtx.state, tc.pod, scores)
+				tCtx.Run("normalizeScore", func(tCtx ktesting.TContext) {
+					assert.Equal(tCtx, tc.want.normalizeScoreResult, scores)
+					testCtx.verify(tCtx, tc.want.normalizeScore, initialObjects, nil, status)
 				})
 			}
 
@@ -2553,11 +2577,11 @@ func TestPlugin(t *testing.T) {
 					selectedNodeName = potentialNodes[0].Node().Name
 				}
 
-				initialObjects = testCtx.listAll(t)
-				initialObjects = testCtx.updateAPIServer(t, initialObjects, tc.prepare.reserve)
-				status := testCtx.p.Reserve(testCtx.ctx, testCtx.state, tc.pod, selectedNodeName)
-				t.Run("reserve", func(t *testing.T) {
-					testCtx.verify(t, tc.want.reserve, initialObjects, nil, status)
+				initialObjects = testCtx.listAll(tCtx)
+				initialObjects = testCtx.updateAPIServer(tCtx, initialObjects, tc.prepare.reserve)
+				status := testCtx.p.Reserve(tCtx, testCtx.state, tc.pod, selectedNodeName)
+				tCtx.Run("reserve", func(tCtx ktesting.TContext) {
+					testCtx.verify(tCtx, tc.want.reserve, initialObjects, nil, status)
 				})
 				if status.Code() != fwk.Success {
 					unschedulable = true
@@ -2566,54 +2590,54 @@ func TestPlugin(t *testing.T) {
 
 			if selectedNodeName != "" {
 				if unschedulable {
-					initialObjects = testCtx.listAll(t)
-					initialObjects = testCtx.updateAPIServer(t, initialObjects, tc.prepare.unreserve)
-					testCtx.p.Unreserve(testCtx.ctx, testCtx.state, tc.pod, selectedNodeName)
-					t.Run("unreserve", func(t *testing.T) {
-						testCtx.verify(t, tc.want.unreserve, initialObjects, nil, status)
+					initialObjects = testCtx.listAll(tCtx)
+					initialObjects = testCtx.updateAPIServer(tCtx, initialObjects, tc.prepare.unreserve)
+					testCtx.p.Unreserve(tCtx, testCtx.state, tc.pod, selectedNodeName)
+					tCtx.Run("unreserve", func(tCtx ktesting.TContext) {
+						testCtx.verify(tCtx, tc.want.unreserve, initialObjects, nil, status)
 					})
 				} else {
 					if tc.want.unreserveBeforePreBind != nil {
-						initialObjects = testCtx.listAll(t)
-						testCtx.p.Unreserve(testCtx.ctx, testCtx.state, tc.pod, selectedNodeName)
-						t.Run("unreserveBeforePreBind", func(t *testing.T) {
-							testCtx.verify(t, *tc.want.unreserveBeforePreBind, initialObjects, nil, status)
+						initialObjects = testCtx.listAll(tCtx)
+						testCtx.p.Unreserve(tCtx, testCtx.state, tc.pod, selectedNodeName)
+						tCtx.Run("unreserveBeforePreBind", func(tCtx ktesting.TContext) {
+							testCtx.verify(tCtx, *tc.want.unreserveBeforePreBind, initialObjects, nil, status)
 						})
 						return
 					}
 
-					initialObjects = testCtx.listAll(t)
-					initialObjects = testCtx.updateAPIServer(t, initialObjects, tc.prepare.prebind)
-					preBindPreFlightStatus := testCtx.p.PreBindPreFlight(testCtx.ctx, testCtx.state, tc.pod, selectedNodeName)
-					t.Run("prebindPreFlight", func(t *testing.T) {
-						assert.Equal(t, tc.want.prebindPreFlight, preBindPreFlightStatus)
+					initialObjects = testCtx.listAll(tCtx)
+					initialObjects = testCtx.updateAPIServer(tCtx, initialObjects, tc.prepare.prebind)
+					preBindPreFlightStatus := testCtx.p.PreBindPreFlight(tCtx, testCtx.state, tc.pod, selectedNodeName)
+					tCtx.Run("prebindPreFlight", func(tContext ktesting.TContext) {
+						assert.Equal(tCtx, tc.want.prebindPreFlight, preBindPreFlightStatus)
 					})
-					preBindStatus := testCtx.p.PreBind(testCtx.ctx, testCtx.state, tc.pod, selectedNodeName)
-					t.Run("prebind", func(t *testing.T) {
-						testCtx.verify(t, tc.want.prebind, initialObjects, nil, preBindStatus)
+					preBindStatus := testCtx.p.PreBind(tCtx, testCtx.state, tc.pod, selectedNodeName)
+					tCtx.Run("prebind", func(tCtx ktesting.TContext) {
+						testCtx.verify(tCtx, tc.want.prebind, initialObjects, nil, preBindStatus)
 					})
 					if tc.want.unreserveAfterBindFailure != nil {
-						initialObjects = testCtx.listAll(t)
-						testCtx.p.Unreserve(testCtx.ctx, testCtx.state, tc.pod, selectedNodeName)
-						t.Run("unreserverAfterBindFailure", func(t *testing.T) {
-							testCtx.verify(t, *tc.want.unreserveAfterBindFailure, initialObjects, nil, status)
+						initialObjects = testCtx.listAll(tCtx)
+						testCtx.p.Unreserve(tCtx, testCtx.state, tc.pod, selectedNodeName)
+						tCtx.Run("unreserverAfterBindFailure", func(tCtx ktesting.TContext) {
+							testCtx.verify(tCtx, *tc.want.unreserveAfterBindFailure, initialObjects, nil, status)
 						})
 					} else if status.IsSuccess() {
-						initialObjects = testCtx.listAll(t)
-						initialObjects = testCtx.updateAPIServer(t, initialObjects, tc.prepare.postbind)
+						initialObjects = testCtx.listAll(tCtx)
+						initialObjects = testCtx.updateAPIServer(tCtx, initialObjects, tc.prepare.postbind)
 					}
 				}
 			} else if len(potentialNodes) == 0 {
-				initialObjects = testCtx.listAll(t)
-				initialObjects = testCtx.updateAPIServer(t, initialObjects, tc.prepare.postfilter)
-				result, status := testCtx.p.PostFilter(testCtx.ctx, testCtx.state, tc.pod, nil /* filteredNodeStatusMap not used by plugin */)
-				t.Run("postfilter", func(t *testing.T) {
-					assert.Equal(t, tc.want.postFilterResult, result)
-					testCtx.verify(t, tc.want.postfilter, initialObjects, nil, status)
+				initialObjects = testCtx.listAll(tCtx)
+				initialObjects = testCtx.updateAPIServer(tCtx, initialObjects, tc.prepare.postfilter)
+				result, status := testCtx.p.PostFilter(tCtx, testCtx.state, tc.pod, nil /* filteredNodeStatusMap not used by plugin */)
+				tCtx.Run("postfilter", func(tCtx ktesting.TContext) {
+					assert.Equal(tCtx, tc.want.postFilterResult, result)
+					testCtx.verify(tCtx, tc.want.postfilter, initialObjects, nil, status)
 				})
 			}
 			if tc.metrics != nil {
-				tc.metrics(t, registry)
+				tc.metrics(tCtx, registry)
 			}
 		})
 	}
@@ -2631,7 +2655,6 @@ func setupMetrics(features feature.Features) compbasemetrics.KubeRegistry {
 }
 
 type testContext struct {
-	ctx             context.Context
 	client          *fake.Clientset
 	informerFactory informers.SharedInformerFactory
 	draManager      *DefaultDRAManager
@@ -2640,18 +2663,18 @@ type testContext struct {
 	state           fwk.CycleState
 }
 
-func (tc *testContext) verify(t *testing.T, expected result, initialObjects []metav1.Object, result interface{}, status *fwk.Status) {
-	t.Helper()
+func (tc *testContext) verify(tCtx ktesting.TContext, expected result, initialObjects []metav1.Object, result interface{}, status *fwk.Status) {
+	tCtx.Helper()
 	if expected.status == nil {
-		assert.Nil(t, status)
+		assert.Nil(tCtx, status)
 	} else if actualErr := status.AsError(); actualErr != nil {
 		// Compare only the error strings.
-		assert.ErrorContains(t, actualErr, expected.status.AsError().Error())
+		assert.ErrorContains(tCtx, actualErr, expected.status.AsError().Error())
 	} else {
-		assert.Equal(t, expected.status, status)
+		assert.Equal(tCtx, expected.status, status)
 	}
-	objects := tc.listAll(t)
-	wantObjects := update(t, initialObjects, expected.changes)
+	objects := tc.listAll(tCtx)
+	wantObjects := update(initialObjects, expected.changes)
 	wantObjects = append(wantObjects, expected.added...)
 	for _, remove := range expected.removed {
 		for i, obj := range wantObjects {
@@ -2679,7 +2702,7 @@ func (tc *testContext) verify(t *testing.T, expected result, initialObjects []me
 		cmpopts.IgnoreFields(resourceapi.DeviceRequestAllocationResult{}, "Device"),
 	}
 	if diff := cmp.Diff(wantObjects, objects, ignoreFieldsInResourceClaims...); diff != "" {
-		t.Errorf("Stored objects are different (- expected, + actual):\n%s", diff)
+		tCtx.Errorf("Stored objects are different (- expected, + actual):\n%s", diff)
 	}
 
 	var expectAssumedClaims []metav1.Object
@@ -2694,13 +2717,13 @@ func (tc *testContext) verify(t *testing.T, expected result, initialObjects []me
 	if len(expectAssumedClaims) == 0 && len(actualAssumedClaims) != 0 {
 		// In case we delete the claim API object,  wait for assumed cache to sync with informer,
 		// then assumed cache should be empty.
-		err := wait.PollUntilContextTimeout(tc.ctx, 200*time.Millisecond, time.Minute, true,
+		err := wait.PollUntilContextTimeout(tCtx, 200*time.Millisecond, time.Minute, true,
 			func(ctx context.Context) (bool, error) {
 				actualAssumedClaims, sameAssumedClaims = tc.listAssumedClaims()
 				return len(actualAssumedClaims) == 0, nil
 			})
 		if err != nil || len(actualAssumedClaims) != 0 {
-			t.Errorf("Assumed claims are different, err=%v, expected: nil, actual:\n%v", err, actualAssumedClaims)
+			tCtx.Errorf("Assumed claims are different, err=%v, expected: nil, actual:\n%v", err, actualAssumedClaims)
 		}
 	}
 	if len(expectAssumedClaims) > 0 {
@@ -2719,21 +2742,21 @@ func (tc *testContext) verify(t *testing.T, expected result, initialObjects []me
 				}
 			}
 			if !seen {
-				t.Errorf("Assumed claims are different, expected: %v not found", expected)
+				tCtx.Errorf("Assumed claims are different, expected: %v not found", expected)
 			}
 		}
 	}
 
 	actualInFlightClaims := tc.listInFlightClaims()
 	if diff := cmp.Diff(expected.inFlightClaims, actualInFlightClaims, ignoreFieldsInResourceClaims...); diff != "" {
-		t.Errorf("In-flight claims are different (- expected, + actual):\n%s", diff)
+		tCtx.Errorf("In-flight claims are different (- expected, + actual):\n%s", diff)
 	}
 }
 
-func (tc *testContext) listAll(t *testing.T) (objects []metav1.Object) {
-	t.Helper()
-	claims, err := tc.client.ResourceV1().ResourceClaims("").List(tc.ctx, metav1.ListOptions{})
-	require.NoError(t, err, "list claims")
+func (tc *testContext) listAll(tCtx ktesting.TContext) (objects []metav1.Object) {
+	tCtx.Helper()
+	claims, err := tc.client.ResourceV1().ResourceClaims("").List(tCtx, metav1.ListOptions{})
+	tCtx.ExpectNoError(err, "list claims")
 	for _, claim := range claims.Items {
 		claim := claim
 		objects = append(objects, &claim)
@@ -2771,21 +2794,19 @@ func (tc *testContext) listInFlightClaims() []metav1.Object {
 }
 
 // updateAPIServer modifies objects and stores any changed object in the API server.
-func (tc *testContext) updateAPIServer(t *testing.T, objects []metav1.Object, updates change) []metav1.Object {
-	modified := update(t, objects, updates)
+func (tc *testContext) updateAPIServer(tCtx ktesting.TContext, objects []metav1.Object, updates change) []metav1.Object {
+	modified := update(objects, updates)
 	for i := range modified {
 		obj := modified[i]
 		if diff := cmp.Diff(objects[i], obj); diff != "" {
-			t.Logf("Updating %T %q, diff (-old, +new):\n%s", obj, obj.GetName(), diff)
+			tCtx.Logf("Updating %T %q, diff (-old, +new):\n%s", obj, obj.GetName(), diff)
 			switch obj := obj.(type) {
 			case *resourceapi.ResourceClaim:
-				obj, err := tc.client.ResourceV1().ResourceClaims(obj.Namespace).Update(tc.ctx, obj, metav1.UpdateOptions{})
-				if err != nil {
-					t.Fatalf("unexpected error during prepare update: %v", err)
-				}
+				obj, err := tc.client.ResourceV1().ResourceClaims(obj.Namespace).Update(tCtx, obj, metav1.UpdateOptions{})
+				tCtx.ExpectNoError(err, "prepare update")
 				modified[i] = obj
 			default:
-				t.Fatalf("unsupported object type %T", obj)
+				tCtx.Fatalf("unsupported object type %T", obj)
 			}
 		}
 	}
@@ -2804,7 +2825,7 @@ func sortObjects(objects []metav1.Object) {
 // update walks through all existing objects, finds the corresponding update
 // function based on name and kind, and replaces those objects that have an
 // update function. The rest is left unchanged.
-func update(t *testing.T, objects []metav1.Object, updates change) []metav1.Object {
+func update(objects []metav1.Object, updates change) []metav1.Object {
 	var updated []metav1.Object
 
 	for _, obj := range objects {
@@ -2820,12 +2841,10 @@ func update(t *testing.T, objects []metav1.Object, updates change) []metav1.Obje
 	return updated
 }
 
-func setup(t *testing.T, args *config.DynamicResourcesArgs, nodes []*v1.Node, claims []*resourceapi.ResourceClaim, classes []*resourceapi.DeviceClass, objs []apiruntime.Object, features feature.Features, failPatch bool, apiReactors []cgotesting.Reactor) (result *testContext) {
-	t.Helper()
+func setup(tCtx ktesting.TContext, args *config.DynamicResourcesArgs, nodes []*v1.Node, claims []*resourceapi.ResourceClaim, classes []*resourceapi.DeviceClass, objs []apiruntime.Object, features feature.Features, failPatch bool, apiReactors []cgotesting.Reactor) (result *testContext) {
+	tCtx.Helper()
 
 	tc := &testContext{}
-	tCtx := ktesting.Init(t)
-	tc.ctx = tCtx
 
 	tc.client = fake.NewSimpleClientset(objs...)
 	reactor := createReactor(tc.client.Tracker(), failPatch)
@@ -2842,7 +2861,7 @@ func setup(t *testing.T, args *config.DynamicResourcesArgs, nodes []*v1.Node, cl
 		KubeClient:             tc.client,
 	}
 	resourceSliceTracker, err := resourceslicetracker.StartTracker(tCtx, resourceSliceTrackerOpts)
-	require.NoError(t, err, "couldn't start resource slice tracker")
+	require.NoError(tCtx, err, "couldn't start resource slice tracker")
 
 	claimsCache := assumecache.NewAssumeCache(tCtx.Logger(), tc.informerFactory.Resource().V1().ResourceClaims().Informer(), "resource claim", "", nil)
 	// NewAssumeCache calls the informer's AddEventHandler method to register
@@ -2872,44 +2891,44 @@ func setup(t *testing.T, args *config.DynamicResourcesArgs, nodes []*v1.Node, cl
 		runtime.WithSharedDRAManager(tc.draManager),
 	}
 	fh, err := runtime.NewFramework(tCtx, nil, nil, opts...)
-	if err != nil {
-		t.Fatal(err)
-	}
+	tCtx.ExpectNoError(err, "create scheduler framework")
+	tCtx.Cleanup(func() {
+		tCtx.Cancel("test has completed")
+		runtime.WaitForShutdown(fh)
+	})
 
 	if args == nil {
 		args = getDefaultDynamicResourcesArgs()
 	}
 	pl, err := New(tCtx, args, fh, features)
-	if err != nil {
-		t.Fatal(err)
-	}
+	tCtx.ExpectNoError(err, "create plugin")
 	tc.p = pl.(*DynamicResources)
 
 	// The tests use the API to create the objects because then reactors
 	// get triggered.
 	for _, claim := range claims {
-		_, err := tc.client.ResourceV1().ResourceClaims(claim.Namespace).Create(tc.ctx, claim, metav1.CreateOptions{})
-		require.NoError(t, err, "create resource claim")
+		_, err := tc.client.ResourceV1().ResourceClaims(claim.Namespace).Create(tCtx, claim, metav1.CreateOptions{})
+		tCtx.ExpectNoError(err, "create resource claim")
 	}
 	for _, class := range classes {
-		_, err := tc.client.ResourceV1().DeviceClasses().Create(tc.ctx, class, metav1.CreateOptions{})
-		require.NoError(t, err, "create resource class")
+		_, err := tc.client.ResourceV1().DeviceClasses().Create(tCtx, class, metav1.CreateOptions{})
+		tCtx.ExpectNoError(err, "create resource class")
 	}
 
-	tc.informerFactory.Start(tc.ctx.Done())
-	t.Cleanup(func() {
+	tc.informerFactory.Start(tCtx.Done())
+	tCtx.Cleanup(func() {
 		// Need to cancel before waiting for the shutdown.
 		tCtx.Cancel("test is done")
 		// Now we can wait for all goroutines to stop.
 		tc.informerFactory.Shutdown()
 	})
 
-	tc.informerFactory.WaitForCacheSync(tc.ctx.Done())
+	tc.informerFactory.WaitForCacheSync(tCtx.Done())
 	// The above does not tell us if the registered handler (from NewAssumeCache)
 	// is synced, we need to wait until HasSynced of the handler returns
 	// true, this ensures that the assume cache is in sync with the informer's
 	// store which has been informed by at least one full LIST of the underlying storage.
-	cache.WaitForCacheSync(tc.ctx.Done(), registeredHandler.HasSynced, resourceSliceTracker.HasSynced)
+	cache.WaitForNamedCacheSyncWithContext(tCtx, registeredHandler.HasSynced, resourceSliceTracker.HasSynced)
 
 	for _, node := range nodes {
 		nodeInfo := framework.NewNodeInfo()
@@ -2994,7 +3013,10 @@ func createReactor(tracker cgotesting.ObjectTracker, failPatch bool) func(action
 	}
 }
 
-func Test_isSchedulableAfterClaimChange(t *testing.T) {
+func TestIsSchedulableAfterClaimChange(t *testing.T) {
+	testIsSchedulableAfterClaimChange(ktesting.Init(t))
+}
+func testIsSchedulableAfterClaimChange(tCtx ktesting.TContext) {
 	testcases := map[string]struct {
 		pod            *v1.Pod
 		claims         []*resourceapi.ResourceClaim
@@ -3081,13 +3103,12 @@ func Test_isSchedulableAfterClaimChange(t *testing.T) {
 	}
 
 	for name, tc := range testcases {
-		t.Run(name, func(t *testing.T) {
-			logger, tCtx := ktesting.NewTestContext(t)
+		tCtx.SyncTest(name, func(tCtx ktesting.TContext) {
 			features := feature.Features{
 				EnableDRASchedulerFilterTimeout: true,
 				EnableDynamicResourceAllocation: true,
 			}
-			testCtx := setup(t, nil, nil, tc.claims, nil, nil, features, false, nil)
+			testCtx := setup(tCtx, nil, nil, tc.claims, nil, nil, features, false, nil)
 			oldObj := tc.oldObj
 			newObj := tc.newObj
 			if claim, ok := tc.newObj.(*resourceapi.ResourceClaim); ok {
@@ -3099,13 +3120,13 @@ func Test_isSchedulableAfterClaimChange(t *testing.T) {
 					createClaim.UID = ""
 					storedClaim, err := testCtx.client.ResourceV1().ResourceClaims(createClaim.Namespace).Create(tCtx, createClaim, metav1.CreateOptions{})
 					if err != nil {
-						t.Fatalf("create claim: expected no error, got: %v", err)
+						tCtx.Fatalf("create claim: expected no error, got: %v", err)
 					}
 					claim = storedClaim
 				} else {
 					cachedClaim, err := testCtx.draManager.resourceClaimTracker.cache.Get(claimKey)
 					if err != nil {
-						t.Fatalf("retrieve old claim: expected no error, got: %v", err)
+						tCtx.Fatalf("retrieve old claim: expected no error, got: %v", err)
 					}
 					updateClaim := claim.DeepCopy()
 					// The test claim doesn't have those (generated dynamically), so copy them.
@@ -3114,44 +3135,46 @@ func Test_isSchedulableAfterClaimChange(t *testing.T) {
 
 					storedClaim, err := testCtx.client.ResourceV1().ResourceClaims(updateClaim.Namespace).Update(tCtx, updateClaim, metav1.UpdateOptions{})
 					if err != nil {
-						t.Fatalf("update claim: expected no error, got: %v", err)
+						tCtx.Fatalf("update claim: expected no error, got: %v", err)
 					}
 					claim = storedClaim
 				}
 
 				// Eventually the assume cache will have it, too.
-				require.EventuallyWithT(t, func(t *assert.CollectT) {
-					cachedClaim, err := testCtx.draManager.resourceClaimTracker.cache.Get(claimKey)
-					require.NoError(t, err, "retrieve claim")
-					if cachedClaim.(*resourceapi.ResourceClaim).ResourceVersion != claim.ResourceVersion {
-						t.Errorf("cached claim not updated yet")
-					}
-				}, time.Minute, time.Second, "claim assume cache must have new or updated claim")
+				tCtx.Wait()
+				cachedClaim, err := testCtx.draManager.resourceClaimTracker.cache.Get(claimKey)
+				tCtx.ExpectNoError(err, "retrieve claim")
+				if cachedClaim.(*resourceapi.ResourceClaim).ResourceVersion != claim.ResourceVersion {
+					tCtx.Errorf("cached claim not updated yet")
+				}
 
 				// This has the actual UID and ResourceVersion,
 				// which is relevant for
 				// isSchedulableAfterClaimChange.
 				newObj = claim
 			}
-			gotHint, err := testCtx.p.isSchedulableAfterClaimChange(logger, tc.pod, oldObj, newObj)
+			gotHint, err := testCtx.p.isSchedulableAfterClaimChange(tCtx.Logger(), tc.pod, oldObj, newObj)
 			if tc.wantErr {
 				if err == nil {
-					t.Fatal("want an error, got none")
+					tCtx.Fatal("want an error, got none")
 				}
 				return
 			}
 
 			if err != nil {
-				t.Fatalf("want no error, got: %v", err)
+				tCtx.Fatalf("want no error, got: %v", err)
 			}
 			if tc.wantHint != gotHint {
-				t.Fatalf("want %#v, got %#v", tc.wantHint.String(), gotHint.String())
+				tCtx.Fatalf("want %#v, got %#v", tc.wantHint.String(), gotHint.String())
 			}
 		})
 	}
 }
 
-func Test_isSchedulableAfterPodChange(t *testing.T) {
+func TestIsSchedulableAfterPodChange(t *testing.T) {
+	testIsSchedulableAfterPodChange(ktesting.Init(t))
+}
+func testIsSchedulableAfterPodChange(tCtx ktesting.TContext) {
 	testcases := map[string]struct {
 		objs     []apiruntime.Object
 		pod      *v1.Pod
@@ -3205,26 +3228,25 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 	}
 
 	for name, tc := range testcases {
-		t.Run(name, func(t *testing.T) {
-			logger, _ := ktesting.NewTestContext(t)
+		tCtx.Run(name, func(tCtx ktesting.TContext) {
 			features := feature.Features{
 				EnableDRASchedulerFilterTimeout: true,
 				EnableDynamicResourceAllocation: true,
 			}
-			testCtx := setup(t, nil, nil, tc.claims, nil, tc.objs, features, false, nil)
-			gotHint, err := testCtx.p.isSchedulableAfterPodChange(logger, tc.pod, nil, tc.obj)
+			testCtx := setup(tCtx, nil, nil, tc.claims, nil, tc.objs, features, false, nil)
+			gotHint, err := testCtx.p.isSchedulableAfterPodChange(tCtx.Logger(), tc.pod, nil, tc.obj)
 			if tc.wantErr {
 				if err == nil {
-					t.Fatal("want an error, got none")
+					tCtx.Fatal("want an error, got none")
 				}
 				return
 			}
 
 			if err != nil {
-				t.Fatalf("want no error, got: %v", err)
+				tCtx.Fatalf("want no error, got: %v", err)
 			}
 			if tc.wantHint != gotHint {
-				t.Fatalf("want %#v, got %#v", tc.wantHint.String(), gotHint.String())
+				tCtx.Fatalf("want %#v, got %#v", tc.wantHint.String(), gotHint.String())
 			}
 		})
 	}
