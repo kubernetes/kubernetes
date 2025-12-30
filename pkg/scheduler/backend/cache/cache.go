@@ -372,24 +372,6 @@ func (cache *cacheImpl) AssumePod(logger klog.Logger, pod *v1.Pod) error {
 	return cache.addPod(logger, pod, true)
 }
 
-func (cache *cacheImpl) FinishBinding(logger klog.Logger, pod *v1.Pod) error {
-	return cache.finishBinding(logger, pod, time.Now())
-}
-
-// finishBinding exists to make tests deterministic by injecting now as an argument
-func (cache *cacheImpl) finishBinding(logger klog.Logger, pod *v1.Pod, now time.Time) error {
-	key, err := framework.GetPodKey(pod)
-	if err != nil {
-		return err
-	}
-
-	cache.mu.RLock()
-	defer cache.mu.RUnlock()
-
-	logger.V(5).Info("Finished binding for pod", "podKey", key, "pod", klog.KObj(pod))
-	return nil
-}
-
 func (cache *cacheImpl) ForgetPod(logger klog.Logger, pod *v1.Pod) error {
 	key, err := framework.GetPodKey(pod)
 	if err != nil {

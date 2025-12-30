@@ -262,17 +262,9 @@ func TestAssumePodScheduled(t *testing.T) {
 	}
 }
 
-func assumeAndFinishBinding(logger klog.Logger, cache *cacheImpl, pod *v1.Pod, assumedTime time.Time) error {
-	if err := cache.AssumePod(logger, pod); err != nil {
-		return err
-	}
-	return cache.finishBinding(logger, pod, assumedTime)
-}
-
 // TestAddPodWillConfirm tests that a pod being Add()ed will be confirmed if assumed.
 func TestAddPodWillConfirm(t *testing.T) {
 	nodeName := "node"
-	now := time.Now()
 
 	testPods := []*v1.Pod{
 		makeBasePod(t, nodeName, "test-1", "100m", "500", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}}),
@@ -306,7 +298,7 @@ func TestAddPodWillConfirm(t *testing.T) {
 	defer cancel()
 	cache := newCache(ctx, time.Second, nil)
 	for _, podToAssume := range test.podsToAssume {
-		if err := assumeAndFinishBinding(logger, cache, podToAssume, now); err != nil {
+		if err := cache.AssumePod(logger, podToAssume); err != nil {
 			t.Fatalf("assumePod failed: %v", err)
 		}
 	}
@@ -341,7 +333,6 @@ func TestAddPodWillConfirm(t *testing.T) {
 
 func TestDump(t *testing.T) {
 	nodeName := "node"
-	now := time.Now()
 
 	testPods := []*v1.Pod{
 		makeBasePod(t, nodeName, "test-1", "100m", "500", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}}),
@@ -360,7 +351,7 @@ func TestDump(t *testing.T) {
 	defer cancel()
 	cache := newCache(ctx, time.Second, nil)
 	for _, podToAssume := range test.podsToAssume {
-		if err := assumeAndFinishBinding(logger, cache, podToAssume, now); err != nil {
+		if err := cache.AssumePod(logger, podToAssume); err != nil {
 			t.Errorf("assumePod failed: %v", err)
 		}
 	}
@@ -392,7 +383,6 @@ func TestAddPodAlwaysUpdatesPodInfoInNodeInfo(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	now := time.Now()
 	p1 := makeBasePod(t, "node1", "test-1", "100m", "500", "", []v1.ContainerPort{{HostPort: 80}})
 
 	p2 := p1.DeepCopy()
@@ -427,7 +417,7 @@ func TestAddPodAlwaysUpdatesPodInfoInNodeInfo(t *testing.T) {
 
 	cache := newCache(ctx, time.Second, nil)
 	for _, podToAssume := range test.podsToAssume {
-		if err := assumeAndFinishBinding(logger, cache, podToAssume, now); err != nil {
+		if err := cache.AssumePod(logger, podToAssume); err != nil {
 			t.Fatalf("assumePod failed: %v", err)
 		}
 	}
@@ -446,8 +436,6 @@ func TestAddPodAlwaysUpdatesPodInfoInNodeInfo(t *testing.T) {
 
 // TestAddPodWillReplaceAssumed tests that a pod being Add()ed will replace any assumed pod.
 func TestAddPodWillReplaceAssumed(t *testing.T) {
-	now := time.Now()
-
 	assumedPod := makeBasePod(t, "assumed-node-1", "test-1", "100m", "500", "", []v1.ContainerPort{{HostPort: 80}})
 	addedPod := makeBasePod(t, "actual-node", "test-1", "100m", "500", "", []v1.ContainerPort{{HostPort: 80}})
 	updatedPod := makeBasePod(t, "actual-node", "test-1", "200m", "500", "", []v1.ContainerPort{{HostPort: 90}})
@@ -485,7 +473,7 @@ func TestAddPodWillReplaceAssumed(t *testing.T) {
 	defer cancel()
 	cache := newCache(ctx, time.Second, nil)
 	for _, podToAssume := range test.podsToAssume {
-		if err := assumeAndFinishBinding(logger, cache, podToAssume, now); err != nil {
+		if err := cache.AssumePod(logger, podToAssume); err != nil {
 			t.Fatalf("assumePod failed: %v", err)
 		}
 	}
@@ -776,14 +764,13 @@ func TestForgetPod(t *testing.T) {
 	nodeName := "node"
 	basePod := makeBasePod(t, nodeName, "test", "100m", "500", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}})
 	pods := []*v1.Pod{basePod}
-	now := time.Now()
 	logger, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	cache := newCache(ctx, time.Second, nil)
 	for _, pod := range pods {
-		if err := assumeAndFinishBinding(logger, cache, pod, now); err != nil {
+		if err := cache.AssumePod(logger, pod); err != nil {
 			t.Fatalf("assumePod failed: %v", err)
 		}
 		isAssumed, err := cache.IsAssumedPod(pod)
