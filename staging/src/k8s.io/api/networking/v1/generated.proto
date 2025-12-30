@@ -116,6 +116,7 @@ message IPAddressSpec {
 message IPBlock {
   // cidr is a string representing the IPBlock
   // Valid examples are "192.168.1.0/24" or "2001:db8::/64"
+  // k8s:required
   optional string cidr = 1;
 
   // except is a slice of CIDRs that should not be included within an IPBlock

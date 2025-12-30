@@ -161,6 +161,7 @@ type NetworkPolicyPort struct {
 type IPBlock struct {
 	// cidr is a string representing the IPBlock
 	// Valid examples are "192.168.1.0/24" or "2001:db8::/64"
+	// +k8s:required
 	CIDR string
 
 	// except is a list of CIDRs that should not be included within the IPBlock

@@ -1209,6 +1209,7 @@ type NetworkPolicyPort struct {
 type IPBlock struct {
 	// CIDR is a string representing the IP Block
 	// Valid examples are "192.168.1.0/24" or "2001:db8::/64"
+	// +k8s:required
 	CIDR string `json:"cidr" protobuf:"bytes,1,name=cidr"`
 	// Except is a slice of CIDRs that should not be included within an IP Block
 	// Valid examples are "192.168.1.0/24" or "2001:db8::/64"
