@@ -1,3 +1,8 @@
+## 1.38.3
+
+### Fixes
+make string formatitng more consistent for users who use format.Object directly
+
 ## 1.38.2
 
 - roll back to go 1.23.0 [c404969]

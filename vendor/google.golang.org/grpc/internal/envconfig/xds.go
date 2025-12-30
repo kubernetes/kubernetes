@@ -63,4 +63,9 @@ var (
 	// For more details, see:
 	// https://github.com/grpc/proposal/blob/master/A82-xds-system-root-certs.md.
 	XDSSystemRootCertsEnabled = boolFromEnv("GRPC_EXPERIMENTAL_XDS_SYSTEM_ROOT_CERTS", false)
+
+	// XDSSPIFFEEnabled controls if SPIFFE Bundle Maps can be used as roots of
+	// trust.  For more details, see:
+	// https://github.com/grpc/proposal/blob/master/A87-mtls-spiffe-support.md
+	XDSSPIFFEEnabled = boolFromEnv("GRPC_EXPERIMENTAL_XDS_MTLS_SPIFFE", false)
 )

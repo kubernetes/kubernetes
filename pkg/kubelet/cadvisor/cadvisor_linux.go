@@ -32,6 +32,14 @@ import (
 	_ "github.com/google/cadvisor/container/crio/install"
 	_ "github.com/google/cadvisor/container/systemd/install"
 
+	// Register filesystem plugins needed for container stats.
+	_ "github.com/google/cadvisor/fs/btrfs/install"
+	_ "github.com/google/cadvisor/fs/devicemapper/install"
+	_ "github.com/google/cadvisor/fs/nfs/install"
+	_ "github.com/google/cadvisor/fs/overlay/install"
+	_ "github.com/google/cadvisor/fs/tmpfs/install"
+	_ "github.com/google/cadvisor/fs/vfs/install"
+
 	"github.com/google/cadvisor/cache/memory"
 	cadvisormetrics "github.com/google/cadvisor/container"
 	cadvisorapi "github.com/google/cadvisor/info/v1"

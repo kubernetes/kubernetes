@@ -200,6 +200,8 @@ type Percentiles struct {
 	Ninety uint64 `json:"ninety"`
 	// 95th percentile over the collected sample.
 	NinetyFive uint64 `json:"ninetyfive"`
+	// Number of samples used to calculate these percentiles.
+	Count uint64 `json:"count"`
 }
 
 type Usage struct {

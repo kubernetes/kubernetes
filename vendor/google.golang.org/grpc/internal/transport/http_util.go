@@ -196,11 +196,11 @@ func decodeTimeout(s string) (time.Duration, error) {
 	if !ok {
 		return 0, fmt.Errorf("transport: timeout unit is not recognized: %q", s)
 	}
-	t, err := strconv.ParseInt(s[:size-1], 10, 64)
+	t, err := strconv.ParseUint(s[:size-1], 10, 64)
 	if err != nil {
 		return 0, err
 	}
-	const maxHours = math.MaxInt64 / int64(time.Hour)
+	const maxHours = math.MaxInt64 / uint64(time.Hour)
 	if d == time.Hour && t > maxHours {
 		// This timeout would overflow math.MaxInt64; clamp it.
 		return time.Duration(math.MaxInt64), nil

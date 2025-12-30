@@ -411,6 +411,10 @@ type terminalSizeQueueAdapter struct {
 }
 
 func (a *terminalSizeQueueAdapter) Next() *remotecommand.TerminalSize {
+	if a.delegate == nil {
+		return nil
+	}
+
 	next := a.delegate.Next()
 	if next == nil {
 		return nil

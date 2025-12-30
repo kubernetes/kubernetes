@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:build linux
+
 // Unmarshal's a Containers description json file. The json file contains
 // an array of ContainerHint structs, each with a container's id and networkInterface
 // This allows collecting stats about network interfaces configured outside docker

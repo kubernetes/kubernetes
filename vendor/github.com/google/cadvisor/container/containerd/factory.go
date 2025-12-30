@@ -12,16 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:build linux
+
 package containerd
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"path"
 	"regexp"
 	"strings"
 
-	"golang.org/x/net/context"
 	"k8s.io/klog/v2"
 
 	"github.com/google/cadvisor/container"
