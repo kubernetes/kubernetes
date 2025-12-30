@@ -208,8 +208,8 @@ func (pl *FakePreBindPlugin) Name() string {
 }
 
 // PreBindPreFlight invoked at the PreBind extension point.
-func (pl *FakePreBindPlugin) PreBindPreFlight(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ string) *fwk.Status {
-	return pl.PreBindPreFlightStatus
+func (pl *FakePreBindPlugin) PreBindPreFlight(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ string) (*fwk.PreBindPreFlightResult, *fwk.Status) {
+	return &fwk.PreBindPreFlightResult{AllowParallel: false}, pl.PreBindPreFlightStatus
 }
 
 // PreBind invoked at the PreBind extension point.
