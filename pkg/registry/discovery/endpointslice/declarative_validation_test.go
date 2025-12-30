@@ -102,7 +102,7 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			oldObj:    mkValidEndpointSlice(),
 			updateObj: mkValidEndpointSlice(),
 		},
-		"valid update: at limit endpoint addresses": {
+		"valid update at limit endpoint addresses": {
 			oldObj:    mkValidEndpointSlice(),
 			updateObj: mkValidEndpointSlice(tweakAddresses(100)),
 		},
@@ -120,6 +120,13 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			updateObj: mkValidEndpointSlice(tweakAddresses(101)),
 			expectedErrs: field.ErrorList{
 				field.TooMany(field.NewPath("endpoints").Index(0).Child("addresses"), 101, 100).WithOrigin("maxItems"),
+			},
+		},
+		"invalid update addressType immutable": {
+			oldObj:    mkValidEndpointSlice(),
+			updateObj: mkValidEndpointSlice(tweakAddressType(discovery.AddressTypeIPv6)),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("addressType"), discovery.AddressTypeIPv6, "field is immutable").WithOrigin("immutable"),
 			},
 		},
 	}

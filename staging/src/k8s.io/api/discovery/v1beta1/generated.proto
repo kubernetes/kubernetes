@@ -172,6 +172,7 @@ message EndpointSlice {
   // * FQDN: Represents a Fully Qualified Domain Name.
   // +required
   // +k8s:required
+  // +k8s:immutable
   optional string addressType = 4;
 
   // endpoints is a list of unique endpoints in this slice. Each slice may
