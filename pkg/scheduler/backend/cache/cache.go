@@ -41,10 +41,9 @@ var (
 // New returns a Cache implementation.
 // It automatically starts a go routine that exports cache metrics.
 // "ctx" is the context that would close the background goroutine.
-func New(ctx context.Context, ttl time.Duration, apiDispatcher fwk.APIDispatcher) Cache {
-	logger := klog.FromContext(ctx)
-	cache := newCache(ctx, ttl, updateMetricsPeriod, apiDispatcher)
-	cache.run(logger)
+func New(ctx context.Context, apiDispatcher fwk.APIDispatcher) Cache {
+	cache := newCache(ctx, updateMetricsPeriod, apiDispatcher)
+	cache.run()
 	return cache
 }
 
@@ -85,7 +84,7 @@ type podState struct {
 	pod *v1.Pod
 }
 
-func newCache(ctx context.Context, _, period time.Duration, apiDispatcher fwk.APIDispatcher) *cacheImpl {
+func newCache(ctx context.Context, period time.Duration, apiDispatcher fwk.APIDispatcher) *cacheImpl {
 	logger := klog.FromContext(ctx)
 	return &cacheImpl{
 		period: period,
@@ -711,7 +710,7 @@ func (cache *cacheImpl) removeNodeImageStates(node *v1.Node) {
 	}
 }
 
-func (cache *cacheImpl) run(logger klog.Logger) {
+func (cache *cacheImpl) run() {
 	go wait.Until(cache.updateMetrics, cache.period, cache.stop)
 }
 

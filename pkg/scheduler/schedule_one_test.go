@@ -993,7 +993,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 							defer apiDispatcher.Close()
 						}
 
-						internalCache := internalcache.New(ctx, 30*time.Second, apiDispatcher)
+						internalCache := internalcache.New(ctx, apiDispatcher)
 						cache := &fakecache.Cache{
 							Cache: internalCache,
 							ForgetFunc: func(pod *v1.Pod) {
@@ -1588,7 +1588,7 @@ func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {
 						defer apiDispatcher.Close()
 					}
 
-					internalCache := internalcache.New(ctx, 30*time.Second, apiDispatcher)
+					internalCache := internalcache.New(ctx, apiDispatcher)
 					cache := &fakecache.Cache{
 						Cache: internalCache,
 						ForgetFunc: func(pod *v1.Pod) {
@@ -1776,7 +1776,7 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 				defer apiDispatcher.Close()
 			}
 
-			scache := internalcache.New(ctx, 10*time.Minute, apiDispatcher)
+			scache := internalcache.New(ctx, apiDispatcher)
 			firstPod := podWithPort("pod.Name", "", 8080)
 			node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1", UID: types.UID("node1")}}
 			scache.AddNode(logger, &node)
@@ -1865,7 +1865,7 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 				defer apiDispatcher.Close()
 			}
 
-			scache := internalcache.New(ctx, 10*time.Minute, apiDispatcher)
+			scache := internalcache.New(ctx, apiDispatcher)
 
 			// Design the baseline for the pods, and we will make nodes that don't fit it later.
 			var cpu = int64(4)
@@ -2173,7 +2173,7 @@ func TestSchedulerBinding(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				cache := internalcache.New(ctx, 100*time.Millisecond, apiDispatcher)
+				cache := internalcache.New(ctx, apiDispatcher)
 				if asyncAPICallsEnabled {
 					informerFactory := informers.NewSharedInformerFactory(client, 0)
 					ar := metrics.NewMetricsAsyncRecorder(10, 1*time.Second, ctx.Done())
@@ -3496,7 +3496,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
-			cache := internalcache.New(ctx, time.Duration(0), nil)
+			cache := internalcache.New(ctx, nil)
 			for _, pod := range test.pods {
 				cache.AddPod(logger, pod)
 			}
@@ -4256,7 +4256,7 @@ func Test_prioritizeNodes(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
-			cache := internalcache.New(ctx, time.Duration(0), nil)
+			cache := internalcache.New(ctx, nil)
 			for _, node := range test.nodes {
 				cache.AddNode(klog.FromContext(ctx), node)
 			}
@@ -4457,7 +4457,7 @@ func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
 			nodes := makeNodeList([]string{"node1", "node2", "node3"})
 			client := clientsetfake.NewClientset(test.pod)
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
-			cache := internalcache.New(ctx, time.Duration(0), nil)
+			cache := internalcache.New(ctx, nil)
 			for _, n := range nodes {
 				cache.AddNode(logger, n)
 			}
@@ -4539,7 +4539,7 @@ func makeNodeList(nodeNames []string) []*v1.Node {
 // makeScheduler makes a simple Scheduler for testing.
 func makeScheduler(ctx context.Context, nodes []*v1.Node) *Scheduler {
 	logger := klog.FromContext(ctx)
-	cache := internalcache.New(ctx, time.Duration(0), nil)
+	cache := internalcache.New(ctx, nil)
 	for _, n := range nodes {
 		cache.AddNode(logger, n)
 	}
@@ -4702,7 +4702,7 @@ func setupTestSchedulerWithVolumeBinding(ctx context.Context, t *testing.T, clie
 		t.Cleanup(apiDispatcher.Close)
 	}
 
-	scache := internalcache.New(ctx, 10*time.Minute, apiDispatcher)
+	scache := internalcache.New(ctx, apiDispatcher)
 	scache.AddNode(logger, &testNode)
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	pvcInformer := informerFactory.Core().V1().PersistentVolumeClaims()
