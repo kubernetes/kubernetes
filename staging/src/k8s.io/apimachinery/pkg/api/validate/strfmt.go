@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/api/validate/content"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/kubernetes/pkg/util/parsers"
 )
 
 const (
@@ -276,6 +277,22 @@ func ResourceFullyQualifiedName[T ~string](ctx context.Context, op operation.Ope
 		allErrs = append(allErrs, field.Invalid(fldPath, s, "a fully qualified name must be a domain and a name separated by a slash"))
 	}
 	return allErrs.WithOrigin("format=k8s-resource-fully-qualified-name")
+}
+
+// CronSchedule validates that the given value is a valid cron schedule
+func CronSchedule[T ~string](ctx context.Context, op operation.Operation, fldPath *field.Path, value, _ *T) field.ErrorList {
+	if value == nil {
+		return nil
+	}
+
+	var allErrs field.ErrorList
+	s := string(*value)
+	_, err := parsers.ParseCronScheduleWithPanicRecovery(s)
+
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, s, err.Error()))
+	}
+	return allErrs.WithOrigin("format=k8s-cron-schedule")
 }
 
 func validateCIdentifier(id string, length int, fldPath *field.Path) field.ErrorList {

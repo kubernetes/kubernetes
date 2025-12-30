@@ -52,6 +52,12 @@ func testDeclarativeValidateForDeclarative(t *testing.T, apiVersion string) {
 				field.Required(field.NewPath("spec", "schedule"), ""),
 			},
 		},
+		"schedule: invalid": {
+			input: mkCronJob(tweakSchedule("bogus")),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "schedule"), "bogus", "expected exactly 5 fields, found 1: [bogus]").WithOrigin("format=k8s-cron-schedule"),
+			},
+		},
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
@@ -80,12 +86,18 @@ func testValidateUpdateForDeclarative(t *testing.T, apiVersion string) {
 			old:    mkCronJob(),
 			update: mkCronJob(tweakResourceVersion("poke")),
 		},
-
 		"schedule: updated to empty": {
 			old:    mkCronJob(),
 			update: mkCronJob(tweakSchedule(""), tweakResourceVersion("poke")),
 			expectedErrs: field.ErrorList{
 				field.Required(field.NewPath("spec", "schedule"), ""),
+			},
+		},
+		"schedule: updated to invalid": {
+			old:    mkCronJob(),
+			update: mkCronJob(tweakSchedule("bogus"), tweakResourceVersion("poke")),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "schedule"), "bogus", "expected exactly 5 fields, found 1: [bogus]").WithOrigin("format=k8s-cron-schedule"),
 			},
 		},
 	}

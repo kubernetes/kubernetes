@@ -783,7 +783,7 @@ func validateCronJobSpec(spec, oldSpec *batch.CronJobSpec, fldPath *field.Path, 
 	allErrs := field.ErrorList{}
 
 	if len(spec.Schedule) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("schedule"), "")).MarkCoveredByDeclarative()
+		allErrs = append(allErrs, field.Required(fldPath.Child("schedule"), "").MarkCoveredByDeclarative())
 	} else {
 		allowTZInSchedule := false
 		if oldSpec != nil {
@@ -834,7 +834,7 @@ func validateScheduleFormat(schedule string, allowTZInSchedule bool, timeZone *s
 	allErrs := field.ErrorList{}
 
 	if _, err := parsers.ParseCronScheduleWithPanicRecovery(schedule); err != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath, schedule, err.Error()))
+		allErrs = append(allErrs, field.Invalid(fldPath, schedule, err.Error()).WithOrigin("format=k8s-cron-schedule").MarkCoveredByDeclarative())
 	}
 	switch {
 	case allowTZInSchedule && strings.Contains(schedule, "TZ") && timeZone != nil:
