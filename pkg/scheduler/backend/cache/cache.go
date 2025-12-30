@@ -35,16 +35,15 @@ import (
 )
 
 var (
-	cleanAssumedPeriod = 1 * time.Second
+	updateMetricsPeriod = 1 * time.Second
 )
 
 // New returns a Cache implementation.
-// It automatically starts a go routine that manages expiration of assumed pods.
-// "ttl" is how long the assumed pod will get expired.
+// It automatically starts a go routine that exports cache metrics.
 // "ctx" is the context that would close the background goroutine.
 func New(ctx context.Context, ttl time.Duration, apiDispatcher fwk.APIDispatcher) Cache {
 	logger := klog.FromContext(ctx)
-	cache := newCache(ctx, ttl, cleanAssumedPeriod, apiDispatcher)
+	cache := newCache(ctx, ttl, updateMetricsPeriod, apiDispatcher)
 	cache.run(logger)
 	return cache
 }
@@ -60,7 +59,6 @@ type nodeInfoListItem struct {
 
 type cacheImpl struct {
 	stop   <-chan struct{}
-	ttl    time.Duration
 	period time.Duration
 
 	// This mutex guards all fields within this cache struct.
@@ -85,17 +83,11 @@ type cacheImpl struct {
 
 type podState struct {
 	pod *v1.Pod
-	// Used by assumedPod to determinate expiration.
-	// If deadline is nil, assumedPod will never expire.
-	deadline *time.Time
-	// Used to block cache from expiring assumedPod if binding still runs
-	bindingFinished bool
 }
 
-func newCache(ctx context.Context, ttl, period time.Duration, apiDispatcher fwk.APIDispatcher) *cacheImpl {
+func newCache(ctx context.Context, _, period time.Duration, apiDispatcher fwk.APIDispatcher) *cacheImpl {
 	logger := klog.FromContext(ctx)
 	return &cacheImpl{
-		ttl:    ttl,
 		period: period,
 		stop:   ctx.Done(),
 
@@ -395,17 +387,7 @@ func (cache *cacheImpl) finishBinding(logger klog.Logger, pod *v1.Pod, now time.
 	cache.mu.RLock()
 	defer cache.mu.RUnlock()
 
-	logger.V(5).Info("Finished binding for pod, can be expired", "podKey", key, "pod", klog.KObj(pod))
-	currState, ok := cache.podStates[key]
-	if ok && cache.assumedPods.Has(key) {
-		if cache.ttl == time.Duration(0) {
-			currState.deadline = nil
-		} else {
-			dl := now.Add(cache.ttl)
-			currState.deadline = &dl
-		}
-		currState.bindingFinished = true
-	}
+	logger.V(5).Info("Finished binding for pod", "podKey", key, "pod", klog.KObj(pod))
 	return nil
 }
 
@@ -730,40 +712,14 @@ func (cache *cacheImpl) removeNodeImageStates(node *v1.Node) {
 }
 
 func (cache *cacheImpl) run(logger klog.Logger) {
-	go wait.Until(func() {
-		cache.cleanupAssumedPods(logger, time.Now())
-	}, cache.period, cache.stop)
-}
-
-// cleanupAssumedPods exists for making test deterministic by taking time as input argument.
-// It also reports metrics on the cache size for nodes, pods, and assumed pods.
-func (cache *cacheImpl) cleanupAssumedPods(logger klog.Logger, now time.Time) {
-	cache.mu.Lock()
-	defer cache.mu.Unlock()
-	defer cache.updateMetrics()
-
-	// The size of assumedPods should be small
-	for key := range cache.assumedPods {
-		ps, ok := cache.podStates[key]
-		if !ok {
-			utilruntime.HandleErrorWithLogger(logger, nil, "Key found in assumed set but not in podStates, potentially a logical error")
-			klog.FlushAndExit(klog.ExitFlushTimeout, 1)
-		}
-		if !ps.bindingFinished {
-			logger.V(5).Info("Could not expire cache for pod as binding is still in progress", "podKey", key, "pod", klog.KObj(ps.pod))
-			continue
-		}
-		if cache.ttl != 0 && now.After(*ps.deadline) {
-			logger.Info("Pod expired", "podKey", key, "pod", klog.KObj(ps.pod))
-			if err := cache.removePod(logger, ps.pod); err != nil {
-				utilruntime.HandleErrorWithLogger(logger, err, "ExpirePod failed", "podKey", key, "pod", klog.KObj(ps.pod))
-			}
-		}
-	}
+	go wait.Until(cache.updateMetrics, cache.period, cache.stop)
 }
 
 // updateMetrics updates cache size metric values for pods, assumed pods, and nodes
 func (cache *cacheImpl) updateMetrics() {
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
 	metrics.CacheSize.WithLabelValues("assumed_pods").Set(float64(len(cache.assumedPods)))
 	metrics.CacheSize.WithLabelValues("pods").Set(float64(len(cache.podStates)))
 	metrics.CacheSize.WithLabelValues("nodes").Set(float64(len(cache.nodes)))
