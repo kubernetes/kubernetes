@@ -299,9 +299,7 @@ func ParseQuantity(str string) (Quantity, error) {
 	switch format {
 	case DecimalExponent, DecimalSI:
 		scale = exponent
-		precision = maxInt64Factors - int32(len(num)+len(denom)) //not making sense if large number then this will always be less than 0
-		//here precision tells how much capacity is left before int64 overflow
-
+		precision = maxInt64Factors - int32(len(num)+len(denom))
 	case BinarySI:
 		scale = 0
 		switch {
@@ -316,8 +314,6 @@ func ParseQuantity(str string) (Quantity, error) {
 	}
 
 	if precision >= 0 {
-		/* Basically if we have enough room in int64 without any problem (overflow) then proceed else store in dec
-		   format*/
 		// if we have a denominator, shift the entire value to the left by the number of places in the
 		// denominator
 		scale -= int32(len(denom))
@@ -348,13 +344,6 @@ func ParseQuantity(str string) (Quantity, error) {
 			}
 		}
 	}
-	/*
-		TODO: ADD A CHECK HERE FOR NUMBERS WHO ARE > or < range but are inside i
-		also check if the number is >nano, beacuse there might be numbers who are 0.1231313...10^19 value
-		which can go beyond range but we might miscalculate them
-		so if a number is not a decimal number, 0.12313 and is not out of the nano scale, then we can do calcs
-
-	*/
 
 	amount := new(inf.Dec)
 	if _, ok := amount.SetString(value); !ok {
