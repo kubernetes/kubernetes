@@ -273,7 +273,108 @@ checkFDs() {
   fi
 }
 
+# monitor periodically dumps information about running processes
+# in a format that helps determine what ran in parallel and
+# which commands consumed CPU cycles.
+#
+# Lines where excessive CPU consumption was detected are prefixed
+# with ERROR.
+#
+# Example:
+# INFO 03:00m config.test,0,0s,22.4% entrypoint,0,0s,0.0% link,10,1s,81.4% bash,0,0s,0.0% bash,0,0s,0.0% bash,0,0s,0.0% go,0,24s,14.0% gotestsum,0,0s,0.0% make,0,0s,0.0% ps,0,0s,0.0%
+# ...
+# ERROR 04:21m devicetainteviction.test,0,12s,280%(BAD) endpoint.test,0,0s,7.1% endpointslice.test,0,0s,8.5% endpointslicemirroring.test,0,0s,84.3% metrics.test,0,0s,3.1% entrypoint,0,0s,0.0% compile,10,1s,63.9% link,10,0s,58.8% bash,0,0s,0.0% bash,0,0s,0.0% bash,0,0s,0.0% go,0,30s,12.0% gotestsum,0,1s,0.6% make,0,0s,0.0% ps,0,0s,0.0% 
+monitor() {
+    start=$SECONDS
+    echo "# ELAPSED: COMMAND,NICE,CPUTIME,%CPU ..."
+    # We sample frequently and then only print lines with excessive CPU consumption or one line every 30 seconds.
+    periodic=30
+    delay=1
+    while sleep "${delay}"; do
+        elapsed=$((SECONDS - $start))
+        # -o comm truncates the command name, so here we use cmd and then only use the first word of it,
+        # stripping directories. The test binaries are in a tmp directory, so we only see the last part
+        # of the package (devicetainteviction.test instead of k8s.io/kubernetes/pkg/controller/devicetainteviction).
+        ps --no-headers --cols 240 -o nice,cputimes,%cpu,cmd --sort cmd | (
+            header=INFO
+            line=$(printf "%02d:%02dm " $((elapsed / 60)) $((elapsed % 60)))
+            # Not a pipe, we need the while ... do to run in the current shell!
+            while read -r nice cputimes cpu comm args; do
+                line+="$(basename "${comm}"),${nice},${cputimes}s,${cpu}%"
+                # Excessive CPU consumption happens if:
+                # - > 5 seconds of CPU time consumed (short-lived tests are less problematic).
+                # - More than one CPU kept busy, with 200% as threshold to avoid potential false positives.
+                # - Priority not reduced, i.e. it might have stolen CPU time from other processes.
+                if [[ "${cputimes}" -gt 5 ]] && [[ "${cpu%.*}" -gt 200 ]] && [[ "${nice}" -eq 0 ]]; then
+                    line+="(BAD)"
+                    header=ERROR
+                fi
+                line+=" "
+            done
+            if [[ "${header}" = ERROR ]] || [[ $((elapsed % "${periodic}")) -eq 0 ]]; then
+                echo "${header} ${line}"
+            fi
+        )
+    done
+}
+
+# check_monitor stops monitoring, then checks for problematic commands.
+check_monitor() {
+    kill "${monitor_pid}"
+    problems=$(
+        for cmd in $(sed -e 's/ /\n/g' "${ARTIFACTS}/commands.log" | grep '(BAD)' | sed -e 's/,.*//' | sort -u); do
+            sed -e 's/ /\n/g' "${ARTIFACTS}/commands.log" | grep '(BAD)' | grep "^${cmd}" | sort -n -k4 -t, | tail -1 | sed -e 's/,0,/ /' -e 's/,/ /' -e 's/(BAD)//'
+        done
+            )
+    if [[ -n "${problems}" ]]; then
+        cat >"${ARTIFACTS}/junit_test_sh_$$.xml" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+<testsuite tests="1" failures="1" name="hack/make-rules/test.sh">
+<testcase classname="hack/make-rules/test.sh" name="CPU consumption">
+<failure message="Excessive CPU consumption detected." type="">
+
+COMMAND CPUTIMES %CPU
+${problems}
+
+COMMAND: binary name (not necessarily unique)
+CPUTIMES: total amount of CPU time in seconds at the time when the check was triggered
+%CPU: average percent of CPUs used since starting the command, >100% when using more than one CPU
+
+These commands kept more than one CPU busy for
+prolonged periods of time without reducing their
+priority. When running multiple test binaries in parallel,
+this can prevent other tests from running long enough
+such that they run into timeouts and flake.
+
+Go packages which use more than one CPU during unit testing
+can reduce their priority with a main_test.go which contains:
+
+   import (
+      _ "k8s.io/apimachinery/pkg/util/benice" // Lower process priority.
+   )
+
+In such tests it may be necessary to use synctest to decouple
+from real-world time.
+
+For details on command execution see artifacts/commands.log.
+</failure>
+</testcase>
+</testsuite>
+</testsuites>
+EOF
+        exit 1
+    fi
+}
+
+
 checkFDs
+
+if [[ -n "${ARTIFACTS:-}" ]]; then
+    monitor >"${ARTIFACTS}/commands.log" &
+    monitor_pid=$!
+    kube::util::trap_add check_monitor EXIT
+fi
 
 runTests "$@"
 
