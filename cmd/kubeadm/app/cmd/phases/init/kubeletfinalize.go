@@ -35,7 +35,7 @@ import (
 
 var (
 	kubeletFinalizePhaseExample = cmdutil.Examples(`
-		# Updates settings relevant to the kubelet after TLS bootstrap"
+		# Updates settings relevant to the kubelet after TLS bootstrap
 		kubeadm init phase kubelet-finalize all --config
 		`)
 )
