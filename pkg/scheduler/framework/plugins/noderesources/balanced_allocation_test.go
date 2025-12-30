@@ -17,7 +17,6 @@ limitations under the License.
 package noderesources
 
 import (
-	"context"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -26,7 +25,6 @@ import (
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -36,9 +34,13 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestNodeResourcesBalancedAllocation(t *testing.T) {
+	testNodeResourcesBalancedAllocation(ktesting.Init(t))
+}
+func testNodeResourcesBalancedAllocation(tCtx ktesting.TContext) {
 	cpuAndMemoryAndGPU := v1.PodSpec{
 		Containers: []v1.Container{
 			{
@@ -363,45 +365,43 @@ func TestNodeResourcesBalancedAllocation(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, test.draObjects != nil)
+		tCtx.SyncTest(test.name, func(tCtx ktesting.TContext) {
+			featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, test.draObjects != nil)
 			snapshot := cache.NewSnapshot(test.pods, test.nodes)
-			logger, ctx := ktesting.NewTestContext(t)
-			ctx, cancel := context.WithCancel(ctx)
-			defer cancel()
-			fh, _ := runtime.NewFramework(ctx, nil, nil, runtime.WithSnapshotSharedLister(snapshot))
-			p, _ := NewBalancedAllocation(ctx, &test.args, fh, feature.Features{
+			fh, _ := runtime.NewFramework(tCtx, nil, nil, runtime.WithSnapshotSharedLister(snapshot))
+			defer func() {
+				tCtx.Cancel("test has completed")
+				runtime.WaitForShutdown(fh)
+			}()
+			p, _ := NewBalancedAllocation(tCtx, &test.args, fh, feature.Features{
 				EnableDRAExtendedResource: test.draObjects != nil,
 			})
 
-			draManager, err := newTestDRAManager(t, ctx, logger, test.draObjects...)
-			if err != nil {
-				t.Fatalf("failed to create test DRA manager: %v", err)
-			}
+			draManager := newTestDRAManager(tCtx, test.draObjects...)
 			p.(*BalancedAllocation).draManager = draManager
 
 			state := framework.NewCycleState()
 			if test.runPreScore {
-				status := p.(fwk.PreScorePlugin).PreScore(ctx, state, test.pod, tf.BuildNodeInfos(test.nodes))
+				status := p.(fwk.PreScorePlugin).PreScore(tCtx, state, test.pod, tf.BuildNodeInfos(test.nodes))
 				if status.Code() != test.wantPreScoreStatusCode {
-					t.Errorf("unexpected status code, want: %v, got: %v", test.wantPreScoreStatusCode, status.Code())
+					tCtx.Errorf("unexpected status code, want: %v, got: %v", test.wantPreScoreStatusCode, status.Code())
 				}
 				if status.Code() == fwk.Skip {
-					t.Log("skipping score test as PreScore returned skip")
+					tCtx.Log("skipping score test as PreScore returned skip")
 					return
 				}
 			}
 			for i := range test.nodes {
 				nodeInfo, err := snapshot.Get(test.nodes[i].Name)
 				if err != nil {
-					t.Errorf("failed to get node %q from snapshot: %v", test.nodes[i].Name, err)
+					tCtx.Errorf("failed to get node %q from snapshot: %v", test.nodes[i].Name, err)
 				}
-				hostResult, status := p.(fwk.ScorePlugin).Score(ctx, state, test.pod, nodeInfo)
+				hostResult, status := p.(fwk.ScorePlugin).Score(tCtx, state, test.pod, nodeInfo)
 				if !status.IsSuccess() {
-					t.Errorf("Score is expected to return success, but didn't. Got status: %v", status)
+					tCtx.Errorf("Score is expected to return success, but didn't. Got status: %v", status)
 				}
 				if diff := cmp.Diff(test.expectedList[i].Score, hostResult); diff != "" {
-					t.Errorf("unexpected score for host %v (-want,+got):\n%s", test.nodes[i].Name, diff)
+					tCtx.Errorf("unexpected score for host %v (-want,+got):\n%s", test.nodes[i].Name, diff)
 				}
 			}
 		})
