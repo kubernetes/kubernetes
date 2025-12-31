@@ -120,7 +120,6 @@ func Validate_CronJobSpec(ctx context.Context, op operation.Operation, fldPath *
 			if earlyReturn {
 				return // do not proceed
 			}
-			errs = append(errs, validate.CronSchedule(ctx, op, fldPath, obj, oldObj)...)
 			return
 		}(fldPath.Child("schedule"), &obj.Schedule, safe.Field(oldObj, func(oldObj *batchv1.CronJobSpec) *string { return &oldObj.Schedule }), oldObj != nil)...)
 
