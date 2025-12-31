@@ -359,6 +359,10 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 	if (result == results.Failure && w.resultRun < int(w.spec.FailureThreshold)) ||
 		(result == results.Success && w.resultRun < int(w.spec.SuccessThreshold)) {
 		// Success or failure is below threshold - leave the probe state unchanged.
+		if result == results.Failure {
+			w.probeManager.prober.recordContainerEvent(ctx, w.pod, &w.container, v1.EventTypeWarning, "ProbeSuppressed",
+				"%s probe failed, but failure count (%d) is less than failure threshold (%d). The result is being ignored.", w.probeType, w.resultRun, w.spec.FailureThreshold)
+		}
 		return true
 	}
 
