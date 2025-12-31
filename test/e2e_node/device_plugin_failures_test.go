@@ -283,7 +283,7 @@ var _ = SIGDescribe("Device Plugin Failures:", framework.WithNodeConformance(), 
 		gomega.Eventually(getNodeResourceValues, nodeStatusUpdateTimeout, f.Timeouts.Poll).WithContext(ctx).WithArguments(resourceName).Should(gomega.Equal(ResourceValue{Allocatable: 0, Capacity: 0}))
 	})
 
-	ginkgo.It("when ListAndWatch fails after provisioning devices, node allocatable will be set to zero and kubelet will not retry to list resources", func(ctx context.Context) {
+	ginkgo.It("when ListAndWatch fails after provisioning devices, node allocatable will be removed and kubelet will not retry to list resources", func(ctx context.Context) {
 		// randomizing so tests can run in parallel
 		resourceName := fmt.Sprintf("test.device/%s", f.UniqueName)
 		devices := []*kubeletdevicepluginv1beta1.Device{
@@ -320,11 +320,11 @@ var _ = SIGDescribe("Device Plugin Failures:", framework.WithNodeConformance(), 
 		// however kubelet will not delete the resource and will keep the capacity
 		gomega.Eventually(getNodeResourceValues, nodeStatusUpdateTimeout, f.Timeouts.Poll).WithContext(ctx).WithArguments(resourceName).Should(gomega.Equal(ResourceValue{Allocatable: 0, Capacity: 2}))
 
-		// after the graceful period devices capacity will reset to zero
-		gomega.Eventually(getNodeResourceValues, devicePluginGracefulTimeout+1*time.Minute, f.Timeouts.Poll).WithContext(ctx).WithArguments(resourceName).Should(gomega.Equal(ResourceValue{Allocatable: 0, Capacity: 0}))
+		// after the graceful period devices capacity will be removed
+		gomega.Eventually(getNodeResourceValues, devicePluginGracefulTimeout+1*time.Minute, f.Timeouts.Poll).WithContext(ctx).WithArguments(resourceName).Should(gomega.Equal(ResourceValue{Allocatable: -1, Capacity: -1}))
 	})
 
-	ginkgo.It("when device plugin is stopped after provisioning devices, node allocatable will be set to zero", func(ctx context.Context) {
+	ginkgo.It("when device plugin is stopped after provisioning devices, node allocatable will be removed", func(ctx context.Context) {
 		// randomizing so tests can run in parallel
 		resourceName := fmt.Sprintf("test.device/%s", f.UniqueName)
 		devices := []*kubeletdevicepluginv1beta1.Device{
@@ -349,7 +349,7 @@ var _ = SIGDescribe("Device Plugin Failures:", framework.WithNodeConformance(), 
 		// kubelet will mark all devices as unhealthy
 		gomega.Eventually(getNodeResourceValues, nodeStatusUpdateTimeout, f.Timeouts.Poll).WithContext(ctx).WithArguments(resourceName).Should(gomega.Equal(ResourceValue{Allocatable: 0, Capacity: 2}))
 
-		// after the graceful period devices capacity will reset to zero
-		gomega.Eventually(getNodeResourceValues, devicePluginGracefulTimeout+1*time.Minute, f.Timeouts.Poll).WithContext(ctx).WithArguments(resourceName).Should(gomega.Equal(ResourceValue{Allocatable: 0, Capacity: 0}))
+		// after the graceful period devices capacity will be removed
+		gomega.Eventually(getNodeResourceValues, devicePluginGracefulTimeout+1*time.Minute, f.Timeouts.Poll).WithContext(ctx).WithArguments(resourceName).Should(gomega.Equal(ResourceValue{Allocatable: -1, Capacity: -1}))
 	})
 })

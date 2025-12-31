@@ -271,16 +271,9 @@ func MachineInfo(nodeName string,
 			}
 
 			for _, removedResource := range removedDevicePlugins {
-				logger.V(2).Info("Set capacity for removed resource to 0 on device removal", "device", removedResource)
-				// Set the capacity of the removed resource to 0 instead of
-				// removing the resource from the node status. This is to indicate
-				// that the resource is managed by device plugin and had been
-				// registered before.
-				//
-				// This is required to differentiate the device plugin managed
-				// resources and the cluster-level resources, which are absent in
-				// node status.
-				node.Status.Capacity[v1.ResourceName(removedResource)] = *resource.NewQuantity(int64(0), resource.DecimalSI)
+				logger.V(2).Info("Delete capacity for removed resource on device removal", "device", removedResource)
+				// Delete capacity of the removed resource.
+				delete(node.Status.Capacity, v1.ResourceName(removedResource))
 			}
 
 			if utilfeature.DefaultFeatureGate.Enabled(features.NodeSwap) && info.SwapCapacity != 0 {
