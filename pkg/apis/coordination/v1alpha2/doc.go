@@ -18,7 +18,8 @@ limitations under the License.
 // +k8s:conversion-gen-external-types=k8s.io/api/coordination/v1alpha2
 // +k8s:defaulter-gen=TypeMeta
 // +k8s:defaulter-gen-input=k8s.io/api/coordination/v1alpha2
-
+// +k8s:validation-gen=TypeMeta
+// +k8s:validation-gen-input=k8s.io/api/coordination/v1alpha2
 // +groupName=coordination.k8s.io
 
 package v1alpha2
