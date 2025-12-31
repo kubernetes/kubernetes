@@ -78,12 +78,12 @@ func testValidateUpdateForDeclarative(t *testing.T, apiVersion string) {
 	}{
 		"valid (no changes)": {
 			old:    mkCronJob(),
-			update: mkCronJob(tweakResourceVersion("poke")),
+			update: mkCronJob(),
 		},
 
 		"schedule: updated to empty": {
 			old:    mkCronJob(),
-			update: mkCronJob(tweakSchedule(""), tweakResourceVersion("poke")),
+			update: mkCronJob(tweakSchedule("")),
 			expectedErrs: field.ErrorList{
 				field.Required(field.NewPath("spec", "schedule"), ""),
 			},
@@ -91,6 +91,8 @@ func testValidateUpdateForDeclarative(t *testing.T, apiVersion string) {
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
+			tc.old.ResourceVersion = "1"
+			tc.update.ResourceVersion = "2"
 			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, Strategy.ValidateUpdate, tc.expectedErrs)
 		})
 	}
@@ -115,11 +117,5 @@ func mkCronJob(mutators ...func(*batch.CronJob)) batch.CronJob {
 func tweakSchedule(schedule string) func(*batch.CronJob) {
 	return func(job *batch.CronJob) {
 		job.Spec.Schedule = schedule
-	}
-}
-
-func tweakResourceVersion(version string) func(*batch.CronJob) {
-	return func(job *batch.CronJob) {
-		job.ObjectMeta.ResourceVersion = version
 	}
 }
