@@ -121,3 +121,13 @@ func (s *stateMemory) ClearState() {
 	s.assignments = make(ContainerCPUAssignments)
 	s.logger.V(2).Info("Cleared state")
 }
+
+func (s *stateMemory) Allocate(podUID string, containerName string, cset cpuset.CPUSet) {
+	s.SetDefaultCPUSet(s.GetDefaultCPUSet().Difference(cset))
+	s.SetCPUSet(podUID, containerName, cset)
+}
+
+func (s *stateMemory) Reclaim(podUID string, containerName string, cset cpuset.CPUSet) {
+	s.Delete(podUID, containerName)
+	s.SetDefaultCPUSet(cset)
+}
