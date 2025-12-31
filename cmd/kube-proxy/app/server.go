@@ -176,7 +176,7 @@ type ProxyServer struct {
 	flagz           flagz.Reader
 
 	podCIDRs    []string // only used for LocalModeNodeCIDR
-	NodeManager *nodemanager.NodeManager
+	NodeManager nodemanager.NodeManager
 
 	Proxier proxy.Provider
 }
