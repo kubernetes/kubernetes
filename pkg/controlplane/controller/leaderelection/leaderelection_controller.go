@@ -75,7 +75,7 @@ type Controller struct {
 }
 
 func (c *Controller) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 	defer c.queue.ShutDown()
 	defer func() {
 		err := c.leaseInformer.Informer().RemoveEventHandler(c.leaseRegistration)

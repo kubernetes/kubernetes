@@ -93,7 +93,7 @@ func NewStorageVersionGC(ctx context.Context, clientset kubernetes.Interface, le
 
 // Run starts one worker.
 func (c *Controller) Run(ctx context.Context) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting storage version garbage collector")

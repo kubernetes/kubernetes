@@ -99,7 +99,7 @@ type Controller struct {
 
 // Start will not return until the default ServiceCIDR exists or stopCh is closed.
 func (c *Controller) Start(ctx context.Context) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 	stopCh := ctx.Done()
 
 	c.eventBroadcaster = record.NewBroadcaster(record.WithContext(ctx))

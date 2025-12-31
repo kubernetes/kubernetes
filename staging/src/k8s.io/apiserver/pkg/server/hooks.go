@@ -196,7 +196,7 @@ func runPostStartHook(name string, entry postStartHookEntry, context PostStartHo
 	var err error
 	func() {
 		// don't let the hook *accidentally* panic and kill the server
-		defer utilruntime.HandleCrash()
+		defer utilruntime.HandleCrashWithContext(context.Context)
 		err = entry.hook(context)
 	}()
 	// if the hook intentionally wants to kill server, let it.
