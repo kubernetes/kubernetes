@@ -35,6 +35,7 @@ func TestGVPackageFlag(t *testing.T) {
 		expected       map[types.GroupVersion]string
 		expectedGroups []types.GroupVersions
 		parseError     string
+		bazel          bool
 	}{
 		{
 			args:           []string{},
@@ -86,17 +87,30 @@ func TestGVPackageFlag(t *testing.T) {
 				}},
 			},
 		},
+		{
+			args:  []string{"foo/bar/v1"},
+			bazel: true,
+			expectedGroups: []types.GroupVersions{
+				{PackageName: "bar", Group: types.Group("bar"), Versions: []types.PackageVersion{
+					{Version: "v1", Package: "foo/bar/v1/v1"},
+				}},
+			},
+		},
 	}
 	for i, test := range tests {
 		fs := pflag.NewFlagSet("testGVPackage", pflag.ContinueOnError)
 		groups := []types.GroupVersions{}
 		builder := NewGroupVersionsBuilder(&groups)
+		fs.BoolVar(&builder.bazel, "bazel", false, "usage")
 		fs.Var(NewGVPackagesValue(builder, test.def), "input", "usage")
 		fs.Var(NewInputBasePathValue(builder, test.importBasePath), "input-base-path", "usage")
 
 		args := []string{}
 		for _, a := range test.args {
 			args = append(args, fmt.Sprintf("--input=%s", a))
+		}
+		if test.bazel {
+			args = append(args, "--bazel")
 		}
 
 		err := fs.Parse(args)
@@ -108,6 +122,9 @@ func TestGVPackageFlag(t *testing.T) {
 			}
 		} else if err != nil {
 			t.Errorf("%d: expected nil error, got %v", i, err)
+		}
+		if err := builder.update(); err != nil {
+			t.Errorf("%d: expected nil error from builder.update(), got %v", i, err)
 		}
 		if !reflect.DeepEqual(groups, test.expectedGroups) {
 			t.Errorf("%d: expected groups %+v, got groups %+v", i, test.expectedGroups, groups)
