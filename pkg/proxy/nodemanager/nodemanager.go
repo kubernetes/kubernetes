@@ -37,13 +37,32 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
+	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 )
 
 // NodeManager handles the life cycle of kube-proxy based on the NodeIPs and PodCIDRs handles
 // node watch events and crashes kube-proxy if there are any changes in NodeIPs or PodCIDRs.
 // Note: It only crashes on change on PodCIDR when watchPodCIDRs is set to true.
-type NodeManager struct {
+type NodeManager interface {
+	proxyconfig.NodeHandler
+
+	// NodeIPs returns the node's IPs. (This may be empty if New() timed out without
+	// getting any IPs.)
+	NodeIPs() []net.IP
+
+	// PodCIDRs returns the node's PodCIDRs.
+	PodCIDRs() []string
+
+	// Node returns a copy of the latest node object, or nil if the Node has not yet
+	// been seen.
+	Node() *v1.Node
+
+	// NodeInformer returns the NodeInformer.
+	NodeInformer() v1informers.NodeInformer
+}
+
+type nodeManager struct {
 	nodeInformer  v1informers.NodeInformer
 	nodeLister    corelisters.NodeLister
 	exitFunc      func(exitCode int)
@@ -64,7 +83,7 @@ type NodeManager struct {
 // is false.
 func New(ctx context.Context, client clientset.Interface,
 	nodeName string, config *kubeproxyconfig.KubeProxyConfiguration,
-) (*NodeManager, error) {
+) (*nodeManager, error) {
 	resyncInterval := config.ConfigSyncPeriod.Duration
 	watchPodCIDRs := config.DetectLocalMode == kubeproxyconfig.LocalModeNodeCIDR
 	return newNodeManager(ctx, client, resyncInterval, nodeName, watchPodCIDRs, os.Exit, time.Second, 30*time.Second, 5*time.Minute)
@@ -74,7 +93,7 @@ func New(ctx context.Context, client clientset.Interface,
 func newNodeManager(ctx context.Context, client clientset.Interface, resyncInterval time.Duration,
 	nodeName string, watchPodCIDRs bool, exitFunc func(int),
 	pollInterval, nodeIPsTimeout, podCIDRsTimeout time.Duration,
-) (*NodeManager, error) {
+) (*nodeManager, error) {
 	// make an informer that selects for the given node
 	thisNodeInformerFactory := informers.NewSharedInformerFactoryWithOptions(client, resyncInterval,
 		informers.WithTransform(func(obj interface{}) (interface{}, error) {
@@ -135,7 +154,7 @@ func newNodeManager(ctx context.Context, client clientset.Interface, resyncInter
 		klog.FromContext(ctx).Error(nil, "Timed out waiting for node to be assigned IPs", "node", klog.KRef("", nodeName))
 	}
 
-	return &NodeManager{
+	return &nodeManager{
 		nodeInformer:  nodeInformer,
 		nodeLister:    nodeLister,
 		exitFunc:      exitFunc,
@@ -158,17 +177,17 @@ func getNodeInfo(nodeLister corelisters.NodeLister, nodeName string) (*v1.Node, 
 
 // NodeIPs returns the node's IPs. (This may be empty if New() timed out without
 // getting any IPs.)
-func (n *NodeManager) NodeIPs() []net.IP {
+func (n *nodeManager) NodeIPs() []net.IP {
 	return n.nodeIPs
 }
 
 // PodCIDRs returns the node's PodCIDRs.
-func (n *NodeManager) PodCIDRs() []string {
+func (n *nodeManager) PodCIDRs() []string {
 	return n.podCIDRs
 }
 
 // Node returns a copy of the latest node object, or nil if the Node has not yet been seen.
-func (n *NodeManager) Node() *v1.Node {
+func (n *nodeManager) Node() *v1.Node {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
@@ -179,12 +198,12 @@ func (n *NodeManager) Node() *v1.Node {
 }
 
 // NodeInformer returns the NodeInformer.
-func (n *NodeManager) NodeInformer() v1informers.NodeInformer {
+func (n *nodeManager) NodeInformer() v1informers.NodeInformer {
 	return n.nodeInformer
 }
 
 // OnNodeChange is a handler for Node creation and update.
-func (n *NodeManager) OnNodeChange(node *v1.Node) {
+func (n *nodeManager) OnNodeChange(node *v1.Node) {
 	// update the node object
 	n.mu.Lock()
 	n.node = node
@@ -214,11 +233,11 @@ func (n *NodeManager) OnNodeChange(node *v1.Node) {
 }
 
 // OnNodeDelete is a handler for Node deletes.
-func (n *NodeManager) OnNodeDelete(node *v1.Node) {
+func (n *nodeManager) OnNodeDelete(node *v1.Node) {
 	klog.InfoS("Node is being deleted", "node", klog.KObj(node))
 	klog.Flush()
 	n.exitFunc(1)
 }
 
 // OnNodeSynced is called after the cache is synced and all pre-existing Nodes have been reported
-func (n *NodeManager) OnNodeSynced() {}
+func (n *nodeManager) OnNodeSynced() {}
