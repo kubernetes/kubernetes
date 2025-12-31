@@ -544,6 +544,10 @@ type JobStatus struct {
 	// The number of pods which reached phase Succeeded.
 	// The value increases monotonically for a given spec. However, it may
 	// decrease in reaction to scale down of elastic indexed jobs.
+	//
+	// This field does not indicate that the Job has completed successfully.
+	// A Job is only considered successfully completed when the "Complete"
+	// condition is set and completionTime is populated.
 	// +optional
 	Succeeded int32
 
