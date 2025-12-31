@@ -4349,6 +4349,7 @@ func TestUpdateJobPodResources(t *testing.T) {
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.MutablePodResourcesForSuspendedJobs, tc.enableFeatureGate)
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.MutableSchedulingDirectivesForSuspendedJobs, true)
 
 			closeFn, restConfig, cs, ns := setup(t, "update-job-pod-resources")
 			defer closeFn()
