@@ -42,6 +42,8 @@ var (
 	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
 	// AddToScheme applies all the stored functions to the scheme.
 	AddToScheme = SchemeBuilder.AddToScheme
+	// localSchemeBuilder is required for declarative validation registration.
+	localSchemeBuilder = SchemeBuilder
 )
 
 // Adds the list of known types to the given scheme.
