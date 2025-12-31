@@ -224,10 +224,14 @@ func newProxyServer(ctx context.Context, config *kubeproxyconfig.KubeProxyConfig
 	}
 
 	rawNodeIPs := s.NodeManager.NodeIPs()
-	if len(rawNodeIPs) > 0 {
-		logger.Info("Successfully retrieved NodeIPs", "NodeIPs", rawNodeIPs)
+	s.PrimaryIPFamily, s.NodeIPs = detectNodeIPs(rawNodeIPs, config.BindAddress)
+	if s.NodeIPs[s.PrimaryIPFamily].IsLoopback() {
+		logger.Info("Can't determine this node's IP, assuming loopback; if this is incorrect, please set the --bind-address flag")
+	} else if s.NodeIPs[proxyutil.OtherIPFamily(s.PrimaryIPFamily)].IsLoopback() {
+		logger.Info("Successfully retrieved NodeIP", "NodeIP", s.NodeIPs[s.PrimaryIPFamily])
+	} else {
+		logger.Info("Successfully retrieved NodeIPs", "NodeIPs", s.NodeIPs)
 	}
-	s.PrimaryIPFamily, s.NodeIPs = detectNodeIPs(ctx, rawNodeIPs, config.BindAddress)
 	s.podCIDRs = s.NodeManager.PodCIDRs()
 
 	config.NodePortAddresses = expandNodePortAddressKeywords(config.NodePortAddresses, s.NodeIPs)
@@ -692,8 +696,7 @@ func expandNodePortAddressKeywords(nodePortAddresses []string, nodeIPs map[v1.IP
 //  1. if bindAddress is not 0.0.0.0 or ::, then it is used as the primary IP.
 //  2. if rawNodeIPs is not empty, then its address(es) is/are used
 //  3. otherwise the node IPs are 127.0.0.1 and ::1
-func detectNodeIPs(ctx context.Context, rawNodeIPs []net.IP, bindAddress string) (v1.IPFamily, map[v1.IPFamily]net.IP) {
-	logger := klog.FromContext(ctx)
+func detectNodeIPs(rawNodeIPs []net.IP, bindAddress string) (v1.IPFamily, map[v1.IPFamily]net.IP) {
 	primaryFamily := v1.IPv4Protocol
 	nodeIPs := map[v1.IPFamily]net.IP{
 		v1.IPv4Protocol: net.IPv4(127, 0, 0, 1),
@@ -726,8 +729,5 @@ func detectNodeIPs(ctx context.Context, rawNodeIPs []net.IP, bindAddress string)
 		nodeIPs[primaryFamily] = bindIP
 	}
 
-	if nodeIPs[primaryFamily].IsLoopback() {
-		logger.Info("Can't determine this node's IP, assuming loopback; if this is incorrect, please set the --bind-address flag")
-	}
 	return primaryFamily, nodeIPs
 }

@@ -45,7 +45,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	proxymetrics "k8s.io/kubernetes/pkg/proxy/metrics"
-	"k8s.io/kubernetes/test/utils/ktesting"
 	netutils "k8s.io/utils/net"
 )
 
@@ -237,8 +236,7 @@ func Test_detectNodeIPs(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
-			primaryFamily, ips := detectNodeIPs(ctx, c.rawNodeIPs, c.bindAddress)
+			primaryFamily, ips := detectNodeIPs(c.rawNodeIPs, c.bindAddress)
 			if primaryFamily != c.expectedFamily {
 				t.Errorf("Expected family %q got %q", c.expectedFamily, primaryFamily)
 			}
