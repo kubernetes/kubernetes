@@ -309,10 +309,10 @@ func (rtv requirednessTagValidator) Docs() TagDoc {
 
 	switch rtv.mode {
 	case requirednessRequired:
-		doc.StabilityLevel = Beta
+		doc.StabilityLevel = Stable
 		doc.Description = "Indicates that a field must be specified by clients."
 	case requirednessOptional:
-		doc.StabilityLevel = Beta
+		doc.StabilityLevel = Stable
 		doc.Description = "Indicates that a field is optional to clients."
 	case requirednessForbidden:
 		doc.StabilityLevel = Alpha

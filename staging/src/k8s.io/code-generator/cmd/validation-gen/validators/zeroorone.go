@@ -101,7 +101,7 @@ func (zmtv zeroOrOneOfMemberTagValidator) Docs() TagDoc {
 	return TagDoc{
 		Tag:            zmtv.TagName(),
 		Scopes:         zmtv.ValidScopes().UnsortedList(),
-		StabilityLevel: Beta,
+		StabilityLevel: Stable,
 		Description:    "Indicates that this field is a member of a zero-or-one-of union.",
 		Docs:           "A zero-or-one-of union allows at most one member to be set. Unlike regular unions, having no members set is valid.",
 		Warning:        "This tag should only be used on sets of list items, and never on struct fields directly.",
