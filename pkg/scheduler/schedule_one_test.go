@@ -1055,7 +1055,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 							t.Fatal(err)
 						}
 
-						ar := metrics.NewMetricsAsyncRecorder(10, 1*time.Second, ctx.Done())
+						ar := metrics.NewMetricsAsyncRecorder(ctx, 10, 1*time.Second)
 						queue := internalqueue.NewSchedulingQueue(nil, informerFactory, internalqueue.WithMetricsRecorder(ar), internalqueue.WithAPIDispatcher(apiDispatcher))
 						if asyncAPICallsEnabled {
 							schedFramework.SetAPICacher(apicache.New(queue, cache))
@@ -1605,7 +1605,7 @@ func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {
 					}
 
 					informerFactory := informers.NewSharedInformerFactory(client, 0)
-					ar := metrics.NewMetricsAsyncRecorder(10, 1*time.Second, ctx.Done())
+					ar := metrics.NewMetricsAsyncRecorder(ctx, 10, 1*time.Second)
 					queue := internalqueue.NewSchedulingQueue(nil, informerFactory, internalqueue.WithMetricsRecorder(ar), internalqueue.WithAPIDispatcher(apiDispatcher))
 
 					schedFramework, err := NewFakeFramework(
@@ -2258,7 +2258,7 @@ func TestSchedulerBinding(t *testing.T) {
 				cache := internalcache.New(ctx, 100*time.Millisecond, apiDispatcher)
 				if asyncAPICallsEnabled {
 					informerFactory := informers.NewSharedInformerFactory(client, 0)
-					ar := metrics.NewMetricsAsyncRecorder(10, 1*time.Second, ctx.Done())
+					ar := metrics.NewMetricsAsyncRecorder(ctx, 10, 1*time.Second)
 					queue := internalqueue.NewSchedulingQueue(nil, informerFactory, internalqueue.WithMetricsRecorder(ar), internalqueue.WithAPIDispatcher(apiDispatcher))
 					fwk.SetAPICacher(apicache.New(queue, cache))
 				}
@@ -2513,7 +2513,7 @@ func TestUpdatePodStatus(t *testing.T) {
 					defer apiDispatcher.Close()
 
 					informerFactory := informers.NewSharedInformerFactory(cs, 0)
-					ar := metrics.NewMetricsAsyncRecorder(10, 1*time.Second, ctx.Done())
+					ar := metrics.NewMetricsAsyncRecorder(ctx, 10, 1*time.Second)
 					queue := internalqueue.NewSchedulingQueue(nil, informerFactory, internalqueue.WithMetricsRecorder(ar), internalqueue.WithAPIDispatcher(apiDispatcher))
 					apiCacher = apicache.New(queue, nil)
 				}

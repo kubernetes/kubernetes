@@ -307,7 +307,7 @@ func TestFailureHandler(t *testing.T) {
 					defer apiDispatcher.Close()
 				}
 
-				recorder := metrics.NewMetricsAsyncRecorder(3, 20*time.Microsecond, ctx.Done())
+				recorder := metrics.NewMetricsAsyncRecorder(ctx, 3, 20*time.Microsecond)
 				queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(testingclock.NewFakeClock(time.Now())), internalqueue.WithMetricsRecorder(recorder), internalqueue.WithAPIDispatcher(apiDispatcher))
 				schedulerCache := internalcache.New(ctx, 30*time.Second, apiDispatcher)
 
