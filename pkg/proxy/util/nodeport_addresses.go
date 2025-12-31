@@ -25,6 +25,7 @@ import (
 )
 
 // NodePortAddresses is used to handle the --nodeport-addresses flag
+// +optional
 type NodePortAddresses struct {
 	cidrStrings []string
 
