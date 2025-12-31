@@ -855,7 +855,7 @@ func testController(tCtx ktesting.TContext) {
 			finalState: state{
 				allocatedClaims: l(ac(inUseClaim, newEvictionTime(taintTime, ruleEvict))),
 				deletePodAt:     evictMap{newObject(podWithClaimName): *newEvictionTime(taintTime, ruleEvict)},
-				queued:          MockState[workItem]{Ready: newWorkItems(ruleEvict, podWithClaimName)},
+				queued:          MockState[workItem]{Ready: newWorkItems(ruleEvict, podWithClaimName), Later: newDelayedWorkItems(ruleEvict, ruleStatusPeriod)},
 			},
 			process: []step{
 				{
@@ -883,23 +883,31 @@ func testController(tCtx ktesting.TContext) {
 			finalState: state{
 				allocatedClaims: l(ac(inUseClaimWithToleration, newEvictionTime(metav1Time(taintTime.Add(tolerationDuration)), ruleEvict))),
 				deletePodAt:     evictMap{newObject(podWithClaimName): *newEvictionTime(metav1Time(taintTime.Add(tolerationDuration)), ruleEvict)},
-				queued:          MockState[workItem]{Ready: newWorkItems(ruleEvict), Later: newDelayedWorkItems(podWithClaimName, tolerationDuration)},
+				queued:          MockState[workItem]{Ready: newWorkItems(ruleEvict), Later: newDelayedWorkItems(podWithClaimName, tolerationDuration, ruleEvict, ruleStatusPeriod)},
 			},
 			process: []step{
 				{
 					// Initial update.
-					deletePodAt: evictMap{newObject(podWithClaimName): *newEvictionTime(metav1Time(taintTime.Add(tolerationDuration)), ruleEvict)},
-					pods:        l(podWithClaimName),
-					rules:       l(inProgress(ruleEvict, true, "PodsPendingEviction", "1 pod needs to be evicted in 1 namespace.", taintTime)),
-
-					queuedProcessed: MockState[workItem]{Later: newDelayedWorkItems(podWithClaimName, tolerationDuration)},
-					advance:         tolerationDuration,
+					deletePodAt:     evictMap{newObject(podWithClaimName): *newEvictionTime(metav1Time(taintTime.Add(tolerationDuration)), ruleEvict)},
+					pods:            l(podWithClaimName),
+					rules:           l(inProgress(ruleEvict, true, "PodsPendingEviction", "1 pod needs to be evicted in 1 namespace.", taintTime)),
+					queuedProcessed: MockState[workItem]{Later: newDelayedWorkItems(podWithClaimName, tolerationDuration, ruleEvict, ruleStatusPeriod)},
+					advance:         ruleStatusPeriod,
+					queuedShifted:   MockState[workItem]{Ready: newWorkItems(ruleEvict), Later: newDelayedWorkItems(podWithClaimName, tolerationDuration-ruleStatusPeriod)},
+				},
+				{
+					// Process the pod eviction.
+					deletePodAt:     evictMap{newObject(podWithClaimName): *newEvictionTime(metav1Time(taintTime.Add(tolerationDuration)), ruleEvict)},
+					pods:            l(podWithClaimName),
+					rules:           l(inProgress(ruleEvict, true, "PodsPendingEviction", "1 pod needs to be evicted in 1 namespace.", metav1Time(taintTime.Add(ruleStatusPeriod)))),
+					queuedProcessed: MockState[workItem]{Later: newDelayedWorkItems(podWithClaimName, tolerationDuration-ruleStatusPeriod)},
+					advance:         tolerationDuration - ruleStatusPeriod,
 					queuedShifted:   MockState[workItem]{Ready: newWorkItems(podWithClaimName)},
 				},
 				{
 					// Deleted, but condition not updated yet.
 					ruleStats:       map[types.UID]taintRuleStats{ruleEvict.UID: {numEvictedPods: 1}},
-					rules:           l(inProgress(ruleEvict, true, "PodsPendingEviction", "1 pod needs to be evicted in 1 namespace.", taintTime)),
+					rules:           l(inProgress(ruleEvict, true, "PodsPendingEviction", "1 pod needs to be evicted in 1 namespace.", metav1Time(taintTime.Add(ruleStatusPeriod)))),
 					queuedProcessed: MockState[workItem]{Later: newDelayedWorkItems(ruleEvict, ruleStatusPeriod)},
 					advance:         ruleStatusPeriod,
 					queuedShifted:   MockState[workItem]{Ready: newWorkItems(ruleEvict)},
@@ -923,7 +931,7 @@ func testController(tCtx ktesting.TContext) {
 			finalState: state{
 				allocatedClaims: l(ac(inUseClaim, newEvictionTime(taintTime, ruleEvict)), ac(inUseClaimOtherNamespace, newEvictionTime(taintTime, ruleEvict))),
 				deletePodAt:     evictMap{newObject(podWithClaimName): *newEvictionTime(taintTime, ruleEvict), newObject(podWithClaimNameOtherNamespace): *newEvictionTime(taintTime, ruleEvict)},
-				queued:          MockState[workItem]{Ready: newWorkItems(ruleEvict, podWithClaimName, podWithClaimNameOtherNamespace)},
+				queued:          MockState[workItem]{Ready: newWorkItems(ruleEvict, podWithClaimName, podWithClaimNameOtherNamespace), Later: newDelayedWorkItems(ruleEvict, ruleStatusPeriod)},
 			},
 			process: []step{
 				{
@@ -953,7 +961,7 @@ func testController(tCtx ktesting.TContext) {
 			finalState: state{
 				allocatedClaims: l(ac(inUseClaim, newEvictionTime(taintTime, ruleEvict)), ac(inUseClaimOtherName, newEvictionTime(taintTime, ruleEvict))),
 				deletePodAt:     evictMap{newObject(podWithClaimName): *newEvictionTime(taintTime, ruleEvict), newObject(podWithClaimNameOtherName): *newEvictionTime(taintTime, ruleEvict)},
-				queued:          MockState[workItem]{Ready: newWorkItems(ruleEvict, podWithClaimName, podWithClaimNameOtherName)},
+				queued:          MockState[workItem]{Ready: newWorkItems(ruleEvict, podWithClaimName, podWithClaimNameOtherName), Later: newDelayedWorkItems(ruleEvict, ruleStatusPeriod)},
 			},
 			process: []step{
 				{
@@ -1039,7 +1047,7 @@ func testController(tCtx ktesting.TContext) {
 			finalState: state{
 				allocatedClaims: l(ac(inUseClaim, newEvictionTime(taintTime, ruleEvict)), ac(inUseClaimOtherNameShared, newEvictionTime(taintTime, ruleEvict))),
 				deletePodAt:     evictMap{newObject(podWithTwoClaimNames): *newEvictionTime(taintTime, ruleEvict)},
-				queued:          MockState[workItem]{Ready: newWorkItems(ruleEvict, podWithTwoClaimNames)},
+				queued:          MockState[workItem]{Ready: newWorkItems(ruleEvict, podWithTwoClaimNames), Later: newDelayedWorkItems(ruleEvict, ruleStatusPeriod)},
 			},
 			process: []step{
 				{
@@ -1079,7 +1087,7 @@ func testController(tCtx ktesting.TContext) {
 			finalState: state{
 				allocatedClaims: l(ac(inUseClaim, newEvictionTime(taintTime, ruleEvictInstance1)), ac(inUseClaimOtherNameShared, newEvictionTime(taintTimeLater, ruleEvictInstance2Later))),
 				deletePodAt:     evictMap{newObject(podWithTwoClaimNames): *newEvictionTime(taintTime, ruleEvictInstance1, ruleEvictInstance2Later)},
-				queued:          MockState[workItem]{Ready: newWorkItems(ruleEvictInstance1, ruleEvictInstance2Later, podWithTwoClaimNames)},
+				queued:          MockState[workItem]{Ready: newWorkItems(ruleEvictInstance1, ruleEvictInstance2Later, podWithTwoClaimNames), Later: newDelayedWorkItems(ruleEvictInstance1, ruleStatusPeriod, ruleEvictInstance2Later, ruleStatusPeriod)},
 			},
 			process: []step{
 				{
@@ -1111,7 +1119,7 @@ func testController(tCtx ktesting.TContext) {
 			finalState: state{
 				allocatedClaims: l(ac(inUseClaim, newEvictionTime(taintTime, ruleEvictInstance1)), ac(inUseClaimOtherNameShared, newEvictionTime(taintTimeLater, ruleEvictInstance2Later))),
 				deletePodAt:     evictMap{newObject(podWithTwoClaimNames): *newEvictionTime(taintTime, ruleEvictInstance1, ruleEvictInstance2Later)},
-				queued:          MockState[workItem]{Ready: newWorkItems(ruleEvictInstance1, ruleEvictInstance2Later, podWithTwoClaimNames), Later: newDelayedWorkItems(podWithTwoClaimNames, ruleEvictInstance2Later.Spec.Taint.TimeAdded.Sub(taintTime.Time))},
+				queued:          MockState[workItem]{Ready: newWorkItems(ruleEvictInstance1, ruleEvictInstance2Later, podWithTwoClaimNames), Later: newDelayedWorkItems(podWithTwoClaimNames, ruleEvictInstance2Later.Spec.Taint.TimeAdded.Sub(taintTime.Time), ruleEvictInstance2Later, ruleStatusPeriod, ruleEvictInstance1, ruleStatusPeriod)},
 			},
 			process: []step{
 				// The pod is scheduled for much later and time needs to advance a few times before it gets processed.
@@ -1119,7 +1127,7 @@ func testController(tCtx ktesting.TContext) {
 					ruleStats: map[types.UID]taintRuleStats{ruleEvictInstance1.UID: {numEvictedPods: 1}, ruleEvictInstance2Later.UID: {numEvictedPods: 1}},
 					// Initial update of both rules before eviction.
 					rules:           l(inProgress(ruleEvictInstance1, true, "PodsPendingEviction", "1 pod needs to be evicted in 1 namespace.", taintTime), inProgress(ruleEvictInstance2Later, true, "PodsPendingEviction", "1 pod needs to be evicted in 1 namespace.", taintTime)),
-					queuedProcessed: MockState[workItem]{Later: newDelayedWorkItems(podWithTwoClaimNames, ruleEvictInstance2Later.Spec.Taint.TimeAdded.Sub(taintTime.Time), ruleEvictInstance1, ruleStatusPeriod, ruleEvictInstance2Later, ruleStatusPeriod)},
+					queuedProcessed: MockState[workItem]{Later: newDelayedWorkItems(podWithTwoClaimNames, ruleEvictInstance2Later.Spec.Taint.TimeAdded.Sub(taintTime.Time), ruleEvictInstance2Later, ruleStatusPeriod, ruleEvictInstance1, ruleStatusPeriod)},
 					advance:         ruleStatusPeriod,
 					queuedShifted:   MockState[workItem]{Ready: newWorkItems(ruleEvictInstance1, ruleEvictInstance2Later), Later: newDelayedWorkItems(podWithTwoClaimNames, ruleEvictInstance2Later.Spec.Taint.TimeAdded.Sub(taintTime.Time)-ruleStatusPeriod)},
 				},
@@ -1496,22 +1504,30 @@ func testController(tCtx ktesting.TContext) {
 					return claim
 				}(), newEvictionTime(metav1Time(taintTime.Add(30*time.Second)), ruleEvict, ruleEvictOther, sliceTaintedTwice, sliceTaintedTwice.Spec.Devices[0].Name, 0, sliceTaintedTwice, sliceTaintedTwice.Spec.Devices[0].Name, 1))),
 				deletePodAt: evictMap{newObject(podWithClaimName): *newEvictionTime(metav1Time(taintTime.Add(30*time.Second)), ruleEvict, ruleEvictOther, sliceTaintedTwice, sliceTaintedTwice.Spec.Devices[0].Name, 0, sliceTaintedTwice, sliceTaintedTwice.Spec.Devices[0].Name, 1)},
-				queued:      MockState[workItem]{Ready: newWorkItems(ruleEvict, ruleEvictOther), Later: newDelayedWorkItems(podWithClaimName, 30*time.Second)},
+				queued:      MockState[workItem]{Ready: newWorkItems(ruleEvict, ruleEvictOther), Later: newDelayedWorkItems(podWithClaimName, 30*time.Second, ruleEvict, ruleStatusPeriod, ruleEvictOther, ruleStatusPeriod)},
 			},
 			process: []step{
-				// First advance time, then delete.
 				{
 					deletePodAt:     evictMap{newObject(podWithClaimName): *newEvictionTime(metav1Time(taintTime.Add(30*time.Second)), ruleEvict, ruleEvictOther, sliceTaintedTwice, sliceTaintedTwice.Spec.Devices[0].Name, 0, sliceTaintedTwice, sliceTaintedTwice.Spec.Devices[0].Name, 1)},
 					pods:            l(podWithClaimName),
 					rules:           l(inProgress(ruleEvict, true, "PodsPendingEviction", "1 pod needs to be evicted in 1 namespace.", taintTime), inProgress(ruleEvictOther, true, "PodsPendingEviction", "1 pod needs to be evicted in 1 namespace.", taintTime)),
-					queuedProcessed: MockState[workItem]{Later: newDelayedWorkItems(podWithClaimName, 30*time.Second)},
-					advance:         30 * time.Second,
+					queuedProcessed: MockState[workItem]{Later: newDelayedWorkItems(podWithClaimName, 30*time.Second, ruleEvict, ruleStatusPeriod, ruleEvictOther, ruleStatusPeriod)},
+					advance:         ruleStatusPeriod,
+					queuedShifted:   MockState[workItem]{Ready: newWorkItems(ruleEvict, ruleEvictOther), Later: newDelayedWorkItems(podWithClaimName, 20*time.Second)},
+				},
+				// First advance time, then delete.
+				{
+					deletePodAt:     evictMap{newObject(podWithClaimName): *newEvictionTime(metav1Time(taintTime.Add(30*time.Second)), ruleEvict, ruleEvictOther, sliceTaintedTwice, sliceTaintedTwice.Spec.Devices[0].Name, 0, sliceTaintedTwice, sliceTaintedTwice.Spec.Devices[0].Name, 1)},
+					pods:            l(podWithClaimName),
+					rules:           l(inProgress(ruleEvict, true, "PodsPendingEviction", "1 pod needs to be evicted in 1 namespace.", metav1Time(taintTime.Add(ruleStatusPeriod))), inProgress(ruleEvictOther, true, "PodsPendingEviction", "1 pod needs to be evicted in 1 namespace.", metav1Time(taintTime.Add(ruleStatusPeriod)))),
+					queuedProcessed: MockState[workItem]{Later: newDelayedWorkItems(podWithClaimName, 20*time.Second)},
+					advance:         20 * time.Second,
 					queuedShifted:   MockState[workItem]{Ready: newWorkItems(podWithClaimName)},
 				},
 				{
 					ruleStats: map[types.UID]taintRuleStats{ruleEvict.UID: {numEvictedPods: 1}, ruleEvictOther.UID: {numEvictedPods: 1}},
 					// Not updated yet.
-					rules:           l(inProgress(ruleEvict, true, "PodsPendingEviction", "1 pod needs to be evicted in 1 namespace.", taintTime), inProgress(ruleEvictOther, true, "PodsPendingEviction", "1 pod needs to be evicted in 1 namespace.", taintTime)),
+					rules:           l(inProgress(ruleEvict, true, "PodsPendingEviction", "1 pod needs to be evicted in 1 namespace.", metav1Time(taintTime.Add(ruleStatusPeriod))), inProgress(ruleEvictOther, true, "PodsPendingEviction", "1 pod needs to be evicted in 1 namespace.", metav1Time(taintTime.Add(ruleStatusPeriod)))),
 					queuedProcessed: MockState[workItem]{Later: newDelayedWorkItems(ruleEvict, ruleStatusPeriod, ruleEvictOther, ruleStatusPeriod)},
 					advance:         ruleStatusPeriod,
 					queuedShifted:   MockState[workItem]{Ready: newWorkItems(ruleEvict, ruleEvictOther)},
@@ -1974,6 +1990,7 @@ func testHandlers(tContext *testContext, tc testCase) {
 		assertEqual(tContext, state.queuedProcessed, tContext.mockQueue.State(), prefix+"work queue after processing", cmpopts.SortSlices(compareWorkItems))
 		time.Sleep(state.advance)
 		for _, item := range tContext.mockQueue.State().Later {
+			fmt.Println(item.Item, item.Duration)
 			tContext.mockQueue.CancelAfter(item.Item)
 			tContext.mockQueue.AddAfter(item.Item, item.Duration-state.advance)
 		}
@@ -2388,7 +2405,7 @@ func synctestDeviceTaintRule(tCtx ktesting.TContext) {
 		wg.Wait()
 	}()
 	wg.Go(func() {
-		assert.NoError(tCtx, controller.Run(tCtx, 10 /* workers */), "eviction controller failed")
+		assert.NoError(tCtx, controller.Run(tCtx, 1 /* workers */), "eviction controller failed")
 	})
 
 	// Eventually the controller should have synced it's informers.
@@ -2420,10 +2437,11 @@ func synctestDeviceTaintRule(tCtx ktesting.TContext) {
 	rule, err := tCtx.Client().ResourceV1alpha3().DeviceTaintRules().Update(tCtx, rule, metav1.UpdateOptions{})
 	tCtx.ExpectNoError(err, "update rule")
 
-	// Wait for eviction. The rule gets updated with another delay.
+	// Wait for eviction.
 	tCtx.Wait()
 	evicted := metav1.Now()
 	tCtx.Logf("TIME: eviction done at %s", evicted)
+	// The rule status got updated once before evicting pods, but not yet after evicting it.
 	check(tCtx, "evict: ", l(inProgress(rule, true, "PodsPendingEviction", "1 pod needs to be evicted in 1 namespace.", &evicted)), nil)
 
 	// AddAfter does not move time forward. Do it ourselves...
@@ -2433,7 +2451,7 @@ func synctestDeviceTaintRule(tCtx ktesting.TContext) {
 	tCtx.Wait()
 	done := metav1.Now()
 	tCtx.Logf("TIME: done at %s", done)
-	check(tCtx, "done: ", l(inProgress(rule, false, "Completed", "1 pod evicted since starting the controller.", &slept)), nil)
+	check(tCtx, "done: ", l(inProgress(rule, false, "Completed", "1 pod evicted since starting the controller.", &done)), nil)
 	assertEqual(tCtx, map[types.UID]taintRuleStats{rule.UID: {numEvictedPods: 1}}, controller.taintRuleStats, "taint rule statistics should have counted the pod")
 
 	// Delete the rule and verify that we don't leak memory by still tracking it.
