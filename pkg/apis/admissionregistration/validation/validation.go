@@ -1313,14 +1313,14 @@ func getStrictStatelessCELCompiler() plugincel.Compiler {
 	return lazyStrictStatelessCELCompiler
 }
 
-func createCompiler(allowComposition bool) plugincel.Compiler {
+func createCompiler(ctx context.Context, allowComposition bool) plugincel.Compiler {
 	if !allowComposition {
 		return getStrictStatelessCELCompiler()
 	}
 	compiler, err := plugincel.NewCompositedCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))
 	if err != nil {
 		// should never happen, but cannot panic either.
-		utilruntime.HandleError(err)
+		utilruntime.HandleErrorWithContext(ctx, err, "failed creating composited CEL comiler")
 		return plugincel.NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))
 	}
 	return compiler
