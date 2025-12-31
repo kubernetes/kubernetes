@@ -153,7 +153,7 @@ func (record *attributesRecord) AddAnnotationWithLevel(key, value string, level 
 	}
 	annotation := annotation{level: level, value: value}
 	if v, ok := record.annotations[key]; ok && v != annotation {
-		return fmt.Errorf("admission annotations are not allowd to be overwritten, key:%q, old value: %v, new value: %v", key, record.annotations[key], annotation)
+		return fmt.Errorf("admission annotations are not allowed to be overwritten, key:%q, old value: %v, new value: %v", key, record.annotations[key], annotation)
 	}
 	record.annotations[key] = annotation
 	return nil

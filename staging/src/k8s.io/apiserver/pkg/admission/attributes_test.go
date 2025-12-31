@@ -34,7 +34,7 @@ func TestAddAnnotation(t *testing.T) {
 
 	// test overwrite
 	assert.Error(t, attr.AddAnnotation("foo.admission.k8s.io/key1", "value1-overwrite"),
-		"admission annotations should not be allowd to be overwritten")
+		"admission annotations should not be allowed to be overwritten")
 	annotations = attr.getAnnotations(auditinternal.LevelMetadata)
 	assert.Equal(t, "value1", annotations["foo.admission.k8s.io/key1"], "admission annotations should not be overwritten")
 
