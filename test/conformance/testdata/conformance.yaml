@@ -3832,14 +3832,10 @@
     to delete the secret, the deletion must succeed.
   release: v1.21
   file: test/e2e/common/storage/secrets_volume.go
-- testname: StorageClass, lifecycle
-  codename: '[sig-storage] StorageClasses CSI Conformance should run through the lifecycle
-    of a StorageClass [Conformance]'
-  description: Creating a StorageClass MUST succeed. Reading the StorageClass MUST
-    succeed. Patching the StorageClass MUST succeed with its new label found. Deleting
-    the StorageClass MUST succeed and it MUST be confirmed. Replacement StorageClass
-    MUST be created. Updating the StorageClass MUST succeed with its new label found.
-    Deleting the StorageClass via deleteCollection MUST succeed and it MUST be confirmed.
+- testname: CRUD operations for StorageClasses
+  codename: '[sig-storage] StorageClass StorageClass API availability [Conformance]'
+  description: kube-apiserver must support create/get/list/update/patch/delete operations
+    for storage.k8s.io/v1 StorageClass.
   release: v1.29
   file: test/e2e/storage/storageclass.go
 - testname: 'SubPath: Reading content from a configmap volume.'
@@ -3903,15 +3899,11 @@
     via deleteCollection MUST succeed and it MUST be confirmed.
   release: v1.30
   file: test/e2e/storage/volume_attachment.go
-- testname: VolumeAttributesClass, lifecycle
+- testname: CRUD operations for VolumeAttributesClasses
   codename: '[sig-storage] VolumeAttributesClass [FeatureGate:VolumeAttributesClass]
-    should run through the lifecycle of a VolumeAttributesClass [Conformance]'
-  description: Creating a VolumeAttributesClass MUST succeed. Reading the VolumeAttributesClass
-    MUST succeed. Patching the VolumeAttributesClass MUST succeed with its new label
-    found. Deleting the VolumeAttributesClass MUST succeed and it MUST be confirmed.
-    Replacement VolumeAttributesClass MUST be created. Updating the VolumeAttributesClass
-    MUST succeed with its new label found. Deleting the VolumeAttributesClass via
-    deleteCollection MUST succeed and it MUST be confirmed.
+    VolumeAttributesClass API availability [Conformance]'
+  description: kube-apiserver must support create/get/list/update/patch/delete operations
+    for storage.k8s.io/v1 VolumeAttributesClass.
   release: v1.35
   file: test/e2e/storage/volumeattributesclass.go
 
