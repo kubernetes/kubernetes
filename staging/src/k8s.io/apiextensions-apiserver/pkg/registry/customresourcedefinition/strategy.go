@@ -320,7 +320,7 @@ func CustomResourceDefinitionToSelectableFields(obj *apiextensions.CustomResourc
 // dropDisabledFields drops disabled fields that are not used if their associated feature gates
 // are not enabled.
 func dropDisabledFields(newCRD *apiextensions.CustomResourceDefinition, oldCRD *apiextensions.CustomResourceDefinition) {
-	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CRDValidationRatcheting) && (oldCRD == nil || (oldCRD != nil && !specHasOptionalOldSelf(&oldCRD.Spec))) {
+	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CRDValidationRatcheting) && (oldCRD == nil || !specHasOptionalOldSelf(&oldCRD.Spec)) {
 		if newCRD.Spec.Validation != nil {
 			dropOptionalOldSelfField(newCRD.Spec.Validation.OpenAPIV3Schema)
 		}
@@ -331,7 +331,7 @@ func dropDisabledFields(newCRD *apiextensions.CustomResourceDefinition, oldCRD *
 			}
 		}
 	}
-	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceFieldSelectors) && (oldCRD == nil || (oldCRD != nil && !specHasSelectableFields(&oldCRD.Spec))) {
+	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceFieldSelectors) && (oldCRD == nil || !specHasSelectableFields(&oldCRD.Spec)) {
 		dropSelectableFields(&newCRD.Spec)
 	}
 	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CRDObservedGenerationTracking) && (oldCRD == nil || !observedGenerationTrackingInUse(&oldCRD.Status)) {
