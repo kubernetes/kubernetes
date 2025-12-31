@@ -269,8 +269,10 @@ func TestHandleStatusz(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Set the component name in the registry
+			tt.registry.name = tt.componentName
 			mux := http.NewServeMux()
-			Install(mux, tt.componentName, tt.registry)
+			Install(mux, tt.registry)
 
 			path := "/statusz"
 			req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://example.com%s", path), nil)
@@ -322,12 +324,17 @@ func parseVersion(t *testing.T, v string) *version.Version {
 }
 
 type fakeRegistry struct {
+	name         string
 	startTime    time.Time
 	goVer        string
 	binaryVer    *version.Version
 	emulationVer *version.Version
 	listedPaths  []string
 	deprecated   map[string]bool
+}
+
+func (f fakeRegistry) componentName() string {
+	return f.name
 }
 
 func (f fakeRegistry) deprecatedVersions() map[string]bool {
