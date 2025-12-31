@@ -838,7 +838,7 @@ func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) err
 	}
 
 	builtinControllerFinalizer := slices.Index(claim.Finalizers, resourceapi.Finalizer)
-	logger.V(5).Info("claim reserved for counts", "currentCount", len(claim.Status.ReservedFor), "claim", klog.KRef(namespace, name), "updatedCount", len(valid), "builtinController", builtinControllerFinalizer >= 0)
+	logger.V(5).Info("claim consumer counts", "currentCount", len(claim.Status.ReservedFor), "claim", klog.KRef(namespace, name), "updatedCount", len(valid), "builtinController", builtinControllerFinalizer >= 0)
 	if len(valid) < len(claim.Status.ReservedFor) {
 		// This is not using a patch because we want the update to fail if anything
 		// changed in the meantime.
@@ -876,6 +876,7 @@ func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) err
 		if err != nil {
 			return err
 		}
+		logger.V(5).Info("Removed consumers", "claim", klog.KRef(namespace, name), "currentCount", len(claim.Status.ReservedFor), "allocated", claim.Status.Allocation != nil)
 
 		// Now also remove the finalizer if it is not needed anymore.
 		// Note that the index may have changed as a result of the UpdateStatus call.
@@ -885,6 +886,7 @@ func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) err
 			if _, err := ec.kubeClient.ResourceV1().ResourceClaims(claim.Namespace).Update(ctx, claim, metav1.UpdateOptions{}); err != nil {
 				return err
 			}
+			logger.V(5).Info("Removed finalizer after removing consumers", "claim", klog.KRef(namespace, name))
 		}
 	} else if builtinControllerFinalizer >= 0 && claim.DeletionTimestamp != nil && len(valid) == 0 {
 		claim := claim.DeepCopy()
@@ -898,6 +900,7 @@ func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) err
 			if err != nil {
 				return err
 			}
+			logger.V(5).Info("Removed allocation because not needed", "claim", klog.KRef(namespace, name))
 		}
 		// Whether it was allocated or not, remove the finalizer to unblock removal.
 		claim.Finalizers = slices.Delete(claim.Finalizers, builtinControllerFinalizer, builtinControllerFinalizer+1)
@@ -905,6 +908,7 @@ func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) err
 		if err != nil {
 			return err
 		}
+		logger.V(5).Info("Removed finalizer because not needed", "claim", klog.KRef(namespace, name))
 	}
 
 	if len(valid) == 0 {
@@ -921,11 +925,11 @@ func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) err
 				if pod.UID != podUID || isPodDone(pod) {
 					// We are certain that the owning pod is not going to need
 					// the claim and therefore remove the claim.
-					logger.V(5).Info("deleting unused generated claim", "claim", klog.KObj(claim), "pod", klog.KObj(pod))
 					err := ec.kubeClient.ResourceV1().ResourceClaims(claim.Namespace).Delete(ctx, claim.Name, metav1.DeleteOptions{})
 					if err != nil {
-						return fmt.Errorf("delete claim %s: %w", klog.KObj(claim), err)
+						return fmt.Errorf("delete unused generated claim %s: %w", klog.KObj(claim), err)
 					}
+					logger.V(5).Info("Deleted unused generated claim", "claim", klog.KObj(claim), "pod", klog.KObj(pod))
 				} else {
 					logger.V(6).Info("wrong pod content, not deleting claim", "claim", klog.KObj(claim), "podUID", podUID, "podContent", pod)
 				}
