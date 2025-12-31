@@ -667,6 +667,9 @@
             "x-kubernetes-list-type": "set"
           }
         },
+        "required": [
+          "policyName"
+        ],
         "type": "object"
       },
       "io.k8s.api.admissionregistration.v1.ValidatingAdmissionPolicyList": {
