@@ -499,6 +499,10 @@ func (r *RepairIPAddress) syncIPAddress(key string) error {
 		return nil
 	}
 
+	// When a Service is created, the IP allocator creates an IPAddress object for it, and
+	// at that moment the Service object is not created yet, so we have to wait for it to be created.
+	// In addition, if the apiserver "dies" in the middle of the creation of the Service, the IPAddress object will be orphaned.
+	// If the time since it was created is greater than 60 seconds (default timeout value on the kube-apiserver), the IPAddress is deleted.
 	svc, err := r.serviceLister.Services(ipAddress.Spec.ParentRef.Namespace).Get(ipAddress.Spec.ParentRef.Name)
 	if apierrors.IsNotFound(err) {
 		// cleaning all IPAddress without an owner reference IF the time since it was created is greater than 60 seconds (default timeout value on the kube-apiserver)
@@ -527,6 +531,21 @@ func (r *RepairIPAddress) syncIPAddress(key string) error {
 	// but we also have to check the reverse, that the IPAddress to Service relation is correct
 	for _, clusterIP := range svc.Spec.ClusterIPs {
 		if ipAddress.Name == clusterIP {
+			return nil
+		}
+	}
+
+	// There is a special case when we "break the immutability" of the Service ClusterIPs,
+	// and we allocate IP addresses on Update. This is when a Service is mutated from Type ExternalName
+	// to any of the Types that require ClusterIP creation. Similar to the same logic we use to handle
+	// the case when the Service is created after the IPAddress, we delay the processing of the new
+	// IPAddress object by the 60 seconds timeout of the kube-apiserver.
+	if svc.Spec.Type == v1.ServiceTypeExternalName {
+		ipLifetime := r.clock.Now().Sub(ipAddress.CreationTimestamp.Time)
+		gracePeriod := 60 * time.Second
+		if ipLifetime < gracePeriod {
+			// requeue after the grace period
+			r.ipQueue.AddAfter(key, gracePeriod-ipLifetime)
 			return nil
 		}
 	}
