@@ -136,6 +136,7 @@ func newFakeKubeRuntimeManager(ctx context.Context, runtimeService internalapi.R
 	kubeRuntimeManager.runtimeName = typedVersion.RuntimeName
 	kubeRuntimeManager.imagePuller = images.NewImageManager(
 		kubecontainer.FilterEventRecorder(recorder),
+		nil,
 		&credentialprovider.BasicDockerKeyring{},
 		kubeRuntimeManager,
 		&imagepullmanager.NoopImagePullManager{},
