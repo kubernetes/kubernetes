@@ -481,10 +481,18 @@ type JobStatus struct {
 	// become false. When a Job is completed, one of the conditions will have
 	// type "Complete" and status true.
 	//
-	// A job is considered finished when it is in a terminal condition, either
-	// "Complete" or "Failed". A Job cannot have both the "Complete" and "Failed" conditions.
+	// The Job controller evaluates terminal conditions in a defined order.
+	// Failure conditions (for example, exceeding backoffLimit,
+	// activeDeadlineSeconds, or PodFailurePolicy actions) are evaluated
+	// before success conditions (such as completions or successPolicy).
+	//
+	// If both failure and success criteria are met during the same
+	// evaluation, the Job is marked as Failed.
+	// This behavior is intentional and part of the Job API contract.
+	//
+	// A Job cannot have both the "Complete" and "Failed" conditions.
 	// Additionally, it cannot be in the "Complete" and "FailureTarget" conditions.
-	// The "Complete", "Failed" and "FailureTarget" conditions cannot be disabled.
+	// The "Complete", "Failed", and "FailureTarget" conditions cannot be disabled.
 	//
 	// +optional
 	Conditions []JobCondition
