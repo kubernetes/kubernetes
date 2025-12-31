@@ -223,7 +223,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		udpService, err := udpJig.CreateUDPService(ctx, func(svc *v1.Service) {
 			svc.Spec.Type = v1.ServiceTypeClusterIP
 			svc.Spec.Ports = []v1.ServicePort{
-				{Port: 80, Name: "udp", Protocol: v1.ProtocolUDP, TargetPort: intstr.FromInt32(80)},
+				{Port: 80, Name: "udp", Protocol: v1.ProtocolUDP, TargetPort: intstr.FromInt32(8080)},
 			}
 		})
 		framework.ExpectNoError(err)
@@ -245,7 +245,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 
 		// Add a backend pod to the service in the other node
 		ginkgo.By("creating a backend pod " + podBackend1 + " for the service " + serviceName)
-		serverPod1 := e2epod.NewAgnhostPod(ns, podBackend1, nil, nil, nil, "netexec", fmt.Sprintf("--udp-port=%d", 80))
+		serverPod1 := e2epod.NewAgnhostPod(ns, podBackend1, nil, nil, nil, "netexec", fmt.Sprintf("--udp-port=%d", 8080))
 		serverPod1.Labels = udpJig.Labels
 		nodeSelection = e2epod.NodeSelection{Name: serverNodeInfo.name}
 		e2epod.SetNodeSelection(&serverPod1.Spec, nodeSelection)
@@ -269,7 +269,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 
 		// Create a second pod
 		ginkgo.By("creating a second backend pod " + podBackend2 + " for the service " + serviceName)
-		serverPod2 := e2epod.NewAgnhostPod(ns, podBackend2, nil, nil, nil, "netexec", fmt.Sprintf("--udp-port=%d", 80))
+		serverPod2 := e2epod.NewAgnhostPod(ns, podBackend2, nil, nil, nil, "netexec", fmt.Sprintf("--udp-port=%d", 8080))
 		serverPod2.Labels = udpJig.Labels
 		nodeSelection = e2epod.NodeSelection{Name: serverNodeInfo.name}
 		e2epod.SetNodeSelection(&serverPod2.Spec, nodeSelection)
