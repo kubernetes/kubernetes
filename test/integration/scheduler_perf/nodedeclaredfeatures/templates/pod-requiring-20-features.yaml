@@ -1,0 +1,49 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-{{ .Index }}
+spec:
+  containers:
+  - name: container-a
+    image: k8s.gcr.io/pause:3.9
+    env:
+    - name: FEATURE_REQUIREMENT_1
+      value: "Feature1"
+    - name: FEATURE_REQUIREMENT_2
+      value: "Feature2"
+    - name: FEATURE_REQUIREMENT_3
+      value: "Feature3"
+    - name: FEATURE_REQUIREMENT_4
+      value: "Feature4"
+    - name: FEATURE_REQUIREMENT_5
+      value: "Feature5"
+    - name: FEATURE_REQUIREMENT_6
+      value: "Feature6"
+    - name: FEATURE_REQUIREMENT_7
+      value: "Feature7"
+    - name: FEATURE_REQUIREMENT_8
+      value: "Feature8"
+    - name: FEATURE_REQUIREMENT_9
+      value: "Feature9"
+    - name: FEATURE_REQUIREMENT_10
+      value: "Feature10"
+    - name: FEATURE_REQUIREMENT_11
+      value: "Feature11"
+    - name: FEATURE_REQUIREMENT_12
+      value: "Feature12"
+    - name: FEATURE_REQUIREMENT_13
+      value: "Feature13"
+    - name: FEATURE_REQUIREMENT_14
+      value: "Feature14"
+    - name: FEATURE_REQUIREMENT_15
+      value: "Feature15"
+    - name: FEATURE_REQUIREMENT_16
+      value: "Feature16"
+    - name: FEATURE_REQUIREMENT_17
+      value: "Feature17"
+    - name: FEATURE_REQUIREMENT_18
+      value: "Feature18"
+    - name: FEATURE_REQUIREMENT_19
+      value: "Feature19"
+    - name: FEATURE_REQUIREMENT_20
+      value: "Feature20"

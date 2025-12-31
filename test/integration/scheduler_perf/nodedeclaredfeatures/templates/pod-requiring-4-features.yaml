@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-{{ .Index }}
+spec:
+  containers:
+  - name: container1
+    image: k8s.gcr.io/pause:3.9
+    env:
+    - name: FEATURE_REQUIREMENT_1
+      value: "Feature1"
+    - name: FEATURE_REQUIREMENT_2
+      value: "Feature2"
+    - name: FEATURE_REQUIREMENT_3
+      value: "Feature3"
+    - name: FEATURE_REQUIREMENT_4
+      value: "Feature4"

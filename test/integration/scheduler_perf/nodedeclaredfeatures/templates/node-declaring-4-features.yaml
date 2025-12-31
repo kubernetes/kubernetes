@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Node
+metadata:
+  name: node-{{ .Index }}
+  labels:
+    kubernetes.io/hostname: node-{{ .Index }}
+    test.kubernetes.io/nodedeclaredfeatures: "true"
+spec:
+  unschedulable: false
+status:
+  capacity:
+    cpu: "4"
+    memory: "16Gi"
+    pods: "110"
+  allocatable:
+    cpu: "4"
+    memory: "16Gi"
+    pods: "110"
+  declaredFeatures:
+    - Feature1
+    - Feature2
+    - Feature3
+    - Feature4
