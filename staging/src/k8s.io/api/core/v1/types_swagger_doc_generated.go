@@ -1700,7 +1700,7 @@ func (PodCertificateProjection) SwaggerDoc() map[string]string {
 var map_PodCondition = map[string]string{
 	"":                   "PodCondition contains details for the current condition of this pod.",
 	"type":               "Type is the type of the condition. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-conditions",
-	"observedGeneration": "If set, this represents the .metadata.generation that the pod condition was set based upon. The PodObservedGenerationTracking feature gate must be enabled to use this field.",
+	"observedGeneration": "If set, this represents the .metadata.generation that the pod condition was set based upon.",
 	"status":             "Status is the status of the condition. Can be True, False, Unknown. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-conditions",
 	"lastProbeTime":      "Last time we probed the condition.",
 	"lastTransitionTime": "Last time the condition transitioned from one status to another.",
