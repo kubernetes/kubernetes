@@ -26,13 +26,13 @@ import (
 	"k8s.io/component-base/featuregate"
 	"k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/scheduler"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
+	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/utils/ptr"
 )
 
@@ -353,7 +353,7 @@ func removeMissingExtendedResources(pod *v1.Pod, nodeInfo *schedulerframework.No
 			// does not use Limits.
 			filteredResources := make(v1.ResourceList)
 			for rName, rQuant := range c.Resources.Requests {
-				if v1helper.IsExtendedResourceName(rName) {
+				if schedutil.IsDRAExtendedResourceName(rName) {
 					if _, found := nodeInfo.Allocatable.ScalarResources[rName]; !found {
 						continue
 					}
