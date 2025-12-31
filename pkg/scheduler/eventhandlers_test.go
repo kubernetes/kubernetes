@@ -1124,12 +1124,18 @@ func TestAddPod_GangSchedulingEnabled(t *testing.T) {
 	queue.Add(logger, pod1)
 	pod, _ := queue.Pop(logger)
 	pod.UnschedulablePlugins = sets.New("GangScheduling")
-	queue.AddUnschedulableIfNotPresent(logger, pod, queue.SchedulingCycle())
+	err := queue.AddUnschedulableIfNotPresent(logger, pod, queue.SchedulingCycle())
+	if err != nil {
+		t.Fatalf("Failed to add pod1 to unschedulable queue: %v", err)
+	}
 
 	queue.Add(logger, pod2)
 	pod, _ = queue.Pop(logger)
 	pod.UnschedulablePlugins = sets.New("GangScheduling")
-	queue.AddUnschedulableIfNotPresent(logger, pod, queue.SchedulingCycle())
+	err = queue.AddUnschedulableIfNotPresent(logger, pod, queue.SchedulingCycle())
+	if err != nil {
+		t.Fatalf("Failed to add pod2 to unschedulable queue: %v", err)
+	}
 
 	if len(queue.UnschedulablePods()) != 2 {
 		t.Errorf("Expected 2 unschedulable pods after adding pod1 and pod2, got %d", len(queue.UnschedulablePods()))
