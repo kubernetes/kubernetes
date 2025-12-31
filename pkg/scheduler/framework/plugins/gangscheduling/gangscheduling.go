@@ -29,6 +29,7 @@ import (
 	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha1"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/util"
@@ -69,7 +70,7 @@ func (pl *GangScheduling) EventsToRegister(_ context.Context) ([]fwk.ClusterEven
 	return []fwk.ClusterEventWithHint{
 		// A new pod being added might be the one that completes a gang, meeting its MinCount requirement.
 		// Workload reference is immutable, so there is no need to subscribe on Pod/Update event.
-		{Event: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.Add}, QueueingHintFn: pl.isSchedulableAfterPodAdded},
+		{Event: framework.EventUnscheduledPodAdd, QueueingHintFn: pl.isSchedulableAfterPodAdded},
 		// A Workload being added can be making a waiting gang schedulable.
 		// Workload's PodGroups are immutable, so there's no need to handle Workload/Update event.
 		{Event: fwk.ClusterEvent{Resource: fwk.Workload, ActionType: fwk.Add}, QueueingHintFn: pl.isSchedulableAfterWorkloadAdded},
