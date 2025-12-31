@@ -25,11 +25,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/runtime/serializer/cbor"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
+	"k8s.io/apiserver/pkg/features"
 	v1alpha1 "k8s.io/apiserver/pkg/server/flagz/api/v1alpha1"
 	"k8s.io/apiserver/pkg/server/flagz/negotiate"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
 const (
@@ -38,6 +41,12 @@ const (
 	GroupName        = "config.k8s.io"
 	Version          = "v1alpha1"
 )
+
+// flagzCodecFactory wraps a CodecFactory to filter out unsupported media types (like protobuf)
+// from the supported media types list, so error messages only show actually supported types.
+type flagzCodecFactory struct {
+	serializer.CodecFactory
+}
 
 type mux interface {
 	Handle(path string, handler http.Handler)
@@ -55,8 +64,7 @@ func Install(m mux, componentName string, flagReader Reader, opts ...Option) {
 
 	scheme := runtime.NewScheme()
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
-	codecFactory := serializer.NewCodecFactory(
-		scheme,
+	codecFactoryOpts := []serializer.CodecFactoryOptionsMutator{
 		serializer.WithSerializer(func(_ runtime.ObjectCreater, _ runtime.ObjectTyper) runtime.SerializerInfo {
 			textSerializer := flagzTextSerializer{componentName, reg.reader}
 			return runtime.SerializerInfo{
@@ -68,8 +76,28 @@ func Install(m mux, componentName string, flagReader Reader, opts ...Option) {
 				PrettySerializer: textSerializer,
 			}
 		}),
-	)
-	m.Handle(DefaultFlagzPath, handleFlagz(componentName, reg, codecFactory, negotiate.FlagzEndpointRestrictions{}))
+	}
+	// TODO: remove this explicit check when https://github.com/kubernetes/enhancements/pull/5740 is implemented.
+	if utilfeature.DefaultFeatureGate.Enabled(features.CBORServingAndStorage) {
+		codecFactoryOpts = append(codecFactoryOpts, serializer.WithSerializer(cbor.NewSerializerInfo))
+	}
+
+	codecFactory := serializer.NewCodecFactory(scheme, codecFactoryOpts...)
+	// Wrap to filter out unsupported media types (e.g., protobuf)
+	filteredCodecFactory := &flagzCodecFactory{codecFactory}
+	m.Handle(DefaultFlagzPath, handleFlagz(componentName, reg, filteredCodecFactory, negotiate.FlagzEndpointRestrictions{}))
+}
+
+func (f *flagzCodecFactory) SupportedMediaTypes() []runtime.SerializerInfo {
+	allTypes := f.CodecFactory.SupportedMediaTypes()
+	filtered := make([]runtime.SerializerInfo, 0, len(allTypes))
+	for _, info := range allTypes {
+		if info.MediaType == runtime.ContentTypeProtobuf {
+			continue
+		}
+		filtered = append(filtered, info)
+	}
+	return filtered
 }
 
 func handleFlagz(componentName string, reg *registry, serializer runtime.NegotiatedSerializer, restrictions negotiate.FlagzEndpointRestrictions) http.HandlerFunc {
@@ -96,9 +124,9 @@ func handleFlagz(componentName string, reg *registry, serializer runtime.Negotia
 
 		var targetGV schema.GroupVersion
 		switch serializerInfo.MediaType {
-		case "application/json":
+		case "application/json", "application/yaml", "application/cbor":
 			if mediaType.Convert == nil {
-				err := fmt.Errorf("content negotiation failed: mediaType.Convert is nil for application/json")
+				err := fmt.Errorf("content negotiation failed: mediaType.Convert is nil for %s", serializerInfo.MediaType)
 				utilruntime.HandleError(err)
 				responsewriters.ErrorNegotiated(
 					err,
@@ -113,11 +141,11 @@ func handleFlagz(componentName string, reg *registry, serializer runtime.Negotia
 			if reg.deprecatedVersions()[targetGV.Version] {
 				w.Header().Set("Warning", `299 - "This version of the flagz endpoint is deprecated. Please use a newer version."`)
 			}
+			writeStructuredResponse(obj, serializer, targetGV, restrictions, w, r)
 		case "text/plain":
 			writePlainTextResponse(obj, serializer, w, reg)
-			return
 		default:
-			err = fmt.Errorf("content negotiation failed: unsupported media type '%s'", serializerInfo.MediaType)
+			err := fmt.Errorf("unsupported media type: %s/%s", serializerInfo.MediaType, serializerInfo.MediaTypeSubType)
 			utilruntime.HandleError(err)
 			responsewriters.ErrorNegotiated(
 				err,
@@ -126,10 +154,7 @@ func handleFlagz(componentName string, reg *registry, serializer runtime.Negotia
 				w,
 				r,
 			)
-			return
 		}
-
-		writeResponse(obj, serializer, targetGV, restrictions, w, r)
 	}
 }
 
@@ -170,7 +195,7 @@ func writePlainTextResponse(obj runtime.Object, serializer runtime.NegotiatedSer
 	}
 }
 
-func writeResponse(obj runtime.Object, serializer runtime.NegotiatedSerializer, targetGV schema.GroupVersion, restrictions negotiate.FlagzEndpointRestrictions, w http.ResponseWriter, r *http.Request) {
+func writeStructuredResponse(obj runtime.Object, serializer runtime.NegotiatedSerializer, targetGV schema.GroupVersion, restrictions negotiate.FlagzEndpointRestrictions, w http.ResponseWriter, r *http.Request) {
 	responsewriters.WriteObjectNegotiated(
 		serializer,
 		restrictions,

@@ -29,6 +29,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
+	"sigs.k8s.io/yaml"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
@@ -37,8 +38,10 @@ import (
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	cbor "k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
+	apiserverfeat "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -136,6 +139,7 @@ func TestLivezAndReadyz(t *testing.T) {
 
 func TestFlagz(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ComponentFlagz, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiserverfeat.CBORServingAndStorage, true)
 	testServerFlags := append(framework.DefaultTestServerFlags(), "--v=2")
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, testServerFlags, framework.SharedEtcd())
 	defer server.TearDownFn()
@@ -157,11 +161,11 @@ func TestFlagz(t *testing.T) {
 	}
 
 	for _, tc := range []struct {
-		name         string
-		acceptHeader string
-		wantStatus   int
-		wantBodySub  string               // for text/plain
-		wantJSON     *flagzv1alpha1.Flagz // for application/json
+		name               string
+		acceptHeader       string
+		wantStatus         int
+		wantBodySub        string               // for text/plain
+		wantStructuredBody *flagzv1alpha1.Flagz // for structured responses (JSON/YAML/CBOR)
 	}{
 		{
 			name:         "text plain response",
@@ -170,10 +174,10 @@ func TestFlagz(t *testing.T) {
 			wantBodySub:  wantBodyStr,
 		},
 		{
-			name:         "structured json response",
-			acceptHeader: "application/json;v=v1alpha1;g=config.k8s.io;as=Flagz",
-			wantStatus:   http.StatusOK,
-			wantJSON:     wantBodyJSON,
+			name:               "structured json response",
+			acceptHeader:       "application/json;v=v1alpha1;g=config.k8s.io;as=Flagz",
+			wantStatus:         http.StatusOK,
+			wantStructuredBody: wantBodyJSON,
 		},
 		{
 			name:         "no accept header (defaults to text)",
@@ -208,6 +212,18 @@ func TestFlagz(t *testing.T) {
 			wantStatus:   http.StatusOK,
 			wantBodySub:  wantBodyStr,
 		},
+		{
+			name:               "structured cbor response",
+			acceptHeader:       "application/cbor;v=v1alpha1;g=config.k8s.io;as=Flagz",
+			wantStatus:         http.StatusOK,
+			wantStructuredBody: wantBodyJSON,
+		},
+		{
+			name:               "structured yaml response",
+			acceptHeader:       "application/yaml;v=v1alpha1;g=config.k8s.io;as=Flagz",
+			wantStatus:         http.StatusOK,
+			wantStructuredBody: wantBodyJSON,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			req := client.CoreV1().RESTClient().Get().RequestURI("/flagz")
@@ -228,17 +244,15 @@ func TestFlagz(t *testing.T) {
 						t.Errorf("body missing expected substring: %q\nGot:\n%s", tc.wantBodySub, string(raw))
 					}
 				}
-				if tc.wantJSON != nil {
+				if tc.wantStructuredBody != nil {
 					var got flagzv1alpha1.Flagz
-					if err := json.Unmarshal(raw, &got); err != nil {
-						t.Fatalf("error unmarshalling JSON: %v", err)
-					}
+					unmarshalResponse(t, tc.acceptHeader, raw, &got)
 					// Only check static fields, since others are dynamic
-					if got.TypeMeta != tc.wantJSON.TypeMeta {
-						t.Errorf("TypeMeta mismatch: want %+v, got %+v", tc.wantJSON.TypeMeta, got.TypeMeta)
+					if got.TypeMeta != tc.wantStructuredBody.TypeMeta {
+						t.Errorf("TypeMeta mismatch: want %+v, got %+v", tc.wantStructuredBody.TypeMeta, got.TypeMeta)
 					}
-					if got.ObjectMeta.Name != tc.wantJSON.ObjectMeta.Name {
-						t.Errorf("ObjectMeta.Name mismatch: want %q, got %q", tc.wantJSON.ObjectMeta.Name, got.ObjectMeta.Name)
+					if got.ObjectMeta.Name != tc.wantStructuredBody.ObjectMeta.Name {
+						t.Errorf("ObjectMeta.Name mismatch: want %q, got %q", tc.wantStructuredBody.ObjectMeta.Name, got.ObjectMeta.Name)
 					}
 					if got.Flags["v"] != "2" {
 						t.Errorf("v mismatch: want %q, got %q", "2", got.Flags["v"])
@@ -251,6 +265,7 @@ func TestFlagz(t *testing.T) {
 
 func TestStatusz(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ComponentStatusz, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiserverfeat.CBORServingAndStorage, true)
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
 
@@ -259,8 +274,8 @@ func TestStatusz(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	wantBodyStr := "statusz\nWarning: This endpoint is not meant to be machine parseable"
-	wantBodyJSON := &v1alpha1.Statusz{
+	wantBodyString := "statusz\nWarning: This endpoint is not meant to be machine parseable"
+	wantBodyStructured := &v1alpha1.Statusz{
 		// StartTime, UptimeSeconds, GoVersion, BinaryVersion,
 		// EmulationVersion, Paths are dynamic, so we only check
 		// static fields
@@ -275,29 +290,29 @@ func TestStatusz(t *testing.T) {
 	}
 
 	for _, tc := range []struct {
-		name         string
-		acceptHeader string
-		wantStatus   int
-		wantBodySub  string            // for text/plain responses
-		wantJSON     *v1alpha1.Statusz // for structured response
+		name               string
+		acceptHeader       string
+		wantStatus         int
+		wantBodySub        string            // for text/plain responses
+		wantStructuredBody *v1alpha1.Statusz // for structured responses (JSON/YAML/CBOR)
 	}{
 		{
 			name:         "text plain response",
 			acceptHeader: "text/plain",
 			wantStatus:   http.StatusOK,
-			wantBodySub:  wantBodyStr,
+			wantBodySub:  wantBodyString,
 		},
 		{
-			name:         "structured json response",
-			acceptHeader: "application/json;v=v1alpha1;g=config.k8s.io;as=Statusz",
-			wantStatus:   http.StatusOK,
-			wantJSON:     wantBodyJSON,
+			name:               "structured json response",
+			acceptHeader:       "application/json;v=v1alpha1;g=config.k8s.io;as=Statusz",
+			wantStatus:         http.StatusOK,
+			wantStructuredBody: wantBodyStructured,
 		},
 		{
 			name:         "no accept header (defaults to text)",
 			acceptHeader: "",
 			wantStatus:   http.StatusOK,
-			wantBodySub:  wantBodyStr,
+			wantBodySub:  wantBodyString,
 		},
 		{
 			name:         "invalid accept header",
@@ -318,13 +333,25 @@ func TestStatusz(t *testing.T) {
 			name:         "wildcard accept header",
 			acceptHeader: "*/*",
 			wantStatus:   http.StatusOK,
-			wantBodySub:  wantBodyStr,
+			wantBodySub:  wantBodyString,
 		},
 		{
 			name:         "bad json header fall back wildcard",
 			acceptHeader: "application/json;v=foo;g=config.k8s.io;as=Statusz,*/*",
 			wantStatus:   http.StatusOK,
-			wantBodySub:  wantBodyStr,
+			wantBodySub:  wantBodyString,
+		},
+		{
+			name:               "structured yaml response",
+			acceptHeader:       "application/yaml;v=v1alpha1;g=config.k8s.io;as=Statusz",
+			wantStatus:         http.StatusOK,
+			wantStructuredBody: wantBodyStructured,
+		},
+		{
+			name:               "structured cbor response",
+			acceptHeader:       "application/cbor;v=v1alpha1;g=config.k8s.io;as=Statusz",
+			wantStatus:         http.StatusOK,
+			wantStructuredBody: wantBodyStructured,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -346,19 +373,17 @@ func TestStatusz(t *testing.T) {
 						t.Errorf("body missing expected substring: %q\nGot:\n%s", tc.wantBodySub, string(raw))
 					}
 				}
-				if tc.wantJSON != nil {
+				if tc.wantStructuredBody != nil {
 					var got v1alpha1.Statusz
-					if err := json.Unmarshal(raw, &got); err != nil {
-						t.Fatalf("error unmarshalling JSON: %v", err)
-					}
+					unmarshalResponse(t, tc.acceptHeader, raw, &got)
 					// Only check static fields, since others are dynamic
-					if got.TypeMeta != tc.wantJSON.TypeMeta {
-						t.Errorf("TypeMeta mismatch: want %+v, got %+v", tc.wantJSON.TypeMeta, got.TypeMeta)
+					if got.TypeMeta != tc.wantStructuredBody.TypeMeta {
+						t.Errorf("TypeMeta mismatch: want %+v, got %+v", tc.wantStructuredBody.TypeMeta, got.TypeMeta)
 					}
-					if got.ObjectMeta.Name != tc.wantJSON.ObjectMeta.Name {
-						t.Errorf("ObjectMeta.Name mismatch: want %q, got %q", tc.wantJSON.ObjectMeta.Name, got.ObjectMeta.Name)
+					if got.ObjectMeta.Name != tc.wantStructuredBody.ObjectMeta.Name {
+						t.Errorf("ObjectMeta.Name mismatch: want %q, got %q", tc.wantStructuredBody.ObjectMeta.Name, got.ObjectMeta.Name)
 					}
-					if diff := cmp.Diff(tc.wantJSON.Paths, got.Paths); diff != "" {
+					if diff := cmp.Diff(tc.wantStructuredBody.Paths, got.Paths); diff != "" {
 						t.Errorf("Paths mismatch (-want,+got):\n%s", diff)
 					}
 				}
@@ -834,4 +859,24 @@ func TestMultiAPIServerNodePortAllocation(t *testing.T) {
 		server.TearDownFn()
 	}
 
+}
+
+func unmarshalResponse(t *testing.T, acceptHeader string, raw []byte, got interface{}) {
+	t.Helper()
+	switch {
+	case strings.Contains(acceptHeader, "application/json"):
+		if err := json.Unmarshal(raw, got); err != nil {
+			t.Fatalf("error unmarshalling JSON: %v", err)
+		}
+	case strings.Contains(acceptHeader, "application/yaml"):
+		if err := yaml.Unmarshal(raw, got); err != nil {
+			t.Fatalf("error unmarshalling YAML: %v", err)
+		}
+	case strings.Contains(acceptHeader, "application/cbor"):
+		if err := cbor.Unmarshal(raw, got); err != nil {
+			t.Fatalf("error unmarshalling CBOR: %v", err)
+		}
+	default:
+		t.Fatalf("unexpected accept header for structured body: %s", acceptHeader)
+	}
 }
