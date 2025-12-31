@@ -371,6 +371,7 @@ type Device struct {
 	// +optional
 	// +listType=atomic
 	// +featureGate=DRADeviceTaints
+	// +k8s:maxItems=16
 	Taints []DeviceTaint `json:"taints,omitempty" protobuf:"bytes,8,rep,name=taints"`
 
 	// BindsToNode indicates if the usage of an allocation involving this device
@@ -650,6 +651,7 @@ type DeviceTaint struct {
 	// Must be a label name.
 	//
 	// +required
+	// +k8s:validation:MinLength=1
 	Key string `json:"key" protobuf:"bytes,1,name=key"`
 
 	// The taint value corresponding to the taint key.
@@ -667,6 +669,7 @@ type DeviceTaint struct {
 	//
 	// +required
 	// +k8s:required
+	// +k8s:validation:Enum=NoSchedule;PreferNoSchedule;NoExecute
 	Effect DeviceTaintEffect `json:"effect" protobuf:"bytes,3,name=effect,casttype=DeviceTaintEffect"`
 
 	// ^^^^
@@ -1962,6 +1965,9 @@ type AllocatedDeviceStatus struct {
 	// +optional
 	// +listType=map
 	// +listMapKey=type
+	// +k8s:listType=map
+	// +k8s:listMapKey=type
+	// +k8s:maxItems=8
 	Conditions []metav1.Condition `json:"conditions" protobuf:"bytes,4,opt,name=conditions"`
 
 	// Data contains arbitrary driver-specific data.
