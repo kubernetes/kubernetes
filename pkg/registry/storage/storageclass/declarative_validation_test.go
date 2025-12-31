@@ -27,8 +27,9 @@ import (
 	"k8s.io/kubernetes/pkg/apis/storage"
 )
 
+var apiVersions = []string{"v1beta1", "v1"} // StorageClass.Provisioner not in v1alpha1
+
 func TestDeclarativeValidate(t *testing.T) {
-	apiVersions := []string{"v1beta1", "v1"} // StorageClass.Provisioner not in v1alpha1
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {
 			testDeclarativeValidate(t, apiVersion)
@@ -70,7 +71,6 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 }
 
 func TestDeclarativeValidateUpdate(t *testing.T) {
-	apiVersions := []string{"v1beta1", "v1"} // StorageClass.Provisioner not in v1alpha1
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {
 			testDeclarativeValidateUpdate(t, apiVersion)

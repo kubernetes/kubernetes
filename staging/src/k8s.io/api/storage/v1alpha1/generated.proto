@@ -134,6 +134,7 @@ message VolumeAttachment {
 
   // spec represents specification of the desired attach/detach volume behavior.
   // Populated by the Kubernetes system.
+  // +k8s:immutable
   optional VolumeAttachmentSpec spec = 2;
 
   // status represents status of the VolumeAttachment request.
@@ -177,6 +178,10 @@ message VolumeAttachmentSource {
 message VolumeAttachmentSpec {
   // attacher indicates the name of the volume driver that MUST handle this
   // request. This is the name returned by GetPluginName().
+  // +required
+  // +k8s:required
+  // +k8s:format="k8s-long-name-caseless"
+  // +k8s:maxLength=63
   optional string attacher = 1;
 
   // source represents the volume that should be attached.
