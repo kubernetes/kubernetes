@@ -50,6 +50,9 @@ const (
 
 // getEventKey builds unique event key based on source, involvedObject, reason, message
 func getEventKey(event *v1.Event) string {
+	if event == nil {
+		return ""
+	}
 	return strings.Join([]string{
 		event.Source.Component,
 		event.Source.Host,
@@ -68,6 +71,9 @@ func getEventKey(event *v1.Event) string {
 
 // getSpamKey builds unique event key based on source, involvedObject
 func getSpamKey(event *v1.Event) string {
+	if event == nil {
+		return ""
+	}
 	return strings.Join([]string{
 		event.Source.Component,
 		event.Source.Host,
@@ -159,6 +165,9 @@ type EventAggregatorKeyFunc func(event *v1.Event) (aggregateKey string, localKey
 // EventAggregatorByReasonFunc aggregates events by exact match on event.Source, event.InvolvedObject, event.Type,
 // event.Reason, event.ReportingController and event.ReportingInstance
 func EventAggregatorByReasonFunc(event *v1.Event) (string, string) {
+	if event == nil {
+		return "", ""
+	}
 	return strings.Join([]string{
 		event.Source.Component,
 		event.Source.Host,
