@@ -50,3 +50,23 @@ func MkdirAll(path string, perm os.FileMode) error {
 func IsAbs(path string) bool {
 	return filepath.IsAbs(path)
 }
+
+// IsPathValidForMount checks if the given `path` is a valid mount point.
+// Return whether the path is valid and error encountered if any
+func IsPathValidForMount(path string) (bool, error) {
+	dir, err := os.Lstat(path)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return false, err
+		}
+
+		return false, nil
+	}
+
+	// for Unix/Linux OS, check if the path is directory.
+	if dir.IsDir() {
+		return true, nil
+	}
+
+	return false, fmt.Errorf("path %v exists but is not a mounted path", path)
+}

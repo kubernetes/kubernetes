@@ -19,10 +19,12 @@ limitations under the License.
 package filesystem
 
 import (
+	"errors"
 	"fmt"
 	"math/rand"
 	"net"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -266,4 +268,273 @@ func TestAbsWithSlash(t *testing.T) {
 
 	assert.False(t, IsAbs("./local"))
 	assert.False(t, IsAbs("local"))
+}
+
+func runPowershellCmd(t *testing.T, command string) (string, error) {
+	cmd := exec.Command("powershell", "/c", fmt.Sprintf("& { $global:ProgressPreference = 'SilentlyContinue'; %s }", command))
+	t.Logf("Executing command: %q", cmd.String())
+	result, err := cmd.CombinedOutput()
+	return string(result), err
+}
+
+func createMountedFolder(t *testing.T, vhdxPath, mountedPath string, initialSize int) {
+	cmd := fmt.Sprintf("New-VHD -Path %s -SizeBytes %d", vhdxPath, initialSize)
+	if out, err := runPowershellCmd(t, cmd); err != nil {
+		t.Fatalf("Error: %v. Command: %q. Out: %s.", err, cmd, out)
+	}
+	cmd = fmt.Sprintf("Mount-VHD -Path %s", vhdxPath)
+	if out, err := runPowershellCmd(t, cmd); err != nil {
+		t.Fatalf("Error: %v. Command: %q. Out: %s", err, cmd, out)
+	}
+	cmd = fmt.Sprintf("Mount-VHD -Path %s", vhdxPath)
+	if out, err := runPowershellCmd(t, cmd); err != nil {
+		t.Fatalf("Error: %v. Command: %q. Out: %s", err, cmd, out)
+	}
+	cmd = fmt.Sprintf("(Get-VHD -Path %s).DiskNumber", vhdxPath)
+	diskNumUnparsed, err := runPowershellCmd(t, cmd)
+	if err != nil {
+		t.Fatalf("Error: %v. Command: %s", err, cmd)
+	}
+	diskNumUnparsed = strings.TrimSpace(diskNumUnparsed)
+	cmd = fmt.Sprintf("Initialize-Disk -Number %s -PartitionStyle GPT", diskNumUnparsed)
+	if out, err := runPowershellCmd(t, cmd); err != nil {
+		t.Fatalf("Error initializing disk: %v. Command: %q. Out: %s", err, cmd, out)
+	}
+	// Create a new partition using all available space
+	cmd = fmt.Sprintf("New-Partition -DiskNumber %s -UseMaximumSize", diskNumUnparsed)
+	if out, err := runPowershellCmd(t, cmd); err != nil {
+		t.Fatalf("Error creating partition: %v. Command: %q. Out: %s", err, cmd, out)
+	}
+	// Format the partition with NTFS
+	cmd = fmt.Sprintf("(Get-Disk -Number %s | Get-Partition | Get-Volume) | Format-Volume -FileSystem NTFS -Confirm:$false", diskNumUnparsed)
+	if out, err := runPowershellCmd(t, cmd); err != nil {
+		t.Fatalf("Error formatting volume: %v. Command: %q. Out: %s", err, cmd, out)
+	}
+	cmd = fmt.Sprintf(`(Get-Disk -Number %s | Get-Partition ) | Add-PartitionAccessPath -AccessPath %s`, diskNumUnparsed, mountedPath)
+	if _, err := runPowershellCmd(t, cmd); err != nil {
+		t.Fatalf("Error: %v. Command: %s", err, cmd)
+	}
+}
+
+func unmountFolder(t *testing.T, vhdxPath, mountedPath string) {
+	cmd := fmt.Sprintf("(Get-VHD -Path %s).DiskNumber", vhdxPath)
+	diskNumUnparsed, err := runPowershellCmd(t, cmd)
+	if err != nil {
+		t.Fatalf("Error: %v. Command: %s", err, cmd)
+	}
+	diskNumUnparsed = strings.TrimSpace(diskNumUnparsed)
+	cmd = fmt.Sprintf(`Get-Disk -Number %s | Get-Partition | Remove-PartitionAccessPath -AccessPath %s`, diskNumUnparsed, mountedPath)
+	if _, err := runPowershellCmd(t, cmd); err != nil {
+		t.Fatalf("Error: %v. Command: %s", err, cmd)
+	}
+	cmd = fmt.Sprintf("Dismount-VHD -Path %s", vhdxPath)
+	if out, err := runPowershellCmd(t, cmd); err != nil {
+		t.Fatalf("Error unmounting VHD: %v. Command: %q. Out: %s", err, cmd, out)
+	}
+}
+
+func TestIsPathValidForMount(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "test-dir")
+	require.NoError(t, err, "Failed to create temporary directory.")
+
+	tests := []struct {
+		name           string
+		path           string
+		setup          func()
+		cleanup        func()
+		expectedResult bool
+		expectedError  error
+	}{
+		{
+			name:           "Non-existent path",
+			path:           filepath.Join(tempDir, "nonexistent"),
+			expectedResult: false,
+			expectedError:  nil,
+		},
+		{
+			name: "Regular directory",
+			path: filepath.Join(tempDir, "regular_dir"),
+			setup: func() {
+				err := os.MkdirAll(filepath.Join(tempDir, "regular_dir"), 0644)
+				require.NoError(t, err, "Failed to create regular_dir directory.")
+			},
+			expectedResult: true,
+			expectedError:  nil,
+		},
+		{
+			name: "Mounted folder",
+			path: filepath.Join(tempDir, "mounted_folder"),
+			setup: func() {
+				err := os.MkdirAll(filepath.Join(tempDir, "mounted_folder"), 0644)
+				require.NoError(t, err, "Failed to create regular_dir directory.")
+
+				createMountedFolder(t, filepath.Join(tempDir, "test.vhdx"), filepath.Join(tempDir, "mounted_folder"), 1024*1024*1024)
+			},
+			cleanup: func() {
+				unmountFolder(t, filepath.Join(tempDir, "test.vhdx"), filepath.Join(tempDir, "mounted_folder"))
+			},
+			expectedResult: true,
+			expectedError:  nil,
+		},
+		{
+			name: "Regular file",
+			path: filepath.Join(tempDir, "regular_file"),
+			setup: func() {
+				err := os.WriteFile(filepath.Join(tempDir, "regular_file"), []byte("just_a_test"), 0644)
+				require.NoError(t, err, "Failed to create regular_file.")
+			},
+			expectedResult: false,
+			expectedError:  fmt.Errorf("path %s exists but is not a mounted path", filepath.Join(tempDir, "regular_file")),
+		},
+		{
+			name: "Regular symlink",
+			path: filepath.Join(tempDir, "regular_symlink"),
+			setup: func() {
+				err := os.WriteFile(filepath.Join(tempDir, "regular_file"), []byte("just_a_test"), 0644)
+				require.NoError(t, err, "Failed to create regular_file.")
+
+				err = os.Symlink(filepath.Join(tempDir, "regular_file"), filepath.Join(tempDir, "regular_symlink"))
+				require.NoError(t, err, "Failed to create regular_file.")
+			},
+			cleanup: func() {
+				err := os.RemoveAll(filepath.Join(tempDir, "regular_file"))
+				require.NoError(t, err, "Failed to delete regular_file.")
+
+				err = os.RemoveAll(filepath.Join(tempDir, "regular_symlink"))
+				require.NoError(t, err, "Failed to delete regular_symlink.")
+			},
+			expectedResult: true,
+			expectedError:  nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.setup != nil {
+				tt.setup()
+			}
+
+			// Run test
+			result, err := IsPathValidForMount(tt.path)
+
+			if tt.cleanup != nil {
+				tt.cleanup()
+			}
+
+			// Assert results
+			if tt.expectedError != nil {
+				assert.Error(t, err)
+				assert.Equal(t, tt.expectedError.Error(), err.Error())
+			} else {
+				assert.NoError(t, err)
+			}
+			assert.Equal(t, tt.expectedResult, result)
+		})
+	}
+
+	err = os.RemoveAll(tempDir)
+	require.NoError(t, err, "Failed to remove directory.")
+}
+
+func TestIsMountedFolder(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "test-dir")
+	require.NoError(t, err, "Failed to create temporary directory.")
+
+	tests := []struct {
+		name           string
+		path           string
+		setup          func()
+		cleanup        func()
+		expectedResult bool
+		expectedError  error
+	}{
+		{
+			name:           "Non-existent path",
+			path:           filepath.Join(tempDir, "nonexistent"),
+			expectedResult: false,
+			expectedError:  errors.New("The system cannot find the file specified."),
+		},
+		{
+			name: "Regular directory",
+			path: filepath.Join(tempDir, "regular_dir"),
+			setup: func() {
+				err := os.MkdirAll(filepath.Join(tempDir, "regular_dir"), 0644)
+				require.NoError(t, err, "Failed to create regular_dir directory.")
+			},
+			expectedResult: false,
+			expectedError:  nil,
+		},
+		{
+			name: "Mounted folder",
+			path: filepath.Join(tempDir, "mounted_folder"),
+			setup: func() {
+				err := os.MkdirAll(filepath.Join(tempDir, "mounted_folder"), 0644)
+				require.NoError(t, err, "Failed to create regular_dir directory.")
+
+				createMountedFolder(t, filepath.Join(tempDir, "test.vhdx"), filepath.Join(tempDir, "mounted_folder"), 1024*1024*1024)
+			},
+			cleanup: func() {
+				unmountFolder(t, filepath.Join(tempDir, "test.vhdx"), filepath.Join(tempDir, "mounted_folder"))
+			},
+			expectedResult: true,
+			expectedError:  nil,
+		},
+		{
+			name: "Regular file",
+			path: filepath.Join(tempDir, "regular_file"),
+			setup: func() {
+				err := os.WriteFile(filepath.Join(tempDir, "regular_file"), []byte("just_a_test"), 0644)
+				require.NoError(t, err, "Failed to create regular_file.")
+			},
+			expectedResult: false,
+			expectedError:  nil,
+		},
+		{
+			name: "Regular symlink",
+			path: filepath.Join(tempDir, "regular_symlink"),
+			setup: func() {
+				err := os.WriteFile(filepath.Join(tempDir, "regular_file"), []byte("just_a_test"), 0644)
+				require.NoError(t, err, "Failed to create regular_file.")
+
+				err = os.Symlink(filepath.Join(tempDir, "regular_file"), filepath.Join(tempDir, "regular_symlink"))
+				require.NoError(t, err, "Failed to create regular_file.")
+			},
+			cleanup: func() {
+				err := os.RemoveAll(filepath.Join(tempDir, "regular_file"))
+				require.NoError(t, err, "Failed to delete regular_file.")
+
+				err = os.RemoveAll(filepath.Join(tempDir, "regular_symlink"))
+				require.NoError(t, err, "Failed to delete regular_symlink.")
+			},
+			expectedResult: true,
+			expectedError:  nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.setup != nil {
+				tt.setup()
+			}
+
+			// Run test
+			result, err := IsMountedFolder(tt.path)
+
+			if tt.cleanup != nil {
+				tt.cleanup()
+			}
+
+			// Assert results
+			if tt.expectedError != nil {
+				assert.Error(t, err)
+				assert.Equal(t, tt.expectedError.Error(), err.Error())
+			} else {
+				assert.NoError(t, err)
+			}
+			assert.Equal(t, tt.expectedResult, result)
+		})
+	}
+
+	err = os.RemoveAll(tempDir)
+	require.NoError(t, err, "Failed to remove directory.")
 }
