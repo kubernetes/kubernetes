@@ -44,12 +44,6 @@ const (
 	// Ignores errors raised on unchanged fields of Custom Resources
 	// across UPDATE/PATCH requests.
 	CRDValidationRatcheting featuregate.Feature = "CRDValidationRatcheting"
-
-	// owner: @jpbetz
-	//
-	// CustomResourceDefinitions may include SelectableFields to declare which fields
-	// may be used as field selectors.
-	CustomResourceFieldSelectors featuregate.Feature = "CustomResourceFieldSelectors"
 )
 
 func init() {
@@ -70,10 +64,5 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.28"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.33"), Default: true, LockToDefault: true, PreRelease: featuregate.GA},
-	},
-	CustomResourceFieldSelectors: {
-		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.32"), Default: true, LockToDefault: true, PreRelease: featuregate.GA},
 	},
 }
