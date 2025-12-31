@@ -213,8 +213,15 @@ fi
 # is not used.
 suite_args+=(--report-complete-ginkgo --report-complete-junit)
 
+# Additional e2e.test arguments. Split into individual arguments at spaces.
+# For more complex arguments pass additional arguments to the script.
+if [[ -n "${KUBE_E2E_TEST_ARGS:-}" ]]; then
+  # shellcheck disable=SC2206 # Splitting at word boundaries is intentional here.
+  suite_args+=(${KUBE_E2E_TEST_ARGS})
+fi
+
 # When SIGTERM doesn't reach the E2E test suite binaries, ginkgo will exit
-# without collecting information from about the currently running and
+# without collecting information about the currently running and
 # potentially stuck tests. This seems to happen when Prow shuts down a test
 # job because of a timeout.
 #
@@ -237,6 +244,8 @@ signal_handler() {
 *** interrupted test was running.
 
 EOF
+    ps -ef --forest || true
+
     # This goes to the process group, which is important because we
     # need to reach the e2e.test processes forked by the Ginkgo CLI.
     kill -TERM "-${GINKGO_CLI_PID}" || true
