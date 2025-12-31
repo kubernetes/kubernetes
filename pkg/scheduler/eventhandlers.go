@@ -53,7 +53,9 @@ import (
 func (sched *Scheduler) addNodeToCache(obj interface{}) {
 	evt := fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add}
 	start := time.Now()
-	defer metrics.EventHandlingLatency.WithLabelValues(evt.Label()).Observe(metrics.SinceInSeconds(start))
+	defer func() {
+		metrics.EventHandlingLatency.WithLabelValues(evt.Label()).Observe(metrics.SinceInSeconds(start))
+	}()
 	logger := sched.logger
 	node, ok := obj.(*v1.Node)
 	if !ok {
@@ -100,7 +102,9 @@ func (sched *Scheduler) updateNodeInCache(oldObj, newObj interface{}) {
 func (sched *Scheduler) deleteNodeFromCache(obj interface{}) {
 	evt := fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Delete}
 	start := time.Now()
-	defer metrics.EventHandlingLatency.WithLabelValues(evt.Label()).Observe(metrics.SinceInSeconds(start))
+	defer func() {
+		metrics.EventHandlingLatency.WithLabelValues(evt.Label()).Observe(metrics.SinceInSeconds(start))
+	}()
 
 	logger := sched.logger
 	var node *v1.Node
@@ -227,7 +231,9 @@ func (sched *Scheduler) deletePod(obj interface{}) {
 
 func (sched *Scheduler) addPodToSchedulingQueue(pod *v1.Pod) {
 	start := time.Now()
-	defer metrics.EventHandlingLatency.WithLabelValues(framework.EventUnscheduledPodAdd.Label()).Observe(metrics.SinceInSeconds(start))
+	defer func() {
+		metrics.EventHandlingLatency.WithLabelValues(framework.EventUnscheduledPodAdd.Label()).Observe(metrics.SinceInSeconds(start))
+	}()
 
 	logger := sched.logger
 	logger.V(3).Info("Add event for unscheduled pod", "pod", klog.KObj(pod))
@@ -303,10 +309,14 @@ func (sched *Scheduler) updatePodInSchedulingQueue(oldPod, newPod *v1.Pod) {
 		return
 	}
 
-	defer metrics.EventHandlingLatency.WithLabelValues(framework.EventUnscheduledPodUpdate.Label()).Observe(metrics.SinceInSeconds(start))
+	defer func() {
+		metrics.EventHandlingLatency.WithLabelValues(framework.EventUnscheduledPodUpdate.Label()).Observe(metrics.SinceInSeconds(start))
+	}()
 	for _, evt := range framework.PodSchedulingPropertiesChange(newPod, oldPod) {
 		if evt.Label() != framework.EventUnscheduledPodUpdate.Label() {
-			defer metrics.EventHandlingLatency.WithLabelValues(evt.Label()).Observe(metrics.SinceInSeconds(start))
+			defer func() {
+				metrics.EventHandlingLatency.WithLabelValues(evt.Label()).Observe(metrics.SinceInSeconds(start))
+			}()
 		}
 	}
 
@@ -345,7 +355,9 @@ func hasNominatedNodeNameChanged(oldPod, newPod *v1.Pod) bool {
 
 func (sched *Scheduler) deletePodFromSchedulingQueue(pod *v1.Pod, inBinding bool) {
 	start := time.Now()
-	defer metrics.EventHandlingLatency.WithLabelValues(framework.EventUnscheduledPodDelete.Label()).Observe(metrics.SinceInSeconds(start))
+	defer func() {
+		metrics.EventHandlingLatency.WithLabelValues(framework.EventUnscheduledPodDelete.Label()).Observe(metrics.SinceInSeconds(start))
+	}()
 
 	logger := sched.logger
 
@@ -384,7 +396,9 @@ func getLEPriorityPreCheck(priority int32) queue.PreEnqueueCheck {
 
 func (sched *Scheduler) addAssignedPodToCache(pod *v1.Pod) {
 	start := time.Now()
-	defer metrics.EventHandlingLatency.WithLabelValues(framework.EventAssignedPodAdd.Label()).Observe(metrics.SinceInSeconds(start))
+	defer func() {
+		metrics.EventHandlingLatency.WithLabelValues(framework.EventAssignedPodAdd.Label()).Observe(metrics.SinceInSeconds(start))
+	}()
 
 	logger := sched.logger
 
@@ -411,7 +425,9 @@ func (sched *Scheduler) addAssignedPodToCache(pod *v1.Pod) {
 
 func (sched *Scheduler) updateAssignedPodInCache(oldPod, newPod *v1.Pod) {
 	start := time.Now()
-	defer metrics.EventHandlingLatency.WithLabelValues(framework.EventAssignedPodUpdate.Label()).Observe(metrics.SinceInSeconds(start))
+	defer func() {
+		metrics.EventHandlingLatency.WithLabelValues(framework.EventAssignedPodUpdate.Label()).Observe(metrics.SinceInSeconds(start))
+	}()
 
 	logger := sched.logger
 
@@ -454,7 +470,9 @@ func (sched *Scheduler) updateAssignedPodInCache(oldPod, newPod *v1.Pod) {
 
 func (sched *Scheduler) deleteAssignedPodFromCache(pod *v1.Pod) {
 	start := time.Now()
-	defer metrics.EventHandlingLatency.WithLabelValues(framework.EventAssignedPodDelete.Label()).Observe(metrics.SinceInSeconds(start))
+	defer func() {
+		metrics.EventHandlingLatency.WithLabelValues(framework.EventAssignedPodDelete.Label()).Observe(metrics.SinceInSeconds(start))
+	}()
 
 	logger := sched.logger
 
@@ -539,7 +557,9 @@ func addAllEventHandlers(
 			evt := fwk.ClusterEvent{Resource: resource, ActionType: fwk.Add}
 			funcs.AddFunc = func(obj interface{}) {
 				start := time.Now()
-				defer metrics.EventHandlingLatency.WithLabelValues(evt.Label()).Observe(metrics.SinceInSeconds(start))
+				defer func() {
+					metrics.EventHandlingLatency.WithLabelValues(evt.Label()).Observe(metrics.SinceInSeconds(start))
+				}()
 				if resource == fwk.StorageClass && !utilfeature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints) {
 					sc, ok := obj.(*storagev1.StorageClass)
 					if !ok {
