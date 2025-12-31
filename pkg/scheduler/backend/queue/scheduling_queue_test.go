@@ -3182,6 +3182,9 @@ var (
 	add = func(t *testing.T, logger klog.Logger, queue *PriorityQueue, pInfo *framework.QueuedPodInfo) {
 		queue.Add(logger, pInfo.Pod)
 	}
+	pop = func(_ *testing.T, logger klog.Logger, queue *PriorityQueue, _ *framework.QueuedPodInfo) {
+		queue.Pop(logger)
+	}
 	popAndRequeueAsUnschedulable = func(t *testing.T, logger klog.Logger, queue *PriorityQueue, pInfo *framework.QueuedPodInfo) {
 		// To simulate the pod is failed in scheduling in the real world, Pop() the pod from activeQ before AddUnschedulableIfNotPresent() below.
 		// UnschedulablePlugins will get cleared by Pop, so make a copy first.
@@ -3362,8 +3365,8 @@ func TestPodTimestamp(t *testing.T) {
 	}
 }
 
-// TestPendingPodsMetric tests Prometheus metrics related with pending pods
-func TestPendingPodsMetric(t *testing.T) {
+// TestSchedulerPodsMetric tests Prometheus metrics
+func TestSchedulerPodsMetric(t *testing.T) {
 	timestamp := time.Now()
 	preenqueuePluginName := "preEnqueuePlugin"
 	metrics.Register()
@@ -3775,6 +3778,77 @@ scheduler_pending_pods{queue="gated"} 0
 scheduler_pending_pods{queue="unschedulable"} 0
 `,
 		},
+		{
+			name: "Unschedulable pods metric must be 0 after a pod is gated, ungated, re-queued, and eventually popped from the scheduling queue",
+			operations: []operation{
+				updatePluginToGateAllPods,
+				add,
+				moveAllToActiveOrBackoffQ,
+				moveAllToActiveOrBackoffQ,
+				updatePluginToUngateAllPods,
+				moveAllToActiveOrBackoffQ,
+				pop,
+			},
+			operands: [][]*framework.QueuedPodInfo{
+				{nil},
+				pInfos[:1],
+				{nil},
+				{nil},
+				{nil},
+				{nil},
+				{nil},
+			},
+			wants: `
+# HELP scheduler_unschedulable_pods [ALPHA] The number of unschedulable pods broken down by plugin name. A pod will increment the gauge for all plugins that caused it to not schedule and so this metric have meaning only when broken down by plugin.
+# TYPE scheduler_unschedulable_pods gauge
+scheduler_unschedulable_pods{plugin="preEnqueuePlugin",profile=""} 0
+`,
+			metricsName: "scheduler_unschedulable_pods",
+		},
+		{
+			name: "Unschedulable pods metric must be 0 after pod is gated and then deleted",
+			operations: []operation{
+				updatePluginToGateAllPods,
+				add,
+				moveAllToActiveOrBackoffQ,
+				moveAllToActiveOrBackoffQ,
+				deletePod,
+			},
+			operands: [][]*framework.QueuedPodInfo{
+				{nil},
+				pInfos[:1],
+				{nil},
+				{nil},
+				pInfos[:1],
+			},
+			metricsName: "scheduler_unschedulable_pods",
+			wants: `
+# HELP scheduler_unschedulable_pods [ALPHA] The number of unschedulable pods broken down by plugin name. A pod will increment the gauge for all plugins that caused it to not schedule and so this metric have meaning only when broken down by plugin.
+# TYPE scheduler_unschedulable_pods gauge
+scheduler_unschedulable_pods{plugin="preEnqueuePlugin",profile=""} 0
+`,
+		},
+		{
+			name: "Unschedulable pods metric must be 0 after pod is gated multiple time by simillar plugin",
+			operations: []operation{
+				updatePluginToGateAllPods,
+				add,
+				moveAllToActiveOrBackoffQ,
+				moveAllToActiveOrBackoffQ,
+			},
+			operands: [][]*framework.QueuedPodInfo{
+				{nil},
+				pInfos[:1],
+				{nil},
+				{nil},
+			},
+			metricsName: "scheduler_unschedulable_pods",
+			wants: `
+# HELP scheduler_unschedulable_pods [ALPHA] The number of unschedulable pods broken down by plugin name. A pod will increment the gauge for all plugins that caused it to not schedule and so this metric have meaning only when broken down by plugin.
+# TYPE scheduler_unschedulable_pods gauge
+scheduler_unschedulable_pods{plugin="preEnqueuePlugin",profile=""} 1
+`,
+		},
 	}
 
 	resetMetrics := func() {
@@ -3782,6 +3856,7 @@ scheduler_pending_pods{queue="unschedulable"} 0
 		metrics.BackoffPods().Set(0)
 		metrics.UnschedulablePods().Set(0)
 		metrics.GatedPods().Set(0)
+		metrics.UnschedulableReason(preenqueuePluginName, "").Set(0)
 		metrics.PluginExecutionDuration.Reset()
 	}
 
@@ -3795,6 +3870,12 @@ scheduler_pending_pods{queue="unschedulable"} 0
 
 			m := makeEmptyQueueingHintMapPerProfile()
 			m[""][framework.EventUnscheduledPodUpdate] = []*QueueingHintFunction{
+				{
+					PluginName:     preenqueuePluginName,
+					QueueingHintFn: queueHintReturnQueue,
+				},
+			}
+			m[""][framework.EventUnschedulableTimeout] = []*QueueingHintFunction{
 				{
 					PluginName:     preenqueuePluginName,
 					QueueingHintFn: queueHintReturnQueue,
