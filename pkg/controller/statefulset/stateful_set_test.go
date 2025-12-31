@@ -271,7 +271,7 @@ func TestStatefulSetControllerDeletionTimestampRace(t *testing.T) {
 	}
 
 	// It should not adopt revisions.
-	revisions, err := ssh.ListControllerRevisions(set, selector)
+	revisions, err := ssh.ListControllerRevisions(set, parentKind, selector)
 	if err != nil {
 		t.Fatal(err)
 	}
