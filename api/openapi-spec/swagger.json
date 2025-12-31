@@ -6572,6 +6572,14 @@
           "description": "Whether this container should allocate a TTY for itself, also requires 'stdin' to be true. Default is false.",
           "type": "boolean"
         },
+        "dependentContainers": {
+          "description": "List of dependent containers that are run before this container is started. If a dependent container fails to start or run, the main container is not started. The dependent containers are run in the order they are defined in the list. This field cannot be set on ephemeral containers.",
+          "items": {
+            "$ref": "#/definitions/io.k8s.api.core.v1.DependentContainer"
+          },
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
+        },
         "volumeDevices": {
           "description": "volumeDevices is the list of block devices to be used by the container.",
           "items": {
@@ -12428,6 +12436,9 @@
         "devicePath"
       ],
       "type": "object"
+    },
+    "io.k8s.api.core.v1.DependentContainer": {
+      "type": "string"
     },
     "io.k8s.api.core.v1.VolumeMount": {
       "description": "VolumeMount describes a mounting of a Volume within a container.",

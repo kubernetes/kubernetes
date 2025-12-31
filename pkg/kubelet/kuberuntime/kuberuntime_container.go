@@ -74,6 +74,8 @@ var (
 	ErrPreStartHook = errors.New("PreStartHookError")
 	// ErrPostStartHook - failed to execute PostStartHook
 	ErrPostStartHook = errors.New("PostStartHookError")
+	// ErrContainerPaused - container is paused
+	ErrContainerPaused = errors.New("ContainerPausedError")
 )
 
 // recordContainerEvent should be used by the runtime manager for all container related events.
@@ -199,7 +201,14 @@ func (m *kubeGenericRuntimeManager) getPodRuntimeHandler(pod *v1.Pod) (podRuntim
 func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandboxID string, podSandboxConfig *runtimeapi.PodSandboxConfig, spec *startSpec, pod *v1.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, podIP string, podIPs []string, imageVolumes kubecontainer.ImageVolumes) (string, error) {
 	logger := klog.FromContext(ctx)
 	container := spec.container
-
+	for _, name := range container.DependentContainers {
+		depStatus := podStatus.FindContainerStatusByName(name)
+		if depStatus.State != kubecontainer.ContainerStateExited {
+			msg := fmt.Sprintf("Container %q is waiting for dependent container %q to be ready", container.Name, name)
+			podStatus.SetContainerStateByName(container.Name, kubecontainer.ContainerStatePaused)
+			return msg, ErrContainerPaused
+		}
+	}
 	// Step 1: pull the image.
 	podRuntimeHandler, err := m.getPodRuntimeHandler(pod)
 	if err != nil {
@@ -222,7 +231,7 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 	// For a new container, the RestartCount should be 0
 	restartCount := 0
 	containerStatus := podStatus.FindContainerStatusByName(container.Name)
-	if containerStatus != nil {
+	if containerStatus != nil && containerStatus.State != kubecontainer.ContainerStatePaused {
 		restartCount = containerStatus.RestartCount + 1
 	} else {
 		// The container runtime keeps state on container statuses and
@@ -1019,7 +1028,8 @@ func hasAnyRegularContainerCreated(pod *v1.Pod, podStatus *kubecontainer.PodStat
 		switch status.State {
 		case kubecontainer.ContainerStateCreated,
 			kubecontainer.ContainerStateRunning,
-			kubecontainer.ContainerStateExited:
+			kubecontainer.ContainerStateExited,
+			kubecontainer.ContainerStatePaused:
 			return true
 		default:
 			// Ignore other states
