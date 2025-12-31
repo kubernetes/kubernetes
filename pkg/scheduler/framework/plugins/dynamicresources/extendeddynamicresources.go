@@ -413,17 +413,17 @@ func createRequestsAndMappings(pod *v1.Pod, extendedResources map[v1.ResourceNam
 	// all mappings across all containers and resource types
 	var mappings []v1.ContainerExtendedResourceRequest
 
-	// Sort resource names to ensure deterministic ordering of device requests and mappings.
-	// Maps have non-deterministic iteration order in Go, so we extract and sort the keys.
-	resourceNames := make([]v1.ResourceName, 0, len(extendedResources))
-	for resource := range extendedResources {
-		resourceNames = append(resourceNames, resource)
-	}
-	sort.Slice(resourceNames, func(i, j int) bool {
-		return resourceNames[i] < resourceNames[j]
-	})
+	// // Sort resource names to ensure deterministic ordering of device requests and mappings.
+	// // Maps have non-deterministic iteration order in Go, so we extract and sort the keys.
+	// resourceNames := make([]v1.ResourceName, 0, len(extendedResources))
+	// for resource := range extendedResources {
+	// 	resourceNames = append(resourceNames, resource)
+	// }
+	// sort.Slice(resourceNames, func(i, j int) bool {
+	// 	return resourceNames[i] < resourceNames[j]
+	// })
 
-	for _, resource := range resourceNames {
+	for resource := range extendedResources {
 		class := deviceClassMapping.GetDeviceClass(resource)
 		// skip if the resource does not map to a device class
 		if class == nil {
