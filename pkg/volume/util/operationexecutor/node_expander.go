@@ -23,7 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/util/storage"
 	kevents "k8s.io/kubernetes/pkg/kubelet/events"
@@ -34,7 +34,7 @@ import (
 type NodeExpander struct {
 	nodeResizeOperationOpts
 	kubeClient clientset.Interface
-	recorder   record.EventRecorder
+	recorder   events.EventRecorder
 
 	// computed via precheck
 	pvcStatusCap resource.Quantity
@@ -53,7 +53,7 @@ type NodeExpander struct {
 	testStatus testResponseData
 }
 
-func newNodeExpander(resizeOp nodeResizeOperationOpts, client clientset.Interface, recorder record.EventRecorder) *NodeExpander {
+func newNodeExpander(resizeOp nodeResizeOperationOpts, client clientset.Interface, recorder events.EventRecorder) *NodeExpander {
 	return &NodeExpander{
 		kubeClient:              client,
 		nodeResizeOperationOpts: resizeOp,
@@ -209,8 +209,7 @@ func (ne *NodeExpander) expandOnPlugin() (bool, resource.Quantity, error) {
 		return false, ne.pluginResizeOpts.OldSize, resizeErr
 	}
 	simpleMsg, detailedMsg := ne.vmt.GenerateMsg("MountVolume.NodeExpandVolume succeeded", nodeName)
-	ne.recorder.Eventf(ne.vmt.Pod, v1.EventTypeNormal, kevents.FileSystemResizeSuccess, simpleMsg)
-	ne.recorder.Eventf(ne.pvc, v1.EventTypeNormal, kevents.FileSystemResizeSuccess, simpleMsg)
+	ne.recorder.Eventf(ne.vmt.Pod, ne.pvc, v1.EventTypeNormal, kevents.FileSystemResizeSuccess, "ExpandingVolumeOnNode", simpleMsg)
 	klog.InfoS(detailedMsg, "pod", klog.KObj(ne.vmt.Pod))
 
 	ne.testStatus = testResponseData{true /*resizeCalledOnPlugin */, true /* assumeResizeFinished */}

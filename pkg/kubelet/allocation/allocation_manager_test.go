@@ -34,7 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
@@ -1461,7 +1461,7 @@ func TestRetryPendingResizesMultipleConditions(t *testing.T) {
 			}
 			require.Equal(t, tc.expectedConditions, conditions)
 
-			fakeRecorder := allocationManager.(*manager).recorder.(*record.FakeRecorder)
+			fakeRecorder := allocationManager.(*manager).recorder.(*events.FakeRecorder)
 			if tc.expectedEvent != "" {
 				require.Len(t, fakeRecorder.Events, 1)
 				event := <-fakeRecorder.Events
@@ -2380,7 +2380,7 @@ func TestRecordPodDeferredAcceptedResizes(t *testing.T) {
 				legacyregistry.DefaultGatherer, strings.NewReader(tc.expectedMetrics), "kubelet_pod_deferred_accepted_resizes_total",
 			))
 
-			fakeRecorder := am.(*manager).recorder.(*record.FakeRecorder)
+			fakeRecorder := am.(*manager).recorder.(*events.FakeRecorder)
 			require.Len(t, fakeRecorder.Events, 1)
 			event := <-fakeRecorder.Events
 			require.Equal(t, tc.expectedEvent, event)
@@ -2418,7 +2418,7 @@ func makeAllocationManager(t *testing.T, runtime *containertest.FakeRuntime, all
 			return nil, false
 		},
 		config.NewSourcesReady(func(_ sets.Set[string]) bool { return true }),
-		record.NewFakeRecorder(20),
+		events.NewFakeRecorder(20),
 	)
 	allocationManager.SetContainerRuntime(runtime)
 

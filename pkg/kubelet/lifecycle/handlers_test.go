@@ -36,7 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/version"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
@@ -706,7 +706,7 @@ func TestRunHandlerHttpsFailureFallback(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	recorder := &record.FakeRecorder{Events: make(chan string, 10)}
+	recorder := &events.FakeRecorder{Events: make(chan string, 10)}
 
 	fakePodStatusProvider := stubPodStatusProvider("127.0.0.1")
 
