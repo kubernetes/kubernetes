@@ -86,7 +86,7 @@ func ValidateEndpointSliceCreate(endpointSlice *discovery.EndpointSlice) field.E
 // ValidateEndpointSliceUpdate validates an EndpointSlice when it is updated.
 func ValidateEndpointSliceUpdate(newEndpointSlice, oldEndpointSlice *discovery.EndpointSlice) field.ErrorList {
 	allErrs := ValidateEndpointSlice(newEndpointSlice, oldEndpointSlice)
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(newEndpointSlice.AddressType, oldEndpointSlice.AddressType, field.NewPath("addressType"))...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(newEndpointSlice.AddressType, oldEndpointSlice.AddressType, field.NewPath("addressType")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
 
 	return allErrs
 }
@@ -104,11 +104,10 @@ func validateEndpoints(endpoints []discovery.Endpoint, addrType discovery.Addres
 		addressPath := idxPath.Child("addresses")
 
 		if len(endpoint.Addresses) == 0 {
-			allErrs = append(allErrs, field.Required(addressPath, "must contain at least 1 address"))
+			allErrs = append(allErrs, field.Required(addressPath, "must contain at least 1 address").MarkCoveredByDeclarative())
 		} else if len(endpoint.Addresses) > maxAddresses {
-			allErrs = append(allErrs, field.TooMany(addressPath, len(endpoint.Addresses), maxAddresses))
+			allErrs = append(allErrs, field.TooMany(addressPath, len(endpoint.Addresses), maxAddresses).WithOrigin("maxItems").MarkCoveredByDeclarative())
 		}
-
 		for i, address := range endpoint.Addresses {
 			// This validates known address types, unknown types fall through
 			// and do not get validated.
@@ -208,9 +207,9 @@ func validateAddressType(addressType discovery.AddressType) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if addressType == "" {
-		allErrs = append(allErrs, field.Required(field.NewPath("addressType"), ""))
+		allErrs = append(allErrs, field.Required(field.NewPath("addressType"), "").MarkCoveredByDeclarative())
 	} else if !supportedAddressTypes.Has(addressType) {
-		allErrs = append(allErrs, field.NotSupported(field.NewPath("addressType"), addressType, sets.List(supportedAddressTypes)))
+		allErrs = append(allErrs, field.NotSupported(field.NewPath("addressType"), addressType, sets.List(supportedAddressTypes)).MarkCoveredByDeclarative())
 	}
 
 	return allErrs
