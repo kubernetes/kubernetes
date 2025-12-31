@@ -671,22 +671,6 @@ func (og *operationGenerator) checkForFailedMount(volumeToMount VolumeToMount, m
 }
 
 func (og *operationGenerator) markDeviceErrorState(volumeToMount VolumeToMount, devicePath, deviceMountPath string, mountError error, actualStateOfWorld ActualStateOfWorldMounterUpdater) {
-	if volumetypes.IsOperationFinishedError(mountError) &&
-		actualStateOfWorld.GetDeviceMountState(volumeToMount.VolumeName) == DeviceMountUncertain {
-
-		if actualStateOfWorld.IsVolumeDeviceReconstructed(volumeToMount.VolumeName) {
-			klog.V(2).InfoS("MountVolume.markDeviceErrorState leaving volume uncertain", "volumeName", volumeToMount.VolumeName)
-			return
-		}
-
-		// Only devices which were uncertain can be marked as unmounted
-		markDeviceUnmountError := actualStateOfWorld.MarkDeviceAsUnmounted(volumeToMount.VolumeName)
-		if markDeviceUnmountError != nil {
-			klog.Error(volumeToMount.GenerateErrorDetailed("MountDevice.MarkDeviceAsUnmounted failed", markDeviceUnmountError).Error())
-		}
-		return
-	}
-
 	if volumetypes.IsUncertainProgressError(mountError) &&
 		actualStateOfWorld.GetDeviceMountState(volumeToMount.VolumeName) == DeviceNotMounted {
 		// only devices which are not mounted can be marked as uncertain. We do not want to mark a device
