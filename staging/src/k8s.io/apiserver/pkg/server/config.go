@@ -818,6 +818,7 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		UnprotectedDebugSocket:         debugSocket,
 
 		listedPathProvider: apiServerHandler,
+		Flagz:              c.Flagz,
 
 		minRequestTimeout:                   time.Duration(c.MinRequestTimeout) * time.Second,
 		ShutdownTimeout:                     c.RequestTimeout,
