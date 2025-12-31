@@ -298,7 +298,7 @@ func TestCallsToSize(t *testing.T) {
 		itemsSizes:   []int{counter.Size()},
 		items:        []runtime.Object{counter},
 	}
-	err := streamingEncodeUnknownList(io.Discard, runtime.Unknown{}, listData, &runtime.Allocator{})
+	err := streamingEncodeUnknownList(io.Discard, runtime.Unknown{}, listData)
 	if err != nil {
 		t.Fatal(err)
 	}
