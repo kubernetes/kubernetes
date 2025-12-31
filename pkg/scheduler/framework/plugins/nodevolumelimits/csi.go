@@ -271,7 +271,7 @@ func (pl *CSILimits) Filter(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, 
 
 	// Count CSI volumes from the new pod
 	newVolumes := make(map[string]string)
-	if err := pl.filterAttachableVolumes(logger, pod, csiNode, true /* new pod */, newVolumes); err != nil {
+	if err := pl.filterAttachableVolumes(logger, pod, true /* new pod */, newVolumes); err != nil {
 		if apierrors.IsNotFound(err) {
 			// PVC is not found. This Pod will never be schedulable until PVC is created.
 			return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, err.Error())
@@ -306,7 +306,7 @@ func (pl *CSILimits) Filter(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, 
 	// Count CSI volumes from existing pods
 	attachedVolumes := make(map[string]string)
 	for _, existingPod := range nodeInfo.GetPods() {
-		if err := pl.filterAttachableVolumes(logger, existingPod.GetPod(), csiNode, false /* existing pod */, attachedVolumes); err != nil {
+		if err := pl.filterAttachableVolumes(logger, existingPod.GetPod(), false /* existing pod */, attachedVolumes); err != nil {
 			return fwk.AsStatus(err)
 		}
 	}
@@ -379,8 +379,7 @@ func (pl *CSILimits) checkCSIDriverOnNode(pluginName string, csiNode *storagev1.
 // filterAttachableVolumes filters the attachable volumes from the pod and adds them to the result map.
 // The result map is a map of volumeUniqueName to driver name. The volumeUniqueName is a unique name for
 // the volume in the format of "driverName/volumeHandle". And driver name is the CSI driver name.
-func (pl *CSILimits) filterAttachableVolumes(
-	logger klog.Logger, pod *v1.Pod, csiNode *storagev1.CSINode, newPod bool, result map[string]string) error {
+func (pl *CSILimits) filterAttachableVolumes(logger klog.Logger, pod *v1.Pod, newPod bool, result map[string]string) error {
 	for _, vol := range pod.Spec.Volumes {
 		pvcName := ""
 		isEphemeral := false
@@ -397,11 +396,8 @@ func (pl *CSILimits) filterAttachableVolumes(
 			isEphemeral = true
 		default:
 			// Inline Volume does not have PVC.
-			// Need to check if CSI migration is enabled for this inline volume.
-			// - If the volume is migratable and CSI migration is enabled, need to count it
-			// as well.
-			// - If the volume is not migratable, it will be count in non_csi filter.
-			if err := pl.checkAttachableInlineVolume(logger, &vol, csiNode, pod, result); err != nil {
+			// - If the inline volume is migratable, need to count it as well.
+			if err := pl.checkAttachableInlineVolume(logger, &vol, pod, result); err != nil {
 				return err
 			}
 
@@ -434,7 +430,7 @@ func (pl *CSILimits) filterAttachableVolumes(
 			}
 		}
 
-		driverName, volumeHandle := pl.getCSIDriverInfo(logger, csiNode, pvc)
+		driverName, volumeHandle := pl.getCSIDriverInfo(logger, pvc)
 		if driverName == "" || volumeHandle == "" {
 			logger.V(5).Info("Could not find a CSI driver name or volume handle, not counting volume")
 			continue
@@ -448,8 +444,7 @@ func (pl *CSILimits) filterAttachableVolumes(
 
 // checkAttachableInlineVolume takes an inline volume and add to the result map if the
 // volume is migratable and CSI migration for this plugin has been enabled.
-func (pl *CSILimits) checkAttachableInlineVolume(logger klog.Logger, vol *v1.Volume, csiNode *storagev1.CSINode,
-	pod *v1.Pod, result map[string]string) error {
+func (pl *CSILimits) checkAttachableInlineVolume(logger klog.Logger, vol *v1.Volume, pod *v1.Pod, result map[string]string) error {
 	if !pl.translator.IsInlineMigratable(vol) {
 		return nil
 	}
@@ -457,15 +452,6 @@ func (pl *CSILimits) checkAttachableInlineVolume(logger klog.Logger, vol *v1.Vol
 	inTreeProvisionerName, err := pl.translator.GetInTreePluginNameFromSpec(nil, vol)
 	if err != nil {
 		return fmt.Errorf("looking up provisioner name for volume %s: %w", vol.Name, err)
-	}
-	if !isCSIMigrationOn(csiNode, inTreeProvisionerName, pl.enableCSIMigrationPortworx) {
-		csiNodeName := ""
-		if csiNode != nil {
-			csiNodeName = csiNode.Name
-		}
-		logger.V(5).Info("CSI Migration is not enabled for provisioner", "provisioner", inTreeProvisionerName,
-			"pod", klog.KObj(pod), "csiNode", csiNodeName)
-		return nil
 	}
 	// Do translation for the in-tree volume.
 	translatedPV, err := pl.translator.TranslateInTreeInlineVolumeToCSI(logger, vol, pod.Namespace)
@@ -489,12 +475,12 @@ func (pl *CSILimits) checkAttachableInlineVolume(logger klog.Logger, vol *v1.Vol
 // getCSIDriverInfo returns the CSI driver name and volume ID of a given PVC.
 // If the PVC is from a migrated in-tree plugin, this function will return
 // the information of the CSI driver that the plugin has been migrated to.
-func (pl *CSILimits) getCSIDriverInfo(logger klog.Logger, csiNode *storagev1.CSINode, pvc *v1.PersistentVolumeClaim) (string, string) {
+func (pl *CSILimits) getCSIDriverInfo(logger klog.Logger, pvc *v1.PersistentVolumeClaim) (string, string) {
 	pvName := pvc.Spec.VolumeName
 
 	if pvName == "" {
 		logger.V(5).Info("Persistent volume had no name for claim", "PVC", klog.KObj(pvc))
-		return pl.getCSIDriverInfoFromSC(logger, csiNode, pvc)
+		return pl.getCSIDriverInfoFromSC(logger, pvc)
 	}
 
 	pv, err := pl.pvLister.Get(pvName)
@@ -503,24 +489,13 @@ func (pl *CSILimits) getCSIDriverInfo(logger klog.Logger, csiNode *storagev1.CSI
 		// If we can't fetch PV associated with PVC, may be it got deleted
 		// or PVC was prebound to a PVC that hasn't been created yet.
 		// fallback to using StorageClass for volume counting
-		return pl.getCSIDriverInfoFromSC(logger, csiNode, pvc)
+		return pl.getCSIDriverInfoFromSC(logger, pvc)
 	}
 
 	csiSource := pv.Spec.PersistentVolumeSource.CSI
 	if csiSource == nil {
 		// We make a fast path for non-CSI volumes that aren't migratable
 		if !pl.translator.IsPVMigratable(pv) {
-			return "", ""
-		}
-
-		pluginName, err := pl.translator.GetInTreePluginNameFromSpec(pv, nil)
-		if err != nil {
-			logger.V(5).Info("Unable to look up plugin name from PV spec", "err", err)
-			return "", ""
-		}
-
-		if !isCSIMigrationOn(csiNode, pluginName, pl.enableCSIMigrationPortworx) {
-			logger.V(5).Info("CSI Migration of plugin is not enabled", "plugin", pluginName)
 			return "", ""
 		}
 
@@ -542,7 +517,7 @@ func (pl *CSILimits) getCSIDriverInfo(logger klog.Logger, csiNode *storagev1.CSI
 }
 
 // getCSIDriverInfoFromSC returns the CSI driver name and a random volume ID of a given PVC's StorageClass.
-func (pl *CSILimits) getCSIDriverInfoFromSC(logger klog.Logger, csiNode *storagev1.CSINode, pvc *v1.PersistentVolumeClaim) (string, string) {
+func (pl *CSILimits) getCSIDriverInfoFromSC(logger klog.Logger, pvc *v1.PersistentVolumeClaim) (string, string) {
 	namespace := pvc.Namespace
 	pvcName := pvc.Name
 	scName := storagehelpers.GetPersistentVolumeClaimClass(pvc)
@@ -567,11 +542,6 @@ func (pl *CSILimits) getCSIDriverInfoFromSC(logger klog.Logger, csiNode *storage
 
 	provisioner := storageClass.Provisioner
 	if pl.translator.IsMigratableIntreePluginByName(provisioner) {
-		if !isCSIMigrationOn(csiNode, provisioner, pl.enableCSIMigrationPortworx) {
-			logger.V(5).Info("CSI Migration of provisioner is not enabled", "provisioner", provisioner)
-			return "", ""
-		}
-
 		driverName, err := pl.translator.GetCSINameFromInTreeName(provisioner)
 		if err != nil {
 			logger.V(5).Info("Unable to look up driver name from provisioner name", "provisioner", provisioner, "err", err)
