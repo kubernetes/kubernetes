@@ -145,11 +145,15 @@ func (p *criStatsProvider) makeWinContainerStats(
 		if stats.Memory.PageFaults != nil {
 			result.Memory.PageFaults = &stats.Memory.PageFaults.Value
 		}
+		if stats.Memory.CommitMemoryBytes != nil {
+			result.Memory.UsageBytes = &stats.Memory.CommitMemoryBytes.Value
+		}
 	} else {
 		result.Memory.Time = metav1.NewTime(time.Unix(0, time.Now().UnixNano()))
 		result.Memory.WorkingSetBytes = ptr.To[uint64](0)
 		result.Memory.AvailableBytes = ptr.To[uint64](0)
 		result.Memory.PageFaults = ptr.To[uint64](0)
+		result.Memory.UsageBytes = ptr.To[uint64](0)
 	}
 	if stats.WritableLayer != nil {
 		result.Rootfs.Time = metav1.NewTime(time.Unix(0, stats.WritableLayer.Timestamp))
@@ -232,6 +236,7 @@ func addCRIPodMemoryStats(ps *statsapi.PodStats, criPodStat *runtimeapi.PodSandb
 	ps.Memory = &statsapi.MemoryStats{
 		Time:            metav1.NewTime(time.Unix(0, criMemory.Timestamp)),
 		AvailableBytes:  valueOfUInt64Value(criMemory.AvailableBytes),
+		UsageBytes:      valueOfUInt64Value(criMemory.CommitMemoryBytes),
 		WorkingSetBytes: valueOfUInt64Value(criMemory.WorkingSetBytes),
 		PageFaults:      valueOfUInt64Value(criMemory.PageFaults),
 	}
