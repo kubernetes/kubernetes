@@ -38,7 +38,7 @@ message LeaseCandidate {
 
   // spec contains the specification of the Lease.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-  // +optional
+  // +required
   optional LeaseCandidateSpec spec = 2;
 }
 
