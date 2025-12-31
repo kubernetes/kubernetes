@@ -74,16 +74,22 @@ func tweakResourceVersion(resourceVersion string) nodeTweak {
 func TestNewNodeManager(t *testing.T) {
 	testCases := []struct {
 		name             string
+		bindAddress      string
 		watchPodCIDRs    bool
 		nodeUpdates      []func(context.Context, clientset.Interface)
-		expectedNodeIPs  []net.IP
+		expectedIPFamily v1.IPFamily
+		expectedNodeIPs  map[v1.IPFamily]net.IP
 		expectedPodCIDRs []string
 		expectedError    string
 	}{
 		{
 			name: "node object doesn't exist",
-			// times out and ignores the error
-			expectedNodeIPs: nil,
+			// times out and ignores the error, returns defaults
+			expectedIPFamily: v1.IPv4Protocol,
+			expectedNodeIPs: map[v1.IPFamily]net.IP{
+				v1.IPv4Protocol: net.IPv4(127, 0, 0, 1),
+				v1.IPv6Protocol: net.IPv6loopback,
+			},
 		},
 		{
 			name:          "node object doesn't exist, with watchPodCIDRs",
@@ -103,8 +109,32 @@ func TestNewNodeManager(t *testing.T) {
 					_, _ = client.CoreV1().Nodes().Create(ctx, makeNode(), metav1.CreateOptions{})
 				},
 			},
-			// times out and ignores the error
-			expectedNodeIPs: nil,
+			// times out and ignores the error, returns defaults
+			expectedIPFamily: v1.IPv4Protocol,
+			expectedNodeIPs: map[v1.IPFamily]net.IP{
+				v1.IPv4Protocol: net.IPv4(127, 0, 0, 1),
+				v1.IPv6Protocol: net.IPv6loopback,
+			},
+		},
+		{
+			name: "node object exist without NodeIP, with --bind-address",
+			nodeUpdates: []func(ctx context.Context, client clientset.Interface){
+				func(ctx context.Context, client clientset.Interface) {
+					// node object doesn't exist initially
+				},
+
+				func(ctx context.Context, client clientset.Interface) {
+					// node object now exists but without NodeIP
+					_, _ = client.CoreV1().Nodes().Create(ctx, makeNode(), metav1.CreateOptions{})
+				},
+			},
+			bindAddress: "192.168.1.1",
+			// times out and ignores the error, returns bind address
+			expectedIPFamily: v1.IPv4Protocol,
+			expectedNodeIPs: map[v1.IPFamily]net.IP{
+				v1.IPv4Protocol: netutils.ParseIPSloppy("192.168.1.1"),
+				v1.IPv6Protocol: net.IPv6loopback,
+			},
 		},
 		{
 			name: "node object exist with NodeIP",
@@ -125,7 +155,37 @@ func TestNewNodeManager(t *testing.T) {
 					), metav1.UpdateOptions{})
 				},
 			},
-			expectedNodeIPs: []net.IP{netutils.ParseIPSloppy("192.168.1.10")},
+			expectedIPFamily: v1.IPv4Protocol,
+			expectedNodeIPs: map[v1.IPFamily]net.IP{
+				v1.IPv4Protocol: netutils.ParseIPSloppy("192.168.1.10"),
+				v1.IPv6Protocol: net.IPv6loopback,
+			},
+		},
+		{
+			name: "node object exist with NodeIP, --bind-address overrides family",
+			nodeUpdates: []func(ctx context.Context, client clientset.Interface){
+				func(ctx context.Context, client clientset.Interface) {
+					// node object doesn't exist initially
+				},
+
+				func(ctx context.Context, client clientset.Interface) {
+					// node object now exists but without NodeIP
+					_, _ = client.CoreV1().Nodes().Create(ctx, makeNode(), metav1.CreateOptions{})
+				},
+
+				func(ctx context.Context, client clientset.Interface) {
+					// node object got updated with NodeIPs
+					_, _ = client.CoreV1().Nodes().Update(ctx, makeNode(
+						tweakNodeIPs("192.168.1.10"),
+					), metav1.UpdateOptions{})
+				},
+			},
+			bindAddress:      "2001:db8::5",
+			expectedIPFamily: v1.IPv6Protocol,
+			expectedNodeIPs: map[v1.IPFamily]net.IP{
+				v1.IPv4Protocol: netutils.ParseIPSloppy("192.168.1.10"),
+				v1.IPv6Protocol: netutils.ParseIPSloppy("2001:db8::5"),
+			},
 		},
 		{
 			name:          "watchPodCIDRs and node object exist without PodCIDRs",
@@ -176,7 +236,11 @@ func TestNewNodeManager(t *testing.T) {
 					), metav1.UpdateOptions{})
 				},
 			},
-			expectedNodeIPs:  []net.IP{netutils.ParseIPSloppy("192.168.1.1")},
+			expectedIPFamily: v1.IPv4Protocol,
+			expectedNodeIPs: map[v1.IPFamily]net.IP{
+				v1.IPv4Protocol: netutils.ParseIPSloppy("192.168.1.1"),
+				v1.IPv6Protocol: net.IPv6loopback,
+			},
 			expectedPodCIDRs: []string{"10.0.0.0/24"},
 		},
 		{
@@ -198,8 +262,12 @@ func TestNewNodeManager(t *testing.T) {
 					), metav1.UpdateOptions{})
 				},
 			},
-			// times out and ignores the error
-			expectedNodeIPs:  nil,
+			// times out and ignores the error, returns default node IPs
+			expectedIPFamily: v1.IPv4Protocol,
+			expectedNodeIPs: map[v1.IPFamily]net.IP{
+				v1.IPv4Protocol: net.IPv4(127, 0, 0, 1),
+				v1.IPv6Protocol: net.IPv6loopback,
+			},
 			expectedPodCIDRs: []string{"10.0.0.0/24"},
 		},
 	}
@@ -222,12 +290,13 @@ func TestNewNodeManager(t *testing.T) {
 				}
 			}()
 			// initialize the node manager with 10ms poll interval and 1s poll timeout
-			nodeManager, err := newNodeManager(ctx, client, time.Second, testNodeName, tc.watchPodCIDRs, func(i int) {}, 10*time.Millisecond, time.Second, time.Second)
+			nodeManager, err := newNodeManager(ctx, client, time.Second, testNodeName, tc.bindAddress, tc.watchPodCIDRs, func(i int) {}, 10*time.Millisecond, time.Second, time.Second)
 			if len(tc.expectedError) > 0 {
 				require.Nil(t, nodeManager)
 				require.ErrorContains(t, err, tc.expectedError)
 			} else {
 				require.NoError(t, err)
+				require.Equal(t, tc.expectedIPFamily, nodeManager.PrimaryIPFamily())
 				require.Equal(t, tc.expectedNodeIPs, nodeManager.NodeIPs())
 				require.Equal(t, tc.expectedPodCIDRs, nodeManager.PodCIDRs())
 			}
@@ -291,7 +360,7 @@ func TestNodeManagerOnNodeChange(t *testing.T) {
 			), metav1.CreateOptions{})
 			require.NoError(t, err)
 
-			nodeManager, err := newNodeManager(ctx, client, 30*time.Second, testNodeName, tc.watchPodCIDRs, exitFunc, 10*time.Millisecond, time.Second, time.Second)
+			nodeManager, err := newNodeManager(ctx, client, 30*time.Second, testNodeName, "", tc.watchPodCIDRs, exitFunc, 10*time.Millisecond, time.Second, time.Second)
 			require.NoError(t, err)
 
 			nodeManager.OnNodeChange(makeNode(tweakNodeIPs(tc.updatedNodeIPs...), tweakPodCIDRs(tc.updatedPodCIDRs...)))
@@ -308,7 +377,7 @@ func TestNodeManagerOnNodeDelete(t *testing.T) {
 	}
 	client := clientsetfake.NewClientset()
 	_, _ = client.CoreV1().Nodes().Create(ctx, makeNode(tweakNodeIPs("192.168.1.1")), metav1.CreateOptions{})
-	nodeManager, err := newNodeManager(ctx, client, 30*time.Second, testNodeName, false, exitFunc, 10*time.Millisecond, time.Second, time.Second)
+	nodeManager, err := newNodeManager(ctx, client, 30*time.Second, testNodeName, "", false, exitFunc, 10*time.Millisecond, time.Second, time.Second)
 	require.NoError(t, err)
 
 	nodeManager.OnNodeDelete(makeNode())
@@ -324,7 +393,7 @@ func TestNodeManagerNode(t *testing.T) {
 		tweakResourceVersion("1")),
 		metav1.CreateOptions{})
 
-	nodeManager, err := newNodeManager(ctx, client, 30*time.Second, testNodeName, false, func(i int) {}, time.Nanosecond, time.Nanosecond, time.Nanosecond)
+	nodeManager, err := newNodeManager(ctx, client, 30*time.Second, testNodeName, "", false, func(i int) {}, time.Nanosecond, time.Nanosecond, time.Nanosecond)
 	require.NoError(t, err)
 	require.Equal(t, "1", nodeManager.Node().ResourceVersion)
 
@@ -333,7 +402,7 @@ func TestNodeManagerNode(t *testing.T) {
 	require.Equal(t, "2", nodeManager.Node().ResourceVersion)
 }
 
-func TestDetectNodeIPs(t *testing.T) {
+func Test_detectNodeIPs(t *testing.T) {
 	cases := []struct {
 		name           string
 		rawNodeIPs     []net.IP
@@ -475,7 +544,7 @@ func TestDetectNodeIPs(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			primaryFamily, ips := DetectNodeIPs(c.rawNodeIPs, c.bindAddress)
+			primaryFamily, ips := detectNodeIPs(c.rawNodeIPs, c.bindAddress)
 			if primaryFamily != c.expectedFamily {
 				t.Errorf("Expected family %q got %q", c.expectedFamily, primaryFamily)
 			}

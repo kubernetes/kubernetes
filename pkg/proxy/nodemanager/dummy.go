@@ -27,7 +27,11 @@ import (
 // a base implementation.
 type Dummy struct{}
 
-func (n *Dummy) NodeIPs() []net.IP {
+func (n *Dummy) PrimaryIPFamily() v1.IPFamily {
+	return v1.IPFamilyUnknown
+}
+
+func (n *Dummy) NodeIPs() map[v1.IPFamily]net.IP {
 	return nil
 }
 

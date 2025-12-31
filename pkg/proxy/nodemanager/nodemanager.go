@@ -48,9 +48,12 @@ import (
 type NodeManager interface {
 	proxyconfig.NodeHandler
 
+	// PrimaryIPFamily returns the node's primary IP Family.
+	PrimaryIPFamily() v1.IPFamily
+
 	// NodeIPs returns the node's IPs. (This may be empty if New() timed out without
 	// getting any IPs.)
-	NodeIPs() []net.IP
+	NodeIPs() map[v1.IPFamily]net.IP
 
 	// PodCIDRs returns the node's PodCIDRs.
 	PodCIDRs() []string
@@ -70,8 +73,10 @@ type nodeManager struct {
 	watchPodCIDRs bool
 
 	// These are constant after construct time
-	nodeIPs  []net.IP
-	podCIDRs []string
+	rawNodeIPs      []net.IP
+	primaryIPFamily v1.IPFamily
+	nodeIPs         map[v1.IPFamily]net.IP
+	podCIDRs        []string
 
 	mu   sync.Mutex
 	node *v1.Node
@@ -87,12 +92,13 @@ func New(ctx context.Context, client clientset.Interface,
 ) (*nodeManager, error) {
 	resyncInterval := config.ConfigSyncPeriod.Duration
 	watchPodCIDRs := config.DetectLocalMode == kubeproxyconfig.LocalModeNodeCIDR
-	return newNodeManager(ctx, client, resyncInterval, nodeName, watchPodCIDRs, os.Exit, time.Second, 30*time.Second, 5*time.Minute)
+	nodeIPOverride := config.BindAddress
+	return newNodeManager(ctx, client, resyncInterval, nodeName, nodeIPOverride, watchPodCIDRs, os.Exit, time.Second, 30*time.Second, 5*time.Minute)
 }
 
 // newNodeManager implements New with configurable exit function, poll interval and timeouts.
 func newNodeManager(ctx context.Context, client clientset.Interface, resyncInterval time.Duration,
-	nodeName string, watchPodCIDRs bool, exitFunc func(int),
+	nodeName, nodeIPOverride string, watchPodCIDRs bool, exitFunc func(int),
 	pollInterval, nodeIPsTimeout, podCIDRsTimeout time.Duration,
 ) (*nodeManager, error) {
 	// make an informer that selects for the given node
@@ -117,15 +123,15 @@ func newNodeManager(ctx context.Context, client clientset.Interface, resyncInter
 		return nil, fmt.Errorf("can not sync node informer")
 	}
 
-	node, nodeIPs, podCIDRs := getNodeInfo(nodeLister, nodeName)
+	node, rawNodeIPs, podCIDRs := getNodeInfo(nodeLister, nodeName)
 
-	if len(nodeIPs) == 0 {
+	if len(rawNodeIPs) == 0 {
 		// wait for the node object to exist and have NodeIPs.
 		ctx, cancel := context.WithTimeout(ctx, nodeIPsTimeout)
 		defer cancel()
 		_ = wait.PollUntilContextCancel(ctx, pollInterval, false, func(context.Context) (bool, error) {
-			node, nodeIPs, podCIDRs = getNodeInfo(nodeLister, nodeName)
-			return len(nodeIPs) != 0, nil
+			node, rawNodeIPs, podCIDRs = getNodeInfo(nodeLister, nodeName)
+			return len(rawNodeIPs) != 0, nil
 		})
 	}
 
@@ -134,7 +140,7 @@ func newNodeManager(ctx context.Context, client clientset.Interface, resyncInter
 		ctx, cancel := context.WithTimeout(ctx, podCIDRsTimeout)
 		defer cancel()
 		_ = wait.PollUntilContextCancel(ctx, pollInterval, false, func(context.Context) (bool, error) {
-			node, nodeIPs, podCIDRs = getNodeInfo(nodeLister, nodeName)
+			node, rawNodeIPs, podCIDRs = getNodeInfo(nodeLister, nodeName)
 			return len(podCIDRs) != 0, nil
 		})
 
@@ -151,9 +157,11 @@ func newNodeManager(ctx context.Context, client clientset.Interface, resyncInter
 	// non-watchPodCIDRs mode) or it didn't have IPs.
 	if node == nil {
 		klog.FromContext(ctx).Error(nil, "Timed out waiting for node to exist", "node", klog.KRef("", nodeName))
-	} else if len(nodeIPs) == 0 {
+	} else if len(rawNodeIPs) == 0 {
 		klog.FromContext(ctx).Error(nil, "Timed out waiting for node to be assigned IPs", "node", klog.KRef("", nodeName))
 	}
+
+	primaryIPFamily, nodeIPs := detectNodeIPs(rawNodeIPs, nodeIPOverride)
 
 	return &nodeManager{
 		nodeInformer:  nodeInformer,
@@ -161,9 +169,11 @@ func newNodeManager(ctx context.Context, client clientset.Interface, resyncInter
 		exitFunc:      exitFunc,
 		watchPodCIDRs: watchPodCIDRs,
 
-		node:     node,
-		nodeIPs:  nodeIPs,
-		podCIDRs: podCIDRs,
+		node:            node,
+		rawNodeIPs:      rawNodeIPs,
+		primaryIPFamily: primaryIPFamily,
+		nodeIPs:         nodeIPs,
+		podCIDRs:        podCIDRs,
 	}, nil
 }
 
@@ -176,30 +186,32 @@ func getNodeInfo(nodeLister corelisters.NodeLister, nodeName string) (*v1.Node, 
 	return node, nodeIPs, node.Spec.PodCIDRs
 }
 
-func DetectNodeIPs(rawNodeIPs []net.IP, bindAddress string) (v1.IPFamily, map[v1.IPFamily]net.IP) {
+func detectNodeIPs(rawNodeIPs []net.IP, nodeIPOverride string) (v1.IPFamily, map[v1.IPFamily]net.IP) {
 	primaryFamily := v1.IPv4Protocol
 	nodeIPs := map[v1.IPFamily]net.IP{
+		// default values if rawNodeIPs has no IP for either family
 		v1.IPv4Protocol: net.IPv4(127, 0, 0, 1),
 		v1.IPv6Protocol: net.IPv6loopback,
 	}
 
 	if len(rawNodeIPs) > 0 {
-		if !netutils.IsIPv4(rawNodeIPs[0]) {
+		if netutils.IsIPv6(rawNodeIPs[0]) {
 			primaryFamily = v1.IPv6Protocol
 		}
 		nodeIPs[primaryFamily] = rawNodeIPs[0]
 		if len(rawNodeIPs) > 1 {
-			// If more than one address is returned, they are guaranteed to be of different families
-			family := v1.IPv4Protocol
-			if !netutils.IsIPv4(rawNodeIPs[1]) {
-				family = v1.IPv6Protocol
+			// If more than one address is returned, they are guaranteed to be
+			// of different families
+			secondaryFamily := v1.IPv4Protocol
+			if netutils.IsIPv6(rawNodeIPs[1]) {
+				secondaryFamily = v1.IPv6Protocol
 			}
-			nodeIPs[family] = rawNodeIPs[1]
+			nodeIPs[secondaryFamily] = rawNodeIPs[1]
 		}
 	}
 
-	// If a bindAddress is passed, override the primary IP
-	bindIP := netutils.ParseIPSloppy(bindAddress)
+	// If nodeIPOverride is passed, it overrides the primary IP
+	bindIP := netutils.ParseIPSloppy(nodeIPOverride)
 	if bindIP != nil && !bindIP.IsUnspecified() {
 		if netutils.IsIPv4(bindIP) {
 			primaryFamily = v1.IPv4Protocol
@@ -212,9 +224,14 @@ func DetectNodeIPs(rawNodeIPs []net.IP, bindAddress string) (v1.IPFamily, map[v1
 	return primaryFamily, nodeIPs
 }
 
+// PrimaryIPFamily returns the node's primary IP Family.
+func (n *nodeManager) PrimaryIPFamily() v1.IPFamily {
+	return n.primaryIPFamily
+}
+
 // NodeIPs returns the node's IPs. (This may be empty if New() timed out without
 // getting any IPs.)
-func (n *nodeManager) NodeIPs() []net.IP {
+func (n *nodeManager) NodeIPs() map[v1.IPFamily]net.IP {
 	return n.nodeIPs
 }
 
@@ -261,9 +278,9 @@ func (n *nodeManager) OnNodeChange(node *v1.Node) {
 
 	// We exit whenever there is a change in NodeIPs detected initially, and NodeIPs received
 	// on node watch event.
-	if !reflect.DeepEqual(n.nodeIPs, nodeIPs) {
+	if !reflect.DeepEqual(n.rawNodeIPs, nodeIPs) {
 		klog.InfoS("NodeIPs changed for the node",
-			"node", klog.KObj(node), "newNodeIPs", nodeIPs, "oldNodeIPs", n.nodeIPs)
+			"node", klog.KObj(node), "newNodeIPs", nodeIPs, "oldNodeIPs", n.rawNodeIPs)
 		klog.Flush()
 		n.exitFunc(1)
 	}

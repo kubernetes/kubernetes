@@ -222,9 +222,9 @@ func newProxyServer(ctx context.Context, config *kubeproxyconfig.KubeProxyConfig
 	if err != nil {
 		return nil, err
 	}
+	s.PrimaryIPFamily = s.NodeManager.PrimaryIPFamily()
+	s.NodeIPs = s.NodeManager.NodeIPs()
 
-	rawNodeIPs := s.NodeManager.NodeIPs()
-	s.PrimaryIPFamily, s.NodeIPs = nodemanager.DetectNodeIPs(rawNodeIPs, config.BindAddress)
 	if s.NodeIPs[s.PrimaryIPFamily].IsLoopback() {
 		logger.Info("Can't determine this node's IP, assuming loopback; if this is incorrect, please set the --bind-address flag")
 	} else {
