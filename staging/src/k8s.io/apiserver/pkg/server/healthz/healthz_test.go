@@ -375,3 +375,72 @@ func (c readyOnChanClose) Check(_ *http.Request) error {
 	}
 	return fmt.Errorf("the provided channel hasn't been closed")
 }
+
+// TestIsHealthCheckerInitialized tests the IsHealthCheckerInitialized helper function.
+func TestIsHealthCheckerInitialized(t *testing.T) {
+	tests := []struct {
+		name     string
+		checker  HealthChecker
+		expected bool
+	}{
+		{
+			name:     "regular checker without IsInitialized is always initialized",
+			checker:  PingHealthz,
+			expected: true,
+		},
+		{
+			name: "regular named checker is always initialized",
+			checker: NamedCheck("test", func(_ *http.Request) error {
+				return nil
+			}),
+			expected: true,
+		},
+		{
+			name: "initializable checker not initialized",
+			checker: &mockInitializableChecker{
+				name:        "test-not-initialized",
+				initialized: false,
+			},
+			expected: false,
+		},
+		{
+			name: "initializable checker initialized",
+			checker: &mockInitializableChecker{
+				name:        "test-initialized",
+				initialized: true,
+			},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := IsHealthCheckerInitialized(tt.checker)
+			if got != tt.expected {
+				t.Errorf("IsHealthCheckerInitialized() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}
+
+// mockInitializableChecker is a test implementation of InitializableHealthChecker.
+type mockInitializableChecker struct {
+	name        string
+	initialized bool
+	checkError  error
+}
+
+func (m *mockInitializableChecker) Name() string {
+	return m.name
+}
+
+func (m *mockInitializableChecker) Check(_ *http.Request) error {
+	if !m.initialized {
+		return m.checkError
+	}
+	return nil
+}
+
+func (m *mockInitializableChecker) IsInitialized() bool {
+	return m.initialized
+}
