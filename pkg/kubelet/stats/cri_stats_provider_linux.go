@@ -46,8 +46,7 @@ func (p *criStatsProvider) addCRIPodContainerStats(
 			continue
 		}
 		// Fill available stats for full set of required pod stats
-		cs, err := p.makeContainerStats(logger, criContainerStat, container, rootFsInfo, fsIDtoInfo, podSandbox.GetMetadata(),
-			updateCPUNanoCoreUsage)
+		cs, err := p.makeContainerStats(logger, criContainerStat, container, rootFsInfo, fsIDtoInfo, podSandbox.GetMetadata(), updateCPUNanoCoreUsage)
 		if err != nil {
 			return fmt.Errorf("make container stats: %w", err)
 		}
