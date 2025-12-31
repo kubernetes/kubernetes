@@ -562,7 +562,7 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 	}
 	if in.EnforceNodeAllocatable != nil {
 		in, out := &in.EnforceNodeAllocatable, &out.EnforceNodeAllocatable
-		*out = make([]string, len(*in))
+		*out = make([]EnforceNodeAllocatable, len(*in))
 		copy(*out, *in)
 	}
 	if in.AllowedUnsafeSysctls != nil {
