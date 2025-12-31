@@ -111,6 +111,7 @@ message CertificateSigningRequestList {
 message CertificateSigningRequestSpec {
   // request contains an x509 certificate signing request encoded in a "CERTIFICATE REQUEST" PEM block.
   // When serialized as JSON or YAML, the data is additionally base64-encoded.
+  // +k8s:required
   optional bytes request = 1;
 
   // signerName indicates the requested signer, and is a qualified name.
@@ -134,6 +135,7 @@ message CertificateSigningRequestSpec {
   //  4. Required, permitted, or forbidden key usages / extended key usages.
   //  5. Expiration/certificate lifetime: whether it is fixed by the signer, configurable by the admin.
   //  6. Whether or not requests for CA certificates are allowed.
+  // +k8s:required
   optional string signerName = 7;
 
   // expirationSeconds is the requested duration of validity of the issued
@@ -173,6 +175,7 @@ message CertificateSigningRequestSpec {
   //  "ipsec end system", "ipsec tunnel", "ipsec user",
   //  "timestamping", "ocsp signing", "microsoft sgc", "netscape sgc"
   // +listType=atomic
+  // +k8s:required
   repeated string usages = 5;
 
   // username contains the name of the user that created the CertificateSigningRequest.
