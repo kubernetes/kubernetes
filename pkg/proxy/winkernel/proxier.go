@@ -42,7 +42,7 @@ import (
 	"k8s.io/klog/v2"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
-	"k8s.io/kubernetes/pkg/proxy/apis/config"
+	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/proxy/metaproxier"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
@@ -649,7 +649,7 @@ func NewProxier(
 	recorder events.EventRecorder,
 	healthzServer *healthcheck.ProxyHealthServer,
 	healthzBindAddress string,
-	config config.KubeProxyWinkernelConfiguration,
+	config kubeproxyconfig.KubeProxyWinkernelConfiguration,
 ) (*Proxier, error) {
 	// windows listens to all node addresses
 	nodePortAddresses := proxyutil.NewNodePortAddresses(ipFamily, nil)
@@ -694,7 +694,7 @@ func newProxierInternal(
 	healthzPort int,
 	hcnImpl HcnService,
 	hostMacProvider HostMacProvider,
-	config config.KubeProxyWinkernelConfiguration,
+	config kubeproxyconfig.KubeProxyWinkernelConfiguration,
 	waitForHNSOverlay bool,
 ) (*Proxier, error) {
 	hns, supportedFeatures := newHostNetworkService(hcnImpl)
@@ -806,7 +806,7 @@ func NewDualStackProxier(
 	recorder events.EventRecorder,
 	healthzServer *healthcheck.ProxyHealthServer,
 	healthzBindAddress string,
-	config config.KubeProxyWinkernelConfiguration,
+	config kubeproxyconfig.KubeProxyWinkernelConfiguration,
 ) (proxy.Provider, error) {
 
 	// Create an ipv4 instance of the single-stack proxier

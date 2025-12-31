@@ -31,15 +31,15 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/proxy"
-	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
+	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/proxy/winkernel"
 )
 
 // platformApplyDefaults is called after parsing command-line flags and/or reading the
 // config file, to apply platform-specific default values to config.
-func (o *Options) platformApplyDefaults(config *proxyconfigapi.KubeProxyConfiguration) {
+func (o *Options) platformApplyDefaults(config *kubeproxyconfig.KubeProxyConfiguration) {
 	if config.Mode == "" {
-		config.Mode = proxyconfigapi.ProxyModeKernelspace
+		config.Mode = kubeproxyconfig.ProxyModeKernelspace
 	}
 	if config.Winkernel.RootHnsEndpointName == "" {
 		config.Winkernel.RootHnsEndpointName = "cbr0"
@@ -80,7 +80,7 @@ func (s *ProxyServer) platformCheckSupported(ctx context.Context) (ipv4Supported
 }
 
 // createProxier creates the proxy.Provider
-func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.KubeProxyConfiguration, dualStackMode, initOnly bool) (proxy.Provider, error) {
+func (s *ProxyServer) createProxier(ctx context.Context, config *kubeproxyconfig.KubeProxyConfiguration, dualStackMode, initOnly bool) (proxy.Provider, error) {
 	if initOnly {
 		return nil, fmt.Errorf("--init-only is not implemented on Windows")
 	}
@@ -120,7 +120,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 }
 
 // platformCleanup removes stale kube-proxy rules that can be safely removed.
-func platformCleanup(ctx context.Context, mode proxyconfigapi.ProxyMode, cleanupAndExit bool) error {
+func platformCleanup(ctx context.Context, mode kubeproxyconfig.ProxyMode, cleanupAndExit bool) error {
 	if cleanupAndExit {
 		return errors.New("--cleanup-and-exit is not implemented on Windows")
 	}

@@ -37,7 +37,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
-	"k8s.io/kubernetes/pkg/proxy/apis/config"
+	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	fakehcn "k8s.io/kubernetes/pkg/proxy/winkernel/testing"
 	netutils "k8s.io/utils/net"
@@ -113,7 +113,7 @@ func NewFakeProxier(t *testing.T, nodeName string, nodeIP net.IP, networkType st
 	// enable `WinDSR` feature gate
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.WinDSR, true)
 
-	config := config.KubeProxyWinkernelConfiguration{
+	config := kubeproxyconfig.KubeProxyWinkernelConfiguration{
 		SourceVip:             sourceVip,
 		EnableDSR:             enableDSR,
 		NetworkName:           testNetwork,
