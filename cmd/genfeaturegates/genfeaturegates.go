@@ -47,6 +47,8 @@ type FeatureGateJSON struct {
 	Name         string      `json:"name"`
 	Stages       []StageJSON `json:"stages"`
 	Dependencies []string    `json:"dependencies,omitempty"`
+	LinkCode     string      `json:"linkCode,omitempty"`
+	LinkKEPs     string      `json:"linkKEPs,omitempty"`
 }
 
 // StageJSON represents a stage in the feature gate lifecycle
@@ -233,6 +235,9 @@ func generateJSON(filterStage string) string {
 			}
 		}
 
+		fg.LinkCode = fmt.Sprintf("https://cs.k8s.io/?q=%%5Cb%s%%5Cb&i=nope&files=&excludeFiles=CHANGELOG&repos=kubernetes/kubernetes", feature)
+		fg.LinkKEPs = fmt.Sprintf("https://cs.k8s.io/?q=%%5Cb%s%%5Cb&i=nope&files=&excludeFiles=CHANGELOG&repos=kubernetes/enhancements", feature)
+
 		features = append(features, fg)
 	}
 
@@ -241,13 +246,16 @@ func generateJSON(filterStage string) string {
 		return features[i].Name < features[j].Name
 	})
 
-	jsonBytes, err := json.MarshalIndent(features, "", "  ")
-	if err != nil {
+	var buf strings.Builder
+	encoder := json.NewEncoder(&buf)
+	encoder.SetIndent("", "  ")
+	encoder.SetEscapeHTML(false)
+	if err := encoder.Encode(features); err != nil {
 		fmt.Fprintf(os.Stderr, "failed to marshal JSON: %v\n", err)
 		os.Exit(1)
 	}
 
-	return string(jsonBytes) + "\n"
+	return buf.String()
 }
 
 // getPreviousMinorVersion returns the previous minor version (e.g., "1.30" -> "1.29")
