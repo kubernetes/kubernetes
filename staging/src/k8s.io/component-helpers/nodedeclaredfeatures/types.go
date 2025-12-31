@@ -69,6 +69,14 @@ type StaticConfiguration struct {
 	CPUManagerPolicy string
 }
 
+// RuntimeHandlerInfo provides information about a CRI runtime handler's capabilities.
+type RuntimeHandlerInfo struct {
+	// Name is the handler name.
+	Name string
+	// SupportsUserNamespacesHostNetwork indicates if the handler supports user namespaces with host network.
+	SupportsUserNamespacesHostNetwork bool
+}
+
 // NodeConfiguration provides a generic view of a node's static configuration.
 type NodeConfiguration struct {
 	// FeatureGates holds an implementation of the FeatureGate interface.
@@ -78,4 +86,6 @@ type NodeConfiguration struct {
 	// Version holds the current node version. This is used for full semantic version comparisons
 	// with Feature.MaxVersion() to determine if a feature needs to be reported.
 	Version *version.Version
+	// RuntimeHandlers holds information about available CRI runtime handlers and their capabilities.
+	RuntimeHandlers []RuntimeHandlerInfo
 }
