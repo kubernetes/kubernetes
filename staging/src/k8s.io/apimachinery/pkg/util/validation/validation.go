@@ -24,8 +24,8 @@ import (
 	"unicode"
 
 	"k8s.io/apimachinery/pkg/api/validate/content"
-
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/constants/rfc"
 )
 
 // IsQualifiedName tests whether the value passed is what Kubernetes calls a
@@ -158,7 +158,8 @@ const dns1123LabelFmtWithUnderscore string = "_?[a-z0-9]([-_a-z0-9]*[a-z0-9])?"
 const dns1123LabelErrMsg string = "a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character"
 
 // DNS1123LabelMaxLength is a label's max length in DNS (RFC 1123)
-const DNS1123LabelMaxLength int = 63
+// Re-exported from k8s.io/constants/rfc for backwards compatibility.
+const DNS1123LabelMaxLength int = rfc.DNS1123LabelMaxLength
 
 var dns1123LabelRegexp = regexp.MustCompile("^" + dns1123LabelFmt + "$")
 
@@ -188,7 +189,8 @@ const dns1123SubdomainFmtWithUnderscore string = dns1123LabelFmtWithUnderscore +
 const dns1123SubdomainErrorMsgFG string = "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '_', '-' or '.', and must start and end with an alphanumeric character"
 
 // DNS1123SubdomainMaxLength is a subdomain's max length in DNS (RFC 1123)
-const DNS1123SubdomainMaxLength int = 253
+// Re-exported from k8s.io/constants/rfc for backwards compatibility.
+const DNS1123SubdomainMaxLength int = rfc.DNS1123SubdomainMaxLength
 
 var dns1123SubdomainRegexp = regexp.MustCompile("^" + dns1123SubdomainFmt + "$")
 var dns1123SubdomainRegexpWithUnderscore = regexp.MustCompile("^" + dns1123SubdomainFmtWithUnderscore + "$")
@@ -223,7 +225,8 @@ const dns1035LabelFmt string = "[a-z]([-a-z0-9]*[a-z0-9])?"
 const dns1035LabelErrMsg string = "a DNS-1035 label must consist of lower case alphanumeric characters or '-', start with an alphabetic character, and end with an alphanumeric character"
 
 // DNS1035LabelMaxLength is a label's max length in DNS (RFC 1035)
-const DNS1035LabelMaxLength int = 63
+// Re-exported from k8s.io/constants/rfc for backwards compatibility.
+const DNS1035LabelMaxLength int = rfc.DNS1035LabelMaxLength
 
 var dns1035LabelRegexp = regexp.MustCompile("^" + dns1035LabelFmt + "$")
 
