@@ -2757,6 +2757,13 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 			// We failed pods that we rejected, so activePods include all admitted
 			// pods that are alive.
 			if ok, reason, message := kl.allocationManager.AddPod(kl.GetActivePods(), pod); !ok {
+				// Remove the pod from podManager since it failed admission.
+				// This prevents rejected pods from being included in resource accounting
+				// for subsequent pod admissions. The pod was added to podManager earlier
+				// to support mirror pod lookups, but rejected pods should not
+				// remain in the manager as they are not admitted.
+				// See: https://github.com/kubernetes/kubernetes/issues/135296
+				kl.podManager.RemovePod(pod)
 				kl.rejectPod(pod, reason, message)
 				// We avoid recording the metric in canAdmitPod because it's called
 				// repeatedly during a resize, which would inflate the metric.
