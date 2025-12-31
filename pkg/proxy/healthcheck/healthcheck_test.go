@@ -35,6 +35,7 @@ import (
 	basemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
+	"k8s.io/kubernetes/pkg/proxy/nodemanager"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	testingclock "k8s.io/utils/clock/testing"
 	"k8s.io/utils/dump"
@@ -470,6 +471,8 @@ type serverTest struct {
 }
 
 type testNodeManager struct {
+	nodemanager.Dummy
+
 	node *v1.Node
 }
 
