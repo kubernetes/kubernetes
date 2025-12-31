@@ -511,7 +511,12 @@ type JobStatus struct {
 	// Represents time when the job was completed. It is not guaranteed to
 	// be set in happens-before order across separate operations.
 	// It is represented in RFC3339 form and is in UTC.
-	// The completion time is set when the job finishes successfully, and only then.
+	//
+	// The presence of completionTime indicates that the Job has reached a 
+	// successful terminal state ("Complete").
+	// Fields such as .status.succeeded are not terminal signals and may be
+	// updated before the Job reaches a final state.
+	//
 	// The value cannot be updated or removed. The value indicates the same or
 	// later point in time as the startTime field.
 	// +optional
