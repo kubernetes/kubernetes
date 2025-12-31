@@ -217,8 +217,7 @@ func newProxyServer(ctx context.Context, config *kubeproxyconfig.KubeProxyConfig
 	}
 
 	// NodeManager makes an informer that selects for the node where this kube-proxy is running
-	s.NodeManager, err = proxy.NewNodeManager(ctx, s.Client, s.Config.ConfigSyncPeriod.Duration,
-		s.NodeName, s.Config.DetectLocalMode == kubeproxyconfig.LocalModeNodeCIDR)
+	s.NodeManager, err = proxy.NewNodeManager(ctx, s.Client, s.NodeName, s.Config)
 	if err != nil {
 		return nil, err
 	}
