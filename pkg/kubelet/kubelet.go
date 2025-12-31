@@ -699,6 +699,7 @@ func NewMainKubelet(ctx context.Context,
 		klet.podManager.GetPodByUID,
 		klet.sourcesReady,
 		kubeDeps.Recorder,
+		klet.containerManager,
 	)
 
 	klet.resourceAnalyzer = serverstats.NewResourceAnalyzer(ctx, klet, kubeCfg.VolumeStatsAggPeriod.Duration, kubeDeps.Recorder)
