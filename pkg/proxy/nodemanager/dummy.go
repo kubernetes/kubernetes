@@ -29,6 +29,10 @@ type Dummy struct{}
 
 var _ NodeManager = &Dummy{}
 
+func (n *Dummy) Name() string {
+	return ""
+}
+
 func (n *Dummy) PrimaryIPFamily() v1.IPFamily {
 	return v1.IPFamilyUnknown
 }

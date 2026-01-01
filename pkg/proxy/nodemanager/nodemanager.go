@@ -48,6 +48,9 @@ import (
 type NodeManager interface {
 	proxyconfig.NodeHandler
 
+	// Name returns the node's name
+	Name() string
+
 	// PrimaryIPFamily returns the node's primary IP Family.
 	PrimaryIPFamily() v1.IPFamily
 
@@ -73,6 +76,7 @@ type nodeManager struct {
 	watchPodCIDRs bool
 
 	// These are constant after construct time
+	nodeName        string
 	rawNodeIPs      []net.IP
 	primaryIPFamily v1.IPFamily
 	nodeIPs         map[v1.IPFamily]net.IP
@@ -172,6 +176,7 @@ func newNodeManager(ctx context.Context, client clientset.Interface, resyncInter
 		watchPodCIDRs: watchPodCIDRs,
 
 		node:            node,
+		nodeName:        nodeName,
 		rawNodeIPs:      rawNodeIPs,
 		primaryIPFamily: primaryIPFamily,
 		nodeIPs:         nodeIPs,
@@ -224,6 +229,11 @@ func detectNodeIPs(rawNodeIPs []net.IP, nodeIPOverride string) (v1.IPFamily, map
 	}
 
 	return primaryFamily, nodeIPs
+}
+
+// Name returns the node's name
+func (n *nodeManager) Name() string {
+	return n.nodeName
 }
 
 // PrimaryIPFamily returns the node's primary IP Family.
