@@ -26,6 +26,7 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2/ktesting"
+	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 )
 
 func TestDeploymentController_reconcileNewReplicaSet(t *testing.T) {
@@ -283,6 +284,121 @@ func TestDeploymentController_cleanupUnhealthyReplicas(t *testing.T) {
 	}
 }
 
+func TestDeploymentController_reconcileOldReplicaSets_MaxUnavailableWithSurge(t *testing.T) {
+	tests := []struct {
+		name                string
+		deploymentReplicas  int32
+		maxSurge            intstr.IntOrString
+		maxUnavailable      intstr.IntOrString
+		oldReplicas         int32
+		newReplicas         int32
+		readyPodsFromOldRS  int32
+		readyPodsFromNewRS  int32
+		scaleExpected       bool
+		expectedOldReplicas int32
+	}{
+		{
+			name:                "pod anti-affinity deadlock: 3 nodes 3 pods, 1 new pending, old pods should scale down",
+			deploymentReplicas:  3,
+			maxSurge:            intstr.FromInt32(1),
+			maxUnavailable:      intstr.FromString("0%"),
+			oldReplicas:         3,
+			newReplicas:         1,
+			readyPodsFromOldRS:  3,
+			readyPodsFromNewRS:  0,
+			scaleExpected:       true,
+			expectedOldReplicas: 2,
+		},
+		{
+			name:                "maxUnavailable enforced to 1 when surge active and rounds to 0",
+			deploymentReplicas:  10,
+			maxSurge:            intstr.FromInt32(2),
+			maxUnavailable:      intstr.FromString("0%"),
+			oldReplicas:         8,
+			newReplicas:         5,
+			readyPodsFromOldRS:  8,
+			readyPodsFromNewRS:  2,
+			scaleExpected:       true,
+			expectedOldReplicas: 7,
+		},
+		{
+			name:               "maxUnavailable not enforced when not in surge",
+			deploymentReplicas: 10,
+			maxSurge:           intstr.FromInt32(2),
+			maxUnavailable:     intstr.FromString("0%"),
+			oldReplicas:        5,
+			newReplicas:        5,
+			readyPodsFromOldRS: 5,
+			readyPodsFromNewRS: 5,
+			scaleExpected:      false,
+		},
+		{
+			name:                "maxUnavailable not changed when already > 0",
+			deploymentReplicas:  10,
+			maxSurge:            intstr.FromInt32(2),
+			maxUnavailable:      intstr.FromInt32(2),
+			oldReplicas:         8,
+			newReplicas:         5,
+			readyPodsFromOldRS:  8,
+			readyPodsFromNewRS:  3,
+			scaleExpected:       true,
+			expectedOldReplicas: 5,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			newSelector := map[string]string{"foo": "new"}
+			oldSelector := map[string]string{"foo": "old"}
+			newRS := rs("foo-new", test.newReplicas, newSelector, noTimestamp)
+			newRS.Status.AvailableReplicas = test.readyPodsFromNewRS
+			oldRS := rs("foo-old", test.oldReplicas, oldSelector, noTimestamp)
+			oldRS.Status.AvailableReplicas = test.readyPodsFromOldRS
+			oldRSs := []*apps.ReplicaSet{oldRS}
+			allRSs := []*apps.ReplicaSet{oldRS, newRS}
+			deployment := newDeployment("foo", test.deploymentReplicas, nil, &test.maxSurge, &test.maxUnavailable, newSelector)
+			fakeClientset := fake.Clientset{}
+			controller := &DeploymentController{
+				client:        &fakeClientset,
+				eventRecorder: &record.FakeRecorder{},
+			}
+			_, ctx := ktesting.NewTestContext(t)
+
+			scaled, err := controller.reconcileOldReplicaSets(ctx, allRSs, oldRSs, newRS, deployment)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+
+			if !test.scaleExpected && scaled {
+				t.Errorf("unexpected scaling: %v", fakeClientset.Actions())
+			}
+			if test.scaleExpected && !scaled {
+				t.Errorf("expected scaling to occur but it did not")
+				return
+			}
+			if test.scaleExpected {
+				if len(fakeClientset.Actions()) == 0 {
+					t.Errorf("expected scaling actions but got none")
+					return
+				}
+				var updateAction core.UpdateAction
+				for _, action := range fakeClientset.Actions() {
+					if a, ok := action.(core.UpdateAction); ok {
+						updateAction = a
+						break
+					}
+				}
+				if updateAction != nil {
+					updated := updateAction.GetObject().(*apps.ReplicaSet)
+					if e, a := test.expectedOldReplicas, *(updated.Spec.Replicas); e != a {
+						t.Errorf("expected old RS to scale to %d replicas, got %d", e, a)
+					}
+				}
+			}
+		})
+	}
+}
+
 func TestDeploymentController_scaleDownOldReplicaSetsForRollingUpdate(t *testing.T) {
 	tests := []struct {
 		deploymentReplicas  int32
@@ -346,7 +462,8 @@ func TestDeploymentController_scaleDownOldReplicaSetsForRollingUpdate(t *testing
 			eventRecorder: &record.FakeRecorder{},
 		}
 		_, ctx := ktesting.NewTestContext(t)
-		scaled, err := controller.scaleDownOldReplicaSetsForRollingUpdate(ctx, allRSs, oldRSs, deployment)
+		maxUnavailableValue := deploymentutil.MaxUnavailable(*deployment)
+		scaled, err := controller.scaleDownOldReplicaSetsForRollingUpdate(ctx, allRSs, oldRSs, deployment, maxUnavailableValue)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 			continue
