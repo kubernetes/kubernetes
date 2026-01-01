@@ -265,33 +265,51 @@ linters:
             contextual k8s.io/kubernetes/pkg/security/.*
             contextual k8s.io/kubernetes/pkg/securitycontext/.*
             contextual k8s.io/kubernetes/test/e2e/dra/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/certificate/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/cm/dra/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/lifecycle/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/pleg/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/clustertrustbundle/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/token/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/cadvisor/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/config/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/oom/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/server/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/status/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/sysctl/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/winstats/.*
+            contextual k8s.io/kubernetes/test/images/sample-device-plugin/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/allocation/.*
             contextual k8s.io/kubernetes/pkg/kubelet/apis/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/cadvisor/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/certificate/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/checkpointmanager/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/client/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/clustertrustbundle/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/cm/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/config/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/configmap/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/container/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/envvars/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/events/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/eviction/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/images/.*
             contextual k8s.io/kubernetes/pkg/kubelet/kubeletconfig/.*
             contextual k8s.io/kubernetes/pkg/kubelet/kuberuntime/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/nodeshutdown/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/pod/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/preemption/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/volumemanager/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/util/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/lifecycle/.*
             contextual k8s.io/kubernetes/pkg/kubelet/logs/.*
-            contextual k8s.io/kubernetes/test/images/sample-device-plugin/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/metrics/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/network/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/nodeshutdown/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/nodestatus/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/oom/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/pleg/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/pluginmanager/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/pod/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/podcertificate/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/preemption/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/prober/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/qos/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/runtimeclass/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/secret/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/server/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/stats/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/status/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/sysctl/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/token/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/types/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/userns/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/util/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/volumemanager/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/watchdog/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/winstats/.*
             
             # As long as contextual logging is alpha or beta, all WithName, WithValues,
             # NewContext calls have to go through klog. Once it is GA, we can lift
