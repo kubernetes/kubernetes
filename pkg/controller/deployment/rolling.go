@@ -93,7 +93,6 @@ func (dc *DeploymentController) reconcileOldReplicaSets(ctx context.Context, all
 	allPodsCount := deploymentutil.GetReplicaCountForReplicaSets(allRSs)
 	logger.V(4).Info("New replica set", "replicaSet", klog.KObj(newRS), "availableReplicas", newRS.Status.AvailableReplicas)
 	maxUnavailable := deploymentutil.MaxUnavailable(*deployment)
-
 	// Check if we can scale down. We can scale down in the following 2 cases:
 	// * Some old replica sets have unhealthy replicas, we could safely scale down those unhealthy replicas since that won't further
 	//  increase unavailability.
@@ -127,6 +126,34 @@ func (dc *DeploymentController) reconcileOldReplicaSets(ctx context.Context, all
 	minAvailable := *(deployment.Spec.Replicas) - maxUnavailable
 	newRSUnavailablePodCount := *(newRS.Spec.Replicas) - newRS.Status.AvailableReplicas
 	maxScaledDown := allPodsCount - minAvailable - newRSUnavailablePodCount
+
+	// Special case: if maxScaledDown is 0 or negative due to maxUnavailable=0, but we're in surge
+	// and the new RS has unavailable pods while old RS is fully available, allow minimal scaling.
+	// This specifically handles anti-affinity deadlocks where new pods can't schedule because
+	// every node already has a pod from this deployment and required pod anti-affinity prevents
+	// co-scheduling (e.g., 3 nodes, 3 pods with pod anti-affinity, maxSurge=1, maxUnavailable
+	// rounds to 0 from percentage).
+	//
+	// We only do this when:
+	// - maxUnavailable resolved to 0 (typically from percentage rounding)
+	// - We're in surge (more total pods than desired replicas)
+	// - The deployment has required pod anti-affinity (which can cause scheduling deadlock)
+	// - New RS has unavailable pods (progress is stuck)
+	// - All old RS pods are healthy (scaling down won't increase unavailability beyond 1)
+	effectiveMaxUnavailable := maxUnavailable
+	if maxScaledDown <= 0 && maxUnavailable == 0 && allPodsCount > *(deployment.Spec.Replicas) && antiAffinityMayBlockScheduling(deployment) {
+		oldRSAvailablePodCount := deploymentutil.GetAvailableReplicaCountForReplicaSets(oldRSs)
+		if newRSUnavailablePodCount > 0 && oldRSAvailablePodCount == oldPodsCount {
+			// Allow scaling down by 1 to potentially unblock progress
+			maxScaledDown = 1
+			effectiveMaxUnavailable = 1
+			logger.V(4).Info("Allowing minimal scale down to potentially resolve scheduling deadlock",
+				"deployment", klog.KObj(deployment),
+				"oldRSAvailable", oldRSAvailablePodCount,
+				"newRSUnavailable", newRSUnavailablePodCount)
+		}
+	}
+
 	if maxScaledDown <= 0 {
 		return false, nil
 	}
@@ -139,9 +166,10 @@ func (dc *DeploymentController) reconcileOldReplicaSets(ctx context.Context, all
 	}
 	logger.V(4).Info("Cleaned up unhealthy replicas from old RSes", "count", cleanupCount)
 
-	// Scale down old replica sets, need check maxUnavailable to ensure we can scale down
+	// Scale down old replica sets, need check maxUnavailable to ensure we can scale down.
+	// Use effectiveMaxUnavailable which may be bumped to 1 if we detected a scheduling deadlock above.
 	allRSs = append(oldRSs, newRS)
-	scaledDownCount, err := dc.scaleDownOldReplicaSetsForRollingUpdate(ctx, allRSs, oldRSs, deployment)
+	scaledDownCount, err := dc.scaleDownOldReplicaSetsForRollingUpdate(ctx, allRSs, oldRSs, deployment, effectiveMaxUnavailable)
 	if err != nil {
 		return false, nil
 	}
@@ -190,10 +218,8 @@ func (dc *DeploymentController) cleanupUnhealthyReplicas(ctx context.Context, ol
 
 // scaleDownOldReplicaSetsForRollingUpdate scales down old replica sets when deployment strategy is "RollingUpdate".
 // Need check maxUnavailable to ensure availability
-func (dc *DeploymentController) scaleDownOldReplicaSetsForRollingUpdate(ctx context.Context, allRSs []*apps.ReplicaSet, oldRSs []*apps.ReplicaSet, deployment *apps.Deployment) (int32, error) {
+func (dc *DeploymentController) scaleDownOldReplicaSetsForRollingUpdate(ctx context.Context, allRSs []*apps.ReplicaSet, oldRSs []*apps.ReplicaSet, deployment *apps.Deployment, maxUnavailable int32) (int32, error) {
 	logger := klog.FromContext(ctx)
-	maxUnavailable := deploymentutil.MaxUnavailable(*deployment)
-
 	// Check if we can scale down.
 	minAvailable := *(deployment.Spec.Replicas) - maxUnavailable
 	// Find the number of available pods.
@@ -232,4 +258,59 @@ func (dc *DeploymentController) scaleDownOldReplicaSetsForRollingUpdate(ctx cont
 	}
 
 	return totalScaledDown, nil
+}
+
+// antiAffinityMayBlockScheduling checks whether the deployment has required pod
+// anti-affinity rules that could cause cross-generation scheduling deadlocks during
+// rolling updates. A deadlock occurs when anti-affinity prevents new surge pods from
+// being placed on any node because every node already runs a pod from the same
+// deployment (from the old ReplicaSet).
+//
+// This only returns true when the anti-affinity's label selector exclusively uses
+// keys from the deployment's .spec.selector (which is stable across all revisions).
+// If the anti-affinity selector includes keys that are NOT in the deployment's
+// selector (e.g., labels that change between revisions like "version" or "iteration"),
+// it targets within-generation pods only and cannot cause a cross-generation deadlock.
+func antiAffinityMayBlockScheduling(deployment *apps.Deployment) bool {
+	affinity := deployment.Spec.Template.Spec.Affinity
+	if affinity == nil || affinity.PodAntiAffinity == nil {
+		return false
+	}
+
+	selectorLabels := deployment.Spec.Selector.MatchLabels
+
+	for _, term := range affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution {
+		if term.LabelSelector == nil {
+			continue
+		}
+
+		// Check if this anti-affinity term would match ALL pods from the deployment
+		// across all revisions. This happens when the term's selector only uses
+		// keys/values from the deployment's .spec.selector (which is stable across revisions).
+		matchesAllRevisions := true
+
+		for key, value := range term.LabelSelector.MatchLabels {
+			if selectorValue, exists := selectorLabels[key]; !exists || selectorValue != value {
+				matchesAllRevisions = false
+				break
+			}
+		}
+
+		if matchesAllRevisions {
+			for _, expr := range term.LabelSelector.MatchExpressions {
+				if _, exists := selectorLabels[expr.Key]; !exists {
+					// Uses a key not in the deployment selector — this likely
+					// targets template-specific labels that change between revisions,
+					// so it won't create cross-generation anti-affinity.
+					matchesAllRevisions = false
+					break
+				}
+			}
+		}
+
+		if matchesAllRevisions {
+			return true
+		}
+	}
+	return false
 }
