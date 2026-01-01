@@ -3103,6 +3103,11 @@ type Container struct {
 	// Default is false.
 	// +optional
 	TTY bool `json:"tty,omitempty" protobuf:"varint,18,opt,name=tty"`
+	// List of containers this containers depends on.
+	// A container will not be started until all containers in
+	// this list have terminated in success (exit code 0).
+	// +optional
+	DependentContainers []string `json:"dependentContainers,omitempty" protobuf:"bytes,26,rep,name=dependentContainers"`
 }
 
 // ProbeHandler defines a specific action that should be taken in a probe.

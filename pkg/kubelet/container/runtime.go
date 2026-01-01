@@ -38,6 +38,10 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 )
 
+var (
+	ErrContainerStatusSet = fmt.Errorf("container status set failed")
+)
+
 // Version interface allow to consume the runtime versions - compare and format to string.
 type Version interface {
 	// Compare compares two versions of the runtime. On success it returns -1
@@ -288,7 +292,9 @@ const (
 	ContainerStateRunning State = "running"
 	// ContainerStateExited indicates a container that ran and completed ("stopped" in other contexts, although a created container is technically also "stopped").
 	ContainerStateExited State = "exited"
-	// ContainerStateUnknown encompasses all the states that we currently don't care about (like restarting, paused, dead).
+	// ContainerStatePaused indicates it is waiting for a depdendency container to be ready.
+	ContainerStatePaused State = "paused"
+	// ContainerStateUnknown encompasses all the states that we currently don't care about (like restarting, dead).
 	ContainerStateUnknown State = "unknown"
 )
 
@@ -430,6 +436,18 @@ func (podStatus *PodStatus) FindContainerStatusByName(containerName string) *Sta
 		}
 	}
 	return nil
+}
+
+// SetContainerStateByName sets container status in the pod status with the given name.
+// When there are multiple containers' statuses with the same name, the first match will be set.
+func (podStatus *PodStatus) SetContainerStateByName(containerName string, state State) error {
+	for _, containerStatus := range podStatus.ContainerStatuses {
+		if containerStatus.Name == containerName {
+			containerStatus.State = state
+			return nil
+		}
+	}
+	return ErrContainerStatusSet
 }
 
 // GetRunningContainerStatuses returns container status of all the running containers in a pod
