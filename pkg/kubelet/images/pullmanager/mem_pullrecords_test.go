@@ -25,7 +25,9 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/klog/v2"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 type testPullRecordsAccessor struct {
@@ -75,7 +77,7 @@ func (a *testPullRecordsAccessor) GetImagePulledRecord(imageRef string) (*kubele
 	return record, exists, nil
 }
 
-func (a *testPullRecordsAccessor) WriteImagePullIntent(image string) error {
+func (a *testPullRecordsAccessor) WriteImagePullIntent(logger klog.Logger, image string) error {
 	if a.nextGetWriteError != nil {
 		return a.nextGetWriteError
 	}
@@ -85,7 +87,7 @@ func (a *testPullRecordsAccessor) WriteImagePullIntent(image string) error {
 	}
 	return nil
 }
-func (a *testPullRecordsAccessor) WriteImagePulledRecord(rec *kubeletconfiginternal.ImagePulledRecord) error {
+func (a *testPullRecordsAccessor) WriteImagePulledRecord(logger klog.Logger, rec *kubeletconfiginternal.ImagePulledRecord) error {
 	if a.nextGetWriteError != nil {
 		return a.nextGetWriteError
 	}
@@ -94,7 +96,7 @@ func (a *testPullRecordsAccessor) WriteImagePulledRecord(rec *kubeletconfiginter
 	return nil
 }
 
-func (a *testPullRecordsAccessor) DeleteImagePullIntent(image string) error {
+func (a *testPullRecordsAccessor) DeleteImagePullIntent(logger klog.Logger, image string) error {
 	if a.nextGetWriteError != nil {
 		return a.nextGetWriteError
 	}
@@ -102,7 +104,7 @@ func (a *testPullRecordsAccessor) DeleteImagePullIntent(image string) error {
 	delete(a.intents, image)
 	return nil
 }
-func (a *testPullRecordsAccessor) DeleteImagePulledRecord(imageRef string) error {
+func (a *testPullRecordsAccessor) DeleteImagePulledRecord(logger klog.Logger, imageRef string) error {
 	if a.nextGetWriteError != nil {
 		return a.nextGetWriteError
 	}
@@ -171,27 +173,28 @@ func (a *recordingPullRecordsAccessor) GetImagePulledRecord(imageRef string) (*k
 	return a.delegate.GetImagePulledRecord(imageRef)
 }
 
-func (a *recordingPullRecordsAccessor) WriteImagePullIntent(image string) error {
+func (a *recordingPullRecordsAccessor) WriteImagePullIntent(logger klog.Logger, image string) error {
 	a.methodsCalled = append(a.methodsCalled, "WriteImagePullIntent")
-	return a.delegate.WriteImagePullIntent(image)
+	return a.delegate.WriteImagePullIntent(logger, image)
 }
 
-func (a *recordingPullRecordsAccessor) WriteImagePulledRecord(rec *kubeletconfiginternal.ImagePulledRecord) error {
+func (a *recordingPullRecordsAccessor) WriteImagePulledRecord(logger klog.Logger, rec *kubeletconfiginternal.ImagePulledRecord) error {
 	a.methodsCalled = append(a.methodsCalled, "WriteImagePulledRecord")
-	return a.delegate.WriteImagePulledRecord(rec)
+	return a.delegate.WriteImagePulledRecord(logger, rec)
 }
 
-func (a *recordingPullRecordsAccessor) DeleteImagePullIntent(image string) error {
+func (a *recordingPullRecordsAccessor) DeleteImagePullIntent(logger klog.Logger, image string) error {
 	a.methodsCalled = append(a.methodsCalled, "DeleteImagePullIntent")
-	return a.delegate.DeleteImagePullIntent(image)
+	return a.delegate.DeleteImagePullIntent(logger, image)
 }
 
-func (a *recordingPullRecordsAccessor) DeleteImagePulledRecord(imageRef string) error {
+func (a *recordingPullRecordsAccessor) DeleteImagePulledRecord(logger klog.Logger, imageRef string) error {
 	a.methodsCalled = append(a.methodsCalled, "DeleteImagePulledRecord")
-	return a.delegate.DeleteImagePulledRecord(imageRef)
+	return a.delegate.DeleteImagePulledRecord(logger, imageRef)
 }
 
 func TestNewCachedPullRecordsAccessor(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	manyPullIntents := generateTestPullIntents(51)
 	slices.SortFunc(manyPullIntents, pullIntentsCmp)
 
@@ -296,7 +299,7 @@ func TestNewCachedPullRecordsAccessor(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotAccessor := NewCachedPullRecordsAccessor(tt.delegate, 50, 100, 10)
+			gotAccessor := NewCachedPullRecordsAccessor(logger, tt.delegate, 50, 100, 10)
 			gotMeteredAccessor, ok := gotAccessor.(*meteringRecordsAccessor)
 			if !ok {
 				t.Fatalf("the tested accessor must be a metered records accessor, got %T", gotAccessor)
@@ -626,6 +629,7 @@ func Test_cachedPullRecordsAccessor_ImagePullIntentExists(t *testing.T) {
 }
 
 func Test_cachedPullRecordsAccessor_WriteImagePullIntent(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	justEnoughIntents := generateTestPullIntents(100)
 
 	tests := []struct {
@@ -731,7 +735,7 @@ func Test_cachedPullRecordsAccessor_WriteImagePullIntent(t *testing.T) {
 			}
 			c.intents.authoritative.Store(tt.initAuthoritative)
 
-			if err := c.WriteImagePullIntent(tt.inputImage); !cmpErrorStrings(err, tt.wantErr) {
+			if err := c.WriteImagePullIntent(logger, tt.inputImage); !cmpErrorStrings(err, tt.wantErr) {
 				t.Errorf("cachedPullRecordsAccessor.WriteImagePullIntent() error = %v, wantErr %v", err, tt.wantErr)
 			}
 
@@ -751,6 +755,7 @@ func Test_cachedPullRecordsAccessor_WriteImagePullIntent(t *testing.T) {
 }
 
 func Test_cachedPullRecordsAccessor_WriteImagePulledRecord(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	justEnoughPulledRecords := generateTestPulledRecords(100)
 
 	tests := []struct {
@@ -898,7 +903,7 @@ func Test_cachedPullRecordsAccessor_WriteImagePulledRecord(t *testing.T) {
 			}
 			c.pulledRecords.authoritative.Store(tt.initAuthoritative)
 
-			if err := c.WriteImagePulledRecord(tt.inputRecord); !cmpErrorStrings(err, tt.wantErr) {
+			if err := c.WriteImagePulledRecord(logger, tt.inputRecord); !cmpErrorStrings(err, tt.wantErr) {
 				t.Errorf("cachedPullRecordsAccessor.WriteImagePulledRecord() error = %v, wantErr %v", err, tt.wantErr)
 			}
 
@@ -918,6 +923,7 @@ func Test_cachedPullRecordsAccessor_WriteImagePulledRecord(t *testing.T) {
 }
 
 func Test_cachedPullRecordsAccessor_DeleteImagePullIntent(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	tests := []struct {
 		name         string
 		delegate     *testPullRecordsAccessor
@@ -960,7 +966,7 @@ func Test_cachedPullRecordsAccessor_DeleteImagePullIntent(t *testing.T) {
 				}
 				c.intents.authoritative.Store(initAuthoritative)
 
-				if err := c.DeleteImagePullIntent(tt.inputImage); !cmpErrorStrings(err, tt.wantErr) {
+				if err := c.DeleteImagePullIntent(logger, tt.inputImage); !cmpErrorStrings(err, tt.wantErr) {
 					t.Errorf("cachedPullRecordsAccessor.DeleteImagePullIntent() error = %v, wantErr %v", err, tt.wantErr)
 				}
 
@@ -986,6 +992,7 @@ func Test_cachedPullRecordsAccessor_DeleteImagePullIntent(t *testing.T) {
 }
 
 func Test_cachedPullRecordsAccessor_DeleteImagePulledRecord(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	tests := []struct {
 		name              string
 		delegate          *testPullRecordsAccessor
@@ -1028,7 +1035,7 @@ func Test_cachedPullRecordsAccessor_DeleteImagePulledRecord(t *testing.T) {
 				}
 				c.pulledRecords.authoritative.Store(initAuthoritative)
 
-				if err := c.DeleteImagePulledRecord(tt.imageRef); !cmpErrorStrings(err, tt.wantErr) {
+				if err := c.DeleteImagePulledRecord(logger, tt.imageRef); !cmpErrorStrings(err, tt.wantErr) {
 					t.Errorf("cachedPullRecordsAccessor.DeleteImagePulledRecord() error = %v, wantErr %v", err, tt.wantErr)
 				}
 
