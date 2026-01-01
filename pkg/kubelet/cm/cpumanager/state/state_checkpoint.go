@@ -17,6 +17,7 @@ limitations under the License.
 package state
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 	"sync"
@@ -24,7 +25,7 @@ import (
 	"github.com/go-logr/logr"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
-	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
+	checkpointerrors "k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/utils/cpuset"
 )
@@ -68,8 +69,8 @@ func NewCheckpointState(logger logr.Logger, stateDir, checkpointName, policyName
 	return stateCheckpoint, nil
 }
 
-// migrateV1CheckpointToV2Checkpoint() converts checkpoints from the v1 format to the v2 format
-func (sc *stateCheckpoint) migrateV1CheckpointToV2Checkpoint(src *CPUManagerCheckpointV1, dst *CPUManagerCheckpointV2) error {
+// migrateV1CheckpointToV3Checkpoint() converts checkpoints from the v1 format to the v3 format
+func (sc *stateCheckpoint) migrateV1CheckpointToV3Checkpoint(src *CPUManagerCheckpointV1, dst *CPUManagerCheckpointV3) error {
 	if src.PolicyName != "" {
 		dst.PolicyName = src.PolicyName
 	}
@@ -88,6 +89,42 @@ func (sc *stateCheckpoint) migrateV1CheckpointToV2Checkpoint(src *CPUManagerChec
 			dst.Entries[podUID] = make(map[string]string)
 		}
 		dst.Entries[podUID][containerName] = cset
+		if dst.Promised == nil {
+			dst.Promised = make(map[string]map[string]string)
+		}
+		if _, exists := dst.Promised[podUID]; !exists {
+			dst.Promised[podUID] = make(map[string]string)
+		}
+		dst.Promised[podUID][containerName] = cset
+	}
+	return nil
+}
+
+// migrateV2CheckpointToV3Checkpoint() converts checkpoints from the v2 format to the v3 format
+func (sc *stateCheckpoint) migrateV2CheckpointToV3Checkpoint(src *CPUManagerCheckpointV2, dst *CPUManagerCheckpointV3) error {
+	if src.PolicyName != "" {
+		dst.PolicyName = src.PolicyName
+	}
+	if src.DefaultCPUSet != "" {
+		dst.DefaultCPUSet = src.DefaultCPUSet
+	}
+	for podUID := range src.Entries {
+		for containerName, cpuString := range src.Entries[podUID] {
+			if dst.Entries == nil {
+				dst.Entries = make(map[string]map[string]string)
+			}
+			if _, exists := dst.Entries[podUID]; !exists {
+				dst.Entries[podUID] = make(map[string]string)
+			}
+			dst.Entries[podUID][containerName] = cpuString
+			if dst.Promised == nil {
+				dst.Promised = make(map[string]map[string]string)
+			}
+			if _, exists := dst.Promised[podUID]; !exists {
+				dst.Promised[podUID] = make(map[string]string)
+			}
+			dst.Promised[podUID][containerName] = cpuString
+		}
 	}
 	return nil
 }
@@ -100,44 +137,62 @@ func (sc *stateCheckpoint) restoreState() error {
 
 	checkpointV1 := newCPUManagerCheckpointV1()
 	checkpointV2 := newCPUManagerCheckpointV2()
+	checkpointV3 := newCPUManagerCheckpointV3()
 
 	if err = sc.checkpointManager.GetCheckpoint(sc.checkpointName, checkpointV1); err != nil {
-		checkpointV1 = &CPUManagerCheckpointV1{} // reset it back to 0
 		if err = sc.checkpointManager.GetCheckpoint(sc.checkpointName, checkpointV2); err != nil {
-			if err == errors.ErrCheckpointNotFound {
-				return sc.storeState()
+			if err = sc.checkpointManager.GetCheckpoint(sc.checkpointName, checkpointV3); err != nil {
+				if errors.Is(err, checkpointerrors.ErrCheckpointNotFound) {
+					return sc.storeState()
+				}
+				return err
 			}
-			return err
+		} else {
+			if err = sc.migrateV2CheckpointToV3Checkpoint(checkpointV2, checkpointV3); err != nil {
+				return fmt.Errorf("error migrating v2 checkpoint state to v3 checkpoint state: %w", err)
+			}
+		}
+	} else {
+		if err = sc.migrateV1CheckpointToV3Checkpoint(checkpointV1, checkpointV3); err != nil {
+			return fmt.Errorf("error migrating v1 checkpoint state to v2 checkpoint state: %w", err)
 		}
 	}
 
-	if err = sc.migrateV1CheckpointToV2Checkpoint(checkpointV1, checkpointV2); err != nil {
-		return fmt.Errorf("error migrating v1 checkpoint state to v2 checkpoint state: %s", err)
-	}
-
-	if sc.policyName != checkpointV2.PolicyName {
-		return fmt.Errorf("configured policy %q differs from state checkpoint policy %q", sc.policyName, checkpointV2.PolicyName)
+	if sc.policyName != checkpointV3.PolicyName {
+		return fmt.Errorf("configured policy %q differs from state checkpoint policy %q", sc.policyName, checkpointV3.PolicyName)
 	}
 
 	var tmpDefaultCPUSet cpuset.CPUSet
-	if tmpDefaultCPUSet, err = cpuset.Parse(checkpointV2.DefaultCPUSet); err != nil {
-		return fmt.Errorf("could not parse default cpu set %q: %v", checkpointV2.DefaultCPUSet, err)
+	if tmpDefaultCPUSet, err = cpuset.Parse(checkpointV3.DefaultCPUSet); err != nil {
+		return fmt.Errorf("could not parse default cpu set %q: %w", checkpointV3.DefaultCPUSet, err)
 	}
 
 	var tmpContainerCPUSet cpuset.CPUSet
 	tmpAssignments := ContainerCPUAssignments{}
-	for pod := range checkpointV2.Entries {
-		tmpAssignments[pod] = make(map[string]cpuset.CPUSet, len(checkpointV2.Entries[pod]))
-		for container, cpuString := range checkpointV2.Entries[pod] {
+	for pod := range checkpointV3.Entries {
+		tmpAssignments[pod] = make(map[string]cpuset.CPUSet, len(checkpointV3.Entries[pod]))
+		for container, cpuString := range checkpointV3.Entries[pod] {
 			if tmpContainerCPUSet, err = cpuset.Parse(cpuString); err != nil {
-				return fmt.Errorf("could not parse cpuset %q for container %q in pod %q: %v", cpuString, container, pod, err)
+				return fmt.Errorf("could not parse cpuset %q for container %q in pod %q: %w", cpuString, container, pod, err)
 			}
 			tmpAssignments[pod][container] = tmpContainerCPUSet
 		}
 	}
 
+	tmpPromised := ContainerCPUAssignments{}
+	for pod := range checkpointV3.Promised {
+		tmpPromised[pod] = make(map[string]cpuset.CPUSet, len(checkpointV3.Promised[pod]))
+		for container, cpuString := range checkpointV3.Promised[pod] {
+			if tmpContainerCPUSet, err = cpuset.Parse(cpuString); err != nil {
+				return fmt.Errorf("could not parse cpuset %q for container %q in pod %q: %w", cpuString, container, pod, err)
+			}
+			tmpPromised[pod][container] = tmpContainerCPUSet
+		}
+	}
+
 	sc.cache.SetDefaultCPUSet(tmpDefaultCPUSet)
 	sc.cache.SetCPUAssignments(tmpAssignments)
+	sc.cache.SetCPUPromised(tmpPromised)
 
 	sc.logger.V(2).Info("restored state from checkpoint")
 	sc.logger.V(2).Info("defaultCPUSet", "defaultCpuSet", tmpDefaultCPUSet.String())
@@ -159,12 +214,29 @@ func (sc *stateCheckpoint) storeState() error {
 		}
 	}
 
+	promised := sc.cache.GetCPUPromised()
+	for pod := range promised {
+		checkpoint.Promised[pod] = make(map[string]string, len(promised[pod]))
+		for container, cset := range promised[pod] {
+			checkpoint.Promised[pod][container] = cset.String()
+		}
+	}
+
 	err := sc.checkpointManager.CreateCheckpoint(sc.checkpointName, checkpoint)
 	if err != nil {
 		sc.logger.Error(err, "Failed to save checkpoint")
 		return err
 	}
 	return nil
+}
+
+// GetPromisedCPUSet returns promised CPU set
+func (sc *stateCheckpoint) GetPromisedCPUSet(podUID string, containerName string) (cpuset.CPUSet, bool) {
+	sc.mux.RLock()
+	defer sc.mux.RUnlock()
+
+	res, ok := sc.cache.GetPromisedCPUSet(podUID, containerName)
+	return res, ok
 }
 
 // GetCPUSet returns current CPU set
@@ -200,6 +272,25 @@ func (sc *stateCheckpoint) GetCPUAssignments() ContainerCPUAssignments {
 	return sc.cache.GetCPUAssignments()
 }
 
+// GetCPUPromised returns current CPU to pod promised
+func (sc *stateCheckpoint) GetCPUPromised() ContainerCPUAssignments {
+	sc.mux.RLock()
+	defer sc.mux.RUnlock()
+
+	return sc.cache.GetCPUPromised()
+}
+
+// SetPromisedCPUSet sets CPU set
+func (sc *stateCheckpoint) SetPromisedCPUSet(podUID string, containerName string, cset cpuset.CPUSet) {
+	sc.mux.Lock()
+	defer sc.mux.Unlock()
+	sc.cache.SetPromisedCPUSet(podUID, containerName, cset)
+	err := sc.storeState()
+	if err != nil {
+		sc.logger.Error(err, "Failed to store state to checkpoint", "podUID", podUID, "containerName", containerName)
+	}
+}
+
 // SetCPUSet sets CPU set
 func (sc *stateCheckpoint) SetCPUSet(podUID string, containerName string, cset cpuset.CPUSet) {
 	sc.mux.Lock()
@@ -227,6 +318,17 @@ func (sc *stateCheckpoint) SetCPUAssignments(a ContainerCPUAssignments) {
 	sc.mux.Lock()
 	defer sc.mux.Unlock()
 	sc.cache.SetCPUAssignments(a)
+	err := sc.storeState()
+	if err != nil {
+		sc.logger.Error(err, "Failed to store state to checkpoint")
+	}
+}
+
+// SetCPUPromised sets CPU to pod promised
+func (sc *stateCheckpoint) SetCPUPromised(a ContainerCPUAssignments) {
+	sc.mux.Lock()
+	defer sc.mux.Unlock()
+	sc.cache.SetCPUPromised(a)
 	err := sc.storeState()
 	if err != nil {
 		sc.logger.Error(err, "Failed to store state to checkpoint")

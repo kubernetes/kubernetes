@@ -281,6 +281,9 @@ func (m *manager) AddContainer(logger logr.Logger, pod *v1.Pod, container *v1.Co
 	if cset, exists := m.state.GetCPUSet(string(pod.UID), container.Name); exists {
 		m.lastUpdateState.SetCPUSet(string(pod.UID), container.Name, cset)
 	}
+	if cset, exists := m.state.GetPromisedCPUSet(string(pod.UID), container.Name); exists {
+		m.lastUpdateState.SetPromisedCPUSet(string(pod.UID), container.Name, cset)
+	}
 	m.containerMap.Add(string(pod.UID), container.Name, containerID)
 	logger.V(4).Info("Added Container", "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name, "containerID", containerID)
 }
