@@ -246,7 +246,7 @@ func TestImageStatsWithError(t *testing.T) {
 }
 
 func TestPullWithSecrets(t *testing.T) {
-	tCtx := ktesting.Init(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 	// auth value is equivalent to: "username":"passed-user","password":"passed-password"
 	dockerCfg := map[string]map[string]string{"index.docker.io/v1/": {"email": "passed-email", "auth": "cGFzc2VkLXVzZXI6cGFzc2VkLXBhc3N3b3Jk"}}
 	dockercfgContent, err := json.Marshal(dockerCfg)
@@ -320,13 +320,14 @@ func TestPullWithSecrets(t *testing.T) {
 		_, fakeImageService, fakeManager, err := createTestRuntimeManager(tCtx)
 		require.NoError(t, err)
 
-		fsRecordAccessor, err := imagepullmanager.NewFSPullRecordsAccessor(t.TempDir())
+		fsRecordAccessor, err := imagepullmanager.NewFSPullRecordsAccessor(logger, t.TempDir())
 		if err != nil {
 			t.Fatal("failed to setup an file pull records accessor")
 		}
 
 		const intentsRecordsCacheSize, pulledRecordsCacheSize, stripedLocksSetSize = 50, 100, 10
 		memCacheRecordsAccessor := imagepullmanager.NewCachedPullRecordsAccessor(
+			logger,
 			fsRecordAccessor,
 			intentsRecordsCacheSize,
 			pulledRecordsCacheSize,
@@ -358,7 +359,7 @@ func TestPullWithSecrets(t *testing.T) {
 }
 
 func TestPullWithSecretsWithError(t *testing.T) {
-	tCtx := ktesting.Init(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 
 	dockerCfg := map[string]map[string]map[string]string{
 		"auths": {
@@ -410,13 +411,14 @@ func TestPullWithSecretsWithError(t *testing.T) {
 				fakeImageService.InjectError("PullImage", fmt.Errorf("test-error"))
 			}
 
-			fsRecordAccessor, err := imagepullmanager.NewFSPullRecordsAccessor(t.TempDir())
+			fsRecordAccessor, err := imagepullmanager.NewFSPullRecordsAccessor(logger, t.TempDir())
 			if err != nil {
 				t.Fatal("failed to setup an file pull records accessor")
 			}
 
 			const intentsRecordsCacheSize, pulledRecordsCacheSize, stripedLocksSetSize = 50, 100, 10
 			memCacheRecordsAccessor := imagepullmanager.NewCachedPullRecordsAccessor(
+				logger,
 				fsRecordAccessor,
 				intentsRecordsCacheSize,
 				pulledRecordsCacheSize,
