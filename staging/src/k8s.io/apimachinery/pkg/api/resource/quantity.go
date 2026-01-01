@@ -636,6 +636,23 @@ func (q *Quantity) Mul(y int64) bool {
 	return q.ToDec().d.Dec.Mul(q.d.Dec, inf.NewDec(y, inf.Scale(0))).UnscaledBig().IsInt64()
 }
 
+func (q *Quantity) QuoRound(y int64, roundVal int64) bool {
+	q.s = ""
+	if q.d.Dec == nil {
+		val, _ := q.i.AsInt64()
+		res := float64(val) / float64(y)
+		// check if its a whole number
+		if res == math.Trunc(res) {
+			q.i = int64Amount{value: int64(res)}
+			return true
+		}
+		unscaled := int64(math.Round(res * math.Pow(10, float64(roundVal))))
+		q.d.Dec = inf.NewDec(unscaled, inf.Scale(roundVal))
+		return false
+	}
+	return q.ToDec().d.Dec.QuoRound(q.d.Dec, inf.NewDec(y, inf.Scale(0)), inf.Scale(roundVal), inf.RoundHalfUp).UnscaledBig().IsInt64()
+}
+
 // Cmp returns 0 if the quantity is equal to y, -1 if the quantity is less than y, or 1 if the
 // quantity is greater than y.
 func (q *Quantity) Cmp(y Quantity) int {

@@ -266,6 +266,21 @@ func TestQuantity(t *testing.T) {
 			expectValue: trueVal,
 		},
 		{
+			name:        "multiply",
+			expr:        `quantity("50k").mul(2) == quantity("100000")`,
+			expectValue: trueVal,
+		},
+		{
+			name:        "divide",
+			expr:        `quantity("100").div(2) == quantity("50")`,
+			expectValue: trueVal,
+		},
+		{
+			name:        "divide_scaled",
+			expr:        `quantity("10k").div(3) == quantity("5000")`,
+			expectValue: trueVal,
+		},
+		{
 			name:        "arith_chain_1",
 			expr:        `quantity("50k").add(20).sub(quantity("100k")).asInteger()`,
 			expectValue: types.Int(-49980),

@@ -18,6 +18,7 @@ package library
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types"
@@ -188,6 +189,13 @@ var quantityLibraryDecls = map[string][]cel.FunctionOpt{
 		cel.MemberOverload("quantity_sub", []*cel.Type{apiservercel.QuantityType, apiservercel.QuantityType}, apiservercel.QuantityType, cel.BinaryBinding(quantitySub)),
 		cel.MemberOverload("quantity_sub_int", []*cel.Type{apiservercel.QuantityType, cel.IntType}, apiservercel.QuantityType, cel.BinaryBinding(quantitySubInt)),
 	},
+	"mul": {
+		cel.MemberOverload("quantity_multiply_int", []*cel.Type{apiservercel.QuantityType, cel.IntType}, apiservercel.QuantityType, cel.BinaryBinding(quantityMultiplyInt)),
+	},
+	"div": {
+		cel.MemberOverload("quantity_divide_int_default_rounding", []*cel.Type{apiservercel.QuantityType, cel.IntType}, apiservercel.QuantityType, cel.BinaryBinding(quantityDivideIntDefaultRounding)),
+		cel.MemberOverload("quantity_divide_int_round", []*cel.Type{apiservercel.QuantityType, cel.IntType, cel.IntType}, apiservercel.QuantityType, cel.FunctionBinding(quantityDivideIntRound)),
+	},
 }
 
 func (*quantity) CompileOptions() []cel.EnvOption {
@@ -342,6 +350,69 @@ func quantityAddInt(arg ref.Val, other ref.Val) ref.Val {
 
 	copy := *q
 	copy.Add(q2Converted)
+	return &apiservercel.Quantity{
+		Quantity: &copy,
+	}
+}
+
+func quantityMultiplyInt(arg ref.Val, mul ref.Val) ref.Val {
+	q, ok := arg.Value().(*resource.Quantity)
+	if !ok {
+		return types.MaybeNoSuchOverloadErr(arg)
+	}
+
+	multiplier, ok := mul.Value().(int64)
+	if !ok {
+		return types.MaybeNoSuchOverloadErr(arg)
+	}
+
+	copy := *q
+	copy.Mul(multiplier)
+	return &apiservercel.Quantity{
+		Quantity: &copy,
+	}
+}
+
+func quantityDivideIntDefaultRounding(arg ref.Val, div ref.Val) ref.Val {
+	q, ok := arg.Value().(*resource.Quantity)
+	if !ok {
+		return types.MaybeNoSuchOverloadErr(arg)
+	}
+
+	denominator, ok := div.Value().(int64)
+	if !ok {
+		return types.MaybeNoSuchOverloadErr(div)
+	}
+
+	copy := *q
+	copy.QuoRound(denominator, 4)
+	return &apiservercel.Quantity{
+		Quantity: &copy,
+	}
+}
+
+func quantityDivideIntRound(args ...ref.Val) ref.Val {
+	q, ok := args[0].Value().(*resource.Quantity)
+	if !ok {
+		return types.MaybeNoSuchOverloadErr(args[0])
+	}
+
+	denominator, ok := args[1].Value().(int64)
+	if !ok {
+		return types.MaybeNoSuchOverloadErr(args[1])
+	}
+
+	roundVal, ok := args[2].Value().(int64)
+	if !ok {
+		return types.MaybeNoSuchOverloadErr(args[2])
+	}
+
+	if roundVal > 10 {
+		return types.WrapErr(fmt.Errorf("the maximum value for rounding float division is 10 but %d was passed", roundVal))
+	}
+
+	copy := *q
+	copy.QuoRound(denominator, roundVal)
 	return &apiservercel.Quantity{
 		Quantity: &copy,
 	}
