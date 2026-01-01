@@ -287,6 +287,7 @@ func (p *criStatsProvider) listPodStatsStrictlyFromCRI(ctx context.Context, upda
 }
 
 func (p *criStatsProvider) PodCPUAndMemoryStats(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) (*statsapi.PodStats, error) {
+	logger := klog.FromContext(ctx)
 	if len(podStatus.SandboxStatuses) == 0 {
 		return nil, fmt.Errorf("missing sandbox for pod %s", format.Pod(pod))
 	}
@@ -310,7 +311,7 @@ func (p *criStatsProvider) PodCPUAndMemoryStats(ctx context.Context, pod *v1.Pod
 				return nil, err
 			}
 			// CRI implementation doesn't support PodSandboxStats, warn and fallback.
-			klog.ErrorS(err,
+			logger.Error(err,
 				"CRI implementation must be updated to support PodSandboxStats if PodAndContainerStatsFromCRI feature gate is enabled. Falling back to populating with cAdvisor; this call will fail in the future.",
 			)
 		} else {
@@ -331,7 +332,7 @@ func (p *criStatsProvider) PodCPUAndMemoryStats(ctx context.Context, pod *v1.Pod
 	for _, stats := range resp {
 		containerStatus := podStatus.FindContainerStatusByName(stats.Attributes.Metadata.Name)
 		if containerStatus == nil {
-			klog.V(4).InfoS("Received stats for unknown container", "pod", klog.KObj(pod), "container", stats.Attributes.Metadata)
+			logger.V(4).Info("Received stats for unknown container", "pod", klog.KObj(pod), "container", stats.Attributes.Metadata)
 			continue
 		}
 
