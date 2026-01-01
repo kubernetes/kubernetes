@@ -109,51 +109,51 @@ func NewMeteringRecordsAccessor(pullRecordsAccessor sizeExposedPullRecordsAccess
 	}
 }
 
-func (m *meteringRecordsAccessor) WriteImagePullIntent(image string) error {
-	if err := m.sizeExposedPullRecordsAccessor.WriteImagePullIntent(image); err != nil {
+func (m *meteringRecordsAccessor) WriteImagePullIntent(logger klog.Logger, image string) error {
+	if err := m.sizeExposedPullRecordsAccessor.WriteImagePullIntent(logger, image); err != nil {
 		return err
 	}
-	m.recordIntentsSize()
+	m.recordIntentsSize(logger)
 	return nil
 }
 
-func (m *meteringRecordsAccessor) DeleteImagePullIntent(image string) error {
-	if err := m.sizeExposedPullRecordsAccessor.DeleteImagePullIntent(image); err != nil {
+func (m *meteringRecordsAccessor) DeleteImagePullIntent(logger klog.Logger, image string) error {
+	if err := m.sizeExposedPullRecordsAccessor.DeleteImagePullIntent(logger, image); err != nil {
 		return err
 	}
-	m.recordIntentsSize()
+	m.recordIntentsSize(logger)
 	return nil
 }
 
-func (m *meteringRecordsAccessor) WriteImagePulledRecord(record *kubeletconfiginternal.ImagePulledRecord) error {
-	if err := m.sizeExposedPullRecordsAccessor.WriteImagePulledRecord(record); err != nil {
+func (m *meteringRecordsAccessor) WriteImagePulledRecord(logger klog.Logger, record *kubeletconfiginternal.ImagePulledRecord) error {
+	if err := m.sizeExposedPullRecordsAccessor.WriteImagePulledRecord(logger, record); err != nil {
 		return err
 	}
-	m.recordPulledRecordsSize()
+	m.recordPulledRecordsSize(logger)
 	return nil
 }
 
-func (m *meteringRecordsAccessor) DeleteImagePulledRecord(imageRef string) error {
-	if err := m.sizeExposedPullRecordsAccessor.DeleteImagePulledRecord(imageRef); err != nil {
+func (m *meteringRecordsAccessor) DeleteImagePulledRecord(logger klog.Logger, imageRef string) error {
+	if err := m.sizeExposedPullRecordsAccessor.DeleteImagePulledRecord(logger, imageRef); err != nil {
 		return err
 	}
-	m.recordPulledRecordsSize()
+	m.recordPulledRecordsSize(logger)
 	return nil
 }
 
-func (m *meteringRecordsAccessor) recordIntentsSize() {
+func (m *meteringRecordsAccessor) recordIntentsSize(logger klog.Logger) {
 	intentsSize, err := m.sizeExposedPullRecordsAccessor.intentsSize()
 	if err != nil {
-		klog.V(4).ErrorS(err, "failed to read number of ImagePullIntents, can't update metric", "metricName", m.intentsSize.Name)
+		logger.V(4).Info("failed to read number of ImagePullIntents, can't update metric", "metricName", m.intentsSize.Name, "error", err)
 		return
 	}
 	m.intentsSize.Set(float64(intentsSize))
 }
 
-func (m *meteringRecordsAccessor) recordPulledRecordsSize() {
+func (m *meteringRecordsAccessor) recordPulledRecordsSize(logger klog.Logger) {
 	pulledRecordsSize, err := m.sizeExposedPullRecordsAccessor.pulledRecordsSize()
 	if err != nil {
-		klog.V(4).ErrorS(err, "failed to read number of ImagePulledRecords, can't update metric", "metricName", m.pulledRecordsSize.Name)
+		logger.V(4).Info("failed to read number of ImagePulledRecords, can't update metric", "metricName", m.pulledRecordsSize.Name, "error", err)
 		return
 	}
 	m.pulledRecordsSize.Set(float64(pulledRecordsSize))
