@@ -76,6 +76,8 @@ var (
 	ErrPostStartHook = errors.New("PostStartHookError")
 	// ErrContainerPaused - container is paused
 	ErrContainerPaused = errors.New("ContainerPausedError")
+	// ErrInvalidContainerName - invalid container name
+	ErrInvalidContainerName = errors.New("InvalidContainerNameError")
 )
 
 // recordContainerEvent should be used by the runtime manager for all container related events.
@@ -201,12 +203,18 @@ func (m *kubeGenericRuntimeManager) getPodRuntimeHandler(pod *v1.Pod) (podRuntim
 func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandboxID string, podSandboxConfig *runtimeapi.PodSandboxConfig, spec *startSpec, pod *v1.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, podIP string, podIPs []string, imageVolumes kubecontainer.ImageVolumes) (string, error) {
 	logger := klog.FromContext(ctx)
 	container := spec.container
+	//check for all depdendent container statuses, if it is exited state run the container else pause it
 	for _, name := range container.DependentContainers {
 		depStatus := podStatus.FindContainerStatusByName(name)
-		if depStatus.State != kubecontainer.ContainerStateExited {
-			msg := fmt.Sprintf("Container %q is waiting for dependent container %q to be ready", container.Name, name)
-			podStatus.SetContainerStateByName(container.Name, kubecontainer.ContainerStatePaused)
-			return msg, ErrContainerPaused
+		if depStatus == nil {
+			msg := fmt.Sprintf("Container %q is unknown within pod", name)
+			return msg, ErrInvalidContainerName
+		} else {
+			if depStatus.State != kubecontainer.ContainerStateExited {
+				msg := fmt.Sprintf("Container %q is waiting for dependent container %q to be ready", container.Name, name)
+				podStatus.SetContainerStateByName(container.Name, kubecontainer.ContainerStatePaused)
+				return msg, ErrContainerPaused
+			}
 		}
 	}
 	// Step 1: pull the image.

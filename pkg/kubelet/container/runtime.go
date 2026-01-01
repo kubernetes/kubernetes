@@ -292,10 +292,10 @@ const (
 	ContainerStateRunning State = "running"
 	// ContainerStateExited indicates a container that ran and completed ("stopped" in other contexts, although a created container is technically also "stopped").
 	ContainerStateExited State = "exited"
-	// ContainerStateUnknown encompasses all the states that we currently don't care about (like restarting, paused, dead).
-	ContainerStateUnknown State = "unknown"
 	// ContainerStatePaused indicates it is waiting for a depdendency container to be ready.
 	ContainerStatePaused State = "paused"
+	// ContainerStateUnknown encompasses all the states that we currently don't care about (like restarting, dead).
+	ContainerStateUnknown State = "unknown"
 )
 
 // ContainerReasonStatusUnknown indicates a container the status of the container cannot be determined.
