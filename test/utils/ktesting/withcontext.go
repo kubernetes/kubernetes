@@ -98,7 +98,17 @@ func (wCtx withContext) CleanupCtx(cb func(TContext)) {
 
 func (wCtx withContext) Expect(actual interface{}, extra ...interface{}) gomega.Assertion {
 	wCtx.Helper()
-	return expect(wCtx, actual, extra...)
+	return gomegaAssertion(wCtx, true, actual, extra...)
+}
+
+func (wCtx withContext) Require(actual interface{}, extra ...interface{}) gomega.Assertion {
+	wCtx.Helper()
+	return gomegaAssertion(wCtx, true, actual, extra...)
+}
+
+func (wCtx withContext) Assert(actual interface{}, extra ...interface{}) gomega.Assertion {
+	wCtx.Helper()
+	return gomegaAssertion(wCtx, false, actual, extra...)
 }
 
 func (wCtx withContext) ExpectNoError(err error, explain ...interface{}) {
@@ -106,12 +116,12 @@ func (wCtx withContext) ExpectNoError(err error, explain ...interface{}) {
 	expectNoError(wCtx, err, explain...)
 }
 
-func (cCtx withContext) Run(name string, cb func(tCtx TContext)) bool {
-	return run(cCtx, name, false, cb)
+func (wCtx withContext) Run(name string, cb func(tCtx TContext)) bool {
+	return run(wCtx, name, false, cb)
 }
 
-func (cCtx withContext) SyncTest(name string, cb func(tCtx TContext)) bool {
-	return run(cCtx, name, true, cb)
+func (wCtx withContext) SyncTest(name string, cb func(tCtx TContext)) bool {
+	return run(wCtx, name, true, cb)
 }
 
 func (wCtx withContext) Logger() klog.Logger {
