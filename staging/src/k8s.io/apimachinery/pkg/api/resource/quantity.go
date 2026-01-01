@@ -653,6 +653,19 @@ func (q *Quantity) QuoRound(y int64, roundVal int64) bool {
 	return q.ToDec().d.Dec.QuoRound(q.d.Dec, inf.NewDec(y, inf.Scale(0)), inf.Scale(roundVal), inf.RoundHalfUp).UnscaledBig().IsInt64()
 }
 
+func (q *Quantity) QuoIntegerDivision(y int64) bool {
+	q.s = ""
+	if q.d.Dec == nil {
+		val, _ := q.i.AsInt64()
+		q.i = int64Amount{value: val / y}
+	} else {
+		result := new(inf.Dec).QuoRound(q.d.Dec, inf.NewDec(y, 0), 0, inf.RoundHalfUp)
+		q.i = int64Amount{value: result.UnscaledBig().Int64()}
+		q.d.Dec = nil
+	}
+	return true
+}
+
 // Cmp returns 0 if the quantity is equal to y, -1 if the quantity is less than y, or 1 if the
 // quantity is greater than y.
 func (q *Quantity) Cmp(y Quantity) int {

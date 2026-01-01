@@ -196,6 +196,9 @@ var quantityLibraryDecls = map[string][]cel.FunctionOpt{
 		cel.MemberOverload("quantity_divide_int_default_rounding", []*cel.Type{apiservercel.QuantityType, cel.IntType}, apiservercel.QuantityType, cel.BinaryBinding(quantityDivideIntDefaultRounding)),
 		cel.MemberOverload("quantity_divide_int_round", []*cel.Type{apiservercel.QuantityType, cel.IntType, cel.IntType}, apiservercel.QuantityType, cel.FunctionBinding(quantityDivideIntRound)),
 	},
+	"divInt": {
+		cel.MemberOverload("quantity_divide_int", []*cel.Type{apiservercel.QuantityType, cel.IntType}, apiservercel.QuantityType, cel.BinaryBinding(quantityIntegerDivision)),
+	},
 }
 
 func (*quantity) CompileOptions() []cel.EnvOption {
@@ -386,6 +389,24 @@ func quantityDivideIntDefaultRounding(arg ref.Val, div ref.Val) ref.Val {
 
 	copy := *q
 	copy.QuoRound(denominator, 4)
+	return &apiservercel.Quantity{
+		Quantity: &copy,
+	}
+}
+
+func quantityIntegerDivision(arg ref.Val, div ref.Val) ref.Val {
+	q, ok := arg.Value().(*resource.Quantity)
+	if !ok {
+		return types.MaybeNoSuchOverloadErr(arg)
+	}
+
+	denominator, ok := div.Value().(int64)
+	if !ok {
+		return types.MaybeNoSuchOverloadErr(div)
+	}
+
+	copy := *q
+	copy.QuoIntegerDivision(denominator)
 	return &apiservercel.Quantity{
 		Quantity: &copy,
 	}
