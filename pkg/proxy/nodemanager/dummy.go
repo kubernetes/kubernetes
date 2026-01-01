@@ -27,6 +27,10 @@ import (
 // a base implementation.
 type Dummy struct{}
 
+func (n *Dummy) Name() string {
+	return ""
+}
+
 func (n *Dummy) PrimaryIPFamily() v1.IPFamily {
 	return v1.IPFamilyUnknown
 }
