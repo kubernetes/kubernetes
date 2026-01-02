@@ -362,7 +362,7 @@ func TestSyncReplicaSetDormancy(t *testing.T) {
 
 	// Lowering expectations should lead to a sync that creates a replica, however the
 	// fakePodControl error will prevent this, leaving expectations at 0, 0
-	manager.expectations.CreationObserved(logger, rsKey)
+	manager.expectations.CreationObserved(logger, rsKey, "")
 	rsSpec.Status.Replicas = 1
 	rsSpec.Status.ReadyReplicas = 1
 	rsSpec.Status.AvailableReplicas = 1

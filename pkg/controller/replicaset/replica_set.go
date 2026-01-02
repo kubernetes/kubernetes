@@ -433,7 +433,10 @@ func (rsc *ReplicaSetController) addPod(logger klog.Logger, obj interface{}) {
 			return
 		}
 		logger.V(4).Info("Pod created", "pod", klog.KObj(pod), "detail", pod)
-		rsc.expectations.CreationObserved(logger, rsKey)
+		// Try to match pod to an expected creation key
+		expectedKeys := rsc.expectations.GetCreationUIDs(rsKey)
+		creationKey := controller.MatchPodToCreationKey(pod, expectedKeys)
+		rsc.expectations.CreationObserved(logger, rsKey, creationKey)
 		rsc.queue.Add(rsKey)
 		return
 	}
@@ -611,12 +614,14 @@ func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, activePods 
 		if diff > rsc.burstReplicas {
 			diff = rsc.burstReplicas
 		}
-		// TODO: Track UIDs of creates just like deletes. The problem currently
-		// is we'd need to wait on the result of a create to record the pod's
-		// UID, which would require locking *across* the create, which will turn
-		// into a performance bottleneck. We should generate a UID for the pod
-		// beforehand and store it via ExpectCreations.
-		rsc.expectations.ExpectCreations(logger, rsKey, diff)
+		// Generate predictable creation keys before pod creation to track individual pods.
+		// These keys are based on namespace/rsName-index pattern.
+		creationKeys := make([]string, diff)
+		podPrefix := controller.GetPodsPrefix(rs.Name)
+		for i := 0; i < diff; i++ {
+			creationKeys[i] = controller.GeneratePodCreationKey(rs.Namespace, podPrefix, i)
+		}
+		rsc.expectations.ExpectCreations(logger, rsKey, creationKeys)
 		logger.V(2).Info("Too few replicas", "replicaSet", klog.KObj(rs), "need", *(rs.Spec.Replicas), "creating", diff)
 		// Batch the pod creates. Batch sizes start at SlowStartInitialBatchSize
 		// and double with each successful iteration in a kind of "slow start".
@@ -643,9 +648,10 @@ func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, activePods 
 		// retry the slow start process.
 		if skippedPods := diff - successfulCreations; skippedPods > 0 {
 			logger.V(2).Info("Slow-start failure. Skipping creation of pods, decrementing expectations", "podsSkipped", skippedPods, "kind", rsc.Kind, "replicaSet", klog.KObj(rs))
+			// Remove expectations for skipped pods by index (from the end)
 			for i := 0; i < skippedPods; i++ {
-				// Decrement the expected number of creates because the informer won't observe this pod
-				rsc.expectations.CreationObserved(logger, rsKey)
+				skippedIndex := diff - i - 1
+				rsc.expectations.CreationObserved(logger, rsKey, creationKeys[skippedIndex])
 			}
 		}
 		return err
