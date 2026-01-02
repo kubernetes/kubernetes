@@ -43,6 +43,11 @@ type RealFIFOOptions struct {
 	// If set, will be called for objects before enqueueing them. Please
 	// see the comment on TransformFunc for details.
 	Transformer TransformFunc
+
+	// AtomicEvents is used to specify whether the RealFIFO will emit events
+	// atomically or not. If it is set, a single event will be emitted
+	// atomically for Replace and Resync operations.
+	AtomicEvents bool
 }
 
 const (
@@ -86,6 +91,16 @@ type RealFIFO struct {
 
 	// batchSize determines the maximum number of objects we can combine into a batch.
 	batchSize int
+
+	// emitAtomicEvents defines whether events like Replace and Resync should be emitted
+	// atomically rather than as a series of events. This means that any call to the FIFO
+	// will emit a single event.
+	emitAtomicEvents bool
+}
+
+type ReplacedListInfo struct {
+	ResourceVersion string
+	Objects         []interface{}
 }
 
 var (
@@ -173,6 +188,54 @@ func (f *RealFIFO) addToItems_locked(deltaActionType DeltaType, skipTransform bo
 	return nil
 }
 
+// addReplaceToItemsLocked appends to the delta list.
+func (f *RealFIFO) addReplaceToItemsLocked(objs []interface{}, resourceVersion string) error {
+	// Every object comes through this code path once, so this is a good
+	// place to call the transform func.
+	//
+	// If obj is a DeletedFinalStateUnknown tombstone or the action is a Sync,
+	// then the object have already gone through the transformer.
+	//
+	// If the objects already present in the cache are passed to Replace(),
+	// the transformer must be idempotent to avoid re-mutating them,
+	// or coordinate with all readers from the cache to avoid data races.
+	// Default informers do not pass existing objects to Replace.
+	for i, obj := range objs {
+		if f.transformer != nil {
+			_, isTombstone := obj.(DeletedFinalStateUnknown)
+			if !isTombstone {
+				var err error
+				obj, err = f.transformer(obj)
+				if err != nil {
+					return err
+				}
+				objs[i] = obj
+			}
+		}
+	}
+
+	info := ReplacedListInfo{
+		ResourceVersion: resourceVersion,
+		Objects:         objs,
+	}
+	f.items = append(f.items, Delta{
+		Type:   ReplacedList,
+		Object: info,
+	})
+	f.cond.Broadcast()
+
+	return nil
+}
+
+func (f *RealFIFO) addResyncToItemsLocked() error {
+	f.items = append(f.items, Delta{
+		Type: ResyncAtomic,
+	})
+	f.cond.Broadcast()
+
+	return nil
+}
+
 // Add inserts an item, and puts it in the queue. The item is only enqueued
 // if it doesn't already exist in the set.
 func (f *RealFIFO) Add(obj interface{}) error {
@@ -241,9 +304,6 @@ func (f *RealFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 	// The underlying array still exists and references this object, so the object will not be garbage collected unless we zero the reference.
 	f.items[0] = Delta{}
 	f.items = f.items[1:]
-	if f.initialPopulationCount > 0 {
-		f.initialPopulationCount--
-	}
 
 	// Only log traces if the queue depth is greater than 10 and it takes more than
 	// 100 milliseconds to process one item from the queue.
@@ -259,12 +319,30 @@ func (f *RealFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 		defer trace.LogIfLong(100 * time.Millisecond)
 	}
 
-	// we wrap in Deltas here to be compatible with preview Pop functions and those interpreting the return value.
-	err := process(Deltas{item}, isInInitialList)
+	// Process the item, this may unlock the lock, and allow other goroutines to add items to the queue.
+	err := f.process(item, isInInitialList, process)
+
+	// Decrement initialPopulationCount if it is greater than 0 after processing the item, to ensure that anything waiting for the cache
+	// to be populated will be unblocked only after the cache has been fully populated.
+	if f.initialPopulationCount > 0 {
+		f.initialPopulationCount--
+	}
 	return Deltas{item}, err
 }
 
-func (f *RealFIFO) PopBatch(process ProcessBatchFunc) error {
+func (f *RealFIFO) process(item Delta, isInInitialList bool, process PopProcessFunc) error {
+	// If we are emitting atomic events, we can optimize the processing by unlocking the lock before calling process so that the
+	// reflector is not blocked while we process the events. This is because we never access the store in the FIFO, and the store will
+	// stay consistent while we process the events.
+	if f.emitAtomicEvents {
+		f.lock.Unlock()
+		defer f.lock.Lock()
+	}
+	// we wrap in Deltas here to be compatible with preview Pop functions and those interpreting the return value.
+	return process(Deltas{item}, isInInitialList)
+}
+
+func (f *RealFIFO) PopBatch(processBatch ProcessBatchFunc, process PopProcessFunc) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
@@ -282,12 +360,18 @@ func (f *RealFIFO) PopBatch(process ProcessBatchFunc) error {
 	isInInitialList := !f.hasSynced_locked()
 	unique := sets.NewString()
 	deltas := make([]Delta, 0, min(len(f.items), f.batchSize))
-	// only bundle unique items into a batch
+	// only bundle unique items into a batch, always batch atomic replaces separately.
 	for i := 0; i < f.batchSize && i < len(f.items); i++ {
 		if f.initialPopulationCount > 0 && i >= f.initialPopulationCount {
 			break
 		}
 		item := f.items[i]
+		if item.Type == ReplacedList {
+			if len(deltas) == 0 {
+				deltas = append(deltas, item)
+			}
+			break
+		}
 		id, err := f.keyOf(item)
 		if err != nil {
 			// close the batch here if error happens
@@ -308,9 +392,6 @@ func (f *RealFIFO) PopBatch(process ProcessBatchFunc) error {
 		// The underlying array still exists and references this object, so the object will not be garbage collected unless we zero the reference.
 		f.items[i] = Delta{}
 	}
-	if f.initialPopulationCount > 0 {
-		f.initialPopulationCount -= len(deltas)
-	}
 	f.items = f.items[len(deltas):]
 
 	// Only log traces if the queue depth is greater than 10 and it takes more than
@@ -328,8 +409,28 @@ func (f *RealFIFO) PopBatch(process ProcessBatchFunc) error {
 		defer trace.LogIfLong(min(100*time.Millisecond*time.Duration(len(deltas)), time.Second))
 	}
 
-	err := process(deltas, isInInitialList)
+	var err error
+	if len(deltas) == 1 {
+		err = f.process(deltas[0], isInInitialList, process)
+	} else {
+		err = f.processBatch(deltas, isInInitialList, processBatch)
+	}
+	// Decrement initialPopulationCount if it is greater than 0 after processing the batch, to ensure that anything waiting for the cache
+	// to be populated will be unblocked only after the cache has been fully populated.
+	if f.initialPopulationCount > 0 {
+		f.initialPopulationCount -= len(deltas)
+	}
 	return err
+}
+
+func (f *RealFIFO) processBatch(deltas Deltas, isInInitialList bool, process ProcessBatchFunc) error {
+	// If we are emitting atomic events, we need are able to unlock the lock before calling process so that the
+	// reflector is not blocked while we process the events.
+	if f.emitAtomicEvents {
+		f.lock.Unlock()
+		defer f.lock.Lock()
+	}
+	return process(deltas, isInInitialList)
 }
 
 // Replace
@@ -340,22 +441,63 @@ func (f *RealFIFO) Replace(newItems []interface{}, resourceVersion string) error
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
+	if f.emitAtomicEvents {
+		f.items = f.items[:0]
+		if !f.populated {
+			f.populated = true
+			f.initialPopulationCount = 1
+		}
+		return f.addReplaceToItemsLocked(newItems, resourceVersion)
+	}
+
+	err := reconcileReplacement(f.items, f.knownObjects, newItems, f.keyOf,
+		func(obj interface{}) error {
+			return f.addToItems_locked(Deleted, true, DeletedFinalStateUnknown{
+				Key: obj.(DeletedFinalStateUnknown).Key,
+				Obj: obj.(DeletedFinalStateUnknown).Obj,
+			})
+		},
+		func(obj interface{}) error {
+			return f.addToItems_locked(Replaced, false, obj)
+		})
+	if err != nil {
+		return err
+	}
+
+	if !f.populated {
+		f.populated = true
+		f.initialPopulationCount = len(f.items)
+	}
+
+	return nil
+}
+
+// reconcileReplacement takes the items that are already in the queue and the set of new items
+// and based upon the state of the items in the queue and known objects will call onDelete and onReplace
+// depending upon whether the item is being deleted or replaced/added.
+func reconcileReplacement(
+	queuedItems []Delta,
+	knownObjects KeyListerGetter,
+	newItems []interface{},
+	keyOf func(obj interface{}) (string, error),
+	onDelete func(obj interface{}) error,
+	onReplace func(obj interface{}) error,
+) error {
 	// determine the keys of everything we're adding.  We cannot add the items until after the synthetic deletes have been
 	// created for items that don't existing in newItems
 	newKeys := sets.Set[string]{}
 	for _, obj := range newItems {
-		key, err := f.keyOf(obj)
+		key, err := keyOf(obj)
 		if err != nil {
 			return KeyError{obj, err}
 		}
 		newKeys.Insert(key)
 	}
 
-	queuedItems := f.items
 	queuedKeys := []string{}
 	lastQueuedItemForKey := map[string]Delta{}
 	for _, queuedItem := range queuedItems {
-		queuedKey, err := f.keyOf(queuedItem.Object)
+		queuedKey, err := keyOf(queuedItem.Object)
 		if err != nil {
 			return KeyError{queuedItem.Object, err}
 		}
@@ -387,17 +529,16 @@ func (f *RealFIFO) Replace(newItems []interface{}, resourceVersion string) error
 		// if we got here, then the last entry we have for the queued item is *not* a deletion and we need to add a delete
 		deletedObj := lastQueuedItem.Object
 
-		retErr := f.addToItems_locked(Deleted, true, DeletedFinalStateUnknown{
+		if err := onDelete(DeletedFinalStateUnknown{
 			Key: queuedKey,
 			Obj: deletedObj,
-		})
-		if retErr != nil {
-			return fmt.Errorf("couldn't enqueue object: %w", retErr)
+		}); err != nil {
+			return fmt.Errorf("couldn't enqueue object: %w", err)
 		}
 	}
 
 	// Detect deletions for objects not present in the queue, but present in KnownObjects
-	knownKeys := f.knownObjects.ListKeys()
+	knownKeys := knownObjects.ListKeys()
 	for _, knownKey := range knownKeys {
 		if newKeys.Has(knownKey) { // still present
 			continue
@@ -406,7 +547,7 @@ func (f *RealFIFO) Replace(newItems []interface{}, resourceVersion string) error
 			continue
 		}
 
-		deletedObj, exists, err := f.knownObjects.GetByKey(knownKey)
+		deletedObj, exists, err := knownObjects.GetByKey(knownKey)
 		if err != nil {
 			deletedObj = nil
 			utilruntime.HandleError(fmt.Errorf("error during lookup, placing DeleteFinalStateUnknown marker without object: key=%q, err=%w", knownKey, err))
@@ -414,26 +555,19 @@ func (f *RealFIFO) Replace(newItems []interface{}, resourceVersion string) error
 			deletedObj = nil
 			utilruntime.HandleError(fmt.Errorf("key does not exist in known objects store, placing DeleteFinalStateUnknown marker without object: key=%q", knownKey))
 		}
-		retErr := f.addToItems_locked(Deleted, false, DeletedFinalStateUnknown{
+		if err := onDelete(DeletedFinalStateUnknown{
 			Key: knownKey,
 			Obj: deletedObj,
-		})
-		if retErr != nil {
-			return fmt.Errorf("couldn't enqueue object: %w", retErr)
+		}); err != nil {
+			return fmt.Errorf("couldn't enqueue object: %w", err)
 		}
 	}
 
 	// now that we have the deletes we need for items, we can add the newItems to the items queue
 	for _, obj := range newItems {
-		retErr := f.addToItems_locked(Replaced, false, obj)
-		if retErr != nil {
-			return fmt.Errorf("couldn't enqueue object: %w", retErr)
+		if err := onReplace(obj); err != nil {
+			return fmt.Errorf("couldn't enqueue object: %w", err)
 		}
-	}
-
-	if !f.populated {
-		f.populated = true
-		f.initialPopulationCount = len(f.items)
 	}
 
 	return nil
@@ -445,6 +579,10 @@ func (f *RealFIFO) Resync() error {
 	// TODO this cannot logically be done by the FIFO, it can only be done by the indexer
 	f.lock.Lock()
 	defer f.lock.Unlock()
+
+	if f.emitAtomicEvents {
+		return f.addResyncToItemsLocked()
+	}
 
 	if f.knownObjects == nil {
 		return nil
@@ -513,12 +651,19 @@ func NewRealFIFOWithOptions(opts RealFIFOOptions) *RealFIFO {
 		panic("coding error: knownObjects must be provided")
 	}
 
+	// If we are emitting atomic events, we must not rely on the known objects store as it is expected to be updated
+	// by the controller that provides the processing loop.
+	if opts.AtomicEvents {
+		opts.KnownObjects = nil
+	}
+
 	f := &RealFIFO{
-		items:        make([]Delta, 0, 10),
-		keyFunc:      opts.KeyFunction,
-		knownObjects: opts.KnownObjects,
-		transformer:  opts.Transformer,
-		batchSize:    defaultBatchSize,
+		items:            make([]Delta, 0, 10),
+		keyFunc:          opts.KeyFunction,
+		knownObjects:     opts.KnownObjects,
+		transformer:      opts.Transformer,
+		batchSize:        defaultBatchSize,
+		emitAtomicEvents: opts.AtomicEvents,
 	}
 
 	f.cond.L = &f.lock
