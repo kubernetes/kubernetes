@@ -335,6 +335,7 @@ type KubeletConfiguration struct {
 	NodeLeaseDurationSeconds int32 `json:"nodeLeaseDurationSeconds,omitempty"`
 	// imageMinimumGCAge is the minimum age for an unused image before it is
 	// garbage collected.
+	// The field value must be greater than 0.
 	// Default: "2m"
 	// +optional
 	ImageMinimumGCAge metav1.Duration `json:"imageMinimumGCAge,omitempty"`
