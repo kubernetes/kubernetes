@@ -48,6 +48,7 @@ var (
 		HealthzPort:                            10248,
 		ImageGCHighThresholdPercent:            85,
 		ImageGCLowThresholdPercent:             80,
+		ImageMinimumGCAge:                      metav1.Duration{Duration: 2 * time.Minute},
 		ImagePullCredentialsVerificationPolicy: "NeverVerifyPreloadedImages",
 		IPTablesDropBit:                        15,
 		IPTablesMasqueradeBit:                  14,
@@ -751,6 +752,20 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 				return conf
 			},
 			errMsg: "unrecognized feature gate: invalid",
+		}, {
+			name: "invalid configuration: invalid ImageMinimumGCAge",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.ImageMinimumGCAge = metav1.Duration{Duration: -1}
+				return conf
+			},
+			errMsg: "invalid configuration: imageMinimumGCAge -1ns must not be negative",
+		}, {
+			name: "valid ImageMinimumGCAge set to default 1ns",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				// Verify that values other than the default are accepted.
+				conf.ImageMinimumGCAge = metav1.Duration{Duration: 1 * time.Nanosecond}
+				return conf
+			},
 		},
 	}
 

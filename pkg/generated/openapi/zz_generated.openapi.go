@@ -70225,7 +70225,7 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 					},
 					"imageMinimumGCAge": {
 						SchemaProps: spec.SchemaProps{
-							Description: "imageMinimumGCAge is the minimum age for an unused image before it is garbage collected. Default: \"2m\"",
+							Description: "imageMinimumGCAge is the minimum age for an unused image before it is garbage collected. The field value must be greater than 0. If unset or 0, defaults to 2m. Default: \"2m\"",
 							Ref:         ref(metav1.Duration{}.OpenAPIModelName()),
 						},
 					},
