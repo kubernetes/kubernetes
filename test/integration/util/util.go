@@ -226,7 +226,7 @@ func StartFakePVController(ctx context.Context, clientSet clientset.Interface, i
 		}
 	}
 
-	pvInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = pvInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			syncPV(obj.(*v1.PersistentVolume))
 		},
@@ -235,7 +235,7 @@ func StartFakePVController(ctx context.Context, clientSet clientset.Interface, i
 		},
 	})
 
-	pvcInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = pvcInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			syncPVC(obj.(*v1.PersistentVolumeClaim))
 		},

@@ -206,33 +206,33 @@ func TestNominatedNodeNameIsSetBeforePreBindAndWaitOnPermit(t *testing.T) {
 	}
 }
 
-type TestBindPlugin struct {
+type mockBindPlugin struct {
 	remainingFailures int
 	beforeBind        func()
 	defaultBindPlugin fwk.BindPlugin
 }
 
-func (p *TestBindPlugin) Name() string {
-	return "TestBindPlugin"
+func (p *mockBindPlugin) Name() string {
+	return "mockBindPlugin"
 }
 
-func (p *TestBindPlugin) Bind(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodename string) *fwk.Status {
+func (p *mockBindPlugin) Bind(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodename string) *fwk.Status {
 	if p.remainingFailures > 0 {
 		p.remainingFailures--
-		return fwk.NewStatus(fwk.Error, "TestBindPlugin reported error because remainingFailures > 0")
+		return fwk.NewStatus(fwk.Error, "mockBindPlugin reported error because remainingFailures > 0")
 	}
 	p.beforeBind()
 	return p.defaultBindPlugin.Bind(ctx, state, pod, nodename)
 }
 
-type TestQueueSortPlugin struct {
+type mockQueueSortPlugin struct {
 	priorities map[string]int
 }
 
-func (p *TestQueueSortPlugin) Name() string {
-	return "TestQueueSortPlugin"
+func (p *mockQueueSortPlugin) Name() string {
+	return "mockQueueSortPlugin"
 }
-func (p *TestQueueSortPlugin) Less(pInfo1, pInfo2 fwk.QueuedPodInfo) bool {
+func (p *mockQueueSortPlugin) Less(pInfo1, pInfo2 fwk.QueuedPodInfo) bool {
 	return p.priorities[pInfo1.GetPodInfo().GetPod().Name] < p.priorities[pInfo2.GetPodInfo().GetPod().Name]
 }
 
@@ -260,12 +260,12 @@ func createPodWithPVC(testCtx *testutils.TestContext, pod v1.Pod, storageClassNa
 
 	createdPod, err := testutils.CreatePausePod(testCtx.ClientSet, &pod)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create pod: %w", err)
+		return nil, fmt.Errorf("failed to create pod: %w", err)
 	}
 	return createdPod, nil
 }
 
-func preferredNodeAffinity(preferredNodeName string) *v1.Affinity {
+func makePreferredNodeAffinity(preferredNodeName string) *v1.Affinity {
 	return &v1.Affinity{
 		NodeAffinity: &v1.NodeAffinity{
 			PreferredDuringSchedulingIgnoredDuringExecution: []v1.PreferredSchedulingTerm{{
@@ -287,7 +287,7 @@ func preferredNodeAffinity(preferredNodeName string) *v1.Affinity {
 func initSchedulerWithPlugins(t *testing.T, testContext *testutils.TestContext, plugins ...fwk.Plugin) (*testutils.TestContext, testutils.ShutdownFunc) {
 	registry, profile := schedulerutils.InitRegistryAndConfig(t, func(plugin fwk.Plugin) frameworkruntime.PluginFactory {
 		return func(ctx context.Context, obj runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
-			if v, ok := plugin.(*TestBindPlugin); ok {
+			if v, ok := plugin.(*mockBindPlugin); ok {
 				binder, err := defaultbinder.New(ctx, obj, fh)
 				if err != nil {
 					return nil, err
@@ -306,30 +306,30 @@ func initSchedulerWithPlugins(t *testing.T, testContext *testutils.TestContext, 
 	return testCtx, teardown
 }
 
+// TestPartialBindingFailureRetriedWithNNN checks the behavior for scheduling a pod that
+// successfully completed PreBind (provisioned PVC) but failed to Bind due to a transient failure.
+//
+// The test does the following:
+// 1. Set up 2 nodes able to hold one pod each
+// 2. Try to schedule pod1 with dynamically provisioned pvc1 N times, but force failure at pod binding each time
+// 3. Schedule pod2 with dynamically provisioned pvc2, preferring the same node as pod1
+// 4. Schedule pod1
+// 5. Verify that pod1 and pod2 have been scheduled successfully
 func TestPartialBindingFailureRetriedWithNNN(t *testing.T) {
-	// The test will do the following:
-	// 1. Set up 2 nodes able to hold one pod each
-	// 2. Try to schedule pod1 with dynamically provisioned pvc1 N times, but force failure at pod binding each time
-	// 3. Schedule pod2 with dynamically provisioned pvc2, preferring the same node as pod1
-	// 4. Schedule pod1
-	// 5. Verify that pod1 and pod2 have been scheduled successfully
-	//
-	// It shouldn't matter how many failed attempts pod1 goes through.
-	//
-	// Note that the pvc will be provisioned at the prebind stage even if the pod fails to bind.
-	for _, attempts := range []int{0, 1, 2} {
-		t.Run(fmt.Sprintf("Test pod binds on the originally determined node after successful prebind and %v failed bind attempts and scheduler restart", attempts), func(t *testing.T) {
+	// `bindFailures` describes how many times the scheduler will fail to bind pod1 before scheduling pod2.
+	for _, bindFailures := range []int{0, 1, 2} {
+		t.Run(fmt.Sprintf("Test pod binds on the originally determined node after successful prebind and %v failed bind attempts and scheduler restart", bindFailures), func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NominatedNodeNameForExpectation, true)
 			testContext := testutils.InitTestAPIServer(t, "nnn-test", nil)
 
 			// This plugin allows us to abort scheduler before binding.
-			bindPlugin := &TestBindPlugin{
-				remainingFailures: attempts,
+			bindPlugin := &mockBindPlugin{
+				remainingFailures: bindFailures,
 			}
 			// We don't use regular pod priorities because they affect behavior related to NominatedNodeName.
 			// In a real scenario, the priorities could be equal and the tiebreaker could be random from the user's perspective.
 			// With a custom plugin we ensure deterministic order without affecting other behavior relevant to the test.
-			queueSortPlugin := &TestQueueSortPlugin{
+			queueSortPlugin := &mockQueueSortPlugin{
 				priorities: map[string]int{
 					"test-pod1": 1,
 					"test-pod2": 2,
@@ -364,7 +364,7 @@ func TestPartialBindingFailureRetriedWithNNN(t *testing.T) {
 					Namespace: testCtx.NS.Name,
 					// Ensure all pods prefer the same node.
 					// However, only 1 pod will fit on the preferred node.
-					Affinity: preferredNodeAffinity(nodes[0].Name),
+					Affinity: makePreferredNodeAffinity(nodes[0].Name),
 				})
 			}
 
