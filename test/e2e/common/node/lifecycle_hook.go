@@ -712,7 +712,7 @@ var _ = SIGDescribe("Lifecycle Sleep Hook", func() {
 	})
 })
 
-var _ = SIGDescribe("Lifecycle sleep action zero value", func() {
+var _ = SIGDescribe("Lifecycle sleep action zero value", framework.WithSerial(), func() {
 	f := framework.NewDefaultFramework("pod-lifecycle-sleep-action-allow-zero")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	var podClient *e2epod.PodClient
