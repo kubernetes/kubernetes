@@ -25,10 +25,7 @@ import (
 	"strings"
 	"time"
 
-	"go.opentelemetry.io/otel/attribute"
-
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metainternalversionscheme "k8s.io/apimachinery/pkg/apis/meta/internalversion/scheme"
 	metainternalversionvalidation "k8s.io/apimachinery/pkg/apis/meta/internalversion/validation"
@@ -171,8 +168,6 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope *RequestScope, forceWatc
 	return func(w http.ResponseWriter, req *http.Request) {
 		ctx := req.Context()
 		// For performance tracking purposes.
-		ctx, span := tracing.Start(ctx, "List", traceFields(req)...)
-		req = req.WithContext(ctx)
 
 		namespace, err := scope.Namer.Namespace(req)
 		if err != nil {
@@ -268,7 +263,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope *RequestScope, forceWatc
 				scope.err(err, w, req)
 				return
 			}
-			handler, err := serveWatchHandler(watcher, scope, outputMediaType, req, w, timeout, metrics.CleanListScope(ctx, &opts))
+			handler, err := serveWatchHandler(watcher, scope, outputMediaType, req, w, timeout, metrics.CleanListScope(ctx, &opts), &opts)
 			if err != nil {
 				scope.err(err, w, req)
 				return
@@ -295,6 +290,8 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope *RequestScope, forceWatc
 			}
 			return
 		}
+		ctx, span := tracing.Start(ctx, "List", traceFields(req)...)
+		req = req.WithContext(ctx)
 
 		// Log only long List requests (ignore Watch).
 		defer span.End(500 * time.Millisecond)
@@ -305,7 +302,6 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope *RequestScope, forceWatc
 			return
 		}
 		span.AddEvent("Listing from storage done")
-		defer span.AddEvent("Writing http response done", attribute.Int("count", meta.LenList(result)))
 		transformResponseObject(ctx, scope, req, w, http.StatusOK, outputMediaType, result)
 	}
 }

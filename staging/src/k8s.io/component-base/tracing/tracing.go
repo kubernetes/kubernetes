@@ -60,6 +60,12 @@ func (s *Span) AddEvent(name string, attributes ...attribute.KeyValue) {
 	}
 }
 
+func (s *Span) AddParallelEvent(name string, duration time.Duration, attributes ...attribute.KeyValue) {
+	if s.utilSpan != nil {
+		s.utilSpan.ParallelStep(name, duration, attributesToFields(attributes)...)
+	}
+}
+
 // End ends the span, and logs if the span duration is greater than the logThreshold.
 func (s *Span) End(logThreshold time.Duration) {
 	s.otelSpan.End()

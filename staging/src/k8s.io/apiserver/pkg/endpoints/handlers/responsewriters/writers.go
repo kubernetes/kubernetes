@@ -32,6 +32,7 @@ import (
 
 	"k8s.io/apiserver/pkg/features"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/httpstream/wsstream"
@@ -97,20 +98,23 @@ func SerializeObject(mediaType string, encoder runtime.Encoder, hw http.Response
 		attribute.String("url", req.URL.Path),
 		attribute.String("protocol", req.Proto),
 		attribute.String("mediaType", mediaType),
-		attribute.String("encoder", string(encoder.Identifier())))
+		attribute.String("encoder", string(encoder.Identifier())),
+	)
 	req = req.WithContext(ctx)
 	defer span.End(5 * time.Second)
 
-	w := &deferredResponseWriter{
-		mediaType:       mediaType,
-		statusCode:      statusCode,
-		contentEncoding: negotiateContentEncoding(req),
-		hw:              hw,
-		ctx:             ctx,
-	}
+	w := NewDeferredResponseWriter(ctx, mediaType, statusCode, negotiateContentEncoding(req), hw)
 
+	start := time.Now()
 	err := encoder.Encode(object, w)
 	if err == nil {
+		var duration time.Duration
+		for _, tracer := range w.tracers {
+			span.AddParallelEvent(tracer.name, tracer.duration-duration, attribute.Int64("size", tracer.bytes))
+			duration = tracer.duration
+		}
+		span.AddParallelEvent("serialize", time.Since(start)-duration, attribute.Int("count", meta.LenList(object)))
+		span.AddEvent("Write call succeeded")
 		err = w.Close()
 		if err != nil {
 			// we cannot write an error to the writer anymore as the Encode call was successful.
@@ -118,6 +122,13 @@ func SerializeObject(mediaType string, encoder runtime.Encoder, hw http.Response
 		}
 		return
 	}
+	var duration time.Duration
+	for _, tracer := range w.tracers {
+		span.AddParallelEvent(tracer.name, tracer.duration-duration, attribute.Int64("size", tracer.bytes))
+		duration = tracer.duration
+	}
+	span.AddParallelEvent("serialize", time.Since(start)-duration)
+	span.AddEvent("Write call failed", attribute.String("err", err.Error()))
 
 	// make a best effort to write the object if a failure is detected
 	utilruntime.HandleError(fmt.Errorf("apiserver was unable to write a JSON response: %v", err))
@@ -190,6 +201,16 @@ func negotiateContentEncoding(req *http.Request) string {
 	return ""
 }
 
+func NewDeferredResponseWriter(ctx context.Context, mediaType string, statusCode int, contentEncoding string, hw http.ResponseWriter) *deferredResponseWriter {
+	return &deferredResponseWriter{
+		mediaType:       mediaType,
+		statusCode:      statusCode,
+		contentEncoding: contentEncoding,
+		hw:              hw,
+		ctx:             ctx,
+	}
+}
+
 type deferredResponseWriter struct {
 	mediaType       string
 	statusCode      int
@@ -199,13 +220,14 @@ type deferredResponseWriter struct {
 	buffer      []byte
 	hasWritten  bool
 	hw          http.ResponseWriter
-	w           io.Writer
+	w           *TraceWriter
 	// totalBytes is the number of bytes written to `w` and does not include buffered bytes
 	totalBytes int
 	// lastWriteErr holds the error result (if any) of the last write attempt to `w`
 	lastWriteErr error
 
-	ctx context.Context
+	ctx     context.Context
+	tracers []*TraceWriter
 }
 
 func (w *deferredResponseWriter) Write(p []byte) (n int, err error) {
@@ -256,8 +278,10 @@ func (w *deferredResponseWriter) unbufferedWrite(p []byte) (n int, err error) {
 	}
 	w.hasWritten = true
 
-	hw := w.hw
-	header := hw.Header()
+	hw := NewTraceWriter("write response", w.hw)
+	w.w = hw
+	w.tracers = append(w.tracers, hw)
+	header := w.hw.Header()
 	switch {
 	case w.contentEncoding == "gzip" && len(p) > defaultGzipThresholdBytes:
 		header.Set("Content-Encoding", "gzip")
@@ -265,41 +289,17 @@ func (w *deferredResponseWriter) unbufferedWrite(p []byte) (n int, err error) {
 
 		gw := gzipPool.Get().(*gzip.Writer)
 		gw.Reset(hw)
-
-		w.w = gw
-	default:
-		w.w = hw
+		tw := NewTraceWriter("compress gzip", gw)
+		w.tracers = append(w.tracers, tw)
+		w.w = tw
 	}
 
-	span := tracing.SpanFromContext(w.ctx)
-	span.AddEvent("About to start writing response",
-		attribute.String("writer", fmt.Sprintf("%T", w.w)),
-		attribute.Int("size", len(p)),
-	)
-
 	header.Set("Content-Type", w.mediaType)
-	hw.WriteHeader(w.statusCode)
+	w.hw.WriteHeader(w.statusCode)
 	return w.w.Write(p)
 }
 
 func (w *deferredResponseWriter) Close() (err error) {
-	defer func() {
-		if !w.hasWritten {
-			return
-		}
-
-		span := tracing.SpanFromContext(w.ctx)
-
-		if w.lastWriteErr != nil {
-			span.AddEvent("Write call failed",
-				attribute.Int("size", w.totalBytes),
-				attribute.String("err", w.lastWriteErr.Error()))
-		} else {
-			span.AddEvent("Write call succeeded",
-				attribute.Int("size", w.totalBytes))
-		}
-	}()
-
 	if !w.hasWritten {
 		if !w.hasBuffered {
 			return nil
@@ -309,10 +309,9 @@ func (w *deferredResponseWriter) Close() (err error) {
 		w.buffer = nil
 		return err
 	}
-
-	switch t := w.w.(type) {
+	err = w.w.Close()
+	switch t := w.w.next.(type) {
 	case *gzip.Writer:
-		err = t.Close()
 		t.Reset(nil)
 		gzipPool.Put(t)
 	}
@@ -406,4 +405,33 @@ func WriteRawJSON(statusCode int, object interface{}, w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
 	w.Write(output)
+}
+
+func NewTraceWriter(name string, next io.Writer) *TraceWriter {
+	return &TraceWriter{
+		name: name,
+		next: next,
+	}
+}
+
+type TraceWriter struct {
+	name     string
+	duration time.Duration
+	bytes    int64
+	next     io.Writer
+}
+
+func (t *TraceWriter) Write(p []byte) (n int, err error) {
+	start := time.Now()
+	n, err = t.next.Write(p)
+	t.duration += time.Since(start)
+	t.bytes += int64(n)
+	return n, err
+}
+
+func (t *TraceWriter) Close() error {
+	if closer, ok := t.next.(io.WriteCloser); ok {
+		return closer.Close()
+	}
+	return nil
 }
