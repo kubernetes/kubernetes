@@ -24,14 +24,17 @@ import (
 	"sync/atomic"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
 	"golang.org/x/net/websocket"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/httpstream/wsstream"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -39,6 +42,7 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	compbasemetrics "k8s.io/component-base/metrics"
+	"k8s.io/component-base/tracing"
 )
 
 // timeoutFactory abstracts watch timeout logic for testing
@@ -64,7 +68,7 @@ func (w *realTimeoutFactory) TimeoutCh() (<-chan time.Time, func() bool) {
 
 // serveWatchHandler returns a handle to serve a watch response.
 // TODO: the functionality in this method and in WatchServer.Serve is not cleanly decoupled.
-func serveWatchHandler(watcher watch.Interface, scope *RequestScope, mediaTypeOptions negotiation.MediaTypeOptions, req *http.Request, w http.ResponseWriter, timeout time.Duration, metricsScope string) (http.Handler, error) {
+func serveWatchHandler(watcher watch.Interface, scope *RequestScope, mediaTypeOptions negotiation.MediaTypeOptions, req *http.Request, w http.ResponseWriter, timeout time.Duration, metricsScope string, opts *internalversion.ListOptions) (http.Handler, error) {
 	options, err := optionsForTransform(mediaTypeOptions, req)
 	if err != nil {
 		return nil, err
@@ -172,6 +176,7 @@ func serveWatchHandler(watcher watch.Interface, scope *RequestScope, mediaTypeOp
 		ServerShuttingDownCh: serverShuttingDownCh,
 
 		metricsScope: metricsScope,
+		opts: opts,
 	}
 
 	if wsstream.IsWebSocketRequest(req) {
@@ -202,6 +207,7 @@ type WatchServer struct {
 	ServerShuttingDownCh <-chan struct{}
 
 	metricsScope string
+	opts *internalversion.ListOptions
 }
 
 // watchEventMetricsRecorder allows the caller to count bytes written and report the size of the event.
@@ -230,6 +236,20 @@ func (c *watchEventMetricsRecorder) RecordEvent() {
 // HandleHTTP serves a series of encoded events via HTTP with Transfer-Encoding: chunked.
 // or over a websocket connection.
 func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
+	ctx := req.Context()
+	var span *tracing.Span
+	if s.opts != nil && s.opts.SendInitialEvents != nil && *s.opts.SendInitialEvents {
+		fmt.Printf("Trace[] Start WatchList\n")
+		ctx, span = tracing.Start(ctx, "SerializeObject",
+		attribute.String("audit-id", audit.GetAuditIDTruncated(ctx)),
+		attribute.String("method", req.Method),
+		attribute.String("url", req.URL.Path),
+		attribute.String("protocol", req.Proto),
+		attribute.String("mediaType", s.MediaType),
+		attribute.String("encoder", string(s.Encoder.Identifier())),
+	)
+	req = req.WithContext(ctx)
+	} else {fmt.Printf("Trace[] Start Watch\n")}
 	defer func() {
 		if s.MemoryAllocator != nil {
 			runtime.AllocatorPool.Put(s.MemoryAllocator)
@@ -243,6 +263,7 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 		s.Scope.err(errors.NewInternalError(err), w, req)
 		return
 	}
+	writer := NewTraceWriter("Network", w)
 
 	framer := s.Framer.NewFrameWriter(w)
 	if framer == nil {
@@ -275,6 +296,8 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 	ch := s.Watching.ResultChan()
 	done := req.Context().Done()
 
+	var duration time.Duration
+	var count int
 	for {
 		select {
 		case <-s.ServerShuttingDownCh:
@@ -297,17 +320,26 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 			}
 			isWatchListLatencyRecordingRequired := shouldRecordWatchListLatency(event)
 
+			start := time.Now()
 			if err := watchEncoder.Encode(event); err != nil {
 				utilruntime.HandleError(err)
 				// client disconnect.
 				return
 			}
 			recorder.RecordEvent()
+			duration += time.Since(start)
+			count++
 
 			if len(ch) == 0 {
 				flusher.Flush()
 			}
 			if isWatchListLatencyRecordingRequired {
+				if span != nil {
+					fmt.Printf("Trace[] Done [%v]\n", duration)
+					span.AddParallelEvent(writer.name, writer.duration, attribute.Int64("size", int64(writer.bytes)))
+					span.AddParallelEvent("Serialize", duration-writer.duration, attribute.Int("count", count-1))
+					span.End(time.Second)
+				}
 				metrics.RecordWatchListLatency(req.Context(), s.Scope.Resource, s.metricsScope)
 			}
 		}
@@ -407,4 +439,33 @@ func shouldRecordWatchListLatency(event watch.Event) bool {
 		return false
 	}
 	return hasAnnotation
+}
+
+func NewTraceWriter(name string, next io.Writer) *TraceWriter {
+	return &TraceWriter{
+		name: name,
+		next: next,
+	}
+}
+
+type TraceWriter struct {
+	name     string
+	duration time.Duration
+	bytes    int64
+	next     io.Writer
+}
+
+func (t *TraceWriter) Write(p []byte) (n int, err error) {
+	start := time.Now()
+	n, err = t.next.Write(p)
+	t.duration += time.Since(start)
+	t.bytes += int64(n)
+	return n, err
+}
+
+func (t *TraceWriter) Close() error {
+	if closer, ok := t.next.(io.WriteCloser); ok {
+		return closer.Close()
+	}
+	return nil
 }
