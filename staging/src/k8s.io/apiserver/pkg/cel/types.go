@@ -407,8 +407,18 @@ func (rt *DeclTypeProvider) WithTypeProvider(tp types.Provider) (*DeclTypeProvid
 
 		expT := declType.CelType()
 		if found && !expT.IsExactType(tpType) {
-			return nil, fmt.Errorf(
-				"type %s definition differs between CEL environment and type provider", name)
+			// Check if tpType is TypeType(expT).
+			// This is needed because DeclTypeProvider.FindStructType wraps types in TypeType.
+			matched := false
+			if params := tpType.Parameters(); len(params) == 1 {
+				if expT.IsExactType(params[0]) {
+					matched = true
+				}
+			}
+			if !matched {
+				return nil, fmt.Errorf(
+					"type %s definition differs between CEL environment and type provider", name)
+			}
 		}
 
 	}
