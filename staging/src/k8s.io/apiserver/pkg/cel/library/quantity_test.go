@@ -17,6 +17,7 @@ limitations under the License.
 package library_test
 
 import (
+	"math"
 	"regexp"
 	"testing"
 
@@ -34,7 +35,7 @@ import (
 	"k8s.io/apiserver/pkg/cel/library"
 )
 
-func testQuantity(t *testing.T, expr string, expectResult ref.Val, expectRuntimeErrPattern string, expectCompileErrs []string) {
+func testQuantity(t *testing.T, expr string, expectResult ref.Val, expectRuntimeErrPattern string, expectCompileErrs []string, cmpFunc func(any, any) bool) {
 	env, err := cel.NewEnv(
 		cel.OptionalTypes(),
 		ext.Strings(),
@@ -113,8 +114,13 @@ func testQuantity(t *testing.T, expr string, expectResult ref.Val, expectRuntime
 	} else if err != nil {
 		t.Fatalf("%v", err)
 	} else if expectResult != nil {
-		converted := res.Equal(expectResult).Value().(bool)
-		require.True(t, converted, "expectation not equal to output: %v", cmp.Diff(expectResult.Value(), res.Value()))
+		if cmpFunc != nil {
+			cmpResult := cmpFunc(expectResult, res)
+			require.True(t, cmpResult, "compare function resulted in mismatch")
+		} else {
+			converted := res.Equal(expectResult).Value().(bool)
+			require.True(t, converted, "expectation not equal to output: %v", cmp.Diff(expectResult.Value(), res.Value()))
+		}
 	} else {
 		t.Fatal("expected result must not be nil")
 	}
@@ -132,6 +138,7 @@ func TestQuantity(t *testing.T) {
 		expectValue        ref.Val
 		expectedCompileErr []string
 		expectedRuntimeErr string
+		cmpFunc            func(any, any) bool
 	}{
 		{
 			name:        "parse",
@@ -271,13 +278,24 @@ func TestQuantity(t *testing.T) {
 			expectValue: trueVal,
 		},
 		{
-			name:        "divide",
-			expr:        `quantity("100").div(2) == quantity("50")`,
-			expectValue: trueVal,
+			name:        "divide_float_result",
+			expr:        `quantity("10000").div(3).asApproximateFloat()`,
+			expectValue: types.Double(3333.3333),
+			cmpFunc: func(expected, actual any) bool {
+				e := expected.(types.Double)
+				a := actual.(types.Double)
+				tolerance := 0.0001
+				return math.Abs(float64(e)-float64(a)) < tolerance
+			},
 		},
 		{
 			name:        "divide_scaled",
-			expr:        `quantity("10k").div(3) == quantity("5000")`,
+			expr:        `quantity("10k").div(2) == quantity("5000")`,
+			expectValue: trueVal,
+		},
+		{
+			name:        "integer_division",
+			expr:        `quantity("10000").divInt(3) == quantity("3333")`,
 			expectValue: trueVal,
 		},
 		{
@@ -319,7 +337,7 @@ func TestQuantity(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			testQuantity(t, c.expr, c.expectValue, c.expectedRuntimeErr, c.expectedCompileErr)
+			testQuantity(t, c.expr, c.expectValue, c.expectedRuntimeErr, c.expectedCompileErr, c.cmpFunc)
 		})
 	}
 }
