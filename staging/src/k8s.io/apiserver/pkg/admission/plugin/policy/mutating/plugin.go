@@ -73,10 +73,10 @@ type MutationEvaluationFunc func(
 ) (runtime.Object, error)
 
 type PolicyEvaluator struct {
-	Matcher        matchconditions.Matcher
-	Mutators       []patch.Patcher
-	CompositionEnv *cel.CompositionEnv
-	Error          error
+	Matcher            matchconditions.Matcher
+	Mutators           []patch.Patcher
+	CompositedCompiler *cel.CompositedCompiler
+	Error              error
 }
 
 // Plugin is an implementation of admission.Interface.

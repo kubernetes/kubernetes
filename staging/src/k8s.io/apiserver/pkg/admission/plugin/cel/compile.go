@@ -160,7 +160,12 @@ func NewCompiler(env *environment.EnvSet) Compiler {
 	return &compiler{varEnvs: mustBuildEnvs(env)}
 }
 
-type variableDeclEnvs map[OptionalVariableDeclarations]*environment.EnvSet
+type builtEnv struct {
+	envSet *environment.EnvSet
+	err    error
+}
+
+type variableDeclEnvs map[OptionalVariableDeclarations]builtEnv
 
 // CompileCELExpression returns a compiled CEL expression.
 // perCallLimit was added for testing purpose only. Callers should always use const PerCallLimit from k8s.io/apiserver/pkg/apis/cel/config.go as input.
@@ -176,7 +181,14 @@ func (c compiler) CompileCELExpression(expressionAccessor ExpressionAccessor, op
 		}
 	}
 
-	env, err := c.varEnvs[options].Env(envType)
+	be, ok := c.varEnvs[options]
+	if !ok {
+		return resultError(fmt.Sprintf("fail to find env for options: %v", options), apiservercel.ErrorTypeInternal, nil)
+	}
+	if be.err != nil {
+		return resultError(fmt.Sprintf("unexpected error loading CEL environment: %v", be.err), apiservercel.ErrorTypeInternal, nil)
+	}
+	env, err := be.envSet.Env(envType)
 	if err != nil {
 		return resultError(fmt.Sprintf("unexpected error loading CEL environment: %v", err), apiservercel.ErrorTypeInternal, nil)
 	}
@@ -228,20 +240,15 @@ func mustBuildEnvs(baseEnv *environment.EnvSet) variableDeclEnvs {
 	envs := make(variableDeclEnvs, 8) // since the number of variable combinations is small, pre-build a environment for each
 	for _, hasParams := range []bool{false, true} {
 		for _, hasAuthorizer := range []bool{false, true} {
-			var err error
 			{
 				decl := OptionalVariableDeclarations{HasParams: hasParams, HasAuthorizer: hasAuthorizer}
-				envs[decl], err = createEnvForOpts(baseEnv, namespaceType, requestType, decl)
-				if err != nil {
-					panic(err)
-				}
+				envSet, err := createEnvForOpts(baseEnv, namespaceType, requestType, decl)
+				envs[decl] = builtEnv{envSet: envSet, err: err}
 			}
 			{
 				decl := OptionalVariableDeclarations{HasParams: hasParams, HasAuthorizer: hasAuthorizer, HasPatchTypes: true}
-				envs[decl], err = createEnvForOpts(baseEnv, namespaceType, requestType, decl)
-				if err != nil {
-					panic(err)
-				}
+				envSet, err := createEnvForOpts(baseEnv, namespaceType, requestType, decl)
+				envs[decl] = builtEnv{envSet: envSet, err: err}
 			}
 		}
 	}

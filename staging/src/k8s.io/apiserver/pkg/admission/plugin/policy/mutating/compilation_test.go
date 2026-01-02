@@ -326,8 +326,8 @@ func TestCompilation(t *testing.T) {
 			}
 
 			policyEvaluator := compilePolicy(tc.policy)
-			if policyEvaluator.CompositionEnv != nil {
-				ctx = policyEvaluator.CompositionEnv.CreateContext(ctx)
+			if policyEvaluator.CompositedCompiler != nil {
+				ctx = policyEvaluator.CompositedCompiler.CreateContext(ctx)
 			}
 			obj := tc.object
 
