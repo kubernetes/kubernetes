@@ -716,7 +716,7 @@ var _ = SIGDescribe("Lifecycle sleep action zero value", func() {
 	f := framework.NewDefaultFramework("pod-lifecycle-sleep-action-allow-zero")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	var podClient *e2epod.PodClient
-
+	const gracePeriod = 50
 	ginkgo.Context("when create a pod with lifecycle hook using sleep action with a duration of zero seconds", func() {
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			podClient = e2epod.NewPodClient(f)
@@ -736,8 +736,8 @@ var _ = SIGDescribe("Lifecycle sleep action zero value", func() {
 			cost := time.Since(start)
 			// cost should be
 			// longer than 0 seconds (pod shouldn't sleep and the handler should return immediately)
-			// shorter than gracePeriodSeconds (default 30 seconds here)
-			if !validDuration(cost, 0, 30) {
+			// shorter than gracePeriodSeconds
+			if !validDuration(cost, 0, gracePeriod) {
 				framework.Failf("unexpected delay duration before killing the pod, cost = %v", cost)
 			}
 		})
