@@ -94,6 +94,10 @@ func NewAllocator(ctx context.Context,
 	}, nil
 }
 
+func (a *Allocator) Channel() internal.AllocatorChannel {
+	return internal.Stable
+}
+
 func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resourceapi.ResourceClaim) (finalResult []resourceapi.AllocationResult, finalErr error) {
 	alloc := &allocator{
 		Allocator:            a,

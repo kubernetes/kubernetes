@@ -899,7 +899,6 @@ func deviceRequestAllocationResultWithBindingConditions(request, driver, pool, d
 // TestAllocator runs as many of the shared tests against a specific allocator implementation as possible.
 // Test cases which depend on features that are not supported by the implementation are silently skipped.
 func TestAllocator(t *testing.T,
-	channel internal.AllocatorChannel,
 	supportedFeatures Features,
 	newAllocator func(
 		ctx context.Context,
@@ -6337,7 +6336,7 @@ func TestAllocator(t *testing.T,
 
 			if expectNumAllocateOneInvocations := tc.expectNumAllocateOneInvocations; expectNumAllocateOneInvocations > 0 {
 				stats := allocator.(internal.AllocatorExtended).GetStats()
-				if override, ok := tc.expectNumAllocateOneInvocationsByChannel[channel]; ok {
+				if override, ok := tc.expectNumAllocateOneInvocationsByChannel[allocator.Channel()]; ok {
 					expectNumAllocateOneInvocations = override
 				}
 				g.Expect(stats.NumAllocateOneInvocations).To(gomega.Equal(expectNumAllocateOneInvocations))
