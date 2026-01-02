@@ -254,10 +254,15 @@ func (im *realImageGCManager) detectImages(ctx context.Context, detectTime time.
 		return imagesInUse, err
 	}
 
+	imageMap := make(map[string]container.Image)
+	for _, img := range images {
+		imageMap[img.ID] = img
+	}
+
 	// Make a set of images in use by containers.
 	for _, pod := range pods {
 		for _, container := range pod.Containers {
-			if err := im.handleImageVolumes(ctx, imagesInUse, container, pod, images); err != nil {
+			if err := im.handleImageVolumes(ctx, imagesInUse, container, pod, imageMap); err != nil {
 				return imagesInUse, err
 			}
 
@@ -273,7 +278,6 @@ func (im *realImageGCManager) detectImages(ctx context.Context, detectTime time.
 	}
 
 	// Add new images and record those being used.
-	now := time.Now()
 	currentImages := sets.New[string]()
 	im.imageRecordsLock.Lock()
 	defer im.imageRecordsLock.Unlock()
@@ -298,9 +302,9 @@ func (im *realImageGCManager) detectImages(ctx context.Context, detectTime time.
 		}
 
 		// Set last used time to now if the image is being used.
-		if isImageUsed(imageKey, imagesInUse) {
-			logger.V(5).Info("Setting Image ID lastUsed", "imageID", imageKey, "lastUsed", now)
-			im.imageRecords[imageKey].lastUsed = now
+		if _, ok := imagesInUse[imageKey]; ok {
+			logger.V(5).Info("Setting Image ID lastUsed", "imageID", imageKey, "lastUsed", detectTime)
+			im.imageRecords[imageKey].lastUsed = detectTime
 		}
 
 		logger.V(5).Info("Image ID has size", "imageID", imageKey, "size", image.Size)
@@ -322,7 +326,7 @@ func (im *realImageGCManager) detectImages(ctx context.Context, detectTime time.
 }
 
 // handleImageVolumes ensures that image volumes are considered as images in use.
-func (im *realImageGCManager) handleImageVolumes(ctx context.Context, imagesInUse sets.Set[string], container *container.Container, pod *container.Pod, images []container.Image) error {
+func (im *realImageGCManager) handleImageVolumes(ctx context.Context, imagesInUse sets.Set[string], container *container.Container, pod *container.Pod, imageMap map[string]container.Image) error {
 	logger := klog.FromContext(ctx)
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ImageVolume) {
 		return nil
@@ -334,11 +338,13 @@ func (im *realImageGCManager) handleImageVolumes(ctx context.Context, imagesInUs
 	}
 
 	for _, mount := range status.Mounts {
-		for _, image := range images {
-			if mount.Image != nil && mount.Image.Image == image.ID {
-				logger.V(5).Info("Container uses image as mount", "pod", klog.KRef(pod.Namespace, pod.Name), "containerName", container.Name, "imageID", image.ID)
-				imagesInUse.Insert(image.ID)
-			}
+		if mount.Image == nil {
+			continue
+		}
+		imageID := mount.Image.Image
+		if _, ok := imageMap[imageID]; ok {
+			logger.V(5).Info("Container uses image as mount", "pod", klog.KRef(pod.Namespace, pod.Name), "containerName", container.Name, "imageID", imageID)
+			imagesInUse.Insert(mount.Image.Image)
 		}
 	}
 
@@ -559,7 +565,7 @@ func (im *realImageGCManager) imagesInEvictionOrder(ctx context.Context, freeTim
 	// Get all images in eviction order.
 	images := make([]evictionInfo, 0, len(im.imageRecords))
 	for image, record := range im.imageRecords {
-		if isImageUsed(image, imagesInUse) {
+		if _, ok := imagesInUse[image]; ok {
 			logger.V(5).Info("Image ID is being used", "imageID", image)
 			continue
 		}
@@ -649,12 +655,4 @@ func (ev byLastUsedAndDetected) Less(i, j int) bool {
 		return ev[i].firstDetected.Before(ev[j].firstDetected)
 	}
 	return ev[i].lastUsed.Before(ev[j].lastUsed)
-}
-
-func isImageUsed(imageID string, imagesInUse sets.Set[string]) bool {
-	// Check the image ID.
-	if _, ok := imagesInUse[imageID]; ok {
-		return true
-	}
-	return false
 }
