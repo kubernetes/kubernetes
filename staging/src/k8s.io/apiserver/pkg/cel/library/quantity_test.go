@@ -289,6 +289,17 @@ func TestQuantity(t *testing.T) {
 			},
 		},
 		{
+			name:        "divide_float_custom_precision",
+			expr:        `quantity("10000").div(3, 2).asApproximateFloat()`,
+			expectValue: types.Double(3333.33),
+			cmpFunc: func(expected, actual any) bool {
+				e := expected.(types.Double)
+				a := actual.(types.Double)
+				tolerance := 0.01
+				return math.Abs(float64(e)-float64(a)) < tolerance
+			},
+		},
+		{
 			name:        "divide_scaled",
 			expr:        `quantity("10k").div(2) == quantity("5000")`,
 			expectValue: trueVal,
