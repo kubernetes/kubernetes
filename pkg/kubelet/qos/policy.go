@@ -56,6 +56,11 @@ func GetContainerOOMScoreAdjust(pod *v1.Pod, container *v1.Container, memoryCapa
 		return besteffortOOMScoreAdj
 	}
 
+	if memoryCapacity <= 0 {
+		// Avoid divide-by-zero when memory capacity is unavailable.
+		return besteffortOOMScoreAdj - 1
+	}
+
 	// Burstable containers are a middle tier, between Guaranteed and Best-Effort. Ideally,
 	// we want to protect Burstable containers that consume less memory than requested.
 	// The formula below is a heuristic. A container requesting for 10% of a system's
