@@ -43,6 +43,8 @@ func (m *CronJobSpec) Reset() { *m = CronJobSpec{} }
 
 func (m *CronJobStatus) Reset() { *m = CronJobStatus{} }
 
+func (m *GangPolicy) Reset() { *m = GangPolicy{} }
+
 func (m *Job) Reset() { *m = Job{} }
 
 func (m *JobCondition) Reset() { *m = JobCondition{} }
@@ -309,6 +311,34 @@ func (m *CronJobStatus) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
+func (m *GangPolicy) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *GangPolicy) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *GangPolicy) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	i -= len(m.Policy)
+	copy(dAtA[i:], m.Policy)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Policy)))
+	i--
+	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
 func (m *Job) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -492,6 +522,20 @@ func (m *JobSpec) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.GangPolicy != nil {
+		{
+			size, err := m.GangPolicy.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x1
+		i--
+		dAtA[i] = 0x8a
+	}
 	if m.SuccessPolicy != nil {
 		{
 			size, err := m.SuccessPolicy.MarshalToSizedBuffer(dAtA[:i])
@@ -1142,6 +1186,17 @@ func (m *CronJobStatus) Size() (n int) {
 	return n
 }
 
+func (m *GangPolicy) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Policy)
+	n += 1 + l + sovGenerated(uint64(l))
+	return n
+}
+
 func (m *Job) Size() (n int) {
 	if m == nil {
 		return 0
@@ -1252,6 +1307,10 @@ func (m *JobSpec) Size() (n int) {
 	}
 	if m.SuccessPolicy != nil {
 		l = m.SuccessPolicy.Size()
+		n += 2 + l + sovGenerated(uint64(l))
+	}
+	if m.GangPolicy != nil {
+		l = m.GangPolicy.Size()
 		n += 2 + l + sovGenerated(uint64(l))
 	}
 	return n
@@ -1501,6 +1560,16 @@ func (this *CronJobStatus) String() string {
 	}, "")
 	return s
 }
+func (this *GangPolicy) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&GangPolicy{`,
+		`Policy:` + fmt.Sprintf("%v", this.Policy) + `,`,
+		`}`,
+	}, "")
+	return s
+}
 func (this *Job) String() string {
 	if this == nil {
 		return "nil"
@@ -1565,6 +1634,7 @@ func (this *JobSpec) String() string {
 		`PodReplacementPolicy:` + valueToStringGenerated(this.PodReplacementPolicy) + `,`,
 		`ManagedBy:` + valueToStringGenerated(this.ManagedBy) + `,`,
 		`SuccessPolicy:` + strings.Replace(this.SuccessPolicy.String(), "SuccessPolicy", "SuccessPolicy", 1) + `,`,
+		`GangPolicy:` + strings.Replace(this.GangPolicy.String(), "GangPolicy", "GangPolicy", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -2366,6 +2436,88 @@ func (m *CronJobStatus) Unmarshal(dAtA []byte) error {
 			if err := m.LastSuccessfulTime.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *GangPolicy) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: GangPolicy: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: GangPolicy: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Policy", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Policy = GangSchedulingPolicy(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
@@ -3346,6 +3498,42 @@ func (m *JobSpec) Unmarshal(dAtA []byte) error {
 				m.SuccessPolicy = &SuccessPolicy{}
 			}
 			if err := m.SuccessPolicy.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 17:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field GangPolicy", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.GangPolicy == nil {
+				m.GangPolicy = &GangPolicy{}
+			}
+			if err := m.GangPolicy.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
