@@ -116,8 +116,7 @@ func compilePolicy(policy *Policy) Validator {
 	failurePolicy := policy.Spec.FailurePolicy
 	var matcher matchconditions.Matcher = nil
 	matchConditions := policy.Spec.MatchConditions
-	var compositionEnvTemplate *environment.EnvSet
-	compositionEnvTemplate = getCompositionEnvTemplateWithStrictCost()
+	compositionEnvTemplate := getCompositionEnvTemplateWithStrictCost()
 	filterCompiler, err := cel.NewCompositedCompiler(compositionEnvTemplate)
 	if err != nil {
 		return NewValidator(nil, nil, nil, nil, failurePolicy, err)
