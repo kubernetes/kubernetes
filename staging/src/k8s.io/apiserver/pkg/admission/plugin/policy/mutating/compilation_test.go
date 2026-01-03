@@ -18,10 +18,11 @@ package mutating
 
 import (
 	"context"
-	"github.com/google/go-cmp/cmp"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/google/go-cmp/cmp"
 
 	"k8s.io/api/admissionregistration/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -326,8 +327,8 @@ func TestCompilation(t *testing.T) {
 			}
 
 			policyEvaluator := compilePolicy(tc.policy)
-			if policyEvaluator.CompositionEnv != nil {
-				ctx = policyEvaluator.CompositionEnv.CreateContext(ctx)
+			if policyEvaluator.CompositedCompiler != nil {
+				ctx = policyEvaluator.CompositedCompiler.CreateContext(ctx)
 			}
 			obj := tc.object
 
