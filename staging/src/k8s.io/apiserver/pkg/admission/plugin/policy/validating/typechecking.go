@@ -187,10 +187,8 @@ func (c *TypeChecker) compiler(ctx *TypeCheckingContext, typeOverwrite typeOverw
 	if err != nil {
 		return nil, err
 	}
-	compiler := &plugincel.CompositedCompiler{
-		Compiler:       &typeCheckingCompiler{typeOverwrite: typeOverwrite, compositionEnv: env},
-		CompositionEnv: env,
-	}
+	compiler := plugincel.NewCompositedCompilerFromEnv(env)
+	compiler.Compiler = &typeCheckingCompiler{typeOverwrite: typeOverwrite, compositionEnv: env}
 	return compiler, nil
 }
 

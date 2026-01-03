@@ -247,58 +247,46 @@ func TestCompositedPolicies(t *testing.T) {
 		})
 	}
 }
-func TestCompositionEnvTemplate(t *testing.T) {
-	baseEnv, err := NewCompositionEnv("variables", environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))
-	if err != nil {
-		t.Fatal(err)
-	}
 
-	compiler1 := NewCompositedCompilerFromTemplate(baseEnv)
-	compiler2 := NewCompositedCompilerFromTemplate(baseEnv)
-
-	compiler1.CompositionEnv.AddField("v1", cel.StringType)
-
-	if _, ok := compiler1.CompositionEnv.MapType.Fields["v1"]; !ok {
-		t.Error("compiler1 should have v1")
-	}
-	if _, ok := compiler2.CompositionEnv.MapType.Fields["v1"]; ok {
-		t.Error("compiler2 should not have v1")
-	}
-}
-
-// TestMapTypePollution checks that variables compiled in one compiler do not leak into another
-// compiler that was created from the same template.
-func TestMapTypePollution(t *testing.T) {
-	// 1. Create a base template (mimicking the singleton in plugin.go)
-	// this templateEnv is created once in validating/plugin.go
+// TestCompilerIsolation verifies that each call to NewCompositedCompiler
+// creates an isolated environment where variables from one compiler
+// do not leak into another.
+func TestCompilerIsolation(t *testing.T) {
 	baseEnv := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion())
-	templateEnv, err := NewCompositionEnv(VariablesTypeName, baseEnv)
+
+	// Create first compiler with variable "foo"
+	compiler1, err := NewCompositedCompiler(baseEnv)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// 2. Compile first policy with variable "foo"
-	compiler1 := NewCompositedCompilerFromTemplate(templateEnv)
 	vars1 := []NamedExpressionAccessor{
 		&testVariable{name: "foo", expression: "'bar'"},
 	}
 	compiler1.CompileAndStoreVariables(vars1, OptionalVariableDeclarations{}, environment.StoredExpressions)
 
-	// 3. Compile second policy with variable "bar" using SAME template
-	compiler2 := NewCompositedCompilerFromTemplate(templateEnv)
+	// Create second compiler with variable "baz"
+	compiler2, err := NewCompositedCompiler(baseEnv)
+	if err != nil {
+		t.Fatal(err)
+	}
 	vars2 := []NamedExpressionAccessor{
-		&testVariable{name: "bar", expression: "'baz'"},
+		&testVariable{name: "baz", expression: "'qux'"},
 	}
 	compiler2.CompileAndStoreVariables(vars2, OptionalVariableDeclarations{}, environment.StoredExpressions)
 
-	// 4. Check if "foo" leaked into compiler2's CompositionEnv
-	// If MapType is shared, compiler2.CompositionEnv.MapType.Fields will contain "foo"
-	if _, ok := compiler2.CompositionEnv.MapType.Fields["foo"]; ok {
-		t.Errorf("Pollution detected: variable 'foo' from policy 1 leaked into policy 2")
+	// Verify isolation: compiler1 should not have "baz", compiler2 should not have "foo"
+	if _, ok := compiler1.state.mapType.Fields["baz"]; ok {
+		t.Error("compiler1 should not have variable 'baz' from compiler2")
+	}
+	if _, ok := compiler2.state.mapType.Fields["foo"]; ok {
+		t.Error("compiler2 should not have variable 'foo' from compiler1")
 	}
 
-	// Also check if "bar" leaked into compiler1 (if they share the exact same map object)
-	if _, ok := compiler1.CompositionEnv.MapType.Fields["bar"]; ok {
-		t.Errorf("Pollution detected: variable 'bar' from policy 2 leaked into policy 1")
+	// Verify each compiler has its own variable
+	if _, ok := compiler1.state.mapType.Fields["foo"]; !ok {
+		t.Error("compiler1 should have variable 'foo'")
+	}
+	if _, ok := compiler2.state.mapType.Fields["baz"]; !ok {
+		t.Error("compiler2 should have variable 'baz'")
 	}
 }

@@ -18,8 +18,9 @@ package mutating
 
 import (
 	"context"
-	celgo "github.com/google/cel-go/cel"
 	"io"
+
+	celgo "github.com/google/cel-go/cel"
 
 	"k8s.io/api/admissionregistration/v1beta1"
 	corev1 "k8s.io/api/core/v1"
@@ -73,10 +74,10 @@ type MutationEvaluationFunc func(
 ) (runtime.Object, error)
 
 type PolicyEvaluator struct {
-	Matcher        matchconditions.Matcher
-	Mutators       []patch.Patcher
-	CompositionEnv *cel.CompositionEnv
-	Error          error
+	Matcher            matchconditions.Matcher
+	Mutators           []patch.Patcher
+	CompositedCompiler *cel.CompositedCompiler
+	Error              error
 }
 
 // Plugin is an implementation of admission.Interface.
