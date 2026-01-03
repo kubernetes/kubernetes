@@ -485,6 +485,28 @@ func handleAttachPod(f cmdutil.Factory, podClient corev1client.PodsGetter, ns, n
 		opts.AttachFunc = attach.DefaultAttachFunc
 	}
 
+	// Fetch and display any logs that were printed before attach connects.
+	ctrName, err := opts.GetContainerName(pod)
+	if err == nil {
+		logRequests, logErr := polymorphichelpers.LogsForObjectFn(f, pod, &corev1.PodLogOptions{
+			Container: ctrName,
+			Follow:    false,
+		}, opts.GetPodTimeout, false)
+
+		if logErr == nil {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			for _, request := range logRequests {
+				if err := logs.DefaultConsumeRequest(ctx, request, opts.Out); err != nil {
+					if opts.ErrOut != nil {
+						fmt.Fprintf(opts.ErrOut, "warning: couldn't fetch pre-attach logs: %v\n", err)
+					}
+					break
+				}
+			}
+			cancel()
+		}
+	}
+
 	if err := opts.Run(); err != nil {
 		fmt.Fprintf(opts.ErrOut, "warning: couldn't attach to pod/%s, falling back to streaming logs: %v\n", name, err)
 		return logOpts(f, pod, opts)
