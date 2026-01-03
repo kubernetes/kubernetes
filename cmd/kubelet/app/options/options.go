@@ -423,6 +423,7 @@ func AddKubeletConfigFlags(mainfs *pflag.FlagSet, c *kubeletconfigapi.KubeletCon
 	fs.Int32Var(&c.RegistryBurst, "registry-burst", c.RegistryBurst, "Maximum size of a bursty pulls, temporarily allows pulls to burst to this number, while still not exceeding registry-qps. Only used if --registry-qps > 0")
 	fs.Int32Var(&c.EventRecordQPS, "event-qps", c.EventRecordQPS, "QPS to limit event creations. The number must be >= 0. If 0 will use DefaultQPS: 5.")
 	fs.Int32Var(&c.EventBurst, "event-burst", c.EventBurst, "Maximum size of a bursty event records, temporarily allows event records to burst to this number, while still not exceeding event-qps. The number must be >= 0. If 0 will use DefaultBurst: 10.")
+	fs.StringVar(&c.EventNamespace, "event-namespace", c.EventNamespace, "Override the namespace for events if they do not already have one. Uses the default namespace if unset.")
 
 	fs.BoolVar(&c.EnableDebuggingHandlers, "enable-debugging-handlers", c.EnableDebuggingHandlers, "Enables server endpoints for log collection and local running of containers and commands")
 	fs.BoolVar(&c.EnableContentionProfiling, "contention-profiling", c.EnableContentionProfiling, "Enable block profiling, if profiling is enabled")

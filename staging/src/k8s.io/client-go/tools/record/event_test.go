@@ -147,7 +147,7 @@ func TestNonRacyShutdown(t *testing.T) {
 
 	var wg sync.WaitGroup
 	wg.Add(100)
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		go func() {
 			defer wg.Done()
 			recorder.Eventf(&v1.ObjectReference{}, v1.EventTypeNormal, "Started", "blah")
@@ -435,7 +435,7 @@ func TestEventf(t *testing.T) {
 	for index, item := range table {
 		clock.Step(1 * time.Second)
 		//nolint:logcheck // Intentionally testing StartLogging here.
-		logWatcher := eventBroadcaster.StartLogging(func(formatter string, args ...interface{}) {
+		logWatcher := eventBroadcaster.StartLogging(func(formatter string, args ...any) {
 			if e, a := item.expectLog, fmt.Sprintf(formatter, args...); e != a {
 				t.Errorf("Expected '%v', got '%v'", e, a)
 			}
@@ -467,8 +467,14 @@ func TestEventf(t *testing.T) {
 	sinkWatcher.Stop()
 }
 
-func recorderWithFakeClock(t *testing.T, eventSource v1.EventSource, eventBroadcaster EventBroadcaster, clock clock.Clock) EventRecorder {
-	return &recorderImpl{scheme.Scheme, eventSource, eventBroadcaster.(*eventBroadcasterImpl).Broadcaster, clock}
+func recorderWithFakeClock(_ *testing.T, eventSource v1.EventSource, eventBroadcaster EventBroadcaster, clock clock.Clock) EventRecorder {
+	return &recorderImpl{
+		scheme:           scheme.Scheme,
+		source:           eventSource,
+		Broadcaster:      eventBroadcaster.(*eventBroadcasterImpl).Broadcaster,
+		clock:            clock,
+		defaultNamespace: eventBroadcaster.(*eventBroadcasterImpl).defaultNamespace,
+	}
 }
 
 func TestWriteEventError(t *testing.T) {
@@ -555,8 +561,7 @@ func TestUpdateExpiredEvent(t *testing.T) {
 	ev := &v1.Event{}
 	ev.ResourceVersion = "updated-resource-version"
 	ev.Count = 2
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	e := eventBroadcasterImpl{
 		cancelationCtx: ctx,
 	}
@@ -624,11 +629,11 @@ func TestLotsOfEvents(t *testing.T) {
 	eventBroadcaster := newBroadcasterForTests(t)
 	sinkWatcher := eventBroadcaster.StartRecordingToSink(&testEvents)
 	//nolint:logcheck // Intentionally using StartLogging here to get notified.
-	logWatcher := eventBroadcaster.StartLogging(func(formatter string, args ...interface{}) {
+	logWatcher := eventBroadcaster.StartLogging(func(formatter string, args ...any) {
 		loggerCalled <- struct{}{}
 	})
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "eventTest"})
-	for i := 0; i < maxQueuedEvents; i++ {
+	for i := range maxQueuedEvents {
 		// we want a unique object to stop spam filtering
 		ref := &v1.ObjectReference{
 			Kind:       "Pod",
@@ -641,12 +646,12 @@ func TestLotsOfEvents(t *testing.T) {
 		go recorder.Eventf(ref, v1.EventTypeNormal, "Reason-"+strconv.Itoa(i), strconv.Itoa(i))
 	}
 	// Make sure no events were dropped by either of the listeners.
-	for i := 0; i < maxQueuedEvents; i++ {
+	for range maxQueuedEvents {
 		<-recorderCalled
 		<-loggerCalled
 	}
 	// Make sure that every event was attempted 5 times
-	for i := 0; i < maxQueuedEvents; i++ {
+	for i := range maxQueuedEvents {
 		if counts[i] < 5 {
 			t.Errorf("Only attempted to record event '%d' %d times.", i, counts[i])
 		}
@@ -671,7 +676,7 @@ func TestEventfNoNamespace(t *testing.T) {
 		eventtype    string
 		reason       string
 		messageFmt   string
-		elements     []interface{}
+		elements     []any
 		expect       *v1.Event
 		expectLog    string
 		expectUpdate bool
@@ -681,7 +686,7 @@ func TestEventfNoNamespace(t *testing.T) {
 			eventtype:  v1.EventTypeNormal,
 			reason:     "Started",
 			messageFmt: "some verbose message: %v",
-			elements:   []interface{}{1},
+			elements:   []any{1},
 			expect: &v1.Event{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
@@ -751,6 +756,86 @@ func TestEventfNoNamespace(t *testing.T) {
 	sinkWatcher.Stop()
 }
 
+func TestEventfWithDefaultNamespace(t *testing.T) {
+	// Node has no namespace
+	testNodeNoNS := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foo",
+			UID:  "bar",
+		},
+	}
+	testRefNoNS, err := ref.GetPartialReference(scheme.Scheme, testNodeNoNS, "spec.addresses")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Pod with namespace
+	testPodWithNS := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foo",
+			Namespace: "other-ns",
+			UID:       "baz",
+		},
+	}
+	testRefWithNS, err := ref.GetPartialReference(scheme.Scheme, testPodWithNS, "spec.containers[2]")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	table := []struct {
+		obj             k8sruntime.Object
+		expectedEventNS string
+		expectLog       string
+	}{
+		{
+			obj:             testRefNoNS,
+			expectedEventNS: "my-default-ns",
+			expectLog:       `Event(v1.ObjectReference{Kind:"Node", Namespace:"", Name:"foo", UID:"bar", APIVersion:"v1", ResourceVersion:"", FieldPath:"spec.addresses"}): type: 'Normal' reason: 'Started' some verbose message: 1`,
+		},
+		{
+			obj:             testRefWithNS,
+			expectedEventNS: "other-ns",
+			expectLog:       `Event(v1.ObjectReference{Kind:"Pod", Namespace:"other-ns", Name:"foo", UID:"baz", APIVersion:"v1", ResourceVersion:"", FieldPath:"spec.containers[2]"}): type: 'Normal' reason: 'Started' some verbose message: 1`,
+		},
+	}
+
+	testCache := map[string]*v1.Event{}
+	logCalled := make(chan struct{})
+	createEvent := make(chan *v1.Event)
+	testEvents := testEventSink{
+		OnCreate: OnCreateFactory(testCache, createEvent),
+	}
+
+	// Create broadcaster with default namespace
+	eventBroadcaster := NewBroadcaster(WithDefaultNamespace("my-default-ns"))
+	defer eventBroadcaster.Shutdown()
+	sinkWatcher := eventBroadcaster.StartRecordingToSink(&testEvents)
+	defer sinkWatcher.Stop()
+
+	clock := testclocks.NewFakeClock(time.Now())
+	recorder := recorderWithFakeClock(t, v1.EventSource{Component: "eventTest"}, eventBroadcaster, clock)
+
+	for index, item := range table {
+		clock.Step(1 * time.Second)
+		logWatcher := eventBroadcaster.StartLogging(func(formatter string, args ...any) {
+			if e, a := item.expectLog, fmt.Sprintf(formatter, args...); e != a {
+				t.Errorf("Expected '%v', got '%v'", e, a)
+			}
+			logCalled <- struct{}{}
+		})
+		recorder.Eventf(item.obj, v1.EventTypeNormal, "Started", "some verbose message: %v", 1)
+
+		<-logCalled
+
+		actualEvent := <-createEvent
+		if actualEvent.Namespace != item.expectedEventNS {
+			t.Errorf("case %d: expected namespace %q, got %q", index, item.expectedEventNS, actualEvent.Namespace)
+		}
+
+		logWatcher.Stop()
+	}
+}
+
 func TestMultiSinkCache(t *testing.T) {
 	testPod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -779,7 +864,7 @@ func TestMultiSinkCache(t *testing.T) {
 		eventtype    string
 		reason       string
 		messageFmt   string
-		elements     []interface{}
+		elements     []any
 		expect       *v1.Event
 		expectLog    string
 		expectUpdate bool
@@ -789,7 +874,7 @@ func TestMultiSinkCache(t *testing.T) {
 			eventtype:  v1.EventTypeNormal,
 			reason:     "Started",
 			messageFmt: "some verbose message: %v",
-			elements:   []interface{}{1},
+			elements:   []any{1},
 			expect: &v1.Event{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
@@ -818,7 +903,7 @@ func TestMultiSinkCache(t *testing.T) {
 			eventtype:  v1.EventTypeNormal,
 			reason:     "Killed",
 			messageFmt: "some other verbose message: %v",
-			elements:   []interface{}{1},
+			elements:   []any{1},
 			expect: &v1.Event{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
@@ -846,7 +931,7 @@ func TestMultiSinkCache(t *testing.T) {
 			eventtype:  v1.EventTypeNormal,
 			reason:     "Started",
 			messageFmt: "some verbose message: %v",
-			elements:   []interface{}{1},
+			elements:   []any{1},
 			expect: &v1.Event{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
@@ -875,7 +960,7 @@ func TestMultiSinkCache(t *testing.T) {
 			eventtype:  v1.EventTypeNormal,
 			reason:     "Started",
 			messageFmt: "some verbose message: %v",
-			elements:   []interface{}{1},
+			elements:   []any{1},
 			expect: &v1.Event{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
@@ -904,7 +989,7 @@ func TestMultiSinkCache(t *testing.T) {
 			eventtype:  v1.EventTypeNormal,
 			reason:     "Started",
 			messageFmt: "some verbose message: %v",
-			elements:   []interface{}{1},
+			elements:   []any{1},
 			expect: &v1.Event{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
