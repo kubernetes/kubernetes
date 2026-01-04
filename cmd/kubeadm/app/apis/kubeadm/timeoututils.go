@@ -40,12 +40,6 @@ func SetDefaultTimeouts(t **Timeouts) {
 var (
 	activeTimeouts *Timeouts = nil
 	timeoutMutex             = &sync.RWMutex{}
-
-	// conversionTimeoutControlPlane is a variable used when converting the v1beta3 field
-	// ClusterConfiguration.APIServer.TimeoutForControlPlane to
-	// v1beta4 {Init|Join}Configuration.Timeouts.ControlPlaneComponentHealthCheck.
-	// TODO: remove this once v1beta3 is removed.
-	conversionTimeoutControlPlane *metav1.Duration
 )
 
 func init() {
@@ -63,21 +57,5 @@ func GetActiveTimeouts() *Timeouts {
 func SetActiveTimeouts(timeouts *Timeouts) {
 	timeoutMutex.Lock()
 	activeTimeouts = timeouts.DeepCopy()
-	timeoutMutex.Unlock()
-}
-
-// TODO: remove these once v1beta3 is removed
-
-// GetConversionTimeoutControlPlane returns conversionTimeoutControlPlane.
-func GetConversionTimeoutControlPlane() *metav1.Duration {
-	timeoutMutex.RLock()
-	defer timeoutMutex.RUnlock()
-	return conversionTimeoutControlPlane
-}
-
-// SetConversionTimeoutControlPlane stores t into conversionTimeoutControlPlane.
-func SetConversionTimeoutControlPlane(t *metav1.Duration) {
-	timeoutMutex.Lock()
-	conversionTimeoutControlPlane = t.DeepCopy()
 	timeoutMutex.Unlock()
 }

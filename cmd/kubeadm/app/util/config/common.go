@@ -74,21 +74,21 @@ func validateSupportedVersion(gvk schema.GroupVersionKind, allowDeprecated, allo
 	// v1.22: v1beta2 read-only, writes only v1beta3 config. Errors if the user tries to use v1beta1 and older
 	// v1.27: only v1beta3 config. Errors if the user tries to use v1beta2 and older
 	// v1.31: v1beta3 read-only, writes only v1beta4 config, errors if the user tries to use older APIs.
+	// v1.36: only v1beta4 config. Errors if the user tries to use v1beta3 and older
 	oldKnownAPIVersions := map[string]string{
 		"kubeadm.k8s.io/v1alpha1": "v1.11",
 		"kubeadm.k8s.io/v1alpha2": "v1.12",
 		"kubeadm.k8s.io/v1alpha3": "v1.14",
 		"kubeadm.k8s.io/v1beta1":  "v1.15",
 		"kubeadm.k8s.io/v1beta2":  "v1.22",
+		"kubeadm.k8s.io/v1beta3":  "v1.35",
 	}
 
 	// Experimental API versions are present here until released. Can be used only if allowed.
 	experimentalAPIVersions := map[string]string{}
 
 	// Deprecated API versions are supported until removed. They throw a warning.
-	deprecatedAPIVersions := map[string]struct{}{
-		"kubeadm.k8s.io/v1beta3": {},
-	}
+	deprecatedAPIVersions := map[string]struct{}{}
 
 	gvString := gvk.GroupVersion().String()
 
@@ -444,41 +444,9 @@ func (mutators *migrateMutators) addEmpty(in []any) {
 }
 
 // defaultMutators returns the default list of mutators for known configuration objects.
-// TODO: make this function return defaultEmptyMutators() when v1beta3 is removed.
+// In case certain fileds need to be mutated during migration, it must be defined here.
 func defaultMigrateMutators() migrateMutators {
-	var (
-		mutators migrateMutators
-		mutator  migrateMutator
-	)
-
-	// mutator for InitConfiguration, ClusterConfiguration.
-	mutator = migrateMutator{
-		in: []any{(*kubeadmapi.InitConfiguration)(nil)},
-		mutateFunc: func(in []any) error {
-			a := in[0].(*kubeadmapi.InitConfiguration)
-			a.Timeouts.ControlPlaneComponentHealthCheck.Duration = a.APIServer.TimeoutForControlPlane.Duration
-			a.APIServer.TimeoutForControlPlane = nil
-			return nil
-		},
-	}
-	mutators = append(mutators, mutator)
-
-	// mutator for JoinConfiguration.
-	mutator = migrateMutator{
-		in: []any{(*kubeadmapi.JoinConfiguration)(nil)},
-		mutateFunc: func(in []any) error {
-			a := in[0].(*kubeadmapi.JoinConfiguration)
-			a.Timeouts.Discovery.Duration = a.Discovery.Timeout.Duration
-			a.Discovery.Timeout = nil
-			return nil
-		},
-	}
-	mutators = append(mutators, mutator)
-
-	// empty mutator for ResetConfiguration.
-	mutators.addEmpty([]any{(*kubeadmapi.ResetConfiguration)(nil)})
-
-	return mutators
+	return defaultEmptyMigrateMutators()
 }
 
 // defaultEmptyMigrateMutators returns a list of empty mutators for known types.
@@ -488,6 +456,7 @@ func defaultEmptyMigrateMutators() migrateMutators {
 	mutators.addEmpty([]any{(*kubeadmapi.InitConfiguration)(nil)})
 	mutators.addEmpty([]any{(*kubeadmapi.JoinConfiguration)(nil)})
 	mutators.addEmpty([]any{(*kubeadmapi.ResetConfiguration)(nil)})
+	mutators.addEmpty([]any{(*kubeadmapi.UpgradeConfiguration)(nil)})
 
 	return *mutators
 }

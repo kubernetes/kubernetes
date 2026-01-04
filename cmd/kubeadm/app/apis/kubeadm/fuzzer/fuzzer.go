@@ -89,7 +89,6 @@ func fuzzClusterConfiguration(obj *kubeadm.ClusterConfiguration, c randfill.Cont
 	obj.CIImageRepository = "" // This fields doesn't exists in public API >> using default to get the roundtrip test pass
 	obj.KubernetesVersion = "qux"
 	obj.CIKubernetesVersion = "" // This fields doesn't exists in public API >> using default to get the roundtrip test pass
-	obj.APIServer.TimeoutForControlPlane = &metav1.Duration{}
 	obj.ControllerManager.ExtraEnvs = nil
 	obj.APIServer.ExtraEnvs = nil
 	obj.Scheduler.ExtraEnvs = nil
@@ -117,12 +116,10 @@ func fuzzLocalEtcd(obj *kubeadm.LocalEtcd, c randfill.Continue) {
 	obj.DataDir = "foo"
 }
 
-// TODO: Remove this once v1beta3 API was removed.
 func fuzzExternalEtcd(obj *kubeadm.ExternalEtcd, c randfill.Continue) {
 	c.FillNoCustom(obj)
 
-	// Ensure HTTPEndpoints equals Endpoints to maintain roundtrip compatibility
-	// with v1beta3 which doesn't have HTTPEndpoints field
+	// Required because the HTTPEndpoints is defaulted to Endpoints.
 	obj.HTTPEndpoints = obj.Endpoints
 }
 
@@ -142,7 +139,6 @@ func fuzzJoinConfiguration(obj *kubeadm.JoinConfiguration, c randfill.Continue) 
 	obj.Discovery = kubeadm.Discovery{
 		BootstrapToken:    &kubeadm.BootstrapTokenDiscovery{Token: "baz"},
 		TLSBootstrapToken: "qux",
-		Timeout:           &metav1.Duration{Duration: constants.DiscoveryTimeout},
 	}
 	obj.SkipPhases = nil
 	obj.NodeRegistration.ImagePullPolicy = corev1.PullIfNotPresent
