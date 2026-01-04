@@ -479,7 +479,6 @@ func (cache *cacheImpl) AddPod(logger klog.Logger, pod *v1.Pod) error {
 			return nil
 		}
 	case !ok:
-		// Pod was expired. We should add it back.
 		if err = cache.addPod(logger, pod, false); err != nil {
 			utilruntime.HandleErrorWithLogger(logger, err, "Error occurred while adding pod")
 		}
