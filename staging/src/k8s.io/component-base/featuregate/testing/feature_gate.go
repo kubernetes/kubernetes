@@ -18,6 +18,7 @@ package testing
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 
@@ -109,17 +110,27 @@ func SetFeatureGatesDuringTest(tb TB, gate featuregate.FeatureGate, features Fea
 		}
 	}
 
+	// Extract and sort keys to ensure deterministic execution
+	// This prevents random map iteration from causing flaky test results.
+	sortedKeys := make([]featuregate.Feature, 0, len(overrides))
 	for f := range overrides {
+		sortedKeys = append(sortedKeys, f)
+	}
+	sort.Slice(sortedKeys, func(i, j int) bool {
+		return string(sortedKeys[i]) < string(sortedKeys[j])
+	})
+
+	for _, f := range sortedKeys {
 		originalValues[string(f)] = gate.Enabled(f)
 		if !gate.(featuregate.MutableVersionedFeatureGate).ExplicitlySet(f) {
 			originalUnset = append(originalUnset, f)
 		}
-		tb.Cleanup(detectParallelOverride(tb, featuregate.Feature(f)))
+		tb.Cleanup(detectParallelOverride(tb, f))
 	}
 
 	m := map[string]bool{}
-	for f, v := range overrides {
-		m[string(f)] = v
+	for _, f := range sortedKeys {
+		m[string(f)] = overrides[f]
 	}
 	if err := gate.(featuregate.MutableFeatureGate).SetFromMap(m); err != nil {
 		tb.Errorf("Failed to set feature gates: %v", err)
