@@ -54,7 +54,7 @@ import (
 )
 
 const (
-	// podResourceClaimIndex is the lookup name for the index function which indexes by pod ResourceClaim templates.
+	// podResourceClaimIndex is the lookup name for the index function which indexes by pod ResourceClaim.
 	podResourceClaimIndex = "pod-resource-claim-index"
 
 	// podResourceClaimTemplateIndexKey is the lookup name for the index function which indexes only by pod ResourceClaim templates.
