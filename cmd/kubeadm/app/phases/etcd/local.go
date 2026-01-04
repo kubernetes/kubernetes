@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	apiclient "k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
@@ -172,6 +173,20 @@ func CreateStackedEtcdStaticPodManifestFile(client clientset.Interface, manifest
 		return nil
 	}
 
+	// Wait for the etcd pod to start before attempting to promote the learner
+	// If the pod never starts, we should remove the added learner member from cluster
+	fmt.Printf("[etcd] Waiting for the etcd pod to start on node %q\n", nodeName)
+	waiter := apiclient.NewKubeWaiter(client, kubeadmapi.GetActiveTimeouts().ControlPlaneComponentHealthCheck.Duration, os.Stdout)
+	if err := waiter.WaitForStaticPodRunning(nodeName, kubeadmconstants.Etcd); err != nil {
+		klog.V(1).Infof("[etcd] The etcd pod did not start successfully, removing learner member %s", etcdPeerAddress)
+		if removeErr := removeLearnerMember(etcdClient, etcdPeerAddress); removeErr != nil {
+			klog.Warningf("[etcd] Failed to remove learner member after pod startup failure: %v", removeErr)
+		} else {
+			klog.V(1).Infof("[etcd] Successfully removed learner member %s", etcdPeerAddress)
+		}
+		return errors.Wrap(err, "The etcd pod did not start successfully")
+	}
+
 	learnerID, err := etcdClient.GetMemberID(etcdPeerAddress)
 	if err != nil {
 		return err
@@ -186,6 +201,26 @@ func CreateStackedEtcdStaticPodManifestFile(client clientset.Interface, manifest
 		return err
 	}
 
+	return nil
+}
+
+// removeLearnerMember removes a learner member from the etcd cluster.
+func removeLearnerMember(etcdClient *etcdutil.Client, etcdPeerAddress string) error {
+	learnerID, err := etcdClient.GetMemberID(etcdPeerAddress)
+	if err != nil {
+		if errors.Is(etcdutil.ErrNoMemberIDForPeerURL, err) {
+			klog.V(5).Infof("[etcd] Member was already removed, because no member id exists for peer %s", etcdPeerAddress)
+			return nil
+		}
+		return err
+	}
+
+	klog.V(1).Infof("[etcd] Removing learner member: %s, id: %d", etcdPeerAddress, learnerID)
+	_, err = etcdClient.RemoveMember(learnerID)
+	if err != nil {
+		return err
+	}
+	klog.V(1).Infof("[etcd] Successfully removed learner member %s", etcdPeerAddress)
 	return nil
 }
 

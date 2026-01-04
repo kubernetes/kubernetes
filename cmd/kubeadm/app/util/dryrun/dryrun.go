@@ -136,6 +136,11 @@ func (w *Waiter) WaitForStaticPodHashChange(_, _, _ string) error {
 	return nil
 }
 
+// WaitForStaticPodRunning returns a dummy nil error in order for the flow to just continue as we're dryrunning
+func (w *Waiter) WaitForStaticPodRunning(_, _ string) error {
+	return nil
+}
+
 // PrintFilesIfDryRunning prints the static pod manifests to stdout and informs about the temporary directory to go and lookup when dry running
 func PrintFilesIfDryRunning(needPrintManifest bool, manifestDir string, outputWriter io.Writer) error {
 	var files []FileToPrint

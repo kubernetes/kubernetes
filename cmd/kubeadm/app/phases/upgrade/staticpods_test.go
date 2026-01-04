@@ -127,6 +127,11 @@ func (w *fakeWaiter) WaitForStaticPodHashChange(_, _, _ string) error {
 	return w.errsToReturn[waitForHashChange]
 }
 
+// WaitForStaticPodRunning returns a dummy nil just to implement the interface
+func (w *fakeWaiter) WaitForStaticPodRunning(_, _ string) error {
+	return nil
+}
+
 // WaitForHKubelet returns a dummy nil just to implement the interface
 func (w *fakeWaiter) WaitForKubelet(_ string, _ int32) error {
 	return nil

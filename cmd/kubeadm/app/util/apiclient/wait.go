@@ -90,6 +90,8 @@ type Waiter interface {
 	WaitForStaticPodHashChange(nodeName, component, previousHash string) error
 	// WaitForStaticPodControlPlaneHashes fetches sha256 hashes for the control plane static pods
 	WaitForStaticPodControlPlaneHashes(nodeName string) (map[string]string, error)
+	// WaitForStaticPodRunning waits for a static pod to be in Running phase
+	WaitForStaticPodRunning(nodeName string, component string) error
 	// WaitForKubelet blocks until the kubelet /healthz endpoint returns 'ok'
 	WaitForKubelet(healthzAddress string, healthzPort int32) error
 	// SetTimeout adjusts the timeout to the specified duration
@@ -493,6 +495,43 @@ func (w *KubeWaiter) WaitForStaticPodHashChange(nodeName, component, previousHas
 		return lastErr
 	}
 	return errors.Wrapf(err, "static Pod hash for component %s on Node %s did not change after %v", component, nodeName, w.timeout)
+}
+
+// WaitForStaticPodRunning waits for a static pod to be in Running phase.
+func (w *KubeWaiter) WaitForStaticPodRunning(nodeName string, component string) error {
+	staticPodName := fmt.Sprintf("%s-%s", component, nodeName)
+	klog.V(1).Infof("Waiting for static pod %q to be running", staticPodName)
+
+	var lastError error
+	err := wait.PollUntilContextTimeout(
+		context.Background(),
+		constants.KubernetesAPICallRetryInterval,
+		w.timeout,
+		true, func(_ context.Context) (bool, error) {
+			pod, err := w.client.CoreV1().Pods(metav1.NamespaceSystem).Get(context.Background(), staticPodName, metav1.GetOptions{})
+			if err != nil {
+				lastError = err
+				klog.V(5).Infof("Failed to get static pod %q: %v", staticPodName, err)
+				return false, nil
+			}
+
+			// Check if the pod is in Running phase
+			if pod.Status.Phase == v1.PodRunning {
+				klog.V(1).Infof("Static pod %q is running", staticPodName)
+				return true, nil
+			}
+			klog.V(5).Infof("Static pod %q is in phase %q, waiting for Running", staticPodName, pod.Status.Phase)
+			return false, nil
+		})
+
+	if err != nil {
+		if lastError != nil {
+			return errors.Wrapf(lastError, "failed to wait for static pod %q to be running", staticPodName)
+		}
+		return errors.Wrapf(err, "timeout waiting for static pod %q to be running", staticPodName)
+	}
+
+	return nil
 }
 
 // getStaticPodSingleHash computes hashes for a single Static Pod resource
