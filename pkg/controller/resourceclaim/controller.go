@@ -191,15 +191,14 @@ func NewController(
 	if _, err := templateInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			logger.V(6).Info("new claim template", "claimTemplateDump", obj)
-			ec.enqueueResourceClaimTemplate(logger, obj, false)
+			ec.enqueueResourceClaimTemplate(logger, obj)
 		},
 		UpdateFunc: func(old, updated interface{}) {
 			logger.V(6).Info("updated claim template", "claimTemplateDump", updated)
-			ec.enqueueResourceClaimTemplate(logger, updated, false)
+			ec.enqueueResourceClaimTemplate(logger, updated)
 		},
 		DeleteFunc: func(obj interface{}) {
 			logger.V(6).Info("deleted claim template", "claimTemplateDump", obj)
-			ec.enqueueResourceClaimTemplate(logger, obj, true)
 		},
 	}, cache.HandlerOptions{Logger: &logger}); err != nil {
 		return nil, err
@@ -208,7 +207,7 @@ func NewController(
 		return nil, fmt.Errorf("could not initialize ResourceClaim controller: %w", err)
 	}
 
-	if err := ec.podIndexer.AddIndexers(cache.Indexers{podResourceClaimTemplateIndexKey: podResourceClaimTemplateNoNSIndexFunc}); err != nil {
+	if err := ec.podIndexer.AddIndexers(cache.Indexers{podResourceClaimTemplateIndexKey: podResourceClaimTemplateIndexFunc}); err != nil {
 		return nil, fmt.Errorf("could not initialize ResourceClaim controller: %w", err)
 	}
 
@@ -237,7 +236,7 @@ func NewController(
 	return ec, nil
 }
 
-func (ec *Controller) enqueueResourceClaimTemplate(logger klog.Logger, obj interface{}, deleted bool) {
+func (ec *Controller) enqueueResourceClaimTemplate(logger klog.Logger, obj interface{}) {
 	if d, ok := obj.(cache.DeletedFinalStateUnknown); ok {
 		obj = d.Obj
 	}
@@ -247,26 +246,28 @@ func (ec *Controller) enqueueResourceClaimTemplate(logger klog.Logger, obj inter
 		logger.Error(nil, "enqueueResourceClaimTemplate called for unexpected object", "type", fmt.Sprintf("%T", obj))
 		return
 	}
-	if deleted {
-		// if template is deleted, we don't need to do anything
-		logger.V(6).Info("template got deleted", "template-name", template.Name)
-		return
-	}
 
-	logger.V(6).Info("template add or updated", "template-name", template.Name)
+	logger.V(6).Info("template add or updated", "template-namespace", template.Namespace, "template-name", template.Name)
 
 	//enqueue all pods with this template name
-	objects, err := ec.podIndexer.ByIndex(podResourceClaimTemplateIndexKey, template.Name)
+	objects, err := ec.podIndexer.ByIndex(podResourceClaimTemplateIndexKey, fmt.Sprintf("%s/%s", template.Namespace, template.Name))
 	if err != nil {
-		logger.Error(err, "unable to list pods for claim template", "template-name", template.Name)
+		logger.Error(err, "unable to list pods for claim template", "template-namespace", template.Namespace, "template-name", template.Name)
 		return
 	}
 	if len(objects) == 0 {
-		logger.V(6).Info("unrelated to any known pod", "template-name", template.Name)
+		logger.V(6).Info("unrelated to any known pod", "template-namespace", template.Namespace, "template-name", template.Name)
 		return
 	}
 
 	for _, object := range objects {
+		pod, ok1 := object.(*v1.Pod)
+		if !ok1 {
+			// Not a pod?!
+			logger.Error(nil, "enqueueResourceClaimTemplate called for unexpected object", "type", fmt.Sprintf("%T", obj))
+			return
+		}
+		logger.V(4).Info("some pods are being enqueued due to this template add/update", "template-namespace", template.Namespace, "template-name", template.Name, "pod-namespace", pod.Namespace, "pod-name", pod.Name)
 		ec.enqueuePod(logger, object, false)
 	}
 
@@ -1014,7 +1015,7 @@ func owningPod(claim *resourceapi.ResourceClaim) (string, types.UID) {
 	return "", ""
 }
 
-func podResourceClaimTemplateNoNSIndexFunc(obj interface{}) ([]string, error) {
+func podResourceClaimTemplateIndexFunc(obj interface{}) ([]string, error) {
 	pod, ok := obj.(*v1.Pod)
 	if !ok {
 		return []string{}, nil
@@ -1024,7 +1025,8 @@ func podResourceClaimTemplateNoNSIndexFunc(obj interface{}) ([]string, error) {
 
 	for _, podClaim := range pod.Spec.ResourceClaims {
 		if podClaim.ResourceClaimTemplateName != nil {
-			keySet.Insert(*podClaim.ResourceClaimTemplateName)
+			resourceTemplate := *podClaim.ResourceClaimTemplateName
+			keySet.Insert(fmt.Sprintf("%s/%s", pod.Namespace, resourceTemplate))
 		}
 	}
 

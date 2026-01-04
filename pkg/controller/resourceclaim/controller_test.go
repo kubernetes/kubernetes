@@ -70,6 +70,7 @@ var (
 	testClaimReserved      = reserveClaim(testClaimAllocated, testPodWithResource)
 	testClaimReservedTwice = reserveClaim(testClaimReserved, otherTestPod)
 	testClaimKey           = claimKeyPrefix + testClaim.Namespace + "/" + testClaim.Name
+	testPodKey             = podKeyPrefix + testNamespace + "/" + testPodName
 
 	templatedTestClaim          = makeTemplatedClaim(podResourceClaimName, testPodName+"-"+podResourceClaimName+"-", testNamespace, className, 1, makeOwnerReference(testPodWithResource, true), nil)
 	templatedTestClaimAllocated = allocateClaim(templatedTestClaim)
@@ -496,6 +497,143 @@ func TestSyncHandler(t *testing.T) {
 			expectMetrics(t, tc.expectedMetrics)
 		})
 	}
+}
+
+func TestResourceClaimTemplateEventHandler(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	tCtx = ktesting.WithCancel(tCtx)
+
+	fakeKubeClient := createTestClient()
+	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
+	podInformer := informerFactory.Core().V1().Pods()
+	claimInformer := informerFactory.Resource().V1().ResourceClaims()
+	templateInformer := informerFactory.Resource().V1().ResourceClaimTemplates()
+	claimTemplateClient := fakeKubeClient.ResourceV1().ResourceClaimTemplates(testNamespace)
+	claimTemplateTmpClient := fakeKubeClient.ResourceV1().ResourceClaimTemplates("tmp")
+	podClient := fakeKubeClient.CoreV1().Pods(testNamespace)
+	podTmpClient := fakeKubeClient.CoreV1().Pods("tmp")
+
+	ec, err := NewController(tCtx.Logger(), Features{}, fakeKubeClient, podInformer, claimInformer, templateInformer)
+	tCtx.ExpectNoError(err, "creating ephemeral controller")
+
+	informerFactory.Start(tCtx.Done())
+	stopInformers := func() {
+		tCtx.Cancel("stopping informers")
+		informerFactory.Shutdown()
+	}
+	defer stopInformers()
+
+	expectQueue := func(tCtx ktesting.TContext, expectedKeys []string, expectedIndexerKeys []string) {
+		g := gomega.NewWithT(tCtx)
+		tCtx.Helper()
+
+		lenDiffMessage := func() string {
+			actualKeys := []string{}
+			for ec.queue.Len() > 0 {
+				actual, _ := ec.queue.Get()
+				actualKeys = append(actualKeys, actual)
+				ec.queue.Forget(actual)
+				ec.queue.Done(actual)
+			}
+			return "Workqueue does not contain expected number of elements\n" +
+				"Diff of elements (- expected, + actual):\n" +
+				diff.Diff(expectedKeys, actualKeys)
+		}
+
+		// check queue len
+		g.Eventually(ec.queue.Len).
+			WithTimeout(5*time.Second).
+			Should(gomega.Equal(len(expectedKeys)), lenDiffMessage)
+		g.Consistently(ec.queue.Len).
+			WithTimeout(1*time.Second).
+			Should(gomega.Equal(len(expectedKeys)), lenDiffMessage)
+
+		// check indexer len
+		g.Eventually(len(ec.podIndexer.ListIndexFuncValues(podResourceClaimTemplateIndexKey))).
+			WithTimeout(5 * time.Second).
+			Should(gomega.Equal(len(expectedIndexerKeys)))
+
+		g.Consistently(len(ec.podIndexer.ListIndexFuncValues(podResourceClaimTemplateIndexKey))).
+			WithTimeout(1 * time.Second).
+			Should(gomega.Equal(len(expectedIndexerKeys)))
+
+		// check queue values equals to expectedKeys
+		for _, expected := range expectedKeys {
+			actual, shuttingDown := ec.queue.Get()
+			g.Expect(shuttingDown).To(gomega.BeFalseBecause("workqueue is unexpectedly shutting down"))
+			g.Expect(actual).To(gomega.Equal(expected))
+			ec.queue.Forget(actual)
+			ec.queue.Done(actual)
+		}
+
+		// check indexer values equals to expectedIndexerKeys
+		for _, src := range expectedIndexerKeys {
+			objects, err := ec.podIndexer.ByIndex(podResourceClaimTemplateIndexKey, src)
+			g.Expect(err).NotTo(gomega.HaveOccurred(), "should not error when getting objects by index for key %s", src)
+			g.Expect(objects).NotTo(gomega.BeEmpty(), "should have at least one object indexed for key %s", src)
+
+			// Verify that the indexed objects are the expected pods
+			found := false
+			for _, obj := range objects {
+				pod, ok := obj.(*v1.Pod)
+				if !ok {
+					continue
+				}
+				// Check if this pod matches the expected template reference
+				for _, claim := range pod.Spec.ResourceClaims {
+					if claim.ResourceClaimTemplateName != nil {
+						// Build the expected index key for this pod
+						expectedKey := pod.Namespace + "/" + *claim.ResourceClaimTemplateName
+						if expectedKey == src {
+							found = true
+							break
+						}
+					}
+				}
+			}
+			g.Expect(found).To(gomega.BeTrue(), "should find a pod with template %s in index for key %s", templateName, src)
+		}
+	}
+
+	var TmpNamespace string = "tmp"
+
+	expectQueue(tCtx, []string{}, []string{})
+
+	// Create two pods:
+	// - testPodWithResource in the my-namespace namespace
+	// - fake-1 in the tmp namespace
+	_, err = podClient.Create(tCtx, testPodWithResource, metav1.CreateOptions{})
+	_, err = podTmpClient.Create(tCtx, makePod("fake-1", TmpNamespace, "uidpod2", *makePodResourceClaim(podResourceClaimName, templateName)), metav1.CreateOptions{})
+	ktesting.Step(tCtx, "create pod", func(tCtx ktesting.TContext) {
+		tCtx.ExpectNoError(err)
+		expectQueue(tCtx, []string{testPodKey, podKeyPrefix + TmpNamespace + "/" + "fake-1"}, []string{testNamespace + "/" + templateName, TmpNamespace + "/" + templateName})
+	})
+
+	//The item  has been forgotten and marked as done in the workqueue,so queue is nil
+	ktesting.Step(tCtx, "expect queue is nil", func(tCtx ktesting.TContext) {
+		expectQueue(tCtx, []string{}, []string{testNamespace + "/" + templateName, TmpNamespace + "/" + templateName})
+	})
+
+	// after create claim template,queue should have test pod key
+	_, err = claimTemplateClient.Create(tCtx, template, metav1.CreateOptions{})
+	ktesting.Step(tCtx, "create claim template after pod backoff", func(tCtx ktesting.TContext) {
+		tCtx.ExpectNoError(err)
+		expectQueue(tCtx, []string{testPodKey}, []string{testNamespace + "/" + templateName, TmpNamespace + "/" + templateName})
+	})
+
+	//The item  has been forgotten and marked as done in the workqueue,so queue is nil
+	ktesting.Step(tCtx, "expect queue is nil", func(tCtx ktesting.TContext) {
+		expectQueue(tCtx, []string{}, []string{testNamespace + "/" + templateName, TmpNamespace + "/" + templateName})
+	})
+
+	// after create other namespace claim template,queue should have
+	TmpNamespaceTemplate := makeTemplate(templateName, "tmp", className, nil)
+	_, err = claimTemplateTmpClient.Create(tCtx, TmpNamespaceTemplate, metav1.CreateOptions{})
+	ktesting.Step(tCtx, "create  claim template in tmp namespace after  pod backoff in test namespace", func(tCtx ktesting.TContext) {
+		tCtx.ExpectNoError(err)
+		expectQueue(tCtx, []string{podKeyPrefix + TmpNamespace + "/" + "fake-1"}, []string{testNamespace + "/" + templateName, TmpNamespace + "/" + templateName})
+	})
+
 }
 
 func TestResourceClaimEventHandler(t *testing.T) {
