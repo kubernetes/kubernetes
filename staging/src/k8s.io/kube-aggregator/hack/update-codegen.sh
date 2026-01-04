@@ -47,6 +47,7 @@ kube::codegen::gen_openapi \
 
 kube::codegen::gen_client \
     --with-watch \
+    --with-applyconfig \
     --output-dir "${SCRIPT_ROOT}/pkg/client" \
     --output-pkg "${THIS_PKG}/pkg/client" \
     --clientset-name "clientset_generated" \
