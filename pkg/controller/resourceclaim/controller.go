@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	corev1apply "k8s.io/client-go/applyconfigurations/core/v1"
 	v1informers "k8s.io/client-go/informers/core/v1"
@@ -53,8 +54,11 @@ import (
 )
 
 const (
-	// podResourceClaimIndex is the lookup name for the index function which indexes by pod ResourceClaim templates.
+	// podResourceClaimIndex is the lookup name for the index function which indexes by pod ResourceClaim.
 	podResourceClaimIndex = "pod-resource-claim-index"
+
+	// podResourceClaimTemplateIndexKey is the lookup name for the index function which indexes only by pod ResourceClaim templates.
+	podResourceClaimTemplateIndexKey = "pod-resource-claim-template-index"
 
 	// podResourceClaimAnnotation is the special annotation that generated
 	// ResourceClaims get. Its value is the pod.spec.resourceClaims[].name
@@ -184,7 +188,26 @@ func NewController(
 	}, cache.HandlerOptions{Logger: &logger}); err != nil {
 		return nil, err
 	}
+	if _, err := templateInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			logger.V(6).Info("new claim template", "claimTemplateDump", obj)
+			ec.enqueueResourceClaimTemplate(logger, obj)
+		},
+		UpdateFunc: func(old, updated interface{}) {
+			logger.V(6).Info("updated claim template", "claimTemplateDump", updated)
+			ec.enqueueResourceClaimTemplate(logger, updated)
+		},
+		DeleteFunc: func(obj interface{}) {
+			logger.V(6).Info("deleted claim template", "claimTemplateDump", obj)
+		},
+	}, cache.HandlerOptions{Logger: &logger}); err != nil {
+		return nil, err
+	}
 	if err := ec.podIndexer.AddIndexers(cache.Indexers{podResourceClaimIndex: podResourceClaimIndexFunc}); err != nil {
+		return nil, fmt.Errorf("could not initialize ResourceClaim controller: %w", err)
+	}
+
+	if err := ec.podIndexer.AddIndexers(cache.Indexers{podResourceClaimTemplateIndexKey: podResourceClaimTemplateIndexFunc}); err != nil {
 		return nil, fmt.Errorf("could not initialize ResourceClaim controller: %w", err)
 	}
 
@@ -211,6 +234,43 @@ func NewController(
 	)
 
 	return ec, nil
+}
+
+func (ec *Controller) enqueueResourceClaimTemplate(logger klog.Logger, obj interface{}) {
+	if d, ok := obj.(cache.DeletedFinalStateUnknown); ok {
+		obj = d.Obj
+	}
+	template, ok := obj.(*resourceapi.ResourceClaimTemplate)
+	if !ok {
+		// Not a template,return
+		logger.Error(nil, "enqueueResourceClaimTemplate called for unexpected object", "type", fmt.Sprintf("%T", obj))
+		return
+	}
+
+	logger.V(6).Info("template add or updated", "template-namespace", template.Namespace, "template-name", template.Name)
+
+	//enqueue all pods with this template name
+	objects, err := ec.podIndexer.ByIndex(podResourceClaimTemplateIndexKey, fmt.Sprintf("%s/%s", template.Namespace, template.Name))
+	if err != nil {
+		logger.Error(err, "unable to list pods for claim template", "template-namespace", template.Namespace, "template-name", template.Name)
+		return
+	}
+	if len(objects) == 0 {
+		logger.V(6).Info("unrelated to any known pod", "template-namespace", template.Namespace, "template-name", template.Name)
+		return
+	}
+
+	for _, object := range objects {
+		pod, ok1 := object.(*v1.Pod)
+		if !ok1 {
+			// Not a pod?!
+			logger.Error(nil, "enqueueResourceClaimTemplate called for unexpected object", "type", fmt.Sprintf("%T", obj))
+			return
+		}
+		logger.V(4).Info("some pods are being enqueued due to this template add/update", "template-namespace", template.Namespace, "template-name", template.Name, "pod-namespace", pod.Namespace, "pod-name", pod.Name)
+		ec.enqueuePod(logger, object, false)
+	}
+
 }
 
 func (ec *Controller) enqueuePod(logger klog.Logger, obj interface{}, deleted bool) {
@@ -953,6 +1013,24 @@ func owningPod(claim *resourceapi.ResourceClaim) (string, types.UID) {
 		}
 	}
 	return "", ""
+}
+
+func podResourceClaimTemplateIndexFunc(obj interface{}) ([]string, error) {
+	pod, ok := obj.(*v1.Pod)
+	if !ok {
+		return []string{}, nil
+	}
+
+	keySet := sets.NewString()
+
+	for _, podClaim := range pod.Spec.ResourceClaims {
+		if podClaim.ResourceClaimTemplateName != nil {
+			resourceTemplate := *podClaim.ResourceClaimTemplateName
+			keySet.Insert(fmt.Sprintf("%s/%s", pod.Namespace, resourceTemplate))
+		}
+	}
+
+	return keySet.List(), nil
 }
 
 // podResourceClaimIndexFunc is an index function that returns ResourceClaim keys (=
