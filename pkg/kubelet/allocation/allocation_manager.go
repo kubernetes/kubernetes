@@ -573,7 +573,7 @@ func (m *manager) RemovePod(uid types.UID) {
 	logger := klog.TODO()
 	if err := m.allocated.RemovePod(uid); err != nil {
 		// If the deletion fails, it will be retried by RemoveOrphanedPods, so we can safely ignore the error.
-		logger.V(3).Error(err, "Failed to delete pod allocation", "podUID", uid)
+		logger.V(3).Info("Failed to delete pod allocation", "podUID", uid, "err", err)
 	}
 }
 
