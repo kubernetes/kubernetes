@@ -367,39 +367,44 @@ func (m *ManagerImpl) Allocate(pod *v1.Pod, container *v1.Container) error {
 	// Use context.TODO() because we currently do not have a proper context to pass in.
 	// Replace this with an appropriate context when refactoring this function to accept a context parameter.
 	ctx := context.TODO()
-	if _, ok := m.devicesToReuse[string(pod.UID)]; !ok {
-		m.devicesToReuse[string(pod.UID)] = make(map[string]sets.Set[string])
+	podUID := string(pod.UID)
+	if _, ok := m.devicesToReuse[podUID]; !ok {
+		m.devicesToReuse[podUID] = make(map[string]sets.Set[string])
 	}
 	// If pod entries to m.devicesToReuse other than the current pod exist, delete them.
-	for podUID := range m.devicesToReuse {
-		if podUID != string(pod.UID) {
-			delete(m.devicesToReuse, podUID)
+	for podUIDKey := range m.devicesToReuse {
+		if podUIDKey != podUID {
+			delete(m.devicesToReuse, podUIDKey)
 		}
 	}
+	// Save a local reference to devicesToReuse for this pod to avoid race conditions.
+	// Another goroutine might delete m.devicesToReuse[podUID] while we're in the RPC call,
+	// so we use this local reference throughout the function.
+	devicesToReuse := m.devicesToReuse[podUID]
 	// Allocate resources for init containers first as we know the caller always loops
 	// through init containers before looping through app containers. Should the caller
 	// ever change those semantics, this logic will need to be amended.
 	for _, initContainer := range pod.Spec.InitContainers {
 		if container.Name == initContainer.Name {
 
-			if err := m.allocateContainerResources(ctx, pod, container, m.devicesToReuse[string(pod.UID)]); err != nil {
+			if err := m.allocateContainerResources(ctx, pod, container, devicesToReuse); err != nil {
 				return err
 			}
 			if !podutil.IsRestartableInitContainer(&initContainer) {
-				m.podDevices.addContainerAllocatedResources(string(pod.UID), container.Name, m.devicesToReuse[string(pod.UID)])
+				m.podDevices.addContainerAllocatedResources(podUID, container.Name, devicesToReuse)
 			} else {
 				// If the init container is restartable, we need to keep the
 				// devices allocated. In other words, we should remove them
 				// from the devicesToReuse.
-				m.podDevices.removeContainerAllocatedResources(string(pod.UID), container.Name, m.devicesToReuse[string(pod.UID)])
+				m.podDevices.removeContainerAllocatedResources(podUID, container.Name, devicesToReuse)
 			}
 			return nil
 		}
 	}
-	if err := m.allocateContainerResources(ctx, pod, container, m.devicesToReuse[string(pod.UID)]); err != nil {
+	if err := m.allocateContainerResources(ctx, pod, container, devicesToReuse); err != nil {
 		return err
 	}
-	m.podDevices.removeContainerAllocatedResources(string(pod.UID), container.Name, m.devicesToReuse[string(pod.UID)])
+	m.podDevices.removeContainerAllocatedResources(podUID, container.Name, devicesToReuse)
 	return nil
 }
 
