@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
-	"k8s.io/kube-scheduler/framework"
 	fwk "k8s.io/kube-scheduler/framework"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/scheduler/util"
@@ -45,7 +44,7 @@ type PodStatusPatchCall struct {
 	podRef klog.ObjectRef
 	// podStatus contains the actual status of the pod.
 	podStatus *v1.PodStatus
-	// newCondition is a condition to update.
+	// newConditions is a list of conditions to update.
 	newConditions []*v1.PodCondition
 	// nominatingInfo is a nominating info to update.
 	nominatingInfo *fwk.NominatingInfo
@@ -70,10 +69,14 @@ func (psuc *PodStatusPatchCall) UID() types.UID {
 }
 
 // syncStatus syncs the given status with condition and nominatingInfo. It returns true if anything was actually updated.
-func syncStatus(status *v1.PodStatus, condition *v1.PodCondition, nominatingInfo *fwk.NominatingInfo) bool {
+func syncStatus(status *v1.PodStatus, condition []*v1.PodCondition, nominatingInfo *fwk.NominatingInfo) bool {
 	nnnNeedsUpdate := nominatingInfo.Mode() == fwk.ModeOverride && status.NominatedNodeName != nominatingInfo.NominatedNodeName
-	if condition != nil {
-		if !podutil.UpdatePodCondition(status, condition) && !nnnNeedsUpdate {
+	if len(condition) > 0 {
+		updated := false
+		for _, cond := range condition {
+			updated = updated || podutil.UpdatePodCondition(status, cond)
+		}
+		if !updated && !nnnNeedsUpdate {
 			return false
 		}
 	} else if !nnnNeedsUpdate {
@@ -89,7 +92,7 @@ func (psuc *PodStatusPatchCall) Execute(ctx context.Context, client clientset.In
 	psuc.lock.Lock()
 	// Executed flag is set not to race with podStatus write in Sync afterwards.
 	psuc.executed = true
-	conditions := []*v1.PodCondition{}
+	conditions := make([]*v1.PodCondition, 0, len(psuc.newConditions))
 	for _, condition := range psuc.newConditions {
 		conditions = append(conditions, condition.DeepCopy())
 	}
@@ -97,19 +100,11 @@ func (psuc *PodStatusPatchCall) Execute(ctx context.Context, client clientset.In
 	psuc.lock.Unlock()
 
 	logger := klog.FromContext(ctx)
-	if len(conditions) > 0 {
-		for _, condition := range conditions {
-			logger.V(3).Info("Updating pod condition", "pod", psuc.podRef, "conditionType", condition.Type, "conditionStatus", condition.Status, "conditionReason", condition.Reason)
-		}
+	for _, condition := range conditions {
+		logger.V(3).Info("Updating pod condition", "pod", psuc.podRef, "conditionType", condition.Type, "conditionStatus", condition.Status, "conditionReason", condition.Reason)
 	}
 
-	anySynced := false
-	for _, condition := range conditions {
-		synced := syncStatus(podStatusCopy, condition, psuc.nominatingInfo)
-		if synced {
-			anySynced = true
-		}
-	}
+	anySynced := syncStatus(podStatusCopy, conditions, psuc.nominatingInfo)
 	// Sync status to have the condition and nominatingInfo applied on a podStatusCopy.
 	if !anySynced {
 		logger.V(5).Info("Pod status patch call does not need to be executed because it has no effect", "pod", psuc.podRef)
@@ -145,14 +140,7 @@ func (psuc *PodStatusPatchCall) Sync(obj metav1.Object) (metav1.Object, error) {
 	psuc.lock.Unlock()
 
 	podCopy := pod.DeepCopy()
-	anySynced := false
-	// Sync passed pod's status with the call's condition and nominatingInfo.	anySynced := false
-	for _, condition := range newConditions {
-		synced := syncStatus(&podCopy.Status, condition, psuc.nominatingInfo)
-		if synced {
-			anySynced = true
-		}
-	}
+	anySynced := syncStatus(&podCopy.Status, newConditions, psuc.nominatingInfo)
 	// Sync status to have the condition and nominatingInfo applied on a podStatusCopy.
 	if !anySynced {
 		return pod, nil
@@ -165,7 +153,7 @@ func (psuc *PodStatusPatchCall) Merge(oldCall fwk.APICall) error {
 	if !ok {
 		return fmt.Errorf("unexpected error: call of type %T is not of type *PodStatusPatchCall", oldCall)
 	}
-	if psuc.nominatingInfo.Mode() == framework.ModeNoop && oldPsuc.nominatingInfo.Mode() == framework.ModeOverride {
+	if psuc.nominatingInfo.Mode() == fwk.ModeNoop && oldPsuc.nominatingInfo.Mode() == fwk.ModeOverride {
 		// Set a nominatingInfo from an old call if the new one is no-op.
 		psuc.nominatingInfo = oldPsuc.nominatingInfo
 	}
@@ -202,12 +190,9 @@ func conditionNeedsUpdate(status *v1.PodStatus, condition *v1.PodCondition) bool
 }
 
 func (psuc *PodStatusPatchCall) IsNoOp() bool {
-	nnnNeedsUpdate := psuc.nominatingInfo.Mode() == framework.ModeOverride && psuc.podStatus.NominatedNodeName != psuc.nominatingInfo.NominatedNodeName
+	nnnNeedsUpdate := psuc.nominatingInfo.Mode() == fwk.ModeOverride && psuc.podStatus.NominatedNodeName != psuc.nominatingInfo.NominatedNodeName
 	if nnnNeedsUpdate {
 		return false
-	}
-	if psuc.newConditions == nil {
-		return true
 	}
 	for _, condition := range psuc.newConditions {
 		if conditionNeedsUpdate(psuc.podStatus, condition) {
