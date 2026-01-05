@@ -648,13 +648,7 @@ func TestCSILimits(t *testing.T) {
 			vas := getFakeVolumeAttachmentLister(test.vaCount, test.driverNames...)
 			fakecli := fake.NewClientset(vas...)
 			informerfactory := informers.NewSharedInformerFactory(fakecli, 0)
-			if err := informerfactory.Storage().V1().VolumeAttachments().Informer().AddIndexers(cache.Indexers{vaIndexKey: func(obj interface{}) ([]string, error) {
-				va, ok := obj.(*storagev1.VolumeAttachment)
-				if !ok {
-					return []string{}, nil
-				}
-				return []string{va.Spec.NodeName}, nil
-			}}); err != nil {
+			if err := informerfactory.Storage().V1().VolumeAttachments().Informer().AddIndexers(cache.Indexers{vaIndexKey: volumeAttachmentIndexer}); err != nil {
 				t.Error(err)
 			}
 			_, ctx := ktesting.NewTestContext(t)
@@ -1345,13 +1339,7 @@ func TestVolumeLimitScalingGate(t *testing.T) {
 			vas := getFakeVolumeAttachmentLister(0, ebsCSIDriverName)
 			fakecli := fake.NewClientset(vas...)
 			informerfactory := informers.NewSharedInformerFactory(fakecli, 0)
-			if err := informerfactory.Storage().V1().VolumeAttachments().Informer().AddIndexers(cache.Indexers{vaIndexKey: func(obj interface{}) ([]string, error) {
-				va, ok := obj.(*storagev1.VolumeAttachment)
-				if !ok {
-					return []string{}, nil
-				}
-				return []string{va.Spec.NodeName}, nil
-			}}); err != nil {
+			if err := informerfactory.Storage().V1().VolumeAttachments().Informer().AddIndexers(cache.Indexers{vaIndexKey: volumeAttachmentIndexer}); err != nil {
 				t.Error(err)
 			}
 			_, ctx := ktesting.NewTestContext(t)

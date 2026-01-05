@@ -584,6 +584,14 @@ func (pl *CSILimits) getCSIDriverInfoFromSC(logger klog.Logger, csiNode *storage
 	return provisioner, volumeHandle
 }
 
+func volumeAttachmentIndexer(obj interface{}) ([]string, error) {
+	va, ok := obj.(*storagev1.VolumeAttachment)
+	if !ok {
+		return []string{}, nil
+	}
+	return []string{va.Spec.NodeName}, nil
+}
+
 // NewCSI initializes a new plugin and returns it.
 func NewCSI(_ context.Context, _ runtime.Object, handle fwk.Handle, fts feature.Features) (fwk.Plugin, error) {
 	informerFactory := handle.SharedInformerFactory()
@@ -593,13 +601,7 @@ func NewCSI(_ context.Context, _ runtime.Object, handle fwk.Handle, fts feature.
 	vaLister := informerFactory.Storage().V1().VolumeAttachments().Lister()
 	csiDriverLister := informerFactory.Storage().V1().CSIDrivers().Lister()
 	vaIndexer := informerFactory.Storage().V1().VolumeAttachments().Informer().GetIndexer()
-	if err := informerFactory.Storage().V1().VolumeAttachments().Informer().AddIndexers(cache.Indexers{vaIndexKey: func(obj interface{}) ([]string, error) {
-		va, ok := obj.(*storagev1.VolumeAttachment)
-		if !ok {
-			return []string{}, nil
-		}
-		return []string{va.Spec.NodeName}, nil
-	}}); err != nil {
+	if err := informerFactory.Storage().V1().VolumeAttachments().Informer().AddIndexers(cache.Indexers{vaIndexKey: volumeAttachmentIndexer}); err != nil {
 		vaInformer := informerFactory.Storage().V1().VolumeAttachments().Informer()
 		if vaInformer.GetIndexer().GetIndexers()[vaIndexKey] == nil {
 			return nil, fmt.Errorf("failed to add index to VA informer: %w", err)
