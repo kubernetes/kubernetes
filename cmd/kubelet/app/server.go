@@ -544,6 +544,7 @@ func setConfigz(cz *configz.Config, kc *kubeletconfiginternal.KubeletConfigurati
 	if err := scheme.Convert(kc, &versioned, nil); err != nil {
 		return err
 	}
+	versioned.GetObjectKind().SetGroupVersionKind(kubeletconfigv1beta1.SchemeGroupVersion.WithKind("KubeletConfiguration"))
 	cz.Set(versioned)
 	return nil
 }

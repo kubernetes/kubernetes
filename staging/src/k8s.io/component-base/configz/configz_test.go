@@ -78,3 +78,43 @@ func TestConfigz(t *testing.T) {
 		t.Fatalf("unexpected Content-Type: %s", resp.Header.Get("Content-Type"))
 	}
 }
+
+func TestConfigzWithAPIVersionAndKind(t *testing.T) {
+	type TestConfig struct {
+		APIVersion string `json:"apiVersion,omitempty"`
+		Kind       string `json:"kind,omitempty"`
+		Value      string `json:"value"`
+	}
+
+	cfg := TestConfig{
+		APIVersion: "test.k8s.io/v1",
+		Kind:       "TestConfig",
+		Value:      "test-value",
+	}
+
+	v, err := New("testobj")
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+
+	v.Set(cfg)
+
+	s := httptest.NewServer(http.HandlerFunc(handle))
+	defer s.Close()
+
+	resp, err := http.Get(s.URL + "/configz")
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	expected := `{"testobj":{"apiVersion":"test.k8s.io/v1","kind":"TestConfig","value":"test-value"}}`
+	if string(body) != expected {
+		t.Fatalf("unexpected output: %s, expected: %s", body, expected)
+	}
+
+	Delete("testobj")
+}
