@@ -590,7 +590,7 @@ func (adc *attachDetachController) nodeDelete(logger klog.Logger, obj interface{
 		logger.Info("Error removing node from desired-state-of-world", "node", klog.KObj(node), "err", err)
 	}
 
-	adc.processVolumesInUse(logger, nodeName, node.Status.VolumesInUse)
+	adc.processVolumesInUse(logger, nodeName, nil)
 }
 
 func (adc *attachDetachController) enqueuePVC(obj interface{}) {
