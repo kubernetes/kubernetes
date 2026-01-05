@@ -1336,6 +1336,16 @@ func MakeResourceSlice(nodeName, driverName string) *ResourceSliceWrapper {
 	return wrapper
 }
 
+func MakeResourceSliceWithPerDeviceNodeSelection(namePrefix, driverName string) *ResourceSliceWrapper {
+	wrapper := new(ResourceSliceWrapper)
+	wrapper.Name = namePrefix + "-" + driverName
+	wrapper.Spec.PerDeviceNodeSelection = ptr.To(true)
+	wrapper.Spec.Pool.Name = namePrefix
+	wrapper.Spec.Pool.ResourceSliceCount = 1
+	wrapper.Spec.Driver = driverName
+	return wrapper
+}
+
 // FromResourceSlice creates a ResourceSlice wrapper from some existing object.
 func FromResourceSlice(other *resourceapi.ResourceSlice) *ResourceSliceWrapper {
 	return &ResourceSliceWrapper{*other.DeepCopy()}
@@ -1353,6 +1363,8 @@ func (wrapper *ResourceSliceWrapper) Devices(names ...string) *ResourceSliceWrap
 	return wrapper
 }
 
+type NodeName string
+
 // Device extends the devices field of the inner object.
 // The device must have a name and may have arbitrary additional fields.
 func (wrapper *ResourceSliceWrapper) Device(name string, otherFields ...any) *ResourceSliceWrapper {
@@ -1365,6 +1377,10 @@ func (wrapper *ResourceSliceWrapper) Device(name string, otherFields ...any) *Re
 			device.Capacity = typedField
 		case resourceapi.DeviceTaint:
 			device.Taints = append(device.Taints, typedField)
+		case NodeName:
+			device.NodeName = (*string)(&typedField)
+		case *v1.NodeSelector:
+			device.NodeSelector = typedField
 		default:
 			panic(fmt.Sprintf("expected a type which matches a field in BasicDevice, got %T", field))
 		}
