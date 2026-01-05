@@ -637,29 +637,37 @@ func (q *Quantity) Mul(y int64) bool {
 }
 
 func (q *Quantity) QuoRound(y int64, roundVal int64) bool {
+	if y == 0 {
+		panic("division by zero error")
+	}
+
 	q.s = ""
 	if q.d.Dec == nil {
 		val, _ := q.i.AsInt64()
-		res := float64(val) / float64(y)
+		infDec := inf.NewDec(val, inf.Scale(0))
+		infDec.QuoRound(infDec, inf.NewDec(y, inf.Scale(0)), inf.Scale(roundVal), inf.RoundDown)
 		// check if its a whole number
-		if res == math.Trunc(res) {
-			q.i = int64Amount{value: int64(res)}
+		if infDec.UnscaledBig().IsInt64() {
+			q.i = int64Amount{value: infDec.UnscaledBig().Int64()}
 			return true
 		}
-		unscaled := int64(math.Round(res * math.Pow(10, float64(roundVal))))
-		q.d.Dec = inf.NewDec(unscaled, inf.Scale(roundVal))
+		q.d.Dec = infDec
 		return false
 	}
-	return q.ToDec().d.Dec.QuoRound(q.d.Dec, inf.NewDec(y, inf.Scale(0)), inf.Scale(roundVal), inf.RoundHalfUp).UnscaledBig().IsInt64()
+	return q.ToDec().d.Dec.QuoRound(q.d.Dec, inf.NewDec(y, inf.Scale(0)), inf.Scale(roundVal), inf.RoundDown).UnscaledBig().IsInt64()
 }
 
 func (q *Quantity) QuoIntegerDivision(y int64) bool {
+	if y == 0 {
+		panic("division by zero error")
+	}
+
 	q.s = ""
 	if q.d.Dec == nil {
 		val, _ := q.i.AsInt64()
 		q.i = int64Amount{value: val / y}
 	} else {
-		result := new(inf.Dec).QuoRound(q.d.Dec, inf.NewDec(y, 0), 0, inf.RoundHalfUp)
+		result := new(inf.Dec).QuoRound(q.d.Dec, inf.NewDec(y, 0), 0, inf.RoundDown)
 		q.i = int64Amount{value: result.UnscaledBig().Int64()}
 		q.d.Dec = nil
 	}
