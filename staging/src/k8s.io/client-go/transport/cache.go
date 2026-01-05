@@ -51,6 +51,7 @@ var tlsCache = &tlsTransportCache{transports: make(map[tlsCacheKey]*http.Transpo
 type tlsCacheKey struct {
 	insecure           bool
 	caData             string
+	caFile             string
 	certData           string
 	keyData            string `datapolicy:"security-key"`
 	certFile           string
@@ -68,8 +69,8 @@ func (t tlsCacheKey) String() string {
 	if len(t.keyData) > 0 {
 		keyText = "<redacted>"
 	}
-	return fmt.Sprintf("insecure:%v, caData:%#v, certData:%#v, keyData:%s, serverName:%s, disableCompression:%t, getCert:%p, dial:%p",
-		t.insecure, t.caData, t.certData, keyText, t.serverName, t.disableCompression, t.getCert, t.dial)
+	return fmt.Sprintf("insecure:%v, caData:%#v, caFile:%s, certData:%#v, keyData:%s, certFile:%s, keyFile:%s, serverName:%s, disableCompression:%t, getCert:%p, dial:%p",
+		t.insecure, t.caData, t.caFile, t.certData, keyText, t.certFile, t.keyFile, t.serverName, t.disableCompression, t.getCert, t.dial)
 }
 
 func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
@@ -126,6 +127,18 @@ func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 		go dynamicCertDialer.run(DialerStopCh)
 	}
 
+	// If we are reloading CA files, set up CA rotation with dynamic verification.
+	// InsecureSkipVerify is set because Go lacks a GetRootCAs callback; we use
+	// VerifyConnection to perform equivalent verification with the dynamic CA pool.
+	if config.TLS.ReloadCAFile && tlsConfig != nil && len(config.TLS.CAFile) > 0 {
+		logger := klog.Background().WithName("tls-ca-rotation")
+		caLoader := caRotatingDialer(logger, config.TLS.CAFile, config.TLS.ServerName, tlsConfig.RootCAs, config.TLS.CAData, dial)
+		dial = caLoader.connDialer.DialContext
+		tlsConfig.InsecureSkipVerify = true
+		tlsConfig.VerifyConnection = caLoader.VerifyConnection
+		go caLoader.run(DialerStopCh)
+	}
+
 	proxy := http.ProxyFromEnvironment
 	if config.Proxy != nil {
 		proxy = config.Proxy
@@ -162,12 +175,18 @@ func tlsConfigKey(c *Config) (tlsCacheKey, bool, error) {
 
 	k := tlsCacheKey{
 		insecure:           c.TLS.Insecure,
-		caData:             string(c.TLS.CAData),
 		serverName:         c.TLS.ServerName,
 		nextProtos:         strings.Join(c.TLS.NextProtos, ","),
 		disableCompression: c.DisableCompression,
 		getCert:            c.TLS.GetCertHolder,
 		dial:               c.DialHolder,
+	}
+
+	// Use file path as cache key when reloading, otherwise use data content
+	if c.TLS.ReloadCAFile {
+		k.caFile = c.TLS.CAFile
+	} else {
+		k.caData = string(c.TLS.CAData)
 	}
 
 	if c.TLS.ReloadTLSFiles {

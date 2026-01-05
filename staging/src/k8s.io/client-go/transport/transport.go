@@ -212,12 +212,13 @@ func TLSConfigFor(c *Config) (*tls.Config, error) {
 // either populated or were empty to start.
 func loadTLSFiles(c *Config) error {
 	var err error
+
 	c.TLS.CAData, err = dataFromSliceOrFile(c.TLS.CAData, c.TLS.CAFile)
 	if err != nil {
 		return err
 	}
 
-	// Check that we are purely loading from files
+	// Enable cert/key file reloading when loading purely from files
 	if len(c.TLS.CertFile) > 0 && len(c.TLS.CertData) == 0 && len(c.TLS.KeyFile) > 0 && len(c.TLS.KeyData) == 0 {
 		c.TLS.ReloadTLSFiles = true
 	}

@@ -261,6 +261,12 @@ type TLSClientConfig struct {
 	// To indicate to the server http/1.1 is preferred over http/2, set to ["http/1.1", "h2"] (though the server is free to ignore that preference).
 	// To use only http/1.1, set to ["http/1.1"].
 	NextProtos []string
+
+	// ReloadCAFile enables hot-reload of the CA certificate file. When set to true and
+	// CAFile is specified (without CAData), the CA certificate will be periodically
+	// reloaded from disk and existing connections will be closed to pick up the new CA.
+	// This enables zero-downtime CA rotation.
+	ReloadCAFile bool
 }
 
 var _ fmt.Stringer = TLSClientConfig{}
