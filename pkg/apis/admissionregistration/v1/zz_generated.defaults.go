@@ -70,6 +70,7 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 }
 
 func SetObjectDefaults_MutatingAdmissionPolicy(in *admissionregistrationv1.MutatingAdmissionPolicy) {
+	SetDefaults_MutatingAdmissionPolicySpec(&in.Spec)
 	if in.Spec.MatchConstraints != nil {
 		SetDefaults_MatchResources(in.Spec.MatchConstraints)
 		for i := range in.Spec.MatchConstraints.ResourceRules {
