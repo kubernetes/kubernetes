@@ -4760,6 +4760,8 @@ func TestSyncPodNodeDeclaredFeaturesUpdate(t *testing.T) {
 		name               string
 		featureGateEnabled bool
 		nodeFeatures       []string
+		oldPod             *v1.Pod
+		newPod             *v1.Pod
 		registeredFeatures []ndf.Feature
 		expectEvent        bool
 		expectedEventMsg   string
@@ -4769,6 +4771,8 @@ func TestSyncPodNodeDeclaredFeaturesUpdate(t *testing.T) {
 			name:               "Feature gate disabled",
 			featureGateEnabled: false,
 			componentVersion:   "1.35.0",
+			oldPod:             oldPod,
+			newPod:             newPod,
 			registeredFeatures: []ndf.Feature{},
 			expectEvent:        false,
 		},
@@ -4776,6 +4780,8 @@ func TestSyncPodNodeDeclaredFeaturesUpdate(t *testing.T) {
 			name:               "Feature gate enabled, no requirements from update",
 			featureGateEnabled: true,
 			componentVersion:   "1.35.0",
+			oldPod:             oldPod,
+			newPod:             newPod,
 			nodeFeatures:       []string{"FeatureA"},
 			registeredFeatures: []ndf.Feature{createMockFeature(t, "FeatureA", false, "")},
 			expectEvent:        false,
@@ -4784,6 +4790,8 @@ func TestSyncPodNodeDeclaredFeaturesUpdate(t *testing.T) {
 			name:               "Feature gate enabled, requirements met",
 			featureGateEnabled: true,
 			componentVersion:   "1.35.0",
+			oldPod:             oldPod,
+			newPod:             newPod,
 			nodeFeatures:       []string{"FeatureA"},
 			registeredFeatures: []ndf.Feature{createMockFeature(t, "FeatureA", true, "")},
 			expectEvent:        false,
@@ -4792,6 +4800,8 @@ func TestSyncPodNodeDeclaredFeaturesUpdate(t *testing.T) {
 			name:               "Feature gate enabled, requirements not met",
 			featureGateEnabled: true,
 			componentVersion:   "1.35.0",
+			oldPod:             oldPod,
+			newPod:             newPod,
 			nodeFeatures:       []string{"FeatureB"},
 			registeredFeatures: []ndf.Feature{createMockFeature(t, "FeatureA", true, "")},
 			expectEvent:        true,
@@ -4801,8 +4811,20 @@ func TestSyncPodNodeDeclaredFeaturesUpdate(t *testing.T) {
 			name:               "feature generally available - not declared",
 			featureGateEnabled: true,
 			componentVersion:   "1.35.0",
+			oldPod:             oldPod,
+			newPod:             newPod,
 			nodeFeatures:       []string{""},
 			registeredFeatures: []ndf.Feature{createMockFeature(t, "FeatureA", true, "1.34.0")},
+			expectEvent:        false,
+		},
+		{
+			name:               "Feature gate enabled, old pod state missing, node declared feature check skipped",
+			featureGateEnabled: true,
+			componentVersion:   "1.35.0",
+			oldPod:             nil,
+			newPod:             newPod,
+			nodeFeatures:       []string{"FeatureB"},
+			registeredFeatures: []ndf.Feature{createMockFeature(t, "FeatureA", true, "")},
 			expectEvent:        false,
 		},
 	}
@@ -4826,10 +4848,12 @@ func TestSyncPodNodeDeclaredFeaturesUpdate(t *testing.T) {
 			kubelet.nodeDeclaredFeaturesSet = ndf.NewFeatureSet(kubelet.nodeDeclaredFeatures...)
 			kubelet.version = utilversion.MustParse("1.35.0")
 
-			kubelet.podManager.SetPods([]*v1.Pod{oldPod})
-			kubelet.statusManager.SetPodStatus(klog.TODO(), newPod, v1.PodStatus{Phase: v1.PodRunning})
-			kubelet.HandlePodUpdates([]*v1.Pod{newPod})
+			if tc.oldPod != nil {
+				kubelet.podManager.SetPods([]*v1.Pod{tc.oldPod})
+			}
 
+			kubelet.statusManager.SetPodStatus(klog.TODO(), tc.newPod, v1.PodStatus{Phase: v1.PodRunning})
+			kubelet.HandlePodUpdates([]*v1.Pod{tc.newPod})
 			if tc.expectEvent {
 				select {
 				case event := <-recorder.Events:
