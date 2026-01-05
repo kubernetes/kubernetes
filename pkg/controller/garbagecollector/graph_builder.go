@@ -223,7 +223,7 @@ func (gb *GraphBuilder) controllerFor(logger klog.Logger, resource schema.GroupV
 
 	shared, err := gb.sharedInformers.ForResource(resource)
 	if err != nil {
-		logger.V(4).Error(err, "unable to use a shared informer", "resource", resource, "kind", kind)
+		logger.V(4).Info("unable to use a shared informer", "resource", resource, "kind", kind, "err", err)
 		return nil, nil, err
 	}
 	logger.V(4).Info("using a shared informer", "resource", resource, "kind", kind)

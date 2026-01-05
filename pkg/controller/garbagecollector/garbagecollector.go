@@ -359,8 +359,8 @@ func (gc *GarbageCollector) attemptToDeleteWorker(ctx context.Context, item inte
 			// 2. The reference is to an invalid group/version. We don't currently
 			//    have a way to distinguish this from a valid type we will recognize
 			//    after the next discovery sync.
-			// For now, record the error and retry.
-			logger.V(5).Error(err, "error syncing item", "item", n.identity)
+			// For now, log the error and retry.
+			logger.V(5).Info("error syncing item", "item", n.identity, "err", err)
 		} else {
 			utilruntime.HandleError(fmt.Errorf("error syncing item %s: %v", n, err))
 		}
