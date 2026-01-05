@@ -17,12 +17,11 @@ limitations under the License.
 package devicemanager
 
 import (
+	"k8s.io/klog/v2"
 	"maps"
 	"sync"
 
 	"google.golang.org/protobuf/proto"
-	"k8s.io/klog/v2"
-
 	"k8s.io/apimachinery/pkg/util/sets"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/checkpoint"
@@ -157,6 +156,9 @@ func (pdev *podDevices) removeContainerAllocatedResources(podUID, contName strin
 		return
 	}
 	for resource, devices := range resources {
+		if allocatedResources[resource] == nil {
+			continue
+		}
 		allocatedResources[resource] = allocatedResources[resource].Difference(devices.deviceIds.Devices())
 	}
 }

@@ -19,6 +19,7 @@ package devicemanager
 import (
 	"context"
 	"fmt"
+	"k8s.io/klog/v2"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -42,7 +43,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/klog/v2"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	watcherapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 	"k8s.io/kubernetes/pkg/features"
@@ -2190,4 +2190,73 @@ func TestEndpointSyncOnDisconnect(t *testing.T) {
 	require.Empty(t, manager.endpoints)
 	require.Empty(t, manager.healthyDevices)
 	require.Empty(t, manager.unhealthyDevices)
+}
+
+func TestDeviceAllocateParallel(t *testing.T) {
+	res1 := TestResource{
+		resourceName:     "domain3.com/resource3",
+		resourceQuantity: *resource.NewQuantity(int64(2), resource.DecimalSI),
+		devs:             checkpoint.DevicesPerNUMA{0: []string{"dev5", "dev6"}},
+		topology:         false,
+	}
+	res2 := TestResource{
+		resourceName:     "domain1.com/resource1",
+		resourceQuantity: *resource.NewQuantity(int64(2), resource.DecimalSI),
+		devs:             checkpoint.DevicesPerNUMA{0: []string{"dev1", "dev2"}},
+		topology:         false,
+	}
+
+	as := require.New(t)
+	podsStub := activePodsStub{
+		activePods: []*v1.Pod{},
+	}
+	tmpDir, err := os.MkdirTemp("", "checkpoint")
+	as.NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	testManager, err := getTestManager(tmpDir, podsStub.getActivePods, []TestResource{res1, res2})
+	as.NoError(err)
+	testManager.endpoints[res1.resourceName] = endpointInfo{
+		e: &MockEndpoint{
+			allocateFunc: func(devs []string) (*pluginapi.AllocateResponse, error) {
+				resp := new(pluginapi.ContainerAllocateResponse)
+				resp.Envs = make(map[string]string)
+				for _, dev := range devs {
+					switch dev {
+					case "dev5":
+						resp.Envs["key2"] = "val2"
+
+					case "dev6":
+						resp.Envs["key2"] = "val3"
+					}
+				}
+				resps := new(pluginapi.AllocateResponse)
+				resps.ContainerResponses = append(resps.ContainerResponses, resp)
+				fmt.Println("start sleep 2s")
+				time.Sleep(2 * time.Second)
+				return resps, nil
+			},
+		},
+		opts: nil,
+	}
+
+	pod1 := makePod(v1.ResourceList{
+		v1.ResourceName(res1.resourceName): res1.resourceQuantity})
+	pod2 := makePod(v1.ResourceList{
+		v1.ResourceName(res2.resourceName): res2.resourceQuantity})
+	activePods := []*v1.Pod{}
+	activePods = append(activePods, pod1, pod2)
+	podsStub.updateActivePods(activePods)
+
+	wg := sync.WaitGroup{}
+	go func() {
+		wg.Add(1)
+		defer wg.Done()
+		err = testManager.Allocate(pod1, &pod1.Spec.Containers[0])
+		as.NoError(err)
+	}()
+
+	err = testManager.Allocate(pod2, &pod2.Spec.Containers[0])
+	as.NoError(err)
+	wg.Wait()
 }
