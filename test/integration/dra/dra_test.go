@@ -176,6 +176,7 @@ func TestDRA(t *testing.T) {
 					tCtx = tCtx.WithNamespace(namespace)
 					TestCreateResourceSlices(tCtx, 100)
 				})
+				tCtx.Run("PartitionableDevices", func(tCtx ktesting.TContext) { testPartitionableDevices(tCtx, false) })
 			},
 		},
 		"v1beta1": {
@@ -249,6 +250,7 @@ func TestDRA(t *testing.T) {
 				// in the experimental channel has an improvement that requires a higher number here than
 				// in the incubating and stable channels.
 				tCtx.Run("FilterTimeout", func(tCtx ktesting.TContext) { testFilterTimeout(tCtx, 20) })
+				tCtx.Run("PartitionableDevices", func(tCtx ktesting.TContext) { testPartitionableDevices(tCtx, true) })
 			},
 		},
 	} {
@@ -295,10 +297,14 @@ func TestDRA(t *testing.T) {
 
 func createNodes(tCtx ktesting.TContext) {
 	for i := 0; i < numNodes; i++ {
+		nodeName := fmt.Sprintf("worker-%d", i)
 		// Create node.
 		node := &v1.Node{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: fmt.Sprintf("worker-%d", i),
+				Name: nodeName,
+				Labels: map[string]string{
+					"kubernetes.io/hostname": nodeName,
+				},
 			},
 		}
 		node, err := tCtx.Client().CoreV1().Nodes().Create(tCtx, node, metav1.CreateOptions{FieldValidation: "Strict"})
