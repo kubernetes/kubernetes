@@ -24,8 +24,6 @@ import (
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
-const imageManagerSubsystem = kubeletmetrics.KubeletSubsystem + "_imagemanager"
-
 type mustAttemptImagePullResult string
 
 const (
@@ -38,40 +36,40 @@ const (
 var (
 	fsPullIntentsSize = metrics.NewGauge(
 		&metrics.GaugeOpts{
-			Subsystem:      imageManagerSubsystem,
-			Name:           "ondisk_pullintents",
+			Subsystem:      kubeletmetrics.KubeletSubsystem,
+			Name:           "imagemanager_ondisk_pullintents",
 			Help:           "Number of ImagePullIntents stored on disk.",
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
 	fsPulledRecordsSize = metrics.NewGauge(
 		&metrics.GaugeOpts{
-			Subsystem:      imageManagerSubsystem,
-			Name:           "ondisk_pulledrecords",
+			Subsystem:      kubeletmetrics.KubeletSubsystem,
+			Name:           "imagemanager_ondisk_pulledrecords",
 			Help:           "Number of ImagePulledRecords stored on disk.",
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
 	inMemIntentsPercent = metrics.NewGauge(
 		&metrics.GaugeOpts{
-			Subsystem:      imageManagerSubsystem,
-			Name:           "inmemory_pullintents_usage_percent",
+			Subsystem:      kubeletmetrics.KubeletSubsystem,
+			Name:           "imagemanager_inmemory_pullintents_usage_percent",
 			Help:           "The ImagePullIntents in-memory cache usage in percent.",
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
 	inMemPulledRecordsPercent = metrics.NewGauge(
 		&metrics.GaugeOpts{
-			Subsystem:      imageManagerSubsystem,
-			Name:           "inmemory_pulledrecords_usage_percent",
+			Subsystem:      kubeletmetrics.KubeletSubsystem,
+			Name:           "imagemanager_inmemory_pulledrecords_usage_percent",
 			Help:           "The ImagePulledRecords in-memory cache usage in percent.",
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
 	mustPullChecksTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
-			Subsystem:      imageManagerSubsystem,
-			Name:           "image_mustpull_checks_total",
+			Subsystem:      kubeletmetrics.KubeletSubsystem,
+			Name:           "imagemanager_image_mustpull_checks_total",
 			Help:           "Counter for how many times kubelet checked whether credentials need to be re-verified to access an image",
 			StabilityLevel: metrics.ALPHA,
 		},

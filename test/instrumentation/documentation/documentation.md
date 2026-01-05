@@ -6,10 +6,10 @@ description: >-
   Details of the metric data that Kubernetes components export.
 ---
 
-## Metrics (v1.34)
+## Metrics (v1.35)
 
-<!-- (auto-generated 2025 Sep 12) -->
-<!-- (auto-generated v1.34) -->
+<!-- (auto-generated 2026 Jan 06) -->
+<!-- (auto-generated v1.35) -->
 This page details the metrics that different Kubernetes components export. You can query the metrics endpoint for these 
 components using an HTTP scrape, and fetch the current metrics data in Prometheus format.
 
@@ -417,6 +417,27 @@ Beta metrics observe a looser API contract than its stable counterparts. No labe
 	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
 	</ul>
 	</div><div class="metric" data-stability="beta">
+	<div class="metric_name">kubelet_image_volume_mounted_errors_total</div>
+	<div class="metric_help">Number of failed image volume mounts.</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">BETA</span></li>
+	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
+	</ul>
+	</div><div class="metric" data-stability="beta">
+	<div class="metric_name">kubelet_image_volume_mounted_succeed_total</div>
+	<div class="metric_help">Number of successful image volume mounts.</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">BETA</span></li>
+	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
+	</ul>
+	</div><div class="metric" data-stability="beta">
+	<div class="metric_name">kubelet_image_volume_requested_total</div>
+	<div class="metric_help">Number of requested image volumes.</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">BETA</span></li>
+	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
+	</ul>
+	</div><div class="metric" data-stability="beta">
 	<div class="metric_name">kubernetes_feature_enabled</div>
 	<div class="metric_help">This metric records the data about the stage and enablement of a k8s feature.</div>
 	<ul>
@@ -454,6 +475,27 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 <div class="metrics"><div class="metric" data-stability="alpha">
 	<div class="metric_name">aggregator_discovery_aggregation_count_total</div>
 	<div class="metric_help">Counter of number of times discovery was aggregated</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
+	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
+	</ul>
+	</div><div class="metric" data-stability="alpha">
+	<div class="metric_name">aggregator_discovery_nopeer_requests_total</div>
+	<div class="metric_help">Counter of number of times no-peer (non peer-aggregated) discovery was requested</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
+	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
+	</ul>
+	</div><div class="metric" data-stability="alpha">
+	<div class="metric_name">aggregator_discovery_peer_aggregated_cache_hits_total</div>
+	<div class="metric_help">Counter of number of times discovery was served from peer-aggregated cache</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
+	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
+	</ul>
+	</div><div class="metric" data-stability="alpha">
+	<div class="metric_name">aggregator_discovery_peer_aggregated_cache_misses_total</div>
+	<div class="metric_help">Counter of number of times discovery was aggregated across all API servers</div>
 	<ul>
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
 	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
@@ -591,6 +633,20 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
 	<li data-type="custom"><label class="metric_detail">Type:</label> <span class="metric_type">Custom</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">apiserver_id_hash</span><span class="metric_label">hash</span></li></ul>
+	</div><div class="metric" data-stability="alpha">
+	<div class="metric_name">apiserver_authentication_jwt_authenticator_jwks_fetch_last_key_set_info</div>
+	<div class="metric_help">Information about the last JWKS fetched by the JWT authenticator with hash as label, split by api server identity and jwt issuer.</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
+	<li data-type="custom"><label class="metric_detail">Type:</label> <span class="metric_type">Custom</span></li>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">jwt_issuer_hash</span><span class="metric_label">apiserver_id_hash</span><span class="metric_label">hash</span></li></ul>
+	</div><div class="metric" data-stability="alpha">
+	<div class="metric_name">apiserver_authentication_jwt_authenticator_jwks_fetch_last_timestamp_seconds</div>
+	<div class="metric_help">Timestamp of the last successful or failed JWKS fetch split by result, api server identity and jwt issuer for the JWT authenticator.</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
+	<li data-type="gauge"><label class="metric_detail">Type:</label> <span class="metric_type">Gauge</span></li>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">apiserver_id_hash</span><span class="metric_label">jwt_issuer_hash</span><span class="metric_label">result</span></li></ul>
 	</div><div class="metric" data-stability="alpha">
 	<div class="metric_name">apiserver_authentication_jwt_authenticator_latency_seconds</div>
 	<div class="metric_help">Latency of jwt authentication operations in seconds. This is the time spent authenticating a token for cache miss only (i.e. when the token is not found in the cache).</div>
@@ -1341,6 +1397,20 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
 	</ul>
 	</div><div class="metric" data-stability="alpha">
+	<div class="metric_name">apiserver_validation_declarative_validation_panics_total</div>
+	<div class="metric_help">Number of panics in declarative validation, broken down by validation identifier.</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
+	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">validation_identifier</span></li></ul>
+	</div><div class="metric" data-stability="alpha">
+	<div class="metric_name">apiserver_validation_declarative_validation_parity_discrepancies_total</div>
+	<div class="metric_help">Number of discrepancies between declarative and handwritten validation, broken down by validation identifier.</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
+	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">validation_identifier</span></li></ul>
+	</div><div class="metric" data-stability="alpha">
 	<div class="metric_name">apiserver_watch_cache_consistent_read_total</div>
 	<div class="metric_help">Counter for consistent reads from cache.</div>
 	<ul>
@@ -1789,6 +1859,13 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
 	</ul>
 	</div><div class="metric" data-stability="alpha">
+	<div class="metric_name">horizontal_pod_autoscaler_controller_desired_replicas</div>
+	<div class="metric_help">Current desired replica count for HPA objects.</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
+	<li data-type="gauge"><label class="metric_detail">Type:</label> <span class="metric_type">Gauge</span></li>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">hpa_name</span><span class="metric_label">namespace</span></li></ul>
+	</div><div class="metric" data-stability="alpha">
 	<div class="metric_name">horizontal_pod_autoscaler_controller_metric_computation_duration_seconds</div>
 	<div class="metric_help">The time(seconds) that the HPA controller takes to calculate one metric. The label 'action' should be either 'scale_down', 'scale_up', or 'none'. The label 'error' should be either 'spec', 'internal', or 'none'. The label 'metric_type' corresponds to HPA.spec.metrics[*].type</div>
 	<ul>
@@ -1802,6 +1879,13 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
 	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">action</span><span class="metric_label">error</span><span class="metric_label">metric_type</span></li></ul>
+	</div><div class="metric" data-stability="alpha">
+	<div class="metric_name">horizontal_pod_autoscaler_controller_num_horizontal_pod_autoscalers</div>
+	<div class="metric_help">Current number of controlled HPA objects.</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
+	<li data-type="gauge"><label class="metric_detail">Type:</label> <span class="metric_type">Gauge</span></li>
+	</ul>
 	</div><div class="metric" data-stability="alpha">
 	<div class="metric_name">horizontal_pod_autoscaler_controller_reconciliation_duration_seconds</div>
 	<div class="metric_help">The time(seconds) that the HPA controller takes to reconcile once. The label 'action' should be either 'scale_down', 'scale_up', or 'none'. Also, the label 'error' should be either 'spec', 'internal', or 'none'. Note that if both spec and internal errors happen during a reconciliation, the first one to occur is reported in `error` label.</div>
@@ -2195,6 +2279,13 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">reason</span></li></ul>
 	</div><div class="metric" data-stability="alpha">
+	<div class="metric_name">kubelet_image_manager_ensure_image_requests_total</div>
+	<div class="metric_help">Number of ensure-image requests processed by the kubelet.</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
+	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">present_locally</span><span class="metric_label">pull_policy</span><span class="metric_label">pull_required</span></li></ul>
+	</div><div class="metric" data-stability="alpha">
 	<div class="metric_name">kubelet_image_pull_duration_seconds</div>
 	<div class="metric_help">Duration in seconds to pull an image.</div>
 	<ul>
@@ -2202,25 +2293,39 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li data-type="histogram"><label class="metric_detail">Type:</label> <span class="metric_type">Histogram</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">image_size_in_bytes</span></li></ul>
 	</div><div class="metric" data-stability="alpha">
-	<div class="metric_name">kubelet_image_volume_mounted_errors_total</div>
-	<div class="metric_help">Number of failed image volume mounts.</div>
+	<div class="metric_name">kubelet_imagemanager_image_mustpull_checks_total</div>
+	<div class="metric_help">Counter for how many times kubelet checked whether credentials need to be re-verified to access an image</div>
 	<ul>
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
 	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">result</span></li></ul>
+	</div><div class="metric" data-stability="alpha">
+	<div class="metric_name">kubelet_imagemanager_inmemory_pulledrecords_usage_percent</div>
+	<div class="metric_help">The ImagePulledRecords in-memory cache usage in percent.</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
+	<li data-type="gauge"><label class="metric_detail">Type:</label> <span class="metric_type">Gauge</span></li>
 	</ul>
 	</div><div class="metric" data-stability="alpha">
-	<div class="metric_name">kubelet_image_volume_mounted_succeed_total</div>
-	<div class="metric_help">Number of successful image volume mounts.</div>
+	<div class="metric_name">kubelet_imagemanager_inmemory_pullintents_usage_percent</div>
+	<div class="metric_help">The ImagePullIntents in-memory cache usage in percent.</div>
 	<ul>
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
-	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
+	<li data-type="gauge"><label class="metric_detail">Type:</label> <span class="metric_type">Gauge</span></li>
 	</ul>
 	</div><div class="metric" data-stability="alpha">
-	<div class="metric_name">kubelet_image_volume_requested_total</div>
-	<div class="metric_help">Number of requested image volumes.</div>
+	<div class="metric_name">kubelet_imagemanager_ondisk_pulledrecords</div>
+	<div class="metric_help">Number of ImagePulledRecords stored on disk.</div>
 	<ul>
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
-	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
+	<li data-type="gauge"><label class="metric_detail">Type:</label> <span class="metric_type">Gauge</span></li>
+	</ul>
+	</div><div class="metric" data-stability="alpha">
+	<div class="metric_name">kubelet_imagemanager_ondisk_pullintents</div>
+	<div class="metric_help">Number of ImagePullIntents stored on disk.</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
+	<li data-type="gauge"><label class="metric_detail">Type:</label> <span class="metric_type">Gauge</span></li>
 	</ul>
 	</div><div class="metric" data-stability="alpha">
 	<div class="metric_name">kubelet_lifecycle_handler_http_fallbacks_total</div>
@@ -2474,6 +2579,13 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
 	<li data-type="histogram"><label class="metric_detail">Type:</label> <span class="metric_type">Histogram</span></li>
 	</ul>
+	</div><div class="metric" data-stability="alpha">
+	<div class="metric_name">kubelet_podcertificate_states</div>
+	<div class="metric_help">Gauge vector reporting the number of pod certificate projected volume sources, faceted by signer_name and state.</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
+	<li data-type="custom"><label class="metric_detail">Type:</label> <span class="metric_type">Custom</span></li>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">signer_name</span><span class="metric_label">state</span></li></ul>
 	</div><div class="metric" data-stability="alpha">
 	<div class="metric_name">kubelet_preemptions</div>
 	<div class="metric_help">Cumulative number of pod preemptions by preemption resource</div>
@@ -3092,11 +3204,11 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">admin_access</span><span class="metric_label">status</span></li></ul>
 	</div><div class="metric" data-stability="alpha">
 	<div class="metric_name">resourceclaim_controller_resource_claims</div>
-	<div class="metric_help">Number of ResourceClaims, categorized by allocation status and admin access</div>
+	<div class="metric_help">Number of ResourceClaims, categorized by allocation status, admin access, and source. Source can be 'resource_claim_template' (created from a template), 'extended_resource' (extended resources), or empty (manually created by a user).</div>
 	<ul>
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
 	<li data-type="custom"><label class="metric_detail">Type:</label> <span class="metric_type">Custom</span></li>
-	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">allocated</span><span class="metric_label">admin_access</span></li></ul>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">allocated</span><span class="metric_label">admin_access</span><span class="metric_label">source</span></li></ul>
 	</div><div class="metric" data-stability="alpha">
 	<div class="metric_name">rest_client_dns_resolution_duration_seconds</div>
 	<div class="metric_help">DNS resolver latency in seconds. Broken down by host.</div>
@@ -3118,6 +3230,13 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
 	<li data-type="histogram"><label class="metric_detail">Type:</label> <span class="metric_type">Histogram</span></li>
 	</ul>
+	</div><div class="metric" data-stability="alpha">
+	<div class="metric_name">rest_client_exec_plugin_policy_call_total</div>
+	<div class="metric_help">Number of comparisons of an exec plugin to the plugin policy and allowlist (if any), partitioned by whether or not the policy permits the plugin</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
+	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">allowed</span><span class="metric_label">denied</span></li></ul>
 	</div><div class="metric" data-stability="alpha">
 	<div class="metric_name">rest_client_exec_plugin_ttl_seconds</div>
 	<div class="metric_help">Gauge of the shortest TTL (time-to-live) of the client certificate(s) managed by the auth exec plugin. The value is in seconds until certificate expiry (negative if already expired). If auth exec plugins are unused or manage no TLS certificates, the value will be +INF.</div>
@@ -3231,6 +3350,20 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">call_type</span><span class="metric_label">result</span></li></ul>
 	</div><div class="metric" data-stability="alpha">
+	<div class="metric_name">scheduler_batch_attempts_total</div>
+	<div class="metric_help">Counts of results when we attempt to use batching.</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
+	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">profile</span><span class="metric_label">result</span></li></ul>
+	</div><div class="metric" data-stability="alpha">
+	<div class="metric_name">scheduler_batch_cache_flushed_total</div>
+	<div class="metric_help">Counts of cache flushes by reason.</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
+	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">profile</span><span class="metric_label">reason</span></li></ul>
+	</div><div class="metric" data-stability="alpha">
 	<div class="metric_name">scheduler_cache_size</div>
 	<div class="metric_help">Number of nodes, pods, and assumed (bound) pods in the scheduler cache.</div>
 	<ul>
@@ -3244,6 +3377,13 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
 	<li data-type="histogram"><label class="metric_detail">Type:</label> <span class="metric_type">Histogram</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">event</span></li></ul>
+	</div><div class="metric" data-stability="alpha">
+	<div class="metric_name">scheduler_get_node_hint_duration_seconds</div>
+	<div class="metric_help">Latency for getting a node hint.</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
+	<li data-type="histogram"><label class="metric_detail">Type:</label> <span class="metric_type">Histogram</span></li>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">hinted</span><span class="metric_label">profile</span></li></ul>
 	</div><div class="metric" data-stability="alpha">
 	<div class="metric_name">scheduler_goroutines</div>
 	<div class="metric_help">Number of running goroutines split by the work they do such as binding.</div>
@@ -3308,12 +3448,26 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li data-type="histogram"><label class="metric_detail">Type:</label> <span class="metric_type">Histogram</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">event</span><span class="metric_label">hint</span><span class="metric_label">plugin</span></li></ul>
 	</div><div class="metric" data-stability="alpha">
+	<div class="metric_name">scheduler_resourceclaim_creates_total</div>
+	<div class="metric_help">Number of ResourceClaims creation requests within scheduler</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
+	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">status</span></li></ul>
+	</div><div class="metric" data-stability="alpha">
 	<div class="metric_name">scheduler_scheduling_algorithm_duration_seconds</div>
 	<div class="metric_help">Scheduling algorithm latency in seconds</div>
 	<ul>
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
 	<li data-type="histogram"><label class="metric_detail">Type:</label> <span class="metric_type">Histogram</span></li>
 	</ul>
+	</div><div class="metric" data-stability="alpha">
+	<div class="metric_name">scheduler_store_schedule_results_duration_seconds</div>
+	<div class="metric_help">Latency for getting a no.</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
+	<li data-type="histogram"><label class="metric_detail">Type:</label> <span class="metric_type">Histogram</span></li>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">profile</span></li></ul>
 	</div><div class="metric" data-stability="alpha">
 	<div class="metric_name">scheduler_unschedulable_pods</div>
 	<div class="metric_help">The number of unschedulable pods broken down by plugin name. A pod will increment the gauge for all plugins that caused it to not schedule and so this metric have meaning only when broken down by plugin.</div>
@@ -3419,6 +3573,20 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
 	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
 	</ul>
+	</div><div class="metric" data-stability="alpha">
+	<div class="metric_name">statefulset_controller_statefulset_max_unavailable</div>
+	<div class="metric_help">Maximum number of unavailable pods allowed during StatefulSet rolling updates</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
+	<li data-type="gauge"><label class="metric_detail">Type:</label> <span class="metric_type">Gauge</span></li>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">pod_management_policy</span><span class="metric_label">statefulset_name</span><span class="metric_label">statefulset_namespace</span></li></ul>
+	</div><div class="metric" data-stability="alpha">
+	<div class="metric_name">statefulset_controller_statefulset_unavailable_replicas</div>
+	<div class="metric_help">Current number of unavailable pods in StatefulSet</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
+	<li data-type="gauge"><label class="metric_detail">Type:</label> <span class="metric_type">Gauge</span></li>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">pod_management_policy</span><span class="metric_label">statefulset_name</span><span class="metric_label">statefulset_namespace</span></li></ul>
 	</div><div class="metric" data-stability="alpha">
 	<div class="metric_name">storage_count_attachable_volumes_in_use</div>
 	<div class="metric_help">Measure number of volumes in use</div>
