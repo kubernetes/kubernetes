@@ -610,6 +610,119 @@ type inClusterClientConfig struct {
 
 var _ ClientConfig = &inClusterClientConfig{}
 
+// applyConfigOverrides systematically applies ConfigOverrides to a rest.Config.
+// Only applies values that are explicitly set in the overrides, not default values.
+func applyConfigOverrides(cfg *restclient.Config, overrides *ConfigOverrides) error {
+	// Only apply cluster overrides if explicitly set (not from defaults)
+	// Check ClusterInfo for explicit overrides
+	if len(overrides.ClusterInfo.Server) > 0 {
+		cfg.Host = overrides.ClusterInfo.Server
+		// When server is overridden, clear TLS settings unless also explicitly overridden
+		// This ensures --server=foo defaults to http://foo, not https://foo
+		if len(overrides.ClusterInfo.CertificateAuthority) == 0 && len(overrides.ClusterInfo.CertificateAuthorityData) == 0 {
+			cfg.CAFile = ""
+			cfg.CAData = nil
+		}
+		if !overrides.ClusterInfo.InsecureSkipTLSVerify {
+			cfg.Insecure = false
+		}
+		if len(overrides.ClusterInfo.TLSServerName) == 0 {
+			cfg.ServerName = ""
+		}
+	}
+	if len(overrides.ClusterInfo.CertificateAuthority) > 0 {
+		cfg.CAFile = overrides.ClusterInfo.CertificateAuthority
+	}
+	if len(overrides.ClusterInfo.CertificateAuthorityData) > 0 {
+		cfg.CAData = overrides.ClusterInfo.CertificateAuthorityData
+	}
+	if overrides.ClusterInfo.InsecureSkipTLSVerify {
+		cfg.Insecure = true
+		// Clear CA settings if insecure is explicitly set
+		cfg.CAFile = ""
+		cfg.CAData = nil
+	}
+	if len(overrides.ClusterInfo.TLSServerName) > 0 {
+		cfg.ServerName = overrides.ClusterInfo.TLSServerName
+	}
+	if len(overrides.ClusterInfo.ProxyURL) > 0 {
+		u, err := parseProxyURL(overrides.ClusterInfo.ProxyURL)
+		if err != nil {
+			return err
+		}
+		cfg.Proxy = http.ProxyURL(u)
+	}
+	if overrides.ClusterInfo.DisableCompression {
+		cfg.DisableCompression = true
+	}
+
+	// Apply auth overrides if explicitly set
+	if len(overrides.AuthInfo.ClientCertificate) > 0 {
+		cfg.CertFile = overrides.AuthInfo.ClientCertificate
+	}
+	if len(overrides.AuthInfo.ClientCertificateData) > 0 {
+		cfg.CertData = overrides.AuthInfo.ClientCertificateData
+	}
+	if len(overrides.AuthInfo.ClientKey) > 0 {
+		cfg.KeyFile = overrides.AuthInfo.ClientKey
+	}
+	if len(overrides.AuthInfo.ClientKeyData) > 0 {
+		cfg.KeyData = overrides.AuthInfo.ClientKeyData
+	}
+	// Token and TokenFile: if either is explicitly set, apply both (mutually exclusive auth methods)
+	if len(overrides.AuthInfo.Token) > 0 || len(overrides.AuthInfo.TokenFile) > 0 {
+		cfg.BearerToken = overrides.AuthInfo.Token
+		cfg.BearerTokenFile = overrides.AuthInfo.TokenFile
+	}
+	// Apply impersonation settings if any are set
+	if len(overrides.AuthInfo.Impersonate) > 0 || len(overrides.AuthInfo.ImpersonateUID) > 0 ||
+		len(overrides.AuthInfo.ImpersonateGroups) > 0 || len(overrides.AuthInfo.ImpersonateUserExtra) > 0 {
+		// Initialize impersonation config if any impersonation field is set
+		if cfg.Impersonate.UserName == "" && cfg.Impersonate.UID == "" &&
+			len(cfg.Impersonate.Groups) == 0 && len(cfg.Impersonate.Extra) == 0 {
+			cfg.Impersonate = restclient.ImpersonationConfig{}
+		}
+		if len(overrides.AuthInfo.Impersonate) > 0 {
+			cfg.Impersonate.UserName = overrides.AuthInfo.Impersonate
+		}
+		if len(overrides.AuthInfo.ImpersonateUID) > 0 {
+			cfg.Impersonate.UID = overrides.AuthInfo.ImpersonateUID
+		}
+		if len(overrides.AuthInfo.ImpersonateGroups) > 0 {
+			cfg.Impersonate.Groups = overrides.AuthInfo.ImpersonateGroups
+		}
+		if len(overrides.AuthInfo.ImpersonateUserExtra) > 0 {
+			cfg.Impersonate.Extra = overrides.AuthInfo.ImpersonateUserExtra
+		}
+	}
+	if len(overrides.AuthInfo.Username) > 0 {
+		cfg.Username = overrides.AuthInfo.Username
+	}
+	if len(overrides.AuthInfo.Password) > 0 {
+		cfg.Password = overrides.AuthInfo.Password
+	}
+	// Apply auth provider if set (e.g., gcp, azure, oidc plugins)
+	if overrides.AuthInfo.AuthProvider != nil {
+		cfg.AuthProvider = overrides.AuthInfo.AuthProvider
+		// Note: AuthConfigPersister is not part of overrides, it's set by the calling context
+	}
+	// Apply exec provider if set (e.g., aws-iam-authenticator, credential plugins)
+	if overrides.AuthInfo.Exec != nil {
+		cfg.ExecProvider = overrides.AuthInfo.Exec
+	}
+
+	// Apply timeout override (not part of cluster/auth info)
+	if len(overrides.Timeout) > 0 {
+		timeout, err := ParseTimeout(overrides.Timeout)
+		if err != nil {
+			return err
+		}
+		cfg.Timeout = timeout
+	}
+
+	return nil
+}
+
 func (config *inClusterClientConfig) RawConfig() (clientcmdapi.Config, error) {
 	return clientcmdapi.Config{}, fmt.Errorf("inCluster environment config doesn't support multiple clusters")
 }
@@ -625,18 +738,10 @@ func (config *inClusterClientConfig) ClientConfig() (*restclient.Config, error) 
 		return nil, err
 	}
 
-	// in-cluster configs only takes a host, token, or CA file
-	// if any of them were individually provided, overwrite anything else
+	// Apply overrides using the same systematic approach as DirectClientConfig
 	if config.overrides != nil {
-		if server := config.overrides.ClusterInfo.Server; len(server) > 0 {
-			icc.Host = server
-		}
-		if len(config.overrides.AuthInfo.Token) > 0 || len(config.overrides.AuthInfo.TokenFile) > 0 {
-			icc.BearerToken = config.overrides.AuthInfo.Token
-			icc.BearerTokenFile = config.overrides.AuthInfo.TokenFile
-		}
-		if certificateAuthorityFile := config.overrides.ClusterInfo.CertificateAuthority; len(certificateAuthorityFile) > 0 {
-			icc.TLSClientConfig.CAFile = certificateAuthorityFile
+		if err := applyConfigOverrides(icc, config.overrides); err != nil {
+			return nil, err
 		}
 	}
 
