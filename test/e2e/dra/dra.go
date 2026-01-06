@@ -1098,6 +1098,54 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		}
 	}
 
+	singleNodeMultipleClaimsTests := func() {
+		nodes := drautils.NewNodes(f, 1, 1)
+		// Allow allocating more than one device so that multiple claims can be prepared on the same node.
+		maxAllocations := 2
+		driver := drautils.NewDriver(f, nodes, drautils.DriverResources(maxAllocations)) // All tests get their own driver instance.
+		driver.WithKubelet = true
+		b := drautils.NewBuilder(f, driver)
+
+		// https://github.com/kubernetes/kubernetes/issues/135901 was fixed in master for Kubernetes 1.35 and not backported
+		// so this test only passes for kubelet >= 1.35.
+		f.It("requests an already allocated and a new claim for a pod", f.WithLabel("KubeletMinVersion:1.35"), func(ctx context.Context) {
+			// This test covers a situation when a pod references a mix of already-prepared and new claims.
+			tCtx := f.TContext(ctx)
+
+			firstClaim := b.ExternalClaim()
+			secondClaim := b.ExternalClaim()
+
+			b.Create(tCtx, firstClaim, secondClaim)
+
+			// First pod uses only firstClaim
+			firstPod := b.PodExternal()
+			b.Create(tCtx, firstPod)
+			b.TestPod(tCtx, firstPod)
+
+			// Second pod uses firstClaim (already prepared) + secondClaim (new)
+			secondPod := b.PodExternal()
+
+			secondPod.Spec.ResourceClaims = []v1.PodResourceClaim{
+				{
+					Name:              "first",
+					ResourceClaimName: &firstClaim.Name,
+				},
+				{
+					Name:              "second",
+					ResourceClaimName: &secondClaim.Name,
+				},
+			}
+
+			secondPod.Spec.Containers[0].Resources.Claims = []v1.ResourceClaim{
+				{Name: "first"},
+				{Name: "second"},
+			}
+
+			b.Create(tCtx, secondPod)
+			b.TestPod(tCtx, secondPod)
+		})
+	}
+
 	// The following tests only make sense when there is more than one node.
 	// They get skipped when there's only one node.
 	multiNodeTests := func(withKubelet bool) {
@@ -1975,6 +2023,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 
 	framework.Context("control plane", func() { singleNodeTests(false) })
 	framework.Context("kubelet", feature.DynamicResourceAllocation, "on single node", func() { singleNodeTests(true) })
+	framework.Context("kubelet", feature.DynamicResourceAllocation, "on single node with multiple claims allocation", singleNodeMultipleClaimsTests)
 
 	framework.Context("control plane", func() { multiNodeTests(false) })
 	framework.Context("kubelet", feature.DynamicResourceAllocation, "on multiple nodes", func() { multiNodeTests(true) })
