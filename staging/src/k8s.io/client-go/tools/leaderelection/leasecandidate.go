@@ -19,6 +19,7 @@ package leaderelection
 import (
 	"context"
 	"reflect"
+	"sync"
 	"time"
 
 	v1 "k8s.io/api/coordination/v1"
@@ -118,11 +119,15 @@ func NewCandidate(clientset kubernetes.Interface,
 }
 
 func (c *LeaseCandidate) Run(ctx context.Context) {
-	defer c.queue.ShutDown()
-
 	logger := klog.FromContext(ctx)
 	logger = klog.LoggerWithName(logger, "leasecandidate")
 	ctx = klog.NewContext(ctx, logger)
+
+	var wg sync.WaitGroup
+	defer func() {
+		c.queue.ShutDown()
+		wg.Wait()
+	}()
 
 	c.informerFactory.Start(ctx.Done())
 	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.hasSynced) {
@@ -130,7 +135,9 @@ func (c *LeaseCandidate) Run(ctx context.Context) {
 	}
 
 	c.enqueueLease()
-	go c.runWorker(ctx)
+	wg.Go(func() {
+		c.runWorker(ctx)
+	})
 	<-ctx.Done()
 }
 
