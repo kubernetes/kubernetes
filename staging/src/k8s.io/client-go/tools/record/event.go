@@ -402,7 +402,7 @@ func (e *eventBroadcasterImpl) StartEventWatcher(eventHandler func(*v1.Event)) w
 		return watch.NewEmptyWatch()
 	}
 	go func() {
-		defer utilruntime.HandleCrash()
+		defer utilruntime.HandleCrashWithContext(e.cancelationCtx)
 		for {
 			select {
 			case <-e.cancelationCtx.Done():

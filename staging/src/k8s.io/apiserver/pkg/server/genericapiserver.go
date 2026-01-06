@@ -533,7 +533,7 @@ func (s preparedGenericAPIServer) RunWithContext(ctx context.Context) error {
 	// If UDS profiling is enabled, start a local http server listening on that socket
 	if s.UnprotectedDebugSocket != nil {
 		go func() {
-			defer utilruntime.HandleCrash()
+			defer utilruntime.HandleCrashWithContext(ctx)
 			klog.Error(s.UnprotectedDebugSocket.RunWithContext(ctx))
 		}()
 	}

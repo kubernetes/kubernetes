@@ -75,7 +75,7 @@ func (ec *EstablishingController) QueueCRD(key string, timeout time.Duration) {
 
 // RunWithContext starts the EstablishingController.
 func (ec *EstablishingController) RunWithContext(ctx context.Context) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 	defer ec.queue.ShutDown()
 
 	logger := klog.FromContext(ctx)

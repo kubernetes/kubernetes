@@ -27,7 +27,7 @@ import (
 // is closed.
 func monitorResizeEvents(fd uintptr, resizeEvents chan<- TerminalSize, stop chan struct{}) {
 	go func() {
-		defer runtime.HandleCrash()
+		defer runtime.HandleCrashWithContext(ctx)
 
 		size := GetSize(fd)
 		if size == nil {

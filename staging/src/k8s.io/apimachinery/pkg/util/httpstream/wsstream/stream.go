@@ -122,7 +122,7 @@ func (r *Reader) handle(ws *websocket.Conn) {
 	defer closeConn()
 
 	go func() {
-		defer runtime.HandleCrash()
+		defer runtime.HandleCrashWithContext(ws.Request().Context())
 		// This blocks until the connection is closed.
 		// Client should not send anything.
 		IgnoreReceives(ws, r.timeout)

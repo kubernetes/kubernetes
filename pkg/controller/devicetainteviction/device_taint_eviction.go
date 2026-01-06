@@ -757,7 +757,7 @@ func New(c clientset.Interface, podInformer coreinformers.PodInformer, claimInfo
 // Run starts the controller which will run until the context is done.
 // An error is returned for startup problems.
 func (tc *Controller) Run(ctx context.Context, numWorkers int) error {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting", "controller", tc.name, "numWorkers", numWorkers)
 	defer logger.Info("Shut down controller", "controller", tc.name, "reason", context.Cause(ctx))

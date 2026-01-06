@@ -272,7 +272,7 @@ func (p *ClusterTrustBundlePublisher[T]) caContentChangedListener() dynamiccerti
 }
 
 func (p *ClusterTrustBundlePublisher[T]) Run(ctx context.Context) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting ClusterTrustBundle CA cert publisher controller")
