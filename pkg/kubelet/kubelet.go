@@ -2722,29 +2722,32 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 	sort.Sort(sliceutils.PodsByCreationTime(pods))
 	var pendingResizes []types.UID
 	for _, pod := range pods {
-		// Always add the pod to the pod manager. Kubelet relies on the pod
-		// manager as the source of truth for the desired state. If a pod does
-		// not exist in the pod manager, it means that it has been deleted in
-		// the apiserver and no action (other than cleanup) is required.
-		kl.podManager.AddPod(pod)
+		// Handle mirror pods separately. Mirror pods don't go through admission
+		// and are always added to the pod manager.
+		if kubetypes.IsMirrorPod(pod) {
+			kl.podManager.AddPod(pod)
+			kl.podCertificateManager.TrackPod(context.TODO(), pod)
 
-		kl.podCertificateManager.TrackPod(context.TODO(), pod)
-
-		pod, mirrorPod, wasMirror := kl.podManager.GetPodAndMirrorPod(pod)
-		if wasMirror {
-			if pod == nil {
-				klog.V(2).InfoS("Unable to find pod for mirror pod, skipping", "mirrorPod", klog.KObj(mirrorPod), "mirrorPodUID", mirrorPod.UID)
+			// Look up the static pod this mirror pod corresponds to
+			staticPod, ok := kl.podManager.GetPodByMirrorPod(pod)
+			if !ok || staticPod == nil {
+				klog.V(2).InfoS("Unable to find pod for mirror pod, skipping", "mirrorPod", klog.KObj(pod), "mirrorPodUID", pod.UID)
 				continue
 			}
 			kl.podWorkers.UpdatePod(UpdatePodOptions{
-				Pod:        pod,
-				MirrorPod:  mirrorPod,
+				Pod:        staticPod,
+				MirrorPod:  pod,
 				UpdateType: kubetypes.SyncPodUpdate,
 				StartTime:  start,
 			})
 			continue
 		}
 
+		// For regular and static pods, perform admission check BEFORE adding
+		// to podManager. This ensures rejected pods are never added to podManager
+		// and cannot affect resource accounting for subsequent pod admissions.
+		// See: https://github.com/kubernetes/kubernetes/issues/135296
+		//
 		// Only go through the admission process if the pod is not requested
 		// for termination by another part of the kubelet. If the pod is already
 		// using resources (previously admitted), the pod worker is going to be
@@ -2752,18 +2755,12 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 		// the pod worker is invoked it will also avoid setting up the pod, so
 		// we simply avoid doing any work.
 		// We also do not try to admit the pod that is already in terminated state.
-		if !kl.podWorkers.IsPodTerminationRequested(pod.UID) && !podutil.IsPodPhaseTerminal(pod.Status.Phase) {
+		podRequiresAdmission := !kl.podWorkers.IsPodTerminationRequested(pod.UID) && !podutil.IsPodPhaseTerminal(pod.Status.Phase)
+		if podRequiresAdmission {
 			// Check if we can admit the pod; if not, reject it.
 			// We failed pods that we rejected, so activePods include all admitted
 			// pods that are alive.
 			if ok, reason, message := kl.allocationManager.AddPod(kl.GetActivePods(), pod); !ok {
-				// Remove the pod from podManager since it failed admission.
-				// This prevents rejected pods from being included in resource accounting
-				// for subsequent pod admissions. The pod was added to podManager earlier
-				// to support mirror pod lookups, but rejected pods should not
-				// remain in the manager as they are not admitted.
-				// See: https://github.com/kubernetes/kubernetes/issues/135296
-				kl.podManager.RemovePod(pod)
 				kl.rejectPod(pod, reason, message)
 				// We avoid recording the metric in canAdmitPod because it's called
 				// repeatedly during a resize, which would inflate the metric.
@@ -2772,15 +2769,25 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 				recordAdmissionRejection(reason)
 				continue
 			}
+		}
 
-			if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-				// Backfill the queue of pending resizes, but only after all the pods have
-				// been added. This ensures that no resizes get resolved until all the
-				// existing pods are added.
-				_, updatedFromAllocation := kl.allocationManager.UpdatePodFromAllocation(pod)
-				if updatedFromAllocation {
-					pendingResizes = append(pendingResizes, pod.UID)
-				}
+		// Admission passed (or pod is terminating/terminal). Now add to podManager.
+		// Kubelet relies on the pod manager as the source of truth for the desired
+		// state. If a pod does not exist in the pod manager, it means that it has
+		// been deleted in the apiserver and no action (other than cleanup) is required.
+		kl.podManager.AddPod(pod)
+		kl.podCertificateManager.TrackPod(context.TODO(), pod)
+
+		// Get the mirror pod for static pods (if one exists)
+		mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
+
+		if podRequiresAdmission && utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+			// Backfill the queue of pending resizes, but only after all the pods have
+			// been added. This ensures that no resizes get resolved until all the
+			// existing pods are added.
+			_, updatedFromAllocation := kl.allocationManager.UpdatePodFromAllocation(pod)
+			if updatedFromAllocation {
+				pendingResizes = append(pendingResizes, pod.UID)
 			}
 		}
 		kl.podWorkers.UpdatePod(UpdatePodOptions{
