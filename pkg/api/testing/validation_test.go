@@ -74,7 +74,9 @@ func TestVersionedValidationByFuzzing(t *testing.T) {
 					allRules := append([]field.NormalizationRule{}, resourcevalidation.ResourceNormalizationRules...)
 					allRules = append(allRules, nodevalidation.NodeNormalizationRules...)
 					opts = append(opts, WithNormalizationRules(allRules...))
-					opts = append(opts, WithIgnoreObjectConversionErrors())
+					if gv.Group == "autoscaling" {
+						opts = append(opts, WithIgnoreObjectConversionErrors())
+					}
 
 					VerifyVersionedValidationEquivalence(t, obj, nil, opts...)
 

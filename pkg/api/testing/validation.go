@@ -202,7 +202,8 @@ type validationOption struct {
 	// NormalizationRules are the rules to apply to field paths before comparison.
 	NormalizationRules []field.NormalizationRule
 
-	// IgnoreObjectConversions skips the tests if the conversion between object fails.
+	// IgnoreObjectConversions skips the tests if the conversion from the internal object
+	// to the versioned object fails.
 	IgnoreObjectConversionErrors bool
 }
 

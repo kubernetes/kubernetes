@@ -98,7 +98,7 @@ func runUpdateValidation(t *testing.T, scheme *runtime.Scheme, options []string,
 						t.Fatal(err)
 					}
 					err = scheme.Convert(unversionedNew, versionedNew, nil)
-					if err != nil && ignoreConversionErrors {
+					if ignoreConversionErrors && err != nil {
 						t.Skipf("Failed to convert object from internal type to %s: %v", gvk.Version, err)
 					} else if err != nil {
 						t.Fatal(err)
@@ -111,7 +111,7 @@ func runUpdateValidation(t *testing.T, scheme *runtime.Scheme, options []string,
 						}
 
 						err = scheme.Convert(unversionedOld, versionedOld, nil)
-						if err != nil && ignoreConversionErrors {
+						if ignoreConversionErrors && err != nil {
 							t.Skipf("Failed to convert object from internal type to %s: %v", gvk.Version, err)
 						} else if err != nil {
 							t.Fatal(err)
