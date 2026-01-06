@@ -7905,6 +7905,7 @@ type Secret struct {
 	// If not set to true, the field can be modified at any time.
 	// Defaulted to nil.
 	// +optional
+	// +k8s:optional
 	Immutable *bool `json:"immutable,omitempty" protobuf:"varint,5,opt,name=immutable"`
 
 	// Data contains the secret data. Each key must consist of alphanumeric
@@ -7925,6 +7926,9 @@ type Secret struct {
 	// Used to facilitate programmatic handling of secret data.
 	// More info: https://kubernetes.io/docs/concepts/configuration/secret/#secret-types
 	// +optional
+	// +k8s:optional
+	// +k8s:immutable
+	// +default="Opaque"
 	Type SecretType `json:"type,omitempty" protobuf:"bytes,3,opt,name=type,casttype=SecretType"`
 }
 

@@ -5766,6 +5766,7 @@ message Secret {
   // If not set to true, the field can be modified at any time.
   // Defaulted to nil.
   // +optional
+  // +k8s:optional
   optional bool immutable = 5;
 
   // Data contains the secret data. Each key must consist of alphanumeric
@@ -5786,6 +5787,9 @@ message Secret {
   // Used to facilitate programmatic handling of secret data.
   // More info: https://kubernetes.io/docs/concepts/configuration/secret/#secret-types
   // +optional
+  // +k8s:optional
+  // +k8s:immutable
+  // +default="Opaque"
   optional string type = 3;
 }
 
