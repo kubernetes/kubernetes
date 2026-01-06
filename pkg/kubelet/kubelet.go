@@ -2826,7 +2826,7 @@ func (kl *Kubelet) HandlePodUpdates(pods []*v1.Pod) {
 			}
 		}
 
-		if utilfeature.DefaultFeatureGate.Enabled(features.NodeDeclaredFeatures) {
+		if utilfeature.DefaultFeatureGate.Enabled(features.NodeDeclaredFeatures) && oldPod != nil {
 			oldPodInfo := &ndf.PodInfo{Spec: &oldPod.Spec, Status: &oldPod.Status}
 			newPodInfo := &ndf.PodInfo{Spec: &pod.Spec, Status: &pod.Status}
 			reqs, err := kl.nodeDeclaredFeaturesFramework.InferForPodUpdate(oldPodInfo, newPodInfo, kl.version)
