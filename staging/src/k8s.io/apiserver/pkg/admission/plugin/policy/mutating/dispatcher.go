@@ -137,8 +137,8 @@ func (d *dispatcher) dispatchInvocations(
 	// Should loop through invocations, handling possible error and invoking
 	// evaluator to apply patch, also should handle re-invocations
 	for _, invocation := range invocations {
-		if invocation.Evaluator.CompositionEnv != nil {
-			ctx = invocation.Evaluator.CompositionEnv.CreateContext(ctx)
+		if invocation.Evaluator.CompositedCompiler != nil {
+			ctx = invocation.Evaluator.CompositedCompiler.CreateContext(ctx)
 		}
 		if len(invocation.Evaluator.Mutators) != len(invocation.Policy.Spec.Mutations) {
 			// This would be a bug. The compiler should always return exactly as

@@ -45,15 +45,17 @@ type validator struct {
 	auditAnnotationFilter cel.ConditionEvaluator
 	messageFilter         cel.ConditionEvaluator
 	failPolicy            *v1.FailurePolicyType
+	compilerError         error
 }
 
-func NewValidator(validationFilter cel.ConditionEvaluator, celMatcher matchconditions.Matcher, auditAnnotationFilter, messageFilter cel.ConditionEvaluator, failPolicy *v1.FailurePolicyType) Validator {
+func NewValidator(validationFilter cel.ConditionEvaluator, celMatcher matchconditions.Matcher, auditAnnotationFilter, messageFilter cel.ConditionEvaluator, failPolicy *v1.FailurePolicyType, compilerError error) Validator {
 	return &validator{
 		celMatcher:            celMatcher,
 		validationFilter:      validationFilter,
 		auditAnnotationFilter: auditAnnotationFilter,
 		messageFilter:         messageFilter,
 		failPolicy:            failPolicy,
+		compilerError:         compilerError,
 	}
 }
 
@@ -80,6 +82,17 @@ func (v *validator) Validate(ctx context.Context, matchedResource schema.GroupVe
 		f = v1.Fail
 	} else {
 		f = *v.failPolicy
+	}
+	if v.compilerError != nil {
+		return ValidateResult{
+			Decisions: []PolicyDecision{
+				{
+					Action:     policyDecisionActionForError(f),
+					Evaluation: EvalError,
+					Message:    v.compilerError.Error(),
+				},
+			},
+		}
 	}
 	if v.celMatcher != nil {
 		matchResults := v.celMatcher.Match(ctx, versionedAttr, versionedParams, authz)
