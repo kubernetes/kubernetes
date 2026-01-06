@@ -89,7 +89,6 @@ func NewStorageFactoryConfigEffectiveVersion(effectiveVersion basecompatibility.
 		resource.Resource("devicetaintrules").WithVersion("v1alpha3"),
 		scheduling.Resource("workloads").WithVersion("v1alpha1"),
 	}
-
 	return &StorageFactoryConfig{
 		Serializer:                legacyscheme.Codecs,
 		DefaultResourceEncoding:   serverstorage.NewDefaultResourceEncodingConfigForEffectiveVersion(legacyscheme.Scheme, effectiveVersion),
