@@ -298,7 +298,7 @@ func (e *VolumeAttachLimitExceededError) Error() string {
 
 func (vm *volumeManager) Run(ctx context.Context, sourcesReady config.SourcesReady) {
 	logger := klog.FromContext(ctx)
-	defer runtime.HandleCrash()
+	defer runtime.HandleCrashWithContext(ctx)
 
 	if vm.kubeClient != nil {
 		// start informer for CSIDriver
