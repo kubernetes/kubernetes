@@ -48,14 +48,6 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 		}
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
-	// type ReplicationControllerList
-	scheme.AddValidationFunc((*corev1.ReplicationControllerList)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_ReplicationControllerList(ctx, op, nil /* fldPath */, obj.(*corev1.ReplicationControllerList), safe.Cast[*corev1.ReplicationControllerList](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
 	return nil
 }
 
@@ -98,27 +90,6 @@ func Validate_ReplicationController(ctx context.Context, op operation.Operation,
 		}(fldPath.Child("spec"), &obj.Spec, safe.Field(oldObj, func(oldObj *corev1.ReplicationController) *corev1.ReplicationControllerSpec { return &oldObj.Spec }), oldObj != nil)...)
 
 	// field corev1.ReplicationController.Status has no validation
-	return errs
-}
-
-// Validate_ReplicationControllerList validates an instance of ReplicationControllerList according
-// to declarative validation rules in the API schema.
-func Validate_ReplicationControllerList(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *corev1.ReplicationControllerList) (errs field.ErrorList) {
-	// field corev1.ReplicationControllerList.TypeMeta has no validation
-	// field corev1.ReplicationControllerList.ListMeta has no validation
-
-	// field corev1.ReplicationControllerList.Items
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []corev1.ReplicationController, oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
-			}
-			// iterate the list and call the type's validation function
-			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_ReplicationController)...)
-			return
-		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *corev1.ReplicationControllerList) []corev1.ReplicationController { return oldObj.Items }), oldObj != nil)...)
-
 	return errs
 }
 
