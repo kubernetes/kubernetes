@@ -1120,7 +1120,7 @@
     preRelease: Beta
     version: "1.34"
   - default: true
-    lockToDefault: true
+    lockToDefault: false
     preRelease: GA
     version: "1.36"
 - name: NFTablesProxyMode
