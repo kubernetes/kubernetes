@@ -278,6 +278,26 @@ func TestQuantity(t *testing.T) {
 			expectValue: trueVal,
 		},
 		{
+			name:        "divide_zero_scale",
+			expr:        `quantity("10").div(2, 0) == quantity("5")`,
+			expectValue: trueVal,
+		},
+		{
+			name:        "div_large_whole_number",
+			expr:        `quantity("1329227995784915872903807060280344576").div(256) == quantity("5192296858534827628530496329220096")`,
+			expectValue: trueVal,
+		},
+		{
+			name:        "large_integer_no_precision_loss",
+			expr:        `quantity("1152921504606846976").divInt(2) == quantity("576460752303423488")`,
+			expectValue: trueVal,
+		},
+		{
+			name:        "divide_scaled",
+			expr:        `quantity("10k").div(2) == quantity("5000")`,
+			expectValue: trueVal,
+		},
+		{
 			name:        "divide_float_result",
 			expr:        `quantity("10000").div(3).asApproximateFloat()`,
 			expectValue: types.Double(3333.3333),
@@ -298,11 +318,6 @@ func TestQuantity(t *testing.T) {
 				tolerance := 0.01
 				return math.Abs(float64(e)-float64(a)) < tolerance
 			},
-		},
-		{
-			name:        "divide_scaled",
-			expr:        `quantity("10k").div(2) == quantity("5000")`,
-			expectValue: trueVal,
 		},
 		{
 			name:        "integer_division",

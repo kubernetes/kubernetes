@@ -150,6 +150,10 @@ const (
 	splitREString = "^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$"
 )
 
+const (
+	zeroDivErrMsg = "division by zero error"
+)
+
 var (
 	// Errors that could happen while parsing a string.
 	ErrFormatWrong = errors.New("quantities must match the regular expression '" + splitREString + "'")
@@ -638,19 +642,35 @@ func (q *Quantity) Mul(y int64) bool {
 
 func (q *Quantity) QuoRound(y int64, roundVal int64) bool {
 	if y == 0 {
-		panic("division by zero error")
+		panic(zeroDivErrMsg)
+	}
+	if roundVal < 0 {
+		panic("negative rounding values are not allowed")
 	}
 
 	q.s = ""
 	if q.d.Dec == nil {
-		val, _ := q.i.AsInt64()
-		infDec := inf.NewDec(val, inf.Scale(0))
+		realVal, _ := q.i.AsInt64()
+		infDec := inf.NewDec(realVal, inf.Scale(0))
 		infDec.QuoRound(infDec, inf.NewDec(y, inf.Scale(0)), inf.Scale(roundVal), inf.RoundDown)
-		// check if its a whole number
-		if infDec.UnscaledBig().IsInt64() {
+		if int64(infDec.Scale()) == 0 {
+			// the scale is zero. then infdec is directly representable as an int
 			q.i = int64Amount{value: infDec.UnscaledBig().Int64()}
 			return true
+		} else {
+			// the scale isn't zero, so the infDec might be a decimal. we need to check if after we bring it back to scale
+			// will there be remaining numbers after division by 10
+			if rem := new(big.Int).Set(infDec.UnscaledBig()).Mod(infDec.UnscaledBig(), big.NewInt(10)); rem.Int64() == 0 {
+				// bring it back to scale by dividing by dividing by 10^scale, we don't need to account for
+				// the remainder since we are doing integer division
+				s := int64(infDec.Scale())
+				e := new(big.Int).Exp(big.NewInt(10), big.NewInt(s), nil)
+				infDec.UnscaledBig().Quo(infDec.UnscaledBig(), e)
+				q.i = int64Amount{value: infDec.UnscaledBig().Int64()}
+				return true
+			}
 		}
+
 		q.d.Dec = infDec
 		return false
 	}
@@ -659,7 +679,7 @@ func (q *Quantity) QuoRound(y int64, roundVal int64) bool {
 
 func (q *Quantity) QuoIntegerDivision(y int64) bool {
 	if y == 0 {
-		panic("division by zero error")
+		panic(zeroDivErrMsg)
 	}
 
 	q.s = ""
@@ -667,6 +687,7 @@ func (q *Quantity) QuoIntegerDivision(y int64) bool {
 		val, _ := q.i.AsInt64()
 		q.i = int64Amount{value: val / y}
 	} else {
+		// this is zero scaled so its ok here for us to use the unscaled big as the final value
 		result := new(inf.Dec).QuoRound(q.d.Dec, inf.NewDec(y, 0), 0, inf.RoundDown)
 		q.i = int64Amount{value: result.UnscaledBig().Int64()}
 		q.d.Dec = nil
