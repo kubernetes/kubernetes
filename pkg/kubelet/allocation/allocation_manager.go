@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -588,10 +589,10 @@ func (m *manager) handlePodResourcesResize(logger klog.Logger, pod *v1.Pod) (boo
 		m.statusManager.ClearPodResizePendingCondition(pod.UID)
 		return false, nil
 
-	} else if resizable, msg, reason := IsInPlacePodVerticalScalingAllowed(pod); !resizable {
+	} else if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		// If there is a pending resize but the resize is not allowed, always use the allocated resources.
-		metrics.PodInfeasibleResizes.WithLabelValues(reason).Inc()
-		m.statusManager.SetPodResizePendingCondition(pod.UID, v1.PodReasonInfeasible, msg, pod.Generation)
+		metrics.PodInfeasibleResizes.WithLabelValues("feature_gate_off").Inc()
+		m.statusManager.SetPodResizePendingCondition(pod.UID, v1.PodReasonInfeasible, "InPlacePodVerticalScaling is disabled", pod.Generation)
 		return false, nil
 
 	} else if resizeNotAllowed, msg := disallowResizeForSwappableContainers(m.containerRuntime, pod, allocatedPod); resizeNotAllowed {
@@ -602,10 +603,10 @@ func (m *manager) handlePodResourcesResize(logger klog.Logger, pod *v1.Pod) (boo
 	}
 
 	if !apiequality.Semantic.DeepEqual(pod.Spec.Resources, allocatedPod.Spec.Resources) {
-		if resizable, msg, reason := IsInPlacePodLevelResourcesVerticalScalingAllowed(pod); !resizable {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
 			// If there is a pending pod-level resources resize but the resize is not allowed, always use the allocated resources.
-			metrics.PodInfeasibleResizes.WithLabelValues(reason).Inc()
-			m.statusManager.SetPodResizePendingCondition(pod.UID, v1.PodReasonInfeasible, msg, pod.Generation)
+			metrics.PodInfeasibleResizes.WithLabelValues("plr_feature_gate_off").Inc()
+			m.statusManager.SetPodResizePendingCondition(pod.UID, v1.PodReasonInfeasible, "InPlacePodLevelResourcesVerticalScaling is disabled", pod.Generation)
 			return false, nil
 		}
 	}
@@ -728,18 +729,19 @@ func (m *manager) canResizePod(logger klog.Logger, allocatedPods []*v1.Pod, pod 
 		}
 	}
 
-	cpuAvailable := m.nodeAllocatableAbsolute.Cpu().MilliValue()
-	memAvailable := m.nodeAllocatableAbsolute.Memory().Value()
+	cpuAllocatable := m.nodeAllocatableAbsolute.Cpu().MilliValue()
+	memAllocatable := m.nodeAllocatableAbsolute.Memory().Value()
 	cpuRequests := resource.GetResourceRequest(pod, v1.ResourceCPU)
 	memRequests := resource.GetResourceRequest(pod, v1.ResourceMemory)
-	if cpuRequests > cpuAvailable || memRequests > memAvailable {
-		var msg string
-		if memRequests > memAvailable {
-			msg = fmt.Sprintf("memory, requested: %d, capacity: %d", memRequests, memAvailable)
-		} else {
-			msg = fmt.Sprintf("cpu, requested: %d, capacity: %d", cpuRequests, cpuAvailable)
-		}
-		msg = "Node didn't have enough capacity: " + msg
+	var msgs []string
+	if cpuRequests > cpuAllocatable {
+		msgs = append(msgs, fmt.Sprintf("cpu, requested: %d, allocatable: %d", cpuRequests, cpuAllocatable))
+	}
+	if memRequests > memAllocatable {
+		msgs = append(msgs, fmt.Sprintf("memory, requested: %d, allocatable: %d", memRequests, memAllocatable))
+	}
+	if len(msgs) > 0 {
+		msg := fmt.Sprintf("Node didn't have enough capacity: %s", strings.Join(msgs, "; "))
 		logger.V(3).Info(msg, "pod", klog.KObj(pod))
 		metrics.PodInfeasibleResizes.WithLabelValues("insufficient_node_allocatable").Inc()
 		return false, v1.PodReasonInfeasible, msg
