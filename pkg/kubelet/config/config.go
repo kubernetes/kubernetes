@@ -99,11 +99,6 @@ func (c *PodConfig) Updates() <-chan kubetypes.PodUpdate {
 	return c.updates
 }
 
-// Sync requests the full configuration be delivered to the update channel.
-func (c *PodConfig) Sync() {
-	c.pods.sync()
-}
-
 // podStorage manages the current pod state at any point in time and ensures updates
 // to the channel are delivered in order.  Note that this object is an in-memory source of
 // "truth" and on creation contains zero entries.  Once all previously read sources are
@@ -403,25 +398,6 @@ func checkAndUpdatePod(existing, ref *v1.Pod) (needUpdate, needReconcile, needGr
 	}
 
 	return
-}
-
-// sync sends a copy of the current state through the update channel.
-func (s *podStorage) sync() {
-	s.updateLock.Lock()
-	defer s.updateLock.Unlock()
-	s.updates <- kubetypes.PodUpdate{Pods: s.mergedState().([]*v1.Pod), Op: kubetypes.SET, Source: kubetypes.AllSource}
-}
-
-func (s *podStorage) mergedState() interface{} {
-	s.podLock.RLock()
-	defer s.podLock.RUnlock()
-	pods := make([]*v1.Pod, 0)
-	for _, sourcePods := range s.pods {
-		for _, podRef := range sourcePods {
-			pods = append(pods, podRef.DeepCopy())
-		}
-	}
-	return pods
 }
 
 func copyPods(sourcePods []*v1.Pod) []*v1.Pod {

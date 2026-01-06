@@ -144,49 +144,40 @@ func expectNoPodUpdate(t *testing.T, ch <-chan kubetypes.PodUpdate) {
 func TestNewPodAdded(t *testing.T) {
 	tCtx := ktesting.Init(t)
 
-	channel, ch, config := createPodConfigTester(tCtx)
+	channel, ch, _ := createPodConfigTester(tCtx)
 
 	// see an update
 	podUpdate := createSourceUpdate(CreateValidPod("foo", "new"))
 	channel <- podUpdate
 	expectPodUpdate(t, ch, CreatePodUpdate(kubetypes.ADD, TestSource, CreateValidPod("foo", "new")))
-
-	config.Sync()
-	expectPodUpdate(t, ch, CreatePodUpdate(kubetypes.SET, kubetypes.AllSource, CreateValidPod("foo", "new")))
 }
 
 func TestNewPodAddedInvalidNamespace(t *testing.T) {
 	tCtx := ktesting.Init(t)
 
-	channel, ch, config := createPodConfigTester(tCtx)
+	channel, ch, _ := createPodConfigTester(tCtx)
 
 	// see an update
 	podUpdate := createSourceUpdate(CreateValidPod("foo", ""))
 	channel <- podUpdate
 	expectPodUpdate(t, ch, CreatePodUpdate(kubetypes.ADD, TestSource, CreateValidPod("foo", "")))
-
-	config.Sync()
-	expectPodUpdate(t, ch, CreatePodUpdate(kubetypes.SET, kubetypes.AllSource, CreateValidPod("foo", "")))
 }
 
 func TestNewPodAddedDefaultNamespace(t *testing.T) {
 	tCtx := ktesting.Init(t)
 
-	channel, ch, config := createPodConfigTester(tCtx)
+	channel, ch, _ := createPodConfigTester(tCtx)
 
 	// see an update
 	podUpdate := createSourceUpdate(CreateValidPod("foo", "default"))
 	channel <- podUpdate
 	expectPodUpdate(t, ch, CreatePodUpdate(kubetypes.ADD, TestSource, CreateValidPod("foo", "default")))
-
-	config.Sync()
-	expectPodUpdate(t, ch, CreatePodUpdate(kubetypes.SET, kubetypes.AllSource, CreateValidPod("foo", "default")))
 }
 
 func TestNewPodAddedDifferentNamespaces(t *testing.T) {
 	tCtx := ktesting.Init(t)
 
-	channel, ch, config := createPodConfigTester(tCtx)
+	channel, ch, _ := createPodConfigTester(tCtx)
 
 	// see an update
 	pod1 := CreateValidPod("foo", "default")
@@ -199,9 +190,6 @@ func TestNewPodAddedDifferentNamespaces(t *testing.T) {
 	podUpdate = createSourceUpdate(pod1, pod2)
 	channel <- podUpdate
 	expectPodUpdate(t, ch, CreatePodUpdate(kubetypes.ADD, TestSource, CreateValidPod("foo", "new")))
-
-	config.Sync()
-	expectPodUpdate(t, ch, CreatePodUpdate(kubetypes.SET, kubetypes.AllSource, CreateValidPod("foo", "default"), CreateValidPod("foo", "new")))
 }
 
 func TestInvalidPodFiltered(t *testing.T) {
