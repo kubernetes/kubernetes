@@ -71,7 +71,7 @@ var _ = SIGDescribe("Kubelet Pods API", framework.WithSerial(), func() {
 			framework.ExpectNoError(err, "failed to get local endpoint for Pods API")
 
 			gomega.Eventually(ctx, func(ctx context.Context) error {
-				conn, err = grpc.DialContext(ctx, endpoint, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
+				conn, err = grpc.NewClient(endpoint, grpc.WithTransportCredentials(insecure.NewCredentials()))
 				if err != nil {
 					return err
 				}
@@ -79,7 +79,7 @@ var _ = SIGDescribe("Kubelet Pods API", framework.WithSerial(), func() {
 				// Make a simple call to ensure the server is responsive.
 				_, err = client.ListPods(ctx, &podsv1alpha1.ListPodsRequest{})
 				if err != nil {
-					conn.Close() // Close connection on failure to retry dialing
+					_ = conn.Close() // Close connection on failure to retry dialing
 					return err
 				}
 				return nil
@@ -88,7 +88,7 @@ var _ = SIGDescribe("Kubelet Pods API", framework.WithSerial(), func() {
 
 		ginkgo.AfterEach(func() {
 			if conn != nil {
-				conn.Close()
+				_ = conn.Close()
 			}
 		})
 
@@ -133,7 +133,7 @@ var _ = SIGDescribe("Kubelet Pods API", framework.WithSerial(), func() {
 					}
 				}
 				return false
-			}, "1m", "5s").Should(gomega.BeTrue(), "test pod not found in list")
+			}, "1m", "5s").Should(gomega.BeTrueBecause("test pod should be present in the list"))
 
 			ginkgo.By("getting the test pod by UID")
 			getResp, err := client.GetPod(ctx, &podsv1alpha1.GetPodRequest{PodUID: string(testPod.UID)})
@@ -255,7 +255,7 @@ var _ = SIGDescribe("Kubelet Pods API", framework.WithSerial(), func() {
 			framework.ExpectNoError(err, "failed to write static pod file")
 
 			defer func() {
-				os.Remove(staticPodPath)
+				_ = os.Remove(staticPodPath)
 			}()
 
 			ginkgo.By("waiting for the static pod ADDED event")
@@ -267,7 +267,7 @@ var _ = SIGDescribe("Kubelet Pods API", framework.WithSerial(), func() {
 						return false
 					}
 					return p.Namespace == f.Namespace.Name && p.Name == staticPodName+"-"+framework.TestContext.NodeName
-				}, gomega.BeTrue()),
+				}, gomega.BeTrueBecause("static pod should match the expected name and namespace")),
 			)), "did not receive ADDED event")
 
 			ginkgo.By("deleting the static pod manifest")
@@ -283,7 +283,7 @@ var _ = SIGDescribe("Kubelet Pods API", framework.WithSerial(), func() {
 						return false
 					}
 					return p.Namespace == f.Namespace.Name && p.Name == staticPodName+"-"+framework.TestContext.NodeName
-				}, gomega.BeTrue()),
+				}, gomega.BeTrueBecause("static pod should match the expected name and namespace")),
 			)), "did not receive DELETED event")
 		})
 
