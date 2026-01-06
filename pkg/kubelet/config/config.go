@@ -70,6 +70,10 @@ type PodConfig struct {
 	sources     sets.Set[string]
 }
 
+type sourceUpdate struct {
+	Pods []*v1.Pod
+}
+
 // NewPodConfig creates an object that can merge many configuration sources into a stream
 // of normalized updates to a pod configuration.
 func NewPodConfig(mode PodConfigNotificationMode, recorder record.EventRecorder, startupSLIObserver podStartupSLIObserver) *PodConfig {
@@ -86,7 +90,7 @@ func NewPodConfig(mode PodConfigNotificationMode, recorder record.EventRecorder,
 
 // Channel creates or returns a config source channel.  The channel
 // only accepts PodUpdates
-func (c *PodConfig) Channel(ctx context.Context, source string) chan<- interface{} {
+func (c *PodConfig) Channel(ctx context.Context, source string) chan<- sourceUpdate {
 	c.sourcesLock.Lock()
 	defer c.sourcesLock.Unlock()
 	c.sources.Insert(source)
@@ -157,15 +161,15 @@ func newPodStorage(updates chan<- kubetypes.PodUpdate, mode PodConfigNotificatio
 	}
 }
 
-// Merge normalizes a set of incoming changes from different sources into a map of all Pods
-// and ensures that redundant changes are filtered out, and then pushes zero or more minimal
+// Merge normalizes a set of incoming updates from different sources into a map of all Pods
+// and ensures that redundant updates are filtered out, and then pushes zero or more minimal
 // updates onto the update channel.  Ensures that updates are delivered in order.
-func (s *podStorage) Merge(ctx context.Context, source string, change interface{}) error {
+func (s *podStorage) Merge(ctx context.Context, source string, update sourceUpdate) error {
 	s.updateLock.Lock()
 	defer s.updateLock.Unlock()
 
 	seenBefore := s.sourcesSeen.Has(source)
-	adds, updates, deletes, removes, reconciles := s.merge(ctx, source, change)
+	adds, updates, deletes, removes, reconciles := s.merge(ctx, source, update)
 	firstSet := !seenBefore && s.sourcesSeen.Has(source)
 
 	// deliver update notifications
@@ -219,7 +223,7 @@ func (s *podStorage) Merge(ctx context.Context, source string, change interface{
 	return nil
 }
 
-func (s *podStorage) merge(ctx context.Context, source string, change interface{}) (adds, updates, deletes, removes, reconciles *kubetypes.PodUpdate) {
+func (s *podStorage) merge(ctx context.Context, source string, update sourceUpdate) (adds, updates, deletes, removes, reconciles *kubetypes.PodUpdate) {
 	s.podLock.Lock()
 	defer s.podLock.Unlock()
 	logger := klog.FromContext(ctx)
@@ -268,47 +272,17 @@ func (s *podStorage) merge(ctx context.Context, source string, change interface{
 		}
 	}
 
-	update := change.(kubetypes.PodUpdate)
-	switch update.Op {
-	case kubetypes.ADD, kubetypes.UPDATE, kubetypes.DELETE:
-		if update.Op == kubetypes.ADD {
-			logger.V(4).Info("Adding new pods from source", "source", source, "pods", klog.KObjSlice(update.Pods))
-		} else if update.Op == kubetypes.DELETE {
-			logger.V(4).Info("Gracefully deleting pods from source", "source", source, "pods", klog.KObjSlice(update.Pods))
-		} else {
-			logger.V(4).Info("Updating pods from source", "source", source, "pods", klog.KObjSlice(update.Pods))
+	logger.V(4).Info("Setting pods for source", "source", source)
+	s.markSourceSet(source)
+	// Clear the old map entries by just creating a new map
+	oldPods := pods
+	pods = make(map[types.UID]*v1.Pod)
+	updatePodsFunc(update.Pods, oldPods, pods)
+	for uid, existing := range oldPods {
+		if _, found := pods[uid]; !found {
+			// this is a delete
+			removePods = append(removePods, existing)
 		}
-		updatePodsFunc(update.Pods, pods, pods)
-
-	case kubetypes.REMOVE:
-		logger.V(4).Info("Removing pods from source", "source", source, "pods", klog.KObjSlice(update.Pods))
-		for _, value := range update.Pods {
-			if existing, found := pods[value.UID]; found {
-				// this is a delete
-				delete(pods, value.UID)
-				removePods = append(removePods, existing)
-				continue
-			}
-			// this is a no-op
-		}
-
-	case kubetypes.SET:
-		logger.V(4).Info("Setting pods for source", "source", source)
-		s.markSourceSet(source)
-		// Clear the old map entries by just creating a new map
-		oldPods := pods
-		pods = make(map[types.UID]*v1.Pod)
-		updatePodsFunc(update.Pods, oldPods, pods)
-		for uid, existing := range oldPods {
-			if _, found := pods[uid]; !found {
-				// this is a delete
-				removePods = append(removePods, existing)
-			}
-		}
-
-	default:
-		logger.Info("Received invalid update type", "type", update)
-
 	}
 
 	s.pods[source] = pods
