@@ -224,7 +224,7 @@ func (svmc *SVMController) sync(ctx context.Context, key string) error {
 		return err
 	}
 	if !exists {
-		logger.V(4).Error(err, "resource does not exist in our rest mapper", "gvr", gvr.String())
+		logger.V(4).Info("resource does not exist in our rest mapper", "gvr", gvr.String())
 		if toBeProcessedSVM.CreationTimestamp.Add(time.Minute).After(time.Now()) {
 			return fmt.Errorf("resource does not exist in rest mapper, requeuing to attempt again: %w", err)
 		}
@@ -241,7 +241,7 @@ func (svmc *SVMController) sync(ctx context.Context, key string) error {
 		return errMonitor
 	}
 	if !hasSynced {
-		logger.V(4).Error(errMonitor, "resource does not exist in GC", "gvr", gvr.String())
+		logger.V(4).Info("resource does not exist in GC", "gvr", gvr.String())
 
 		// our mapper could be missing a recently created custom resource, so give it some time to catch up
 		// we resync discovery every 30 seconds so twice that should be sufficient
@@ -308,7 +308,7 @@ func (svmc *SVMController) runMigration(ctx context.Context, logger klog.Logger,
 		}
 		rvCmp, err := resourceversion.CompareResourceVersion(accessor.GetResourceVersion(), listResourceVersion)
 		if err != nil {
-			logger.V(4).Error(err, "Unable to compare the resource version of the resource", "namespace", accessor.GetNamespace(), "name", accessor.GetName(), "gvr", gvr.String(), "accessorRV", accessor.GetResourceVersion(), "listResourceVersion", listResourceVersion, "error", err.Error())
+			logger.Error(err, "Unable to compare the resource version of the resource", "namespace", accessor.GetNamespace(), "name", accessor.GetName(), "gvr", gvr.String(), "accessorRV", accessor.GetResourceVersion(), "listResourceVersion", listResourceVersion, "error", err.Error())
 			return svmc.failMigration(ctx, toBeProcessedSVM, err), true
 		}
 		if rvCmp == 1 {
@@ -358,7 +358,7 @@ func (svmc *SVMController) runMigration(ctx context.Context, logger klog.Logger,
 		}
 
 		if errPatch != nil {
-			logger.V(4).Error(errPatch, "Failed to migrate the resource", "namespace", accessor.GetNamespace(), "name", accessor.GetName(), "gvr", gvr.String(), "reason", apierrors.ReasonForError(errPatch))
+			logger.Error(errPatch, "Failed to migrate the resource", "namespace", accessor.GetNamespace(), "name", accessor.GetName(), "gvr", gvr.String(), "reason", apierrors.ReasonForError(errPatch))
 			errStatus := svmc.failMigration(ctx, toBeProcessedSVM, errPatch)
 			return errStatus, true
 		}
