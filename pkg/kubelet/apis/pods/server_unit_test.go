@@ -35,7 +35,7 @@ import (
 	podsv1alpha1 "k8s.io/kubelet/pkg/apis/pods/v1alpha1"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	corefuzzer "k8s.io/kubernetes/pkg/apis/core/fuzzer"
-	podsapi "k8s.io/kubernetes/pkg/kubele t/apis/pods"
+	podsapi "k8s.io/kubernetes/pkg/kubelet/apis/pods"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	kubepodtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
 )
