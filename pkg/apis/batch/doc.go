@@ -15,5 +15,6 @@ limitations under the License.
 */
 
 // +k8s:deepcopy-gen=package
+// +k8s:validation-gen=true
 
 package batch
