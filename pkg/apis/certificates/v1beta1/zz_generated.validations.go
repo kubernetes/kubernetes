@@ -63,7 +63,20 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 func Validate_CertificateSigningRequest(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *certificatesv1beta1.CertificateSigningRequest) (errs field.ErrorList) {
 	// field certificatesv1beta1.CertificateSigningRequest.TypeMeta has no validation
 	// field certificatesv1beta1.CertificateSigningRequest.ObjectMeta has no validation
-	// field certificatesv1beta1.CertificateSigningRequest.Spec has no validation
+
+	// field certificatesv1beta1.CertificateSigningRequest.Spec
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *certificatesv1beta1.CertificateSigningRequestSpec, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_CertificateSigningRequestSpec(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("spec"), &obj.Spec, safe.Field(oldObj, func(oldObj *certificatesv1beta1.CertificateSigningRequest) *certificatesv1beta1.CertificateSigningRequestSpec {
+			return &oldObj.Spec
+		}), oldObj != nil)...)
 
 	// field certificatesv1beta1.CertificateSigningRequest.Status
 	errs = append(errs,
@@ -102,6 +115,41 @@ func Validate_CertificateSigningRequestList(ctx context.Context, op operation.Op
 			return oldObj.Items
 		}), oldObj != nil)...)
 
+	return errs
+}
+
+// Validate_CertificateSigningRequestSpec validates an instance of CertificateSigningRequestSpec according
+// to declarative validation rules in the API schema.
+func Validate_CertificateSigningRequestSpec(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *certificatesv1beta1.CertificateSigningRequestSpec) (errs field.ErrorList) {
+	// field certificatesv1beta1.CertificateSigningRequestSpec.Request has no validation
+	// field certificatesv1beta1.CertificateSigningRequestSpec.SignerName has no validation
+	// field certificatesv1beta1.CertificateSigningRequestSpec.ExpirationSeconds has no validation
+
+	// field certificatesv1beta1.CertificateSigningRequestSpec.Usages
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []certificatesv1beta1.KeyUsage, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("usages"), obj.Usages, safe.Field(oldObj, func(oldObj *certificatesv1beta1.CertificateSigningRequestSpec) []certificatesv1beta1.KeyUsage {
+			return oldObj.Usages
+		}), oldObj != nil)...)
+
+	// field certificatesv1beta1.CertificateSigningRequestSpec.Username has no validation
+	// field certificatesv1beta1.CertificateSigningRequestSpec.UID has no validation
+	// field certificatesv1beta1.CertificateSigningRequestSpec.Groups has no validation
+	// field certificatesv1beta1.CertificateSigningRequestSpec.Extra has no validation
 	return errs
 }
 
