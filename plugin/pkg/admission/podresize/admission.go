@@ -24,6 +24,8 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/client-go/informers"
@@ -38,6 +40,9 @@ import (
 const (
 	// PluginName is the name of this admission controller plugin.
 	PluginName = "PodResizeValidator"
+
+	ReasonNodeCapacity        metav1.CauseType = "NodeCapacity"
+	ReasonUnsupportedPlatform metav1.CauseType = "UnsupportedPlatform"
 )
 
 // Register registers a plugin.
@@ -149,12 +154,20 @@ func (p *Plugin) validatePodResize(pod *core.Pod, a admission.Attributes) error 
 
 	// If the new requests are larger than the node allocatable, reject the update.
 	if err := validateNodeAllocatable(podV1, node); err != nil {
-		return admission.NewForbidden(a, err)
+		statusErr := admission.NewForbidden(a, err).(*apierrors.StatusError)
+		statusErr.ErrStatus.Details.Causes = append(statusErr.ErrStatus.Details.Causes, metav1.StatusCause{
+			Type: ReasonNodeCapacity,
+		})
+		return statusErr
 	}
 
 	// If the node is not a linux node, reject the update.
 	if err := validateLinuxNode(node); err != nil {
-		return admission.NewForbidden(a, err)
+		statusErr := admission.NewForbidden(a, err).(*apierrors.StatusError)
+		statusErr.ErrStatus.Details.Causes = append(statusErr.ErrStatus.Details.Causes, metav1.StatusCause{
+			Type: ReasonUnsupportedPlatform,
+		})
+		return statusErr
 	}
 
 	return nil
