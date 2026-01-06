@@ -18,7 +18,6 @@ package config
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 	"sync"
 	"time"
@@ -32,23 +31,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
-)
-
-// PodConfigNotificationMode describes how changes are sent to the update channel.
-type PodConfigNotificationMode int
-
-const (
-	// PodConfigNotificationUnknown is the default value for
-	// PodConfigNotificationMode when uninitialized.
-	PodConfigNotificationUnknown PodConfigNotificationMode = iota
-	// PodConfigNotificationSnapshot delivers the full configuration as a SET whenever
-	// any change occurs.
-	PodConfigNotificationSnapshot
-	// PodConfigNotificationSnapshotAndUpdates delivers an UPDATE and DELETE message whenever pods are
-	// changed, and a SET message if there are any additions or removals.
-	PodConfigNotificationSnapshotAndUpdates
-	// PodConfigNotificationIncremental delivers ADD, UPDATE, DELETE, REMOVE, RECONCILE to the update channel.
-	PodConfigNotificationIncremental
 )
 
 type podStartupSLIObserver interface {
@@ -76,9 +58,9 @@ type sourceUpdate struct {
 
 // NewPodConfig creates an object that can merge many configuration sources into a stream
 // of normalized updates to a pod configuration.
-func NewPodConfig(mode PodConfigNotificationMode, recorder record.EventRecorder, startupSLIObserver podStartupSLIObserver) *PodConfig {
+func NewPodConfig(recorder record.EventRecorder, startupSLIObserver podStartupSLIObserver) *PodConfig {
 	updates := make(chan kubetypes.PodUpdate, 50)
-	storage := newPodStorage(updates, mode, recorder, startupSLIObserver)
+	storage := newPodStorage(updates, recorder, startupSLIObserver)
 	podConfig := &PodConfig{
 		pods:    storage,
 		mux:     newMux(storage),
@@ -130,7 +112,6 @@ type podStorage struct {
 	podLock sync.RWMutex
 	// map of source name to pod uid to pod reference
 	pods map[string]map[types.UID]*v1.Pod
-	mode PodConfigNotificationMode
 
 	// ensures that updates are delivered in strict order
 	// on the updates channel
@@ -150,10 +131,9 @@ type podStorage struct {
 // TODO: PodConfigNotificationMode could be handled by a listener to the updates channel
 // in the future, especially with multiple listeners.
 // TODO: allow initialization of the current state of the store with snapshotted version.
-func newPodStorage(updates chan<- kubetypes.PodUpdate, mode PodConfigNotificationMode, recorder record.EventRecorder, startupSLIObserver podStartupSLIObserver) *podStorage {
+func newPodStorage(updates chan<- kubetypes.PodUpdate, recorder record.EventRecorder, startupSLIObserver podStartupSLIObserver) *podStorage {
 	return &podStorage{
 		pods:               make(map[string]map[types.UID]*v1.Pod),
-		mode:               mode,
 		updates:            updates,
 		sourcesSeen:        sets.Set[string]{},
 		recorder:           recorder,
@@ -173,51 +153,27 @@ func (s *podStorage) Merge(ctx context.Context, source string, update sourceUpda
 	firstSet := !seenBefore && s.sourcesSeen.Has(source)
 
 	// deliver update notifications
-	switch s.mode {
-	case PodConfigNotificationIncremental:
-		if len(removes.Pods) > 0 {
-			s.updates <- *removes
-		}
-		if len(adds.Pods) > 0 {
-			s.updates <- *adds
-		}
-		if len(updates.Pods) > 0 {
-			s.updates <- *updates
-		}
-		if len(deletes.Pods) > 0 {
-			s.updates <- *deletes
-		}
-		if firstSet && len(adds.Pods) == 0 && len(updates.Pods) == 0 && len(deletes.Pods) == 0 {
-			// Send an empty update when first seeing the source and there are
-			// no ADD or UPDATE or DELETE pods from the source. This signals kubelet that
-			// the source is ready.
-			s.updates <- *adds
-		}
-		// Only add reconcile support here, because kubelet doesn't support Snapshot update now.
-		if len(reconciles.Pods) > 0 {
-			s.updates <- *reconciles
-		}
-
-	case PodConfigNotificationSnapshotAndUpdates:
-		if len(removes.Pods) > 0 || len(adds.Pods) > 0 || firstSet {
-			s.updates <- kubetypes.PodUpdate{Pods: s.mergedState().([]*v1.Pod), Op: kubetypes.SET, Source: source}
-		}
-		if len(updates.Pods) > 0 {
-			s.updates <- *updates
-		}
-		if len(deletes.Pods) > 0 {
-			s.updates <- *deletes
-		}
-
-	case PodConfigNotificationSnapshot:
-		if len(updates.Pods) > 0 || len(deletes.Pods) > 0 || len(adds.Pods) > 0 || len(removes.Pods) > 0 || firstSet {
-			s.updates <- kubetypes.PodUpdate{Pods: s.mergedState().([]*v1.Pod), Op: kubetypes.SET, Source: source}
-		}
-
-	case PodConfigNotificationUnknown:
-		fallthrough
-	default:
-		panic(fmt.Sprintf("unsupported PodConfigNotificationMode: %#v", s.mode))
+	if len(removes.Pods) > 0 {
+		s.updates <- *removes
+	}
+	if len(adds.Pods) > 0 {
+		s.updates <- *adds
+	}
+	if len(updates.Pods) > 0 {
+		s.updates <- *updates
+	}
+	if len(deletes.Pods) > 0 {
+		s.updates <- *deletes
+	}
+	if firstSet && len(adds.Pods) == 0 && len(updates.Pods) == 0 && len(deletes.Pods) == 0 {
+		// Send an empty update when first seeing the source and there are
+		// no ADD or UPDATE or DELETE pods from the source. This signals kubelet that
+		// the source is ready.
+		s.updates <- *adds
+	}
+	// Only add reconcile support here, because kubelet doesn't support Snapshot update now.
+	if len(reconciles.Pods) > 0 {
+		s.updates <- *reconciles
 	}
 
 	return nil
