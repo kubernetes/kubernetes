@@ -131,8 +131,8 @@ func TestStaticPod(t *testing.T) {
 
 	staticPod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			UID: "static-pod-uid",
-			Name: "static-pod",
+			UID:       "static-pod-uid",
+			Name:      "static-pod",
 			Namespace: "default",
 			Annotations: map[string]string{
 				"kubernetes.io/config.source": "file",
