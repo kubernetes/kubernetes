@@ -319,13 +319,13 @@ func TestControllerSync(t *testing.T) {
 		// Initialize the controller
 		client := &fake.Clientset{}
 
-		fakeVolumeWatch := watch.NewFake()
+		fakeVolumeWatch := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger})
 		client.PrependWatchReactor("persistentvolumes", core.DefaultWatchReactor(fakeVolumeWatch, nil))
-		fakeClaimWatch := watch.NewFake()
+		fakeClaimWatch := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger})
 		client.PrependWatchReactor("persistentvolumeclaims", core.DefaultWatchReactor(fakeClaimWatch, nil))
-		client.PrependWatchReactor("storageclasses", core.DefaultWatchReactor(watch.NewFake(), nil))
-		client.PrependWatchReactor("nodes", core.DefaultWatchReactor(watch.NewFake(), nil))
-		client.PrependWatchReactor("pods", core.DefaultWatchReactor(watch.NewFake(), nil))
+		client.PrependWatchReactor("storageclasses", core.DefaultWatchReactor(watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger}), nil))
+		client.PrependWatchReactor("nodes", core.DefaultWatchReactor(watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger}), nil))
+		client.PrependWatchReactor("pods", core.DefaultWatchReactor(watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger}), nil))
 
 		informers := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 		ctrl, err := newTestController(ctx, client, informers, true)

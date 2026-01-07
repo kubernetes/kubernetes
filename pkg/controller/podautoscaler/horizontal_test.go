@@ -187,6 +187,7 @@ func init() {
 }
 
 func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfake.Clientset, *cmfake.FakeCustomMetricsClient, *emfake.FakeExternalMetricsClient, *scalefake.FakeScaleClient) {
+	logger, _ := ktesting.NewTestContext(t)
 	namespace := "test-namespace"
 	hpaName := "test-hpa"
 	podNamePrefix := "test-pod"
@@ -511,7 +512,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 		return true, obj, nil
 	})
 
-	fakeWatch := watch.NewFake()
+	fakeWatch := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger})
 	fakeClient.AddWatchReactor("*", core.DefaultWatchReactor(fakeWatch, nil))
 
 	fakeMetricsClient := &metricsfake.Clientset{}
