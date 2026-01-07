@@ -19,6 +19,8 @@ package daemonset
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"k8s.io/klog/v2"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -29,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/daemon"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/utils/format"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func NewDaemonSet(dsName, image string, labels map[string]string, volumes []v1.Volume, mounts []v1.VolumeMount, ports []v1.ContainerPort, args ...string) *appsv1.DaemonSet {
@@ -147,8 +150,19 @@ func checkDaemonPodStateOnNodes(ctx context.Context, c clientset.Interface, ds *
 // state is not reached in the amount of time it takes to start
 // pods. f.Timeouts.PodStart can be changed to influence that timeout.
 func CheckDaemonStatus(ctx context.Context, f *framework.Framework, dsName string) error {
-	return framework.Gomega().Eventually(ctx, framework.GetObject(f.ClientSet.AppsV1().DaemonSets(f.Namespace.Name).Get, dsName, metav1.GetOptions{})).
-		WithTimeout(f.Timeouts.PodStart).
+	return CheckDaemonStatusTCtx(f.TContext(ctx), f.Timeouts.PodStart, dsName)
+}
+
+func CheckDaemonStatusTCtx(tCtx ktesting.TContext, timeout time.Duration, dsName string) (err error) {
+	tCtx, finalize := tCtx.WithError(&err)
+	defer finalize()
+
+	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) *appsv1.DaemonSet {
+		ds, err := framework.GetObject(tCtx.Client().AppsV1().DaemonSets(tCtx.Namespace()).Get, dsName, metav1.GetOptions{})(tCtx)
+		tCtx.ExpectNoError(err)
+		return ds
+	}).
+		WithTimeout(timeout).
 		Should(framework.MakeMatcher(func(ds *appsv1.DaemonSet) (failure func() string, err error) {
 			desired, scheduled, ready := ds.Status.DesiredNumberScheduled, ds.Status.CurrentNumberScheduled, ds.Status.NumberReady
 			if desired == scheduled && scheduled == ready {
@@ -158,4 +172,6 @@ func CheckDaemonStatus(ctx context.Context, f *framework.Framework, dsName strin
 				return fmt.Sprintf("Expected daemon set to reach state where all desired pods are scheduled and ready. Got instead DesiredScheduled: %d, CurrentScheduled: %d, Ready: %d\n%s", desired, scheduled, ready, format.Object(ds, 1))
 			}, nil
 		}))
+
+	return nil
 }
