@@ -94,10 +94,13 @@ func (dc *DeploymentController) reconcileOldReplicaSets(ctx context.Context, all
 	logger.V(4).Info("New replica set", "replicaSet", klog.KObj(newRS), "availableReplicas", newRS.Status.AvailableReplicas)
 	maxUnavailable := deploymentutil.MaxUnavailable(*deployment)
 	desiredReplicas := *(deployment.Spec.Replicas)
-	// Check when surge is active (allPodsCount > DesiredReplicas) and maxUnavailable rounds to 0,
-	// enforce a minimum of 1 to allow old pods to scale down even when new pods are pending.
+	newRSUnavailablePodCount := *(newRS.Spec.Replicas) - newRS.Status.AvailableReplicas
+	oldRSAvailablePodCount := deploymentutil.GetAvailableReplicaCountForReplicaSets(oldRSs)
+	// Check when surge is active (allPodsCount > DesiredReplicas), maxUnavailable rounds to 0,
+	// new RS has unavailable pods, and old RS pods are all available, enforce a minimum of 1.
 	// This prevents deadlocks with antiPodAffinity where old pods block new pods from scheduling.
-	if maxUnavailable < 1 && allPodsCount > desiredReplicas {
+	// We only enforce when old pods are healthy to avoid interfering with normal cleanup of unhealthy pods.
+	if maxUnavailable < 1 && allPodsCount > desiredReplicas && newRSUnavailablePodCount > 0 && oldRSAvailablePodCount == oldPodsCount {
 		maxUnavailable = 1
 	}
 	// Check if we can scale down. We can scale down in the following 2 cases:
@@ -131,7 +134,6 @@ func (dc *DeploymentController) reconcileOldReplicaSets(ctx context.Context, all
 	// * However, newRSPodsUnavailable would also be 0, so the 2 old replica sets could be scaled down by 5 (13 - 8 - 0), which would then
 	// allow the new replica set to be scaled up by 5.
 	minAvailable := *(deployment.Spec.Replicas) - maxUnavailable
-	newRSUnavailablePodCount := *(newRS.Spec.Replicas) - newRS.Status.AvailableReplicas
 	maxScaledDown := allPodsCount - minAvailable - newRSUnavailablePodCount
 	if maxScaledDown <= 0 {
 		return false, nil
@@ -198,7 +200,6 @@ func (dc *DeploymentController) cleanupUnhealthyReplicas(ctx context.Context, ol
 // Need check maxUnavailable to ensure availability
 func (dc *DeploymentController) scaleDownOldReplicaSetsForRollingUpdate(ctx context.Context, allRSs []*apps.ReplicaSet, oldRSs []*apps.ReplicaSet, deployment *apps.Deployment, maxUnavailable int32) (int32, error) {
 	logger := klog.FromContext(ctx)
-
 	// Check if we can scale down.
 	minAvailable := *(deployment.Spec.Replicas) - maxUnavailable
 	// Find the number of available pods.
