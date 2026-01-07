@@ -284,11 +284,6 @@ const (
 	// Enables post-start-hook for storage readiness
 	WatchCacheInitializationPostStartHook featuregate.Feature = "WatchCacheInitializationPostStartHook"
 
-	// owner: @serathius
-	// Enables watches without resourceVersion to be served from storage.
-	// Used to prevent https://github.com/kubernetes/kubernetes/issues/123072 until etcd fixes the issue.
-	WatchFromStorageWithoutResourceVersion featuregate.Feature = "WatchFromStorageWithoutResourceVersion"
-
 	// owner: @p0lyn0mial
 	//
 	// Allow the API server to stream individual items instead of chunking
@@ -494,11 +489,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	WatchCacheInitializationPostStartHook: {
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
-	},
-
-	WatchFromStorageWithoutResourceVersion: {
-		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Deprecated, LockToDefault: true},
 	},
 
 	WatchList: {

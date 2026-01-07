@@ -129,10 +129,6 @@ func (c *CacheDelegator) Watch(ctx context.Context, key string, opts storage.Lis
 	if !utilfeature.DefaultFeatureGate.Enabled(features.WatchList) && opts.SendInitialEvents != nil {
 		opts.SendInitialEvents = nil
 	}
-	// TODO: we should eventually get rid of this legacy case
-	if utilfeature.DefaultFeatureGate.Enabled(features.WatchFromStorageWithoutResourceVersion) && opts.SendInitialEvents == nil && opts.ResourceVersion == "" {
-		return c.storage.Watch(ctx, key, opts)
-	}
 	return c.cacher.Watch(ctx, key, opts)
 }
 
