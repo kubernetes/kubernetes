@@ -803,6 +803,7 @@ func testExtendedResource(tCtx ktesting.TContext, enabled bool) {
 	}
 
 	tCtx.Run("scheduler", func(tCtx ktesting.TContext) {
+		waitForResourceSlices(tCtx, driverName, 1, 30*time.Second)
 		startScheduler(tCtx)
 
 		pod := podWithExtendedResource.DeepCopy()

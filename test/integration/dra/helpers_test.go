@@ -227,3 +227,19 @@ func waitForClaimAllocatedToDevice(tCtx ktesting.TContext, namespace, claimName 
 		"Claim should have been allocated.",
 	)
 }
+
+func waitForResourceSlices(tCtx ktesting.TContext, driverName string, minCount int, timeout time.Duration) []resourceapi.ResourceSlice {
+	tCtx.Helper()
+
+	listOptions := metav1.ListOptions{
+		FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + driverName,
+	}
+	var slices []resourceapi.ResourceSlice
+	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) int {
+		list, err := tCtx.Client().ResourceV1().ResourceSlices().List(tCtx, listOptions)
+		tCtx.ExpectNoError(err, "list ResourceSlices for driver %s", driverName)
+		slices = list.Items
+		return len(slices)
+	}).WithTimeout(timeout).WithPolling(time.Second).Should(gomega.BeNumerically(">=", minCount))
+	return slices
+}
