@@ -166,17 +166,14 @@ func (sched *Scheduler) updatePod(oldObj, newObj interface{}) {
 	if assignedPod(oldPod) {
 		sched.updateAssignedPodInCache(oldPod, newPod)
 	} else if assignedPod(newPod) {
+
+		// If external binding happen to a pod that is already in the scheduling queue
+		//  and has either NNN or assumed NN different from the binding one,
+		//  we need to wake up other pods waiting on releasing these resources by a deletion event.
+		sched.wakeUpPodsWhenExternalBinding(oldPod, newPod)
+
 		// This update means binding operation. We can treat it as adding the pod to a cache
 		// (addition to the cache will handle this binding appropriately).
-		// Get the assumed pod from the cache before it is updated.
-		assumedPod, err := sched.Cache.GetPod(oldPod)
-		if err == nil && assumedPod.Spec.NodeName != newPod.Spec.NodeName {
-			// The pod was assumed on a different node. Wake up pods waiting for resources on the old node.
-			sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.EventAssignedPodDelete, assumedPod, nil, nil)
-		} else if oldPod.Status.NominatedNodeName != "" && oldPod.Status.NominatedNodeName != newPod.Spec.NodeName {
-			// The pod was nominated for a different node. Wake up pods waiting for resources on the nominated node.
-			sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.EventAssignedPodDelete, oldPod, nil, getLEPriorityPreCheck(corev1helpers.PodPriority(oldPod)))
-		}
 		sched.addAssignedPodToCache(newPod)
 
 		if responsibleForPod(oldPod, sched.Profiles) {
@@ -387,6 +384,19 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(pod *v1.Pod, inBinding bool
 func getLEPriorityPreCheck(priority int32) queue.PreEnqueueCheck {
 	return func(pod *v1.Pod) bool {
 		return corev1helpers.PodPriority(pod) <= priority
+	}
+}
+
+func (sched *Scheduler) wakeUpPodsWhenExternalBinding(oldPod *v1.Pod, newPod *v1.Pod) {
+	logger := sched.logger
+	// Get the assumed pod from the cache before it is updated.
+	assumedPod, err := sched.Cache.GetPod(oldPod)
+	if err == nil && assumedPod.Spec.NodeName != newPod.Spec.NodeName {
+		// The pod was assumed on a different node. Wake up pods waiting for resources on the old node.
+		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.EventAssignedPodDelete, assumedPod, nil, nil)
+	} else if oldPod.Status.NominatedNodeName != "" && oldPod.Status.NominatedNodeName != newPod.Spec.NodeName {
+		// The pod was nominated for a different node. Wake up pods waiting for resources on the nominated node.
+		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.EventAssignedPodDelete, oldPod, nil, getLEPriorityPreCheck(corev1helpers.PodPriority(oldPod)))
 	}
 }
 
