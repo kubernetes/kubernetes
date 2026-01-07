@@ -72,7 +72,7 @@ import (
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/certificate"
 	"k8s.io/client-go/util/connrotation"
@@ -568,12 +568,12 @@ func makeEventRecorder(ctx context.Context, kubeDeps *kubelet.Dependencies, node
 		return
 	}
 	logger := klog.FromContext(ctx)
-	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
-	kubeDeps.Recorder = eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: server.ComponentKubelet, Host: string(nodeName)})
+	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: kubeDeps.KubeClient.EventsV1()})
+	kubeDeps.Recorder = eventBroadcaster.NewRecorder(legacyscheme.Scheme, server.ComponentKubelet)
 	eventBroadcaster.StartStructuredLogging(3)
 	if kubeDeps.EventClient != nil {
 		logger.V(4).Info("Sending events to api server")
-		eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeDeps.EventClient.Events("")})
+		eventBroadcaster.StartRecordingToSink(ctx.Done())
 	} else {
 		logger.Info("No api server defined - no events will be sent to API server")
 	}

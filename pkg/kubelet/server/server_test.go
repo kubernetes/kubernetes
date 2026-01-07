@@ -49,7 +49,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/tools/remotecommand"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
@@ -367,7 +367,7 @@ func newServerTestWithDebuggingHandlers(ctx context.Context, kubeCfg *kubeletcon
 	server := NewServer(
 		ctx,
 		fw.fakeKubelet,
-		stats.NewResourceAnalyzer(ctx, fw.fakeKubelet, time.Minute, &record.FakeRecorder{}),
+		stats.NewResourceAnalyzer(ctx, fw.fakeKubelet, time.Minute, &events.FakeRecorder{}),
 		[]healthz.HealthChecker{},
 		flagz.NamedFlagSetsReader{},
 		fw.fakeAuth,
@@ -2005,7 +2005,7 @@ func TestFineGrainedAuthz(t *testing.T) {
 func TestNewServerRegistersMetricsSLIsEndpointTwice(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	host := &fakeKubelet{}
-	resourceAnalyzer := stats.NewResourceAnalyzer(tCtx, nil, time.Minute, &record.FakeRecorder{})
+	resourceAnalyzer := stats.NewResourceAnalyzer(tCtx, nil, time.Minute, &events.FakeRecorder{})
 
 	server1 := NewServer(tCtx, host, resourceAnalyzer, []healthz.HealthChecker{}, flagz.NamedFlagSetsReader{}, nil, nil)
 	server2 := NewServer(tCtx, host, resourceAnalyzer, []healthz.HealthChecker{}, flagz.NamedFlagSetsReader{}, nil, nil)

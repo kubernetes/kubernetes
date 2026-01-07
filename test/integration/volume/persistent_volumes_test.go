@@ -134,6 +134,7 @@ func TestPersistentVolumeRecycler(t *testing.T) {
 	defer testClient.CoreV1().PersistentVolumes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 
 	informers.Start(tCtx.Done())
+	informers.WaitForCacheSync(tCtx.Done())
 	go ctrl.Run(tCtx)
 
 	// This PV will be claimed, released, and recycled.
@@ -190,6 +191,7 @@ func TestPersistentVolumeDeleter(t *testing.T) {
 	defer testClient.CoreV1().PersistentVolumes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 
 	informers.Start(tCtx.Done())
+	informers.WaitForCacheSync(tCtx.Done())
 	go ctrl.Run(tCtx)
 
 	// This PV will be claimed, released, and deleted.
@@ -251,6 +253,7 @@ func TestPersistentVolumeBindRace(t *testing.T) {
 	defer testClient.CoreV1().PersistentVolumes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 
 	informers.Start(tCtx.Done())
+	informers.WaitForCacheSync(tCtx.Done())
 	go ctrl.Run(tCtx)
 
 	pv := createPV("fake-pv-race", "/tmp/foo", "10G", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}, v1.PersistentVolumeReclaimRetain)
@@ -324,6 +327,7 @@ func TestPersistentVolumeClaimLabelSelector(t *testing.T) {
 	defer testClient.CoreV1().PersistentVolumes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 
 	informers.Start(tCtx.Done())
+	informers.WaitForCacheSync(tCtx.Done())
 	go controller.Run(tCtx)
 
 	var (
@@ -406,6 +410,7 @@ func TestPersistentVolumeClaimLabelSelectorMatchExpressions(t *testing.T) {
 	defer testClient.CoreV1().PersistentVolumes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 
 	informers.Start(tCtx.Done())
+	informers.WaitForCacheSync(tCtx.Done())
 	go controller.Run(tCtx)
 
 	var (
@@ -507,6 +512,7 @@ func TestPersistentVolumeMultiPVs(t *testing.T) {
 	defer testClient.CoreV1().PersistentVolumes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 
 	informers.Start(tCtx.Done())
+	informers.WaitForCacheSync(tCtx.Done())
 	go controller.Run(tCtx)
 
 	maxPVs := getObjectCount()
@@ -775,6 +781,7 @@ func TestPersistentVolumeMultiPVsPVCs(t *testing.T) {
 	defer testClient.CoreV1().PersistentVolumes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 
 	informers.Start(tCtx.Done())
+	informers.WaitForCacheSync(tCtx.Done())
 	go binder.Run(tCtx)
 
 	objCount := getObjectCount()
@@ -992,6 +999,7 @@ func TestPersistentVolumeControllerStartup(t *testing.T) {
 
 	// Start the controller when all PVs and PVCs are already saved in etcd
 	informers.Start(tCtx.Done())
+	informers.WaitForCacheSync(tCtx.Done())
 	go binder.Run(tCtx)
 
 	// wait for at least two sync periods for changes. No volume should be
@@ -1081,6 +1089,7 @@ func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 	testClient.StorageV1().StorageClasses().Create(context.TODO(), &storageClass, metav1.CreateOptions{})
 
 	informers.Start(tCtx.Done())
+	informers.WaitForCacheSync(tCtx.Done())
 	go binder.Run(tCtx)
 
 	objCount := getObjectCount()
@@ -1165,6 +1174,7 @@ func TestPersistentVolumeMultiPVsDiffAccessModes(t *testing.T) {
 	defer testClient.CoreV1().PersistentVolumes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 
 	informers.Start(tCtx.Done())
+	informers.WaitForCacheSync(tCtx.Done())
 	go controller.Run(tCtx)
 
 	// This PV will be claimed, released, and deleted
@@ -1269,6 +1279,7 @@ func TestRetroactiveStorageClassAssignment(t *testing.T) {
 	}
 
 	informers.Start(tCtx.Done())
+	informers.WaitForCacheSync(tCtx.Done())
 	go binder.Run(tCtx)
 
 	klog.V(2).Infof("TestRetroactiveStorageClassAssignment: start")

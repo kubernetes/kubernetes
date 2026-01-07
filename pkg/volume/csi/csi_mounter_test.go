@@ -38,7 +38,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	clitesting "k8s.io/client-go/testing"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	pkgauthenticationv1 "k8s.io/kubernetes/pkg/apis/authentication/v1"
 	pkgcorev1 "k8s.io/kubernetes/pkg/apis/core/v1"
@@ -374,7 +374,7 @@ func (m *mockVolumeOwnershipChanger) ChangePermissions() error {
 	return nil
 }
 
-func (m *mockVolumeOwnershipChanger) AddProgressNotifier(pod *corev1.Pod, recorder record.EventRecorder) volume.VolumeOwnershipChanger {
+func (m *mockVolumeOwnershipChanger) AddProgressNotifier(pod *corev1.Pod, recorder events.EventRecorder) volume.VolumeOwnershipChanger {
 	return m
 }
 

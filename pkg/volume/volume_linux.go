@@ -29,7 +29,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/tools/record"
+	toolsevents "k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/volume/util/types"
@@ -62,7 +62,7 @@ func NewVolumeOwnership(mounter Mounter, dir string, fsGroup *int64, fsGroupChan
 	return vo
 }
 
-func (vo *VolumeOwnership) AddProgressNotifier(pod *v1.Pod, recorder record.EventRecorder) VolumeOwnershipChanger {
+func (vo *VolumeOwnership) AddProgressNotifier(pod *v1.Pod, recorder toolsevents.EventRecorder) VolumeOwnershipChanger {
 	vo.pod = pod
 	vo.recorder = recorder
 	return vo
@@ -116,7 +116,7 @@ func (vo *VolumeOwnership) changePermissionsRecursively() error {
 func (vo *VolumeOwnership) monitorProgress(ctx context.Context) {
 	dirName := getDirnameToReport(vo.dir, string(vo.pod.UID))
 	msg := fmt.Sprintf("Setting volume ownership for %s is taking longer than expected, consider using OnRootMismatch - https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#configure-volume-permission-and-ownership-change-policy-for-pods", dirName)
-	vo.recorder.Event(vo.pod, v1.EventTypeWarning, events.VolumePermissionChangeInProgress, msg)
+	vo.recorder.Eventf(vo.pod, nil, v1.EventTypeWarning, events.VolumePermissionChangeInProgress, "SettingVolumeOwnership", msg)
 	ticker := time.NewTicker(progressReportDuration)
 	defer ticker.Stop()
 	for {
@@ -142,7 +142,7 @@ func (vo *VolumeOwnership) logWarning() {
 	dirName := getDirnameToReport(vo.dir, string(vo.pod.UID))
 	msg := fmt.Sprintf("Setting volume ownership for %s, processed %d files.", dirName, vo.fileCounter.Load())
 	klog.Warning(msg)
-	vo.recorder.Event(vo.pod, v1.EventTypeWarning, events.VolumePermissionChangeInProgress, msg)
+	vo.recorder.Eventf(vo.pod, nil, v1.EventTypeWarning, events.VolumePermissionChangeInProgress, "SettingVolumeOwnership", msg)
 }
 
 func changeFilePermission(filename string, fsGroup *int64, readonly bool, info os.FileInfo) error {
