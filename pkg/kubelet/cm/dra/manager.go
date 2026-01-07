@@ -226,7 +226,8 @@ func (m *Manager) reconcileLoop(ctx context.Context) {
 func (m *Manager) PrepareResources(ctx context.Context, pod *v1.Pod) error {
 	startTime := time.Now()
 	err := m.prepareResources(ctx, pod)
-	kubeletmetrics.DRAOperationsDuration.WithLabelValues("PrepareResources", strconv.FormatBool(err == nil)).Observe(time.Since(startTime).Seconds())
+	isError := (err != nil)
+	kubeletmetrics.DRAOperationsDuration.WithLabelValues("PrepareResources", strconv.FormatBool(isError)).Observe(time.Since(startTime).Seconds())
 	if err != nil {
 		return fmt.Errorf("prepare dynamic resources: %w", err)
 	}
@@ -554,7 +555,8 @@ func (m *Manager) GetResources(pod *v1.Pod, container *v1.Container) (*Container
 func (m *Manager) UnprepareResources(ctx context.Context, pod *v1.Pod) error {
 	startTime := time.Now()
 	err := m.unprepareResourcesForPod(ctx, pod)
-	kubeletmetrics.DRAOperationsDuration.WithLabelValues("UnprepareResources", strconv.FormatBool(err == nil)).Observe(time.Since(startTime).Seconds())
+	isError := (err != nil)
+	kubeletmetrics.DRAOperationsDuration.WithLabelValues("UnprepareResources", strconv.FormatBool(isError)).Observe(time.Since(startTime).Seconds())
 	if err != nil {
 		return fmt.Errorf("unprepare dynamic resources: %w", err)
 	}

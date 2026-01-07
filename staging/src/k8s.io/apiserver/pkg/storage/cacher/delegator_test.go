@@ -29,6 +29,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/apis/example"
 	"k8s.io/apiserver/pkg/storage"
+
+	cachertesting "k8s.io/apiserver/pkg/storage/cacher/testing"
 )
 
 func TestConsistencyCheckerDigest(t *testing.T) {
@@ -153,8 +155,8 @@ func TestConsistencyCheckerDigest(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
-			etcd := &dummyStorage{
-				getListFn: func(_ context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
+			etcd := &cachertesting.MockStorage{
+				GetListFn: func(_ context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
 					if key != tc.expectListKey {
 						t.Fatalf("Expect GetList key %q, got %q", tc.expectListKey, key)
 					}
@@ -170,11 +172,11 @@ func TestConsistencyCheckerDigest(t *testing.T) {
 					return nil
 				},
 			}
-			cacher := &dummyCacher{
-				ready:      tc.cacherReady,
-				consistent: true,
-				dummyStorage: dummyStorage{
-					getListFn: func(_ context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
+			cacher := &cachertesting.MockCacher{
+				IsReady:    tc.cacherReady,
+				Consistent: true,
+				MockStorage: cachertesting.MockStorage{
+					GetListFn: func(_ context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
 						if key != tc.expectListKey {
 							t.Fatalf("Expect GetList key %q, got %q", tc.expectListKey, key)
 						}
@@ -204,8 +206,8 @@ func TestConsistencyCheckerDigest(t *testing.T) {
 			}
 
 			checker.check(context.Background())
-			if cacher.consistent != tc.expectConsistent {
-				t.Errorf("Expect: %+v Got: %+v", tc.expectConsistent, cacher.consistent)
+			if cacher.Consistent != tc.expectConsistent {
+				t.Errorf("Expect: %+v Got: %+v", tc.expectConsistent, cacher.Consistent)
 			}
 		})
 	}
@@ -216,8 +218,8 @@ func TestConsistencyCheckerListOpts(t *testing.T) {
 
 	resourceVersion := "50"
 	etcdOpts := []storage.ListOptions{}
-	etcd := &dummyStorage{
-		getListFn: func(_ context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
+	etcd := &cachertesting.MockStorage{
+		GetListFn: func(_ context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
 			etcdOpts = append(etcdOpts, opts)
 			podList := listObj.(*example.PodList)
 			podList.ResourceVersion = resourceVersion
@@ -225,10 +227,10 @@ func TestConsistencyCheckerListOpts(t *testing.T) {
 		},
 	}
 	cacherOpts := []storage.ListOptions{}
-	cacher := &dummyCacher{
-		ready: true,
-		dummyStorage: dummyStorage{
-			getListFn: func(_ context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
+	cacher := &cachertesting.MockCacher{
+		IsReady: true,
+		MockStorage: cachertesting.MockStorage{
+			GetListFn: func(_ context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
 				cacherOpts = append(cacherOpts, opts)
 				podList := listObj.(*example.PodList)
 				podList.ResourceVersion = resourceVersion

@@ -26,7 +26,6 @@ import (
 	fmt "fmt"
 
 	storagev1 "k8s.io/api/storage/v1"
-	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
@@ -44,14 +43,6 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 		switch op.Request.SubresourcePath() {
 		case "/":
 			return Validate_StorageClass(ctx, op, nil /* fldPath */, obj.(*storagev1.StorageClass), safe.Cast[*storagev1.StorageClass](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
-	// type StorageClassList
-	scheme.AddValidationFunc((*storagev1.StorageClassList)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_StorageClassList(ctx, op, nil /* fldPath */, obj.(*storagev1.StorageClassList), safe.Cast[*storagev1.StorageClassList](oldObj))
 		}
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
@@ -89,26 +80,5 @@ func Validate_StorageClass(ctx context.Context, op operation.Operation, fldPath 
 	// field storagev1.StorageClass.AllowVolumeExpansion has no validation
 	// field storagev1.StorageClass.VolumeBindingMode has no validation
 	// field storagev1.StorageClass.AllowedTopologies has no validation
-	return errs
-}
-
-// Validate_StorageClassList validates an instance of StorageClassList according
-// to declarative validation rules in the API schema.
-func Validate_StorageClassList(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *storagev1.StorageClassList) (errs field.ErrorList) {
-	// field storagev1.StorageClassList.TypeMeta has no validation
-	// field storagev1.StorageClassList.ListMeta has no validation
-
-	// field storagev1.StorageClassList.Items
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []storagev1.StorageClass, oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
-			}
-			// iterate the list and call the type's validation function
-			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_StorageClass)...)
-			return
-		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *storagev1.StorageClassList) []storagev1.StorageClass { return oldObj.Items }), oldObj != nil)...)
-
 	return errs
 }

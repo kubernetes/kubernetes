@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -87,12 +88,12 @@ type QueueSortPlugin struct {
 }
 
 type PreEnqueuePlugin struct {
-	called int
+	called atomic.Int64
 	admit  bool
 }
 
 type PreFilterPlugin struct {
-	numPreFilterCalled   int
+	numPreFilterCalled   atomic.Int64
 	failPreFilter        bool
 	rejectPreFilter      bool
 	preFilterResultNodes sets.Set[string]
@@ -349,7 +350,7 @@ func (ep *PreEnqueuePlugin) Name() string {
 }
 
 func (ep *PreEnqueuePlugin) PreEnqueue(ctx context.Context, p *v1.Pod) *fwk.Status {
-	ep.called++
+	ep.called.Add(1)
 	if ep.admit {
 		return nil
 	}
@@ -582,7 +583,7 @@ func (pp *PreFilterPlugin) PreFilterExtensions() fwk.PreFilterExtensions {
 
 // PreFilter is a test function that returns (true, nil) or errors for testing.
 func (pp *PreFilterPlugin) PreFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
-	pp.numPreFilterCalled++
+	pp.numPreFilterCalled.Add(1)
 	if pp.failPreFilter {
 		return nil, fwk.NewStatus(fwk.Error, fmt.Sprintf("injecting failure for pod %v", pod.Name))
 	}
@@ -765,7 +766,7 @@ func TestPreFilterPlugin(t *testing.T) {
 				}
 			}
 
-			if preFilterPlugin.numPreFilterCalled == 0 {
+			if preFilterPlugin.numPreFilterCalled.Load() == 0 {
 				t.Errorf("Expected the prefilter plugin to be called.")
 			}
 		})
@@ -2408,7 +2409,7 @@ func TestPreEnqueuePlugin(t *testing.T) {
 					t.Errorf("Expected the pod to be schedulable, but got: %v", err)
 				}
 				// Also verify enqueuePlugin is called.
-				if enqueuePlugin.called == 0 {
+				if enqueuePlugin.called.Load() == 0 {
 					t.Errorf("Expected the enqueuePlugin plugin to be called at least once, but got 0")
 				}
 			} else {
@@ -2416,8 +2417,8 @@ func TestPreEnqueuePlugin(t *testing.T) {
 					t.Errorf("Expected the pod to be scheduling waiting, but got: %v", err)
 				}
 				// Also verify preFilterPlugin is not called.
-				if preFilterPlugin.numPreFilterCalled != 0 {
-					t.Errorf("Expected the preFilter plugin not to be called, but got %v", preFilterPlugin.numPreFilterCalled)
+				if called := preFilterPlugin.numPreFilterCalled.Load(); called != 0 {
+					t.Errorf("Expected the preFilter plugin not to be called, but got %v", called)
 				}
 			}
 		})
