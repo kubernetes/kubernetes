@@ -197,9 +197,48 @@ func registerInSuite(ginkgoCall func(string, ...interface{}) bool, args []interf
 	var offset ginkgo.Offset
 	var texts []string
 
-	addLabel := func(label string) {
-		texts = append(texts, fmt.Sprintf("[%s]", label))
-		ginkgoArgs = append(ginkgoArgs, ginkgo.Label(label))
+	// additionalLabels contains labels like Alpha that might get added
+	// indirectly multiple times by registerInSuite. Instead of injecting
+	// their tag multiple times directly into the text at the place which
+	// triggers their addition, they get at the end.
+	//
+	// It would be nicer if we could do this across nodes (feature gate set in
+	// Context call, Alpha added at the end of the It text), but that's currently
+	// not possible because there is no way to pass information from the
+	// Context wrapper to the It wrapper:
+	// - The It wrapper is not called directly by the Context wrapper.
+	// - GetCurrentSpec returns an empty spec.
+	additionalLabels := sets.New[string]()
+
+	// If a dependency was already specified through WithFeatureGate,
+	// it doesn't need to be added again.
+	manualFeatureGates := sets.New[featuregate.Feature]()
+
+	featureDependencies := utilfeature.DefaultMutableFeatureGate.Dependencies()
+	addFeatureGateDependencies := func(featureGate featuregate.Feature) {
+		for _, featureGate := range featureDependencies[featureGate] {
+			if manualFeatureGates.Has(featureGate) {
+				continue
+			}
+
+			spec := utilfeature.DefaultMutableFeatureGate.GetAll()[featureGate]
+			// This matches the behavior of top-level withFeatureGate and
+			// how that gets handled below.
+			//
+			// The difference is that all dependencies get added at the end
+			// and only once per node, not once per withFeatureGate.
+			if level := featureGateLevel(spec); level != "" {
+				additionalLabels.Insert(level)
+				if level == "Beta" && !spec.Default {
+					// Not embedded in text!
+					ginkgoArgs = append(ginkgoArgs, ginkgo.Label("BetaOffByDefault"))
+				}
+			}
+			additionalLabels.Insert("FeatureGate:" + string(featureGate))
+			if !spec.Default {
+				additionalLabels.Insert("Feature:OffByDefault")
+			}
+		}
 	}
 
 	haveEmptyStrings := false
@@ -207,17 +246,22 @@ func registerInSuite(ginkgoCall func(string, ...interface{}) bool, args []interf
 		switch arg := arg.(type) {
 		case label:
 			fullLabel := strings.Join(arg.parts, ":")
-			addLabel(fullLabel)
+			texts = append(texts, fmt.Sprintf("[%s]", fullLabel))
+			ginkgoArgs = append(ginkgoArgs, ginkgo.Label(fullLabel))
+			if len(arg.parts) == 2 && arg.parts[0] == "FeatureGate" {
+				featureGate := featuregate.Feature(arg.parts[1])
+				manualFeatureGates.Insert(featureGate)
+				addFeatureGateDependencies(featureGate)
+			}
 			if arg.alphaBetaLevel != "" {
-				texts = append(texts, fmt.Sprintf("[%[1]s]", arg.alphaBetaLevel))
-				ginkgoArgs = append(ginkgoArgs, ginkgo.Label(arg.alphaBetaLevel))
+				additionalLabels.Insert(arg.alphaBetaLevel)
 			}
 			if arg.offByDefault {
-				texts = append(texts, "[Feature:OffByDefault]")
-				ginkgoArgs = append(ginkgoArgs, ginkgo.Label("Feature:OffByDefault"))
+				additionalLabels.Insert("Feature:OffByDefault")
 				// Alphas are always off by default but we may want to select
 				// betas based on defaulted-ness.
 				if arg.alphaBetaLevel == "Beta" {
+					// Not embedded in text!
 					ginkgoArgs = append(ginkgoArgs, ginkgo.Label("BetaOffByDefault"))
 				}
 			}
@@ -254,6 +298,12 @@ func registerInSuite(ginkgoCall func(string, ...interface{}) bool, args []interf
 		if strings.HasPrefix(text, " ") || strings.HasSuffix(text, " ") {
 			RecordBug(NewBug(fmt.Sprintf("trailing or leading spaces are unnecessary and need to be removed: %q", text), int(offset)))
 		}
+	}
+
+	// Add additional labels once (sorted, unique).
+	for _, label := range sets.List(additionalLabels) {
+		texts = append(texts, fmt.Sprintf("[%s]", label))
+		ginkgoArgs = append(ginkgoArgs, ginkgo.Label(label))
 	}
 
 	ginkgoArgs = append(ginkgoArgs, offset)
@@ -447,17 +497,20 @@ func withFeatureGate(featureGate featuregate.Feature) interface{} {
 		RecordBug(NewBug(fmt.Sprintf("WithFeatureGate: the feature gate %q is unknown", featureGate), 2))
 	}
 
+	l := newLabel("FeatureGate", string(featureGate))
+	l.offByDefault = !spec.Default
+	l.alphaBetaLevel = featureGateLevel(spec)
+	return l
+}
+
+func featureGateLevel(spec featuregate.FeatureSpec) string {
 	// We use mixed case (i.e. Beta instead of BETA). GA feature gates have no level string.
 	var level string
 	if spec.PreRelease != "" {
 		level = string(spec.PreRelease)
 		level = strings.ToUpper(level[0:1]) + strings.ToLower(level[1:])
 	}
-
-	l := newLabel("FeatureGate", string(featureGate))
-	l.offByDefault = !spec.Default
-	l.alphaBetaLevel = level
-	return l
+	return level
 }
 
 // WithEnvironment specifies that a certain test or group of tests only works
