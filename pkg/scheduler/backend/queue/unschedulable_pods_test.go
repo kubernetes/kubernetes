@@ -60,22 +60,22 @@ func TestUnschedulablePods(t *testing.T) {
 	)
 
 	type step struct {
-		action      action
-		pods        []*framework.QueuedPodInfo
-		expectedMap map[string]*framework.QueuedPodInfo
+		action       action
+		pods         []*framework.QueuedPodInfo
+		expectedPods []*framework.QueuedPodInfo
 	}
 
-	var actionToOperation = map[action]func(pInfo *framework.QueuedPodInfo, upm *unschedulablePods, gatedBefore bool){
-		add: func(pInfo *framework.QueuedPodInfo, upm *unschedulablePods, _ bool) {
+	var actionToOperation = map[action]func(upm *unschedulablePods, pInfo *framework.QueuedPodInfo, gatedBefore bool){
+		add: func(upm *unschedulablePods, pInfo *framework.QueuedPodInfo, _ bool) {
 			upm.addOrUpdate(pInfo, false, framework.EventUnscheduledPodAdd.Label())
 		},
-		update: func(pInfo *framework.QueuedPodInfo, upm *unschedulablePods, gatedBefore bool) {
+		update: func(upm *unschedulablePods, pInfo *framework.QueuedPodInfo, gatedBefore bool) {
 			upm.addOrUpdate(pInfo, gatedBefore, framework.EventUnscheduledPodUpdate.Label())
 		},
-		delete: func(pInfo *framework.QueuedPodInfo, upm *unschedulablePods, gatedBefore bool) {
+		delete: func(upm *unschedulablePods, pInfo *framework.QueuedPodInfo, gatedBefore bool) {
 			upm.delete(pInfo.Pod, gatedBefore)
 		},
-		clear: func(_ *framework.QueuedPodInfo, upm *unschedulablePods, _ bool) {
+		clear: func(upm *unschedulablePods, _ *framework.QueuedPodInfo, _ bool) {
 			upm.clear()
 		},
 	}
@@ -94,7 +94,7 @@ func TestUnschedulablePods(t *testing.T) {
 		return pInfo != nil && pInfo.Gated()
 	}
 
-	makPodInfo := func(p *v1.Pod, gated bool) *framework.QueuedPodInfo {
+	makePodInfo := func(p *v1.Pod, gated bool) *framework.QueuedPodInfo {
 		info := &framework.QueuedPodInfo{
 			PodInfo:              mustNewTestPodInfo(t, p),
 			UnschedulablePlugins: sets.New[string](),
@@ -106,6 +106,14 @@ func TestUnschedulablePods(t *testing.T) {
 		return info
 	}
 
+	makePodInfoMap := func(pods []*framework.QueuedPodInfo) map[string]*framework.QueuedPodInfo {
+		podInfoMap := make(map[string]*framework.QueuedPodInfo)
+		for _, p := range pods {
+			podInfoMap[util.GetPodFullName(p.Pod)] = p
+		}
+		return podInfoMap
+	}
+
 	tests := []struct {
 		name  string
 		steps []step
@@ -115,30 +123,30 @@ func TestUnschedulablePods(t *testing.T) {
 			steps: []step{
 				{
 					action: add,
-					pods:   []*framework.QueuedPodInfo{makPodInfo(pods[0], false), makPodInfo(pods[1], false), makPodInfo(pods[2], false), makPodInfo(pods[2], false), makPodInfo(pods[3], false)},
-					expectedMap: map[string]*framework.QueuedPodInfo{
-						util.GetPodFullName(pods[0]): makPodInfo(pods[0], false),
-						util.GetPodFullName(pods[1]): makPodInfo(pods[1], false),
-						util.GetPodFullName(pods[2]): makPodInfo(pods[2], false),
-						util.GetPodFullName(pods[3]): makPodInfo(pods[3], false),
+					pods:   []*framework.QueuedPodInfo{makePodInfo(pods[0], false), makePodInfo(pods[1], false), makePodInfo(pods[2], false), makePodInfo(pods[2], false), makePodInfo(pods[3], false)},
+					expectedPods: []*framework.QueuedPodInfo{
+						makePodInfo(pods[0], false),
+						makePodInfo(pods[1], false),
+						makePodInfo(pods[2], false),
+						makePodInfo(pods[3], false),
 					},
 				},
 				{
 					action: update,
-					pods:   []*framework.QueuedPodInfo{makPodInfo(pods[0], false)},
-					expectedMap: map[string]*framework.QueuedPodInfo{
-						util.GetPodFullName(pods[0]): makPodInfo(pods[0], false),
-						util.GetPodFullName(pods[1]): makPodInfo(pods[1], false),
-						util.GetPodFullName(pods[2]): makPodInfo(pods[2], false),
-						util.GetPodFullName(pods[3]): makPodInfo(pods[3], false),
+					pods:   []*framework.QueuedPodInfo{makePodInfo(pods[0], false)},
+					expectedPods: []*framework.QueuedPodInfo{
+						makePodInfo(pods[0], false),
+						makePodInfo(pods[1], false),
+						makePodInfo(pods[2], false),
+						makePodInfo(pods[3], false),
 					},
 				},
 				{
 					action: delete,
-					pods:   []*framework.QueuedPodInfo{makPodInfo(pods[0], false), makPodInfo(pods[1], false)},
-					expectedMap: map[string]*framework.QueuedPodInfo{
-						util.GetPodFullName(pods[2]): makPodInfo(pods[2], false),
-						util.GetPodFullName(pods[3]): makPodInfo(pods[3], false),
+					pods:   []*framework.QueuedPodInfo{makePodInfo(pods[0], false), makePodInfo(pods[1], false)},
+					expectedPods: []*framework.QueuedPodInfo{
+						makePodInfo(pods[2], false),
+						makePodInfo(pods[3], false),
 					},
 				},
 			},
@@ -148,24 +156,24 @@ func TestUnschedulablePods(t *testing.T) {
 			steps: []step{
 				{
 					action: add,
-					pods:   []*framework.QueuedPodInfo{makPodInfo(pods[0], false), makPodInfo(pods[3], false)},
-					expectedMap: map[string]*framework.QueuedPodInfo{
-						util.GetPodFullName(pods[0]): makPodInfo(pods[0], false),
-						util.GetPodFullName(pods[3]): makPodInfo(pods[3], false),
+					pods:   []*framework.QueuedPodInfo{makePodInfo(pods[0], false), makePodInfo(pods[3], false)},
+					expectedPods: []*framework.QueuedPodInfo{
+						makePodInfo(pods[0], false),
+						makePodInfo(pods[3], false),
 					},
 				},
 				{
 					action: update,
-					pods:   []*framework.QueuedPodInfo{makPodInfo(pods[3], false)},
-					expectedMap: map[string]*framework.QueuedPodInfo{
-						util.GetPodFullName(pods[0]): makPodInfo(pods[0], false),
-						util.GetPodFullName(pods[3]): makPodInfo(pods[3], false),
+					pods:   []*framework.QueuedPodInfo{makePodInfo(pods[3], false)},
+					expectedPods: []*framework.QueuedPodInfo{
+						makePodInfo(pods[0], false),
+						makePodInfo(pods[3], false),
 					},
 				},
 				{
-					action:      delete,
-					pods:        []*framework.QueuedPodInfo{makPodInfo(pods[0], false), makPodInfo(pods[3], false)},
-					expectedMap: map[string]*framework.QueuedPodInfo{},
+					action:       delete,
+					pods:         []*framework.QueuedPodInfo{makePodInfo(pods[0], false), makePodInfo(pods[3], false)},
+					expectedPods: []*framework.QueuedPodInfo{},
 				},
 			},
 		},
@@ -174,25 +182,25 @@ func TestUnschedulablePods(t *testing.T) {
 			steps: []step{
 				{
 					action: add,
-					pods:   []*framework.QueuedPodInfo{makPodInfo(pods[1], false), makPodInfo(pods[2], false)},
-					expectedMap: map[string]*framework.QueuedPodInfo{
-						util.GetPodFullName(pods[1]): makPodInfo(pods[1], false),
-						util.GetPodFullName(pods[2]): makPodInfo(pods[2], false),
+					pods:   []*framework.QueuedPodInfo{makePodInfo(pods[1], false), makePodInfo(pods[2], false)},
+					expectedPods: []*framework.QueuedPodInfo{
+						makePodInfo(pods[1], false),
+						makePodInfo(pods[2], false),
 					},
 				},
 				{
 					action: update,
-					pods:   []*framework.QueuedPodInfo{makPodInfo(pods[1], false)},
-					expectedMap: map[string]*framework.QueuedPodInfo{
-						util.GetPodFullName(pods[1]): makPodInfo(pods[1], false),
-						util.GetPodFullName(pods[2]): makPodInfo(pods[2], false),
+					pods:   []*framework.QueuedPodInfo{makePodInfo(pods[1], false)},
+					expectedPods: []*framework.QueuedPodInfo{
+						makePodInfo(pods[1], false),
+						makePodInfo(pods[2], false),
 					},
 				},
 				{
 					action: delete,
-					pods:   []*framework.QueuedPodInfo{makPodInfo(pods[2], false), makPodInfo(pods[3], false)},
-					expectedMap: map[string]*framework.QueuedPodInfo{
-						util.GetPodFullName(pods[1]): makPodInfo(pods[1], false),
+					pods:   []*framework.QueuedPodInfo{makePodInfo(pods[2], false), makePodInfo(pods[3], false)},
+					expectedPods: []*framework.QueuedPodInfo{
+						makePodInfo(pods[1], false),
 					},
 				},
 			},
@@ -202,17 +210,17 @@ func TestUnschedulablePods(t *testing.T) {
 			steps: []step{
 				{
 					action: add,
-					pods:   []*framework.QueuedPodInfo{makPodInfo(pods[0], true), makPodInfo(pods[1], true)},
-					expectedMap: map[string]*framework.QueuedPodInfo{
-						util.GetPodFullName(pods[0]): makPodInfo(pods[0], true),
-						util.GetPodFullName(pods[1]): makPodInfo(pods[1], true),
+					pods:   []*framework.QueuedPodInfo{makePodInfo(pods[0], true), makePodInfo(pods[1], true)},
+					expectedPods: []*framework.QueuedPodInfo{
+						makePodInfo(pods[0], true),
+						makePodInfo(pods[1], true),
 					},
 				},
 				{
 					action: delete,
-					pods:   []*framework.QueuedPodInfo{makPodInfo(pods[0], true)},
-					expectedMap: map[string]*framework.QueuedPodInfo{
-						util.GetPodFullName(pods[1]): makPodInfo(pods[1], true),
+					pods:   []*framework.QueuedPodInfo{makePodInfo(pods[0], true)},
+					expectedPods: []*framework.QueuedPodInfo{
+						makePodInfo(pods[1], true),
 					},
 				},
 			},
@@ -223,18 +231,18 @@ func TestUnschedulablePods(t *testing.T) {
 				{
 					action: add,
 					pods: []*framework.QueuedPodInfo{
-						makPodInfo(pods[0], false),
-						makPodInfo(pods[1], true),
+						makePodInfo(pods[0], false),
+						makePodInfo(pods[1], true),
 					},
-					expectedMap: map[string]*framework.QueuedPodInfo{
-						util.GetPodFullName(pods[0]): makPodInfo(pods[0], false),
-						util.GetPodFullName(pods[1]): makPodInfo(pods[1], true),
+					expectedPods: []*framework.QueuedPodInfo{
+						makePodInfo(pods[0], false),
+						makePodInfo(pods[1], true),
 					},
 				},
 				{
-					action:      delete,
-					pods:        []*framework.QueuedPodInfo{makPodInfo(pods[0], false), makPodInfo(pods[1], true)},
-					expectedMap: map[string]*framework.QueuedPodInfo{},
+					action:       delete,
+					pods:         []*framework.QueuedPodInfo{makePodInfo(pods[0], false), makePodInfo(pods[1], true)},
+					expectedPods: []*framework.QueuedPodInfo{},
 				},
 			},
 		},
@@ -243,24 +251,24 @@ func TestUnschedulablePods(t *testing.T) {
 			steps: []step{
 				{
 					action: add,
-					pods:   []*framework.QueuedPodInfo{makPodInfo(pods[0], true)},
-					expectedMap: map[string]*framework.QueuedPodInfo{
-						util.GetPodFullName(pods[0]): makPodInfo(pods[0], true),
+					pods:   []*framework.QueuedPodInfo{makePodInfo(pods[0], true)},
+					expectedPods: []*framework.QueuedPodInfo{
+						makePodInfo(pods[0], true),
 					},
 				},
 				{
 					action: update,
-					pods:   []*framework.QueuedPodInfo{makPodInfo(pods[0], false)},
-					expectedMap: map[string]*framework.QueuedPodInfo{
-						util.GetPodFullName(pods[0]): makPodInfo(pods[0], false),
+					pods:   []*framework.QueuedPodInfo{makePodInfo(pods[0], false)},
+					expectedPods: []*framework.QueuedPodInfo{
+						makePodInfo(pods[0], false),
 					},
 				},
 				{
 					action: delete,
 					pods: []*framework.QueuedPodInfo{
-						makPodInfo(pods[0], false),
+						makePodInfo(pods[0], false),
 					},
-					expectedMap: map[string]*framework.QueuedPodInfo{},
+					expectedPods: []*framework.QueuedPodInfo{},
 				},
 			},
 		},
@@ -269,18 +277,18 @@ func TestUnschedulablePods(t *testing.T) {
 			steps: []step{
 				{
 					action: add,
-					pods:   []*framework.QueuedPodInfo{makPodInfo(pods[0], false)},
-					expectedMap: map[string]*framework.QueuedPodInfo{
-						util.GetPodFullName(pods[0]): makPodInfo(pods[0], false),
+					pods:   []*framework.QueuedPodInfo{makePodInfo(pods[0], false)},
+					expectedPods: []*framework.QueuedPodInfo{
+						makePodInfo(pods[0], false),
 					},
 				},
 				{
 					action: update,
 					pods: []*framework.QueuedPodInfo{
-						makPodInfo(pods[0], true),
+						makePodInfo(pods[0], true),
 					},
-					expectedMap: map[string]*framework.QueuedPodInfo{
-						util.GetPodFullName(pods[0]): makPodInfo(pods[0], true),
+					expectedPods: []*framework.QueuedPodInfo{
+						makePodInfo(pods[0], true),
 					},
 				},
 			},
@@ -291,36 +299,36 @@ func TestUnschedulablePods(t *testing.T) {
 				{
 					action: add,
 					pods: []*framework.QueuedPodInfo{
-						makPodInfo(pods[0], false),
-						makPodInfo(pods[1], false),
-						makPodInfo(pods[2], false),
-						makPodInfo(pods[3], false),
-						makPodInfo(pods[4], true),
-						makPodInfo(pods[5], true),
+						makePodInfo(pods[0], false),
+						makePodInfo(pods[1], false),
+						makePodInfo(pods[2], false),
+						makePodInfo(pods[3], false),
+						makePodInfo(pods[4], true),
+						makePodInfo(pods[5], true),
 					},
-					expectedMap: map[string]*framework.QueuedPodInfo{
-						util.GetPodFullName(pods[0]): makPodInfo(pods[0], false),
-						util.GetPodFullName(pods[1]): makPodInfo(pods[1], false),
-						util.GetPodFullName(pods[2]): makPodInfo(pods[2], false),
-						util.GetPodFullName(pods[3]): makPodInfo(pods[3], false),
-						util.GetPodFullName(pods[4]): makPodInfo(pods[4], true),
-						util.GetPodFullName(pods[5]): makPodInfo(pods[5], true),
+					expectedPods: []*framework.QueuedPodInfo{
+						makePodInfo(pods[0], false),
+						makePodInfo(pods[1], false),
+						makePodInfo(pods[2], false),
+						makePodInfo(pods[3], false),
+						makePodInfo(pods[4], true),
+						makePodInfo(pods[5], true),
 					},
 				},
 				{
 					action: update,
 					pods: []*framework.QueuedPodInfo{
-						makPodInfo(pods[0], true),
-						makPodInfo(pods[1], true),
-						makPodInfo(pods[4], false),
+						makePodInfo(pods[0], true),
+						makePodInfo(pods[1], true),
+						makePodInfo(pods[4], false),
 					},
-					expectedMap: map[string]*framework.QueuedPodInfo{
-						util.GetPodFullName(pods[0]): makPodInfo(pods[0], true),
-						util.GetPodFullName(pods[1]): makPodInfo(pods[1], true),
-						util.GetPodFullName(pods[2]): makPodInfo(pods[2], false),
-						util.GetPodFullName(pods[3]): makPodInfo(pods[3], false),
-						util.GetPodFullName(pods[4]): makPodInfo(pods[4], false),
-						util.GetPodFullName(pods[5]): makPodInfo(pods[5], true),
+					expectedPods: []*framework.QueuedPodInfo{
+						makePodInfo(pods[0], true),
+						makePodInfo(pods[1], true),
+						makePodInfo(pods[2], false),
+						makePodInfo(pods[3], false),
+						makePodInfo(pods[4], false),
+						makePodInfo(pods[5], true),
 					},
 				},
 			},
@@ -332,12 +340,12 @@ func TestUnschedulablePods(t *testing.T) {
 			unschedulableRecorder := &mockMetricRecorder{}
 			gatedRecorder := &mockMetricRecorder{}
 			upm := newUnschedulablePods(unschedulableRecorder, gatedRecorder)
-			assertMetrics := func(expectedMapAfterAction map[string]*framework.QueuedPodInfo, action string) {
+			assertMetrics := func(expectedPods []*framework.QueuedPodInfo, action string) {
 				t.Helper()
 
 				expectedUnschedulableMetric := 0
 				expectedGatedMetric := 0
-				for _, p := range expectedMapAfterAction {
+				for _, p := range expectedPods {
 					if p.Gated() {
 						expectedGatedMetric++
 					} else {
@@ -355,20 +363,20 @@ func TestUnschedulablePods(t *testing.T) {
 			for _, step := range test.steps {
 				op := actionToOperation[step.action]
 				for _, p := range step.pods {
-					op(p, upm, gated(p.Pod, upm))
+					op(upm, p, gated(p.Pod, upm))
 				}
-				if diff := cmp.Diff(step.expectedMap, upm.podInfoMap, cmpopts.IgnoreUnexported(framework.PodInfo{})); diff != "" {
+				if diff := cmp.Diff(makePodInfoMap(step.expectedPods), upm.podInfoMap, cmpopts.IgnoreUnexported(framework.PodInfo{})); diff != "" {
 					t.Errorf("Unexpected map after %s pods(-want, +got):\n%s", step.action, diff)
 				}
 
-				assertMetrics(step.expectedMap, string(step.action))
+				assertMetrics(step.expectedPods, string(step.action))
 			}
 
 			upm.clear()
 			if len(upm.podInfoMap) != 0 {
 				t.Errorf("Expected the map to be empty, but has %v elements.", len(upm.podInfoMap))
 			}
-			assertMetrics(map[string]*framework.QueuedPodInfo{}, string(clear))
+			assertMetrics([]*framework.QueuedPodInfo{}, string(clear))
 		})
 	}
 }
