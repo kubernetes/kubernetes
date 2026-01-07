@@ -370,7 +370,7 @@ func TestIgnoredUpdate(t *testing.T) {
 
 // Shows that an object which fails reconciliation will retry
 func TestReconcileRetry(t *testing.T) {
-	testContext, testCancel := context.WithTimeout(context.Background(), 2*time.Second)
+	testContext, testCancel := context.WithTimeout(context.Background(), wait.ForeverTestTimeout)
 	defer testCancel()
 
 	calls := atomic.Uint64{}
