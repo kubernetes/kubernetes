@@ -89,7 +89,7 @@ func VerifyVersionedValidationEquivalence(t *testing.T, obj, old runtime.Object,
 		return
 	}
 	if old == nil {
-		runtimetest.RunValidationForEachVersion(t, legacyscheme.Scheme, []string{}, internalObj, accumulate, opts.SubResources...)
+		runtimetest.RunValidationForEachVersion(t, legacyscheme.Scheme, []string{}, internalObj, accumulate, opts.IgnoreObjectConversionErrors, opts.SubResources...)
 	} else {
 		// Convert old versioned object to internal format before validation.
 		// runtimetest.RunUpdateValidationForEachVersion requires unversioned (internal) objects as input.
@@ -100,7 +100,7 @@ func VerifyVersionedValidationEquivalence(t *testing.T, obj, old runtime.Object,
 		if internalOld == nil {
 			return
 		}
-		runtimetest.RunUpdateValidationForEachVersion(t, legacyscheme.Scheme, []string{}, internalObj, internalOld, accumulate, opts.SubResources...)
+		runtimetest.RunUpdateValidationForEachVersion(t, legacyscheme.Scheme, []string{}, internalObj, internalOld, accumulate, opts.IgnoreObjectConversionErrors, opts.SubResources...)
 	}
 
 	// Make a copy so we can modify it.
@@ -201,6 +201,10 @@ type validationOption struct {
 	SubResources []string
 	// NormalizationRules are the rules to apply to field paths before comparison.
 	NormalizationRules []field.NormalizationRule
+
+	// IgnoreObjectConversions skips the tests if the conversion from the internal object
+	// to the versioned object fails.
+	IgnoreObjectConversionErrors bool
 }
 
 func WithSubResources(subResources ...string) ValidationTestConfig {
@@ -212,6 +216,12 @@ func WithSubResources(subResources ...string) ValidationTestConfig {
 func WithNormalizationRules(rules ...field.NormalizationRule) ValidationTestConfig {
 	return func(o *validationOption) {
 		o.NormalizationRules = rules
+	}
+}
+
+func WithIgnoreObjectConversionErrors() ValidationTestConfig {
+	return func(o *validationOption) {
+		o.IgnoreObjectConversionErrors = true
 	}
 }
 
