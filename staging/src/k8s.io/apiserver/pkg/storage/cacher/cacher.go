@@ -1258,7 +1258,7 @@ func (c *Cacher) getWatchCacheResourceVersion(ctx context.Context, parsedWatchRe
 		return parsedWatchResourceVersion, nil
 	}
 	// legacy case
-	if !utilfeature.DefaultFeatureGate.Enabled(features.WatchFromStorageWithoutResourceVersion) && opts.SendInitialEvents == nil && opts.ResourceVersion == "" {
+	if opts.SendInitialEvents == nil && opts.ResourceVersion == "" {
 		return 0, nil
 	}
 	rv, err := c.storage.GetCurrentResourceVersion(ctx)
