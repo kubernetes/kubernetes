@@ -45,30 +45,15 @@ func testDeclarativeValidateForDeclarative(t *testing.T, apiVersion string) {
 		expectedErrs field.ErrorList
 	}{
 		"valid user priority class with positive value": {
-			input: scheduling.PriorityClass{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "high-priority",
-				},
-				Value: 1000,
-			},
+			input:        mkPriorityClass(),
 			expectedErrs: field.ErrorList{},
 		},
 		"valid user priority class at maximum boundary": {
-			input: scheduling.PriorityClass{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "max-user-priority",
-				},
-				Value: 1000000000,
-			},
+			input:        mkPriorityClass(tweakValue(1000000000)),
 			expectedErrs: field.ErrorList{},
 		},
 		"valid priority class with negative value": {
-			input: scheduling.PriorityClass{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "negative-priority",
-				},
-				Value: -1000,
-			},
+			input:        mkPriorityClass(tweakValue(-1000)),
 			expectedErrs: field.ErrorList{},
 		},
 	}
@@ -98,41 +83,13 @@ func testValidateUpdateForDeclarative(t *testing.T, apiVersion string) {
 		expectedErrs field.ErrorList
 	}{
 		"valid update of description": {
-			old: scheduling.PriorityClass{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:            "test-priority",
-					ResourceVersion: "1",
-				},
-				Value:       1000,
-				Description: "old description",
-			},
-			update: scheduling.PriorityClass{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:            "test-priority",
-					ResourceVersion: "1",
-				},
-				Value:       1000,
-				Description: "new description",
-			},
+			old:          mkPriorityClass(tweakDescription("old description")),
+			update:       mkPriorityClass(tweakDescription("new description")),
 			expectedErrs: field.ErrorList{},
 		},
 		"invalid update of value field (immutable)": {
-			old: scheduling.PriorityClass{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:            "test-priority",
-					ResourceVersion: "1",
-				},
-				Value:       1000,
-				Description: "test description",
-			},
-			update: scheduling.PriorityClass{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:            "test-priority",
-					ResourceVersion: "1",
-				},
-				Value:       2000,
-				Description: "test description",
-			},
+			old:    mkPriorityClass(tweakDescription("test description")),
+			update: mkPriorityClass(tweakValue(2000), tweakDescription("test description")),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("value"), nil, "field is immutable").WithOrigin("immutable"),
 			},
@@ -143,5 +100,33 @@ func testValidateUpdateForDeclarative(t *testing.T, apiVersion string) {
 		t.Run(k, func(t *testing.T) {
 			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, Strategy.ValidateUpdate, tc.expectedErrs)
 		})
+	}
+}
+
+// mkPriorityClass creates a valid PriorityClass with default values, then applies any tweaks.
+func mkPriorityClass(tweaks ...func(pc *scheduling.PriorityClass)) scheduling.PriorityClass {
+	pc := scheduling.PriorityClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "test-priority",
+			ResourceVersion: "1",
+		},
+		Value: 1000,
+	}
+
+	for _, tweak := range tweaks {
+		tweak(&pc)
+	}
+	return pc
+}
+
+func tweakValue(value int32) func(pc *scheduling.PriorityClass) {
+	return func(pc *scheduling.PriorityClass) {
+		pc.Value = value
+	}
+}
+
+func tweakDescription(description string) func(pc *scheduling.PriorityClass) {
+	return func(pc *scheduling.PriorityClass) {
+		pc.Description = description
 	}
 }

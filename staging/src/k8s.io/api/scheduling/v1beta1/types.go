@@ -37,7 +37,6 @@ type PriorityClass struct {
 	// Standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
-	// +k8:optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// value represents the integer value of this priority class. This is the actual priority that pods
@@ -51,20 +50,20 @@ type PriorityClass struct {
 	// one PriorityClasses exists with their `globalDefault` field set to true,
 	// the smallest value of such global default PriorityClasses will be used as the default priority.
 	// +optional
-	// +k8:optional
+	// +k8s:optional
 	GlobalDefault bool `json:"globalDefault,omitempty" protobuf:"bytes,3,opt,name=globalDefault"`
 
 	// description is an arbitrary string that usually provides guidelines on
 	// when this priority class should be used.
 	// +optional
-	// +k8:optional
+	// +k8s:optional
 	Description string `json:"description,omitempty" protobuf:"bytes,4,opt,name=description"`
 
 	// preemptionPolicy is the Policy for preempting pods with lower priority.
 	// One of Never, PreemptLowerPriority.
 	// Defaults to PreemptLowerPriority if unset.
 	// +optional
-	// +k8:optional
+	// +k8s:optional
 	PreemptionPolicy *apiv1.PreemptionPolicy `json:"preemptionPolicy,omitempty" protobuf:"bytes,5,opt,name=preemptionPolicy"`
 }
 
