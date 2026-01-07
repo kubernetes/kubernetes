@@ -67,6 +67,7 @@ Warning: This endpoint is not meant to be machine parseable, has no formatting c
 // from the supported media types list, so error messages only show actually supported types.
 type statuszCodecFactory struct {
 	serializer.CodecFactory
+	supportedMediaTypes []runtime.SerializerInfo
 }
 
 type mux interface {
@@ -89,6 +90,16 @@ func NewRegistry(effectiveVersion compatibility.EffectiveVersion, opts ...Option
 func Install(m mux, componentName string, reg statuszRegistry) {
 	scheme := runtime.NewScheme()
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
+	filteredCodecFactory, err := newStatuszCodecFactory(scheme, componentName, reg)
+	if err != nil {
+		utilruntime.HandleError(err)
+	}
+	m.Handle(DefaultStatuszPath, handleStatusz(componentName, reg, filteredCodecFactory, negotiate.StatuszEndpointRestrictions{}))
+}
+
+// newStatuszCodecFactory creates a codec factory with the standard serializers for statusz,
+// filtering out unsupported media types (e.g., protobuf).
+func newStatuszCodecFactory(scheme *runtime.Scheme, componentName string, reg statuszRegistry) (*statuszCodecFactory, error) {
 	codecFactoryOpts := []serializer.CodecFactoryOptionsMutator{
 		serializer.WithSerializer(func(_ runtime.ObjectCreater, _ runtime.ObjectTyper) runtime.SerializerInfo {
 			textSerializer := statuszTextSerializer{componentName, reg}
@@ -108,21 +119,36 @@ func Install(m mux, componentName string, reg statuszRegistry) {
 	}
 
 	codecFactory := serializer.NewCodecFactory(scheme, codecFactoryOpts...)
-	// Wrap to filter out unsupported media types (e.g., protobuf)
-	filteredCodecFactory := &statuszCodecFactory{codecFactory}
-	m.Handle(DefaultStatuszPath, handleStatusz(componentName, reg, filteredCodecFactory, negotiate.StatuszEndpointRestrictions{}))
+	allTypes := codecFactory.SupportedMediaTypes()
+	filtered := make([]runtime.SerializerInfo, 0, len(allTypes))
+
+	var unknownTypes []string
+	for _, info := range allTypes {
+		switch info.MediaType {
+		// Supported media types
+		case "text/plain", runtime.ContentTypeJSON, runtime.ContentTypeYAML, runtime.ContentTypeCBOR:
+			filtered = append(filtered, info)
+		// Unsupported media types
+		case runtime.ContentTypeProtobuf:
+			continue
+		default:
+			unknownTypes = append(unknownTypes, info.MediaType)
+		}
+	}
+
+	var err error
+	if len(unknownTypes) > 0 {
+		err = fmt.Errorf("statusz: unknown media type(s) %v, excluding from supported types", unknownTypes)
+	}
+
+	return &statuszCodecFactory{
+		CodecFactory:        codecFactory,
+		supportedMediaTypes: filtered,
+	}, err
 }
 
 func (f *statuszCodecFactory) SupportedMediaTypes() []runtime.SerializerInfo {
-	allTypes := f.CodecFactory.SupportedMediaTypes()
-	filtered := make([]runtime.SerializerInfo, 0, len(allTypes))
-	for _, info := range allTypes {
-		if info.MediaType == runtime.ContentTypeProtobuf {
-			continue
-		}
-		filtered = append(filtered, info)
-	}
-	return filtered
+	return f.supportedMediaTypes
 }
 
 func handleStatusz(componentName string, reg statuszRegistry, serializer runtime.NegotiatedSerializer, restrictions negotiate.StatuszEndpointRestrictions) http.HandlerFunc {

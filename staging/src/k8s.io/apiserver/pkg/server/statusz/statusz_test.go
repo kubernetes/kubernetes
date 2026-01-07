@@ -27,7 +27,9 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	cbor "k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apiserver/pkg/features"
@@ -442,4 +444,19 @@ func timeEqual() cmp.Option {
 	return cmp.Comparer(func(expectedTime, actualTime metav1.Time) bool {
 		return expectedTime.Truncate(time.Second).Equal(actualTime.Truncate(time.Second))
 	})
+}
+
+// TestNewStatuszCodecFactory ensures all media types in the codec factory
+// are explicitly handled. If this test fails, a new media type was added
+// to the codec factory and needs to be explicitly added to the supported
+// or unsupported list in newStatuszCodecFactory.
+func TestNewStatuszCodecFactory(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CBORServingAndStorage, true)
+	scheme := runtime.NewScheme()
+	utilruntime.Must(v1alpha1.AddToScheme(scheme))
+
+	_, err := newStatuszCodecFactory(scheme, "", nil)
+	if err != nil {
+		t.Fatalf("unknown media type(s) detected - update newStatuszCodecFactory to explicitly handle them: %v", err)
+	}
 }

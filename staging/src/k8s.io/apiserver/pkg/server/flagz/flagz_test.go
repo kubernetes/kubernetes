@@ -27,7 +27,9 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/spf13/pflag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	cbor "k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
+	"k8s.io/apimachinery/pkg/runtime"
+	cbordirect "k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/features"
 	v1alpha1 "k8s.io/apiserver/pkg/server/flagz/api/v1alpha1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -306,7 +308,7 @@ func unmarshalResponse(t *testing.T, contentType string, body []byte, got *v1alp
 			t.Fatalf("unexpected error while unmarshalling YAML response: %v", err)
 		}
 	case strings.Contains(contentType, "application/cbor"):
-		if err := cbor.Unmarshal(body, got); err != nil {
+		if err := cbordirect.Unmarshal(body, got); err != nil {
 			t.Fatalf("unexpected error while unmarshalling CBOR response: %v", err)
 		}
 	default:
@@ -358,5 +360,20 @@ func TestCache(t *testing.T) {
 	}
 	if diff := cmp.Diff(cached, capturedReg.cachedPlainTextResponse); diff != "" {
 		t.Errorf("Unexpected diff on cached response (-want,+got):\n%s", diff)
+	}
+}
+
+// TestNewFlagzCodecFactory ensures all media types in the codec factory
+// are explicitly handled. If this test fails, a new media type was added
+// to the codec factory and needs to be explicitly added to the supported
+// or unsupported list in newFlagzCodecFactory.
+func TestNewFlagzCodecFactory(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CBORServingAndStorage, true)
+	scheme := runtime.NewScheme()
+	utilruntime.Must(v1alpha1.AddToScheme(scheme))
+
+	_, err := newFlagzCodecFactory(scheme, "", nil)
+	if err != nil {
+		t.Fatalf("unknown media type(s) detected - update newFlagzCodecFactory to explicitly handle them: %v", err)
 	}
 }

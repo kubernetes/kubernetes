@@ -46,6 +46,7 @@ const (
 // from the supported media types list, so error messages only show actually supported types.
 type flagzCodecFactory struct {
 	serializer.CodecFactory
+	supportedMediaTypes []runtime.SerializerInfo
 }
 
 type mux interface {
@@ -64,9 +65,19 @@ func Install(m mux, componentName string, flagReader Reader, opts ...Option) {
 
 	scheme := runtime.NewScheme()
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
+	filteredCodecFactory, err := newFlagzCodecFactory(scheme, componentName, reg.reader)
+	if err != nil {
+		utilruntime.HandleError(err)
+	}
+	m.Handle(DefaultFlagzPath, handleFlagz(componentName, reg, filteredCodecFactory, negotiate.FlagzEndpointRestrictions{}))
+}
+
+// newFlagzCodecFactory creates a codec factory with the standard serializers for flagz,
+// filtering out unsupported media types (e.g., protobuf).
+func newFlagzCodecFactory(scheme *runtime.Scheme, componentName string, flagReader Reader) (*flagzCodecFactory, error) {
 	codecFactoryOpts := []serializer.CodecFactoryOptionsMutator{
 		serializer.WithSerializer(func(_ runtime.ObjectCreater, _ runtime.ObjectTyper) runtime.SerializerInfo {
-			textSerializer := flagzTextSerializer{componentName, reg.reader}
+			textSerializer := flagzTextSerializer{componentName, flagReader}
 			return runtime.SerializerInfo{
 				MediaType:        "text/plain",
 				MediaTypeType:    "text",
@@ -83,21 +94,36 @@ func Install(m mux, componentName string, flagReader Reader, opts ...Option) {
 	}
 
 	codecFactory := serializer.NewCodecFactory(scheme, codecFactoryOpts...)
-	// Wrap to filter out unsupported media types (e.g., protobuf)
-	filteredCodecFactory := &flagzCodecFactory{codecFactory}
-	m.Handle(DefaultFlagzPath, handleFlagz(componentName, reg, filteredCodecFactory, negotiate.FlagzEndpointRestrictions{}))
+	allTypes := codecFactory.SupportedMediaTypes()
+	filtered := make([]runtime.SerializerInfo, 0, len(allTypes))
+
+	var unknownTypes []string
+	for _, info := range allTypes {
+		switch info.MediaType {
+		// Supported media types
+		case "text/plain", runtime.ContentTypeJSON, runtime.ContentTypeYAML, runtime.ContentTypeCBOR:
+			filtered = append(filtered, info)
+		// Unsupported media types
+		case runtime.ContentTypeProtobuf:
+			continue
+		default:
+			unknownTypes = append(unknownTypes, info.MediaType)
+		}
+	}
+
+	var err error
+	if len(unknownTypes) > 0 {
+		err = fmt.Errorf("flagz: unknown media type(s) %v, excluding from supported types", unknownTypes)
+	}
+
+	return &flagzCodecFactory{
+		CodecFactory:        codecFactory,
+		supportedMediaTypes: filtered,
+	}, err
 }
 
 func (f *flagzCodecFactory) SupportedMediaTypes() []runtime.SerializerInfo {
-	allTypes := f.CodecFactory.SupportedMediaTypes()
-	filtered := make([]runtime.SerializerInfo, 0, len(allTypes))
-	for _, info := range allTypes {
-		if info.MediaType == runtime.ContentTypeProtobuf {
-			continue
-		}
-		filtered = append(filtered, info)
-	}
-	return filtered
+	return f.supportedMediaTypes
 }
 
 func handleFlagz(componentName string, reg *registry, serializer runtime.NegotiatedSerializer, restrictions negotiate.FlagzEndpointRestrictions) http.HandlerFunc {
