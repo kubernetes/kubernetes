@@ -219,6 +219,8 @@ type KubeletConfiguration struct {
 	NodeLeaseDurationSeconds int32
 	// ImageMinimumGCAge is the minimum age for an unused image before it is
 	// garbage collected.
+	// The field value must be greater than 0.
+	// If unset or 0, defaults to 2m.
 	ImageMinimumGCAge metav1.Duration
 	// ImageMaximumGCAge is the maximum age an image can be unused before it is garbage collected.
 	// The default of this field is "0s", which disables this field--meaning images won't be garbage
