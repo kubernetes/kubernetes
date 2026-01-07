@@ -19,7 +19,6 @@ package noderesources
 import (
 	"fmt"
 	"testing"
-	"testing/synctest"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -31,10 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/informers"
-	"k8s.io/client-go/kubernetes/fake"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/dynamic-resource-allocation/deviceclass/extendedresourcecache"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -46,7 +42,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
-	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
@@ -652,7 +647,7 @@ func testEnoughRequests(tCtx ktesting.TContext) {
 			nodeInfo: framework.NewNodeInfo(newResourcePod(framework.Resource{MilliCPU: 0, Memory: 0})),
 			name:     "extended resource backed by DRA, nil draManager",
 			// When DRAExtendedResource is enabled but draManager is nil (e.g., kubelet path),
-			// the noderesources plugin delegates to DRA instead of reporting insufficient resources.
+			// the noderesources plugin must not delegate to DRA and process the request itself.
 			wantInsufficientResources: []InsufficientResource{},
 		},
 		{
@@ -707,7 +702,6 @@ func testEnoughRequests(tCtx ktesting.TContext) {
 
 	for _, test := range enoughPodsTests {
 		tCtx.SyncTest(test.name, func(tCtx ktesting.TContext) {
-
 			featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, test.draExtendedResourceEnabled)
 			node := v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 5, 20, 5), Allocatable: makeAllocatableResources(10, 20, 32, 5, 20, 5)}}
 			test.nodeInfo.SetNode(&node)
@@ -716,30 +710,11 @@ func testEnoughRequests(tCtx ktesting.TContext) {
 				test.args.ScoringStrategy = defaultScoringStrategy
 			}
 
-			client := fake.NewSimpleClientset(deviceClassWithExtendResourceName)
-			informerFactory := informers.NewSharedInformerFactory(client, 0)
-			claimsCache := assumecache.NewAssumeCache(tCtx.Logger(), informerFactory.Resource().V1().ResourceClaims().Informer(), "resource claim", "", nil)
-			draManager := dynamicresources.NewDRAManager(tCtx, claimsCache, nil, informerFactory)
-			if test.draExtendedResourceEnabled {
-				cache := draManager.DeviceClassResolver().(*extendedresourcecache.ExtendedResourceCache)
-				handle, err := informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandler(cache)
-				tCtx.ExpectNoError(err, "add device class informer event handler")
-				tCtx.Cleanup(func() {
-					_ = informerFactory.Resource().V1().DeviceClasses().Informer().RemoveEventHandler(handle)
-				})
-			}
-			informerFactory.Start(tCtx.Done())
-			tCtx.Cleanup(func() {
-				tCtx.Cancel("test has completed")
-				// Now we can wait for all goroutines to stop.
-				informerFactory.Shutdown()
-			})
-			informerFactory.WaitForCacheSync(tCtx.Done())
-			// Wait for event delivery.
-			synctest.Wait()
-
-			runOpts := []runtime.Option{
-				runtime.WithSharedDRAManager(draManager),
+			runOpts := []runtime.Option{}
+			var testDRAManager *dynamicresources.DefaultDRAManager
+			if !test.nilDRAManager && test.draExtendedResourceEnabled {
+				testDRAManager = newTestDRAManager(tCtx, deviceClassWithExtendResourceName)
+				runOpts = append(runOpts, runtime.WithSharedDRAManager(testDRAManager))
 			}
 			fh, _ := runtime.NewFramework(tCtx, nil, nil, runOpts...)
 			defer func() {
@@ -761,10 +736,6 @@ func testEnoughRequests(tCtx ktesting.TContext) {
 
 			opts := ResourceRequestsOptions{EnablePodLevelResources: test.podLevelResourcesEnabled, EnableDRAExtendedResource: test.draExtendedResourceEnabled}
 			state := computePodResourceRequest(test.pod, opts)
-			var testDRAManager fwk.SharedDRAManager
-			if !test.nilDRAManager {
-				testDRAManager = draManager
-			}
 			gotInsufficientResources := fitsRequest(state, test.nodeInfo, p.(*Fit).ignoredResources, p.(*Fit).ignoredResourceGroups, testDRAManager, opts)
 			if diff := cmp.Diff(test.wantInsufficientResources, gotInsufficientResources); diff != "" {
 				tCtx.Errorf("insufficient resources do not match (-want,+got):\n%s", diff)
@@ -1986,6 +1957,9 @@ func TestIsFit(t *testing.T) {
 }
 
 func TestHaveAnyRequestedResourcesIncreased(t *testing.T) {
+	testHaveAnyRequestedResourcesIncreased(ktesting.Init(t))
+}
+func testHaveAnyRequestedResourcesIncreased(tCtx ktesting.TContext) {
 	testCases := map[string]struct {
 		pod                        *v1.Pod
 		originalNode               *v1.Node
@@ -2034,19 +2008,19 @@ func TestHaveAnyRequestedResourcesIncreased(t *testing.T) {
 				MilliCPU:         2,
 				Memory:           2,
 				EphemeralStorage: 2,
-				ScalarResources:  map[v1.ResourceName]int64{extendedResourceA: 2},
+				ScalarResources:  map[v1.ResourceName]int64{extendedResourceDRA: 2},
 			}),
 			originalNode: st.MakeNode().Capacity(map[v1.ResourceName]string{
 				v1.ResourceCPU:              "1",
 				v1.ResourceMemory:           "2",
 				v1.ResourceEphemeralStorage: "3",
-				extendedResourceA:           "4",
+				extendedResourceDRA:         "4",
 			}).Obj(),
 			modifiedNode: st.MakeNode().Capacity(map[v1.ResourceName]string{
 				v1.ResourceCPU:              "1",
 				v1.ResourceMemory:           "2",
 				v1.ResourceEphemeralStorage: "1",
-				extendedResourceA:           "1",
+				extendedResourceDRA:         "1",
 			}).Obj(),
 			draExtendedResourceEnabled: true,
 			expected:                   false,
@@ -2056,7 +2030,7 @@ func TestHaveAnyRequestedResourcesIncreased(t *testing.T) {
 				MilliCPU:         2,
 				Memory:           2,
 				EphemeralStorage: 2,
-				ScalarResources:  map[v1.ResourceName]int64{extendedResourceA: 2},
+				ScalarResources:  map[v1.ResourceName]int64{extendedResourceDRA: 2},
 			}),
 			originalNode: st.MakeNode().Capacity(map[v1.ResourceName]string{
 				v1.ResourceCPU:              "1",
@@ -2073,13 +2047,13 @@ func TestHaveAnyRequestedResourcesIncreased(t *testing.T) {
 		},
 		"requested-resources-dra-zero-capacity": {
 			pod: newResourcePod(framework.Resource{
-				ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 1},
+				ScalarResources: map[v1.ResourceName]int64{extendedResourceDRA: 1},
 			}),
 			originalNode: st.MakeNode().Capacity(map[v1.ResourceName]string{
-				extendedResourceA: "0",
+				extendedResourceDRA: "0",
 			}).Obj(),
 			modifiedNode: st.MakeNode().Capacity(map[v1.ResourceName]string{
-				extendedResourceA: "0",
+				extendedResourceDRA: "0",
 			}).Obj(),
 			draExtendedResourceEnabled: true,
 			expected:                   true,
@@ -2101,8 +2075,7 @@ func TestHaveAnyRequestedResourcesIncreased(t *testing.T) {
 				v1.ResourceMemory:           "2",
 				v1.ResourceEphemeralStorage: "1",
 			}).Obj(),
-			draExtendedResourceEnabled: false,
-			expected:                   false,
+			expected: false,
 		},
 		"requested-resources-decreased": {
 			pod: newResourcePod(framework.Resource{
@@ -2186,9 +2159,14 @@ func TestHaveAnyRequestedResourcesIncreased(t *testing.T) {
 		},
 	}
 	for name, tc := range testCases {
-		t.Run(name, func(t *testing.T) {
-			if got := haveAnyRequestedResourcesIncreased(tc.pod, tc.originalNode, tc.modifiedNode, nil, ResourceRequestsOptions{EnableDRAExtendedResource: tc.draExtendedResourceEnabled}); got != tc.expected {
-				t.Errorf("expected: %v, got: %v", tc.expected, got)
+		tCtx.SyncTest(name, func(tCtx ktesting.TContext) {
+			var draManager *dynamicresources.DefaultDRAManager
+			featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, tc.draExtendedResourceEnabled)
+			if tc.draExtendedResourceEnabled {
+				draManager = newTestDRAManager(tCtx, deviceClassWithExtendResourceName)
+			}
+			if got := haveAnyRequestedResourcesIncreased(tc.pod, tc.originalNode, tc.modifiedNode, draManager, ResourceRequestsOptions{EnableDRAExtendedResource: tc.draExtendedResourceEnabled}); got != tc.expected {
+				tCtx.Errorf("expected: %v, got: %v", tc.expected, got)
 			}
 		})
 	}

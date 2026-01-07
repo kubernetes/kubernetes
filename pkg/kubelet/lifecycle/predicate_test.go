@@ -29,6 +29,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
@@ -39,49 +40,51 @@ import (
 )
 
 var (
-	quantity = *resource.NewQuantity(1, resource.DecimalSI)
+	quantity         = *resource.NewQuantity(1, resource.DecimalSI)
+	extendedResource = v1.ResourceName("foo.com/bar")
 )
 
 func TestRemoveMissingExtendedResources(t *testing.T) {
 	for _, test := range []struct {
-		desc string
-		pod  *v1.Pod
-		node *v1.Node
+		desc                      string
+		pod                       *v1.Pod
+		node                      *v1.Node
+		enableDRAExtendedResource bool
 
 		expectedPod *v1.Pod
 	}{
 		{
 			desc: "requests in Limits should be ignored",
 			pod: makeTestPod(
-				v1.ResourceList{},                        // Requests
-				v1.ResourceList{"foo.com/bar": quantity}, // Limits
+				v1.ResourceList{}, // Requests
+				v1.ResourceList{extendedResource: quantity}, // Limits
 			),
 			node: makeTestNode(
 				v1.ResourceList{"foo.com/baz": quantity}, // Allocatable
 			),
 			expectedPod: makeTestPod(
-				v1.ResourceList{},                        // Requests
-				v1.ResourceList{"foo.com/bar": quantity}, // Limits
+				v1.ResourceList{}, // Requests
+				v1.ResourceList{extendedResource: quantity}, // Limits
 			),
 		},
 		{
 			desc: "requests for resources available in node should not be removed",
 			pod: makeTestPod(
-				v1.ResourceList{"foo.com/bar": quantity}, // Requests
-				v1.ResourceList{},                        // Limits
+				v1.ResourceList{extendedResource: quantity}, // Requests
+				v1.ResourceList{}, // Limits
 			),
 			node: makeTestNode(
-				v1.ResourceList{"foo.com/bar": quantity}, // Allocatable
+				v1.ResourceList{extendedResource: quantity}, // Allocatable
 			),
 			expectedPod: makeTestPod(
-				v1.ResourceList{"foo.com/bar": quantity}, // Requests
-				v1.ResourceList{}),                       // Limits
+				v1.ResourceList{extendedResource: quantity}, // Requests
+				v1.ResourceList{}), // Limits
 		},
 		{
 			desc: "requests for resources unavailable in node should be removed",
 			pod: makeTestPod(
-				v1.ResourceList{"foo.com/bar": quantity}, // Requests
-				v1.ResourceList{},                        // Limits
+				v1.ResourceList{extendedResource: quantity}, // Requests
+				v1.ResourceList{}, // Limits
 			),
 			node: makeTestNode(
 				v1.ResourceList{"foo.com/baz": quantity}, // Allocatable
@@ -91,13 +94,62 @@ func TestRemoveMissingExtendedResources(t *testing.T) {
 				v1.ResourceList{}, // Limits
 			),
 		},
+		{
+			desc: "requests for extended resources with Allocatable 0 should not be removed",
+			pod: makeTestPod(
+				v1.ResourceList{extendedResource: quantity}, // Requests
+				v1.ResourceList{extendedResource: quantity}, // Limits
+			),
+			node: makeTestNode(
+				v1.ResourceList{extendedResource: *resource.NewQuantity(0, resource.DecimalSI)}, // Allocatable = 0
+			),
+			expectedPod: makeTestPod(
+				v1.ResourceList{extendedResource: quantity}, // Requests
+				v1.ResourceList{extendedResource: quantity}, // Limits
+			),
+		},
+		{
+			desc: "requests for extended resources that are not available in node should be removed",
+			pod: makeTestPod(
+				v1.ResourceList{extendedResource: quantity}, // Requests
+				v1.ResourceList{extendedResource: quantity}, // Limits
+			),
+			node: makeTestNode(
+				v1.ResourceList{}, // Allocatable is absent for foo.com/bar
+			),
+			expectedPod: makeTestPod(
+				v1.ResourceList{}, // Requests are filtered
+				v1.ResourceList{extendedResource: quantity}, // Limits
+			),
+		},
+		{
+			desc: "request for extended resource backed by DRA should be removed if Allocatable is 0",
+			pod:  makeTestPodWithDRAResource(extendedResource, quantity),
+			node: makeTestNode(
+				v1.ResourceList{extendedResource: *resource.NewQuantity(0, resource.DecimalSI)}, // Allocatable = 0
+			),
+			enableDRAExtendedResource: true,
+			expectedPod:               emptyRequests(makeTestPodWithDRAResource(extendedResource, quantity)),
+		},
+		{
+			desc: "request for extended resource backed by DRA should be removed if Allocatable is absent",
+			pod:  makeTestPodWithDRAResource(extendedResource, quantity),
+			node: makeTestNode(
+				v1.ResourceList{}, // Allocatable is absent for foo.com/bar
+			),
+			enableDRAExtendedResource: true,
+			expectedPod:               emptyRequests(makeTestPodWithDRAResource(extendedResource, quantity)),
+		},
 	} {
-		nodeInfo := schedulerframework.NewNodeInfo()
-		nodeInfo.SetNode(test.node)
-		pod := removeMissingExtendedResources(test.pod, nodeInfo)
-		if diff := cmp.Diff(test.expectedPod, pod); diff != "" {
-			t.Errorf("unexpected pod (-want, +got):\n%s", diff)
-		}
+		t.Run(test.desc, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, test.enableDRAExtendedResource)
+			nodeInfo := schedulerframework.NewNodeInfo()
+			nodeInfo.SetNode(test.node)
+			pod := removeMissingExtendedResources(test.pod, nodeInfo)
+			if diff := cmp.Diff(test.expectedPod, pod); diff != "" {
+				t.Errorf("unexpected pod (-want, +got):\n%s", diff)
+			}
+		})
 	}
 }
 
@@ -122,6 +174,44 @@ func makeTestPod(requests, limits v1.ResourceList) *v1.Pod {
 			},
 		},
 	}
+}
+
+func makeTestPodWithDRAResource(resourceName v1.ResourceName, quantity resource.Quantity) *v1.Pod {
+	pod := &v1.Pod{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "test-container",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{resourceName: quantity},
+						Limits:   v1.ResourceList{resourceName: quantity},
+					},
+				},
+			},
+		},
+	}
+	pod.Status = v1.PodStatus{
+		ExtendedResourceClaimStatus: &v1.PodExtendedResourceClaimStatus{
+			RequestMappings: []v1.ContainerExtendedResourceRequest{
+				{
+					ResourceName:  string(resourceName),
+					ContainerName: pod.Spec.Containers[0].Name,
+				},
+			},
+		},
+	}
+	return pod
+}
+
+func emptyRequests(pod *v1.Pod) *v1.Pod {
+	newPod := pod.DeepCopy()
+	for i := range newPod.Spec.Containers {
+		newPod.Spec.Containers[i].Resources.Requests = v1.ResourceList{}
+	}
+	for i := range newPod.Spec.InitContainers {
+		newPod.Spec.InitContainers[i].Resources.Requests = v1.ResourceList{}
+	}
+	return newPod
 }
 
 func makeTestNode(allocatable v1.ResourceList) *v1.Node {
