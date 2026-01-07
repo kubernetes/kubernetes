@@ -655,8 +655,12 @@ func (q *Quantity) QuoRound(y int64, roundVal int64) bool {
 		infDec.QuoRound(infDec, inf.NewDec(y, inf.Scale(0)), inf.Scale(roundVal), inf.RoundDown)
 		if int64(infDec.Scale()) == 0 {
 			// the scale is zero. then infdec is directly representable as an int
-			q.i = int64Amount{value: infDec.UnscaledBig().Int64()}
-			return true
+			if infDec.UnscaledBig().IsInt64() {
+				q.i = int64Amount{value: infDec.UnscaledBig().Int64()}
+				return true
+			}
+			q.i = int64Amount{value: math.MaxInt64}
+			return false
 		} else {
 			// the scale isn't zero, so the infDec might be a decimal. we need to check if after we bring it back to scale
 			// will there be remaining numbers after division by 10
@@ -666,8 +670,12 @@ func (q *Quantity) QuoRound(y int64, roundVal int64) bool {
 				s := int64(infDec.Scale())
 				e := new(big.Int).Exp(big.NewInt(10), big.NewInt(s), nil)
 				infDec.UnscaledBig().Quo(infDec.UnscaledBig(), e)
-				q.i = int64Amount{value: infDec.UnscaledBig().Int64()}
-				return true
+				if infDec.UnscaledBig().IsInt64() {
+					q.i = int64Amount{value: infDec.UnscaledBig().Int64()}
+					return true
+				}
+				q.i = int64Amount{value: math.MaxInt64}
+				return false
 			}
 		}
 
