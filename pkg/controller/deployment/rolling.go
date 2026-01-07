@@ -93,16 +93,6 @@ func (dc *DeploymentController) reconcileOldReplicaSets(ctx context.Context, all
 	allPodsCount := deploymentutil.GetReplicaCountForReplicaSets(allRSs)
 	logger.V(4).Info("New replica set", "replicaSet", klog.KObj(newRS), "availableReplicas", newRS.Status.AvailableReplicas)
 	maxUnavailable := deploymentutil.MaxUnavailable(*deployment)
-	desiredReplicas := *(deployment.Spec.Replicas)
-	newRSUnavailablePodCount := *(newRS.Spec.Replicas) - newRS.Status.AvailableReplicas
-	oldRSAvailablePodCount := deploymentutil.GetAvailableReplicaCountForReplicaSets(oldRSs)
-	// Check when surge is active (allPodsCount > DesiredReplicas), maxUnavailable rounds to 0,
-	// new RS has unavailable pods, and old RS pods are all available, enforce a minimum of 1.
-	// This prevents deadlocks with antiPodAffinity where old pods block new pods from scheduling.
-	// We only enforce when old pods are healthy to avoid interfering with normal cleanup of unhealthy pods.
-	if maxUnavailable < 1 && allPodsCount > desiredReplicas && newRSUnavailablePodCount > 0 && oldRSAvailablePodCount == oldPodsCount {
-		maxUnavailable = 1
-	}
 	// Check if we can scale down. We can scale down in the following 2 cases:
 	// * Some old replica sets have unhealthy replicas, we could safely scale down those unhealthy replicas since that won't further
 	//  increase unavailability.
@@ -134,7 +124,30 @@ func (dc *DeploymentController) reconcileOldReplicaSets(ctx context.Context, all
 	// * However, newRSPodsUnavailable would also be 0, so the 2 old replica sets could be scaled down by 5 (13 - 8 - 0), which would then
 	// allow the new replica set to be scaled up by 5.
 	minAvailable := *(deployment.Spec.Replicas) - maxUnavailable
+	newRSUnavailablePodCount := *(newRS.Spec.Replicas) - newRS.Status.AvailableReplicas
 	maxScaledDown := allPodsCount - minAvailable - newRSUnavailablePodCount
+
+	// Special case: if maxScaledDown is 0 or negative due to maxUnavailable=0, but we're in surge
+	// and the new RS has pods that aren't ready while old RS is fully available, allow minimal scaling.
+	// This handles anti-affinity deadlocks where new pods can't schedule until old pods are removed.
+	// We only do this when new RS has NO ready replicas at all, indicating scheduling issues rather
+	// than pods that are running but failing readiness checks.
+	if maxScaledDown <= 0 && maxUnavailable == 0 && allPodsCount > *(deployment.Spec.Replicas) {
+		oldRSAvailablePodCount := deploymentutil.GetAvailableReplicaCountForReplicaSets(oldRSs)
+		// Only allow scaling if:
+		// 1. Old RS is fully healthy (no pods to clean up)
+		// 2. New RS has unavailable pods
+		// 3. New RS has ZERO ready replicas (indicating scheduling issues, not readiness failures)
+		if newRSUnavailablePodCount > 0 && newRS.Status.ReadyReplicas == 0 && oldRSAvailablePodCount == oldPodsCount {
+			// Allow scaling down by 1 to potentially unblock scheduling
+			maxScaledDown = 1
+			logger.V(4).Info("Allowing minimal scale down to potentially resolve scheduling deadlock",
+				"deployment", klog.KObj(deployment),
+				"oldRSAvailable", oldRSAvailablePodCount,
+				"newRSUnavailable", newRSUnavailablePodCount)
+		}
+	}
+
 	if maxScaledDown <= 0 {
 		return false, nil
 	}
