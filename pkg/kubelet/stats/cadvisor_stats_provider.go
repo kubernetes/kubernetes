@@ -436,6 +436,14 @@ func filterTerminatedContainerInfoAndAssembleByPodCgroupKey(logger klog.Logger, 
 			continue
 		}
 		sort.Sort(ByCreationTime(refs))
+
+		// collect terminated containers
+		for _, ref := range refs {
+			if isContainerTerminated(&ref.cinfo) {
+				terminated[ref.cgroup] = ref.cinfo
+			}
+		}
+
 		for i := len(refs) - 1; i >= 0; i-- {
 			if hasMemoryAndCPUInstUsage(&refs[i].cinfo) {
 				result[refs[i].cgroup] = refs[i].cinfo

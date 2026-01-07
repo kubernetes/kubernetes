@@ -117,6 +117,60 @@ func TestFilterTerminatedContainerInfoAndAssembleByPodCgroupKey(t *testing.T) {
 	}
 }
 
+func TestFilterTerminatedContainerInfo_ReturnsAllTerminatedInstances(t *testing.T) {
+	const (
+		seedPastPodInfra = 1000
+		seedPodInfra     = 2000
+		seedPodContainer = 3000
+	)
+
+	const (
+		namespace = "test"
+		podName   = "pod0"
+		container = "c0"
+	)
+
+	infos := map[string]cadvisorapiv2.ContainerInfo{
+		// Old terminated container
+		"/pod0-c0-terminated-1": getTerminatedContainerInfo(
+			seedPastPodInfra, podName, namespace, container,
+		),
+
+		// Mid terminated container
+		"/pod0-c0-terminated-2": getTerminatedContainerInfo(
+			seedPodInfra, podName, namespace, container,
+		),
+
+		// Latest running container
+		"/pod0-c0": getTestContainerInfo(
+			seedPodContainer, podName, namespace, container,
+		),
+	}
+
+	logger, _ := ktesting.NewTestContext(t)
+
+	filteredInfos, terminatedInfos, allInfos :=
+		filterTerminatedContainerInfoAndAssembleByPodCgroupKey(logger, infos)
+
+	assert.Len(t, allInfos, 3)
+	assert.Len(t, filteredInfos, 1)
+	if _, found := filteredInfos["/pod0-c0"]; !found {
+		t.Errorf("expected running container to be present in filteredInfos")
+	}
+
+	// terminated containers should be returned
+	assert.Len(t, terminatedInfos, 2)
+
+	for _, cgroup := range []string{
+		"/pod0-c0-terminated-1",
+		"/pod0-c0-terminated-2",
+	} {
+		if _, found := terminatedInfos[cgroup]; !found {
+			t.Errorf("expected terminated container %q to be present", cgroup)
+		}
+	}
+}
+
 func TestCadvisorListPodStats(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletPSI, true)
 	ctx := context.Background()
