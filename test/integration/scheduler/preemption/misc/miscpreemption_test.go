@@ -494,7 +494,7 @@ func TestPreemptionRaces(t *testing.T) {
 				Priority:  &highPriority,
 				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 					v1.ResourceCPU:    *resource.NewMilliQuantity(4900, resource.DecimalSI),
-					v1.ResourceMemory: *resource.NewQuantity(4900, resource.DecimalSI)},
+					v1.ResourceMemory: *resource.NewQuantity(4900*1024, resource.DecimalSI)},
 				},
 			}),
 		},
@@ -504,7 +504,7 @@ func TestPreemptionRaces(t *testing.T) {
 	nodeRes := map[v1.ResourceName]string{
 		v1.ResourcePods:   "100",
 		v1.ResourceCPU:    "5000m",
-		v1.ResourceMemory: "5000",
+		v1.ResourceMemory: "5000Ki",
 	}
 	_, err := createNode(testCtx.ClientSet, st.MakeNode().Name("node1").Capacity(nodeRes).Obj())
 	if err != nil {
