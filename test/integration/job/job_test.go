@@ -4392,22 +4392,13 @@ func TestUpdateJobPodResources(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Failed to suspend Job: %v", err)
 				}
-
+			}
+			if tc.suspend || tc.startThenSuspend {
 				// Wait for the job to be suspended
-				err = wait.PollUntilContextTimeout(ctx, time.Second, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
-					j, err := jobClient.Get(ctx, job.Name, metav1.GetOptions{})
-					if err != nil {
-						return false, err
-					}
-					return j.Spec.Suspend != nil && *j.Spec.Suspend, nil
-				})
-				if err != nil {
-					t.Fatalf("Failed to wait for job to be suspended: %v", err)
-				}
+				waitForPodsToBeActive(ctx, t, jobClient, 0, job)
+				validateJobCondition(ctx, t, cs, job, batchv1.JobSuspended)
 				t.Logf("job is suspended")
 			}
-
-			waitForPodsToBeActive(ctx, t, jobClient, 0, job)
 
 			if tc.updateResources {
 				_, err := updateJob(ctx, jobClient, job.Name, func(j *batchv1.Job) {
