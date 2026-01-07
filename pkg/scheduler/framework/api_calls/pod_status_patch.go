@@ -72,11 +72,14 @@ func (psuc *PodStatusPatchCall) UID() types.UID {
 func syncStatus(status *v1.PodStatus, condition []*v1.PodCondition, nominatingInfo *fwk.NominatingInfo) bool {
 	nnnNeedsUpdate := nominatingInfo.Mode() == fwk.ModeOverride && status.NominatedNodeName != nominatingInfo.NominatedNodeName
 	if len(condition) > 0 {
-		updated := false
+		anyUpdated := false
 		for _, cond := range condition {
-			updated = updated || podutil.UpdatePodCondition(status, cond)
+			updated := podutil.UpdatePodCondition(status, cond)
+			if updated {
+				anyUpdated = true
+			}
 		}
-		if !updated && !nnnNeedsUpdate {
+		if !anyUpdated && !nnnNeedsUpdate {
 			return false
 		}
 	} else if !nnnNeedsUpdate {
@@ -104,8 +107,8 @@ func (psuc *PodStatusPatchCall) Execute(ctx context.Context, client clientset.In
 		logger.V(3).Info("Updating pod condition", "pod", psuc.podRef, "conditionType", condition.Type, "conditionStatus", condition.Status, "conditionReason", condition.Reason)
 	}
 
-	anySynced := syncStatus(podStatusCopy, conditions, psuc.nominatingInfo)
 	// Sync status to have the condition and nominatingInfo applied on a podStatusCopy.
+	anySynced := syncStatus(podStatusCopy, conditions, psuc.nominatingInfo)
 	if !anySynced {
 		logger.V(5).Info("Pod status patch call does not need to be executed because it has no effect", "pod", psuc.podRef)
 		return nil
@@ -140,8 +143,8 @@ func (psuc *PodStatusPatchCall) Sync(obj metav1.Object) (metav1.Object, error) {
 	psuc.lock.Unlock()
 
 	podCopy := pod.DeepCopy()
-	anySynced := syncStatus(&podCopy.Status, newConditions, psuc.nominatingInfo)
 	// Sync status to have the condition and nominatingInfo applied on a podStatusCopy.
+	anySynced := syncStatus(&podCopy.Status, newConditions, psuc.nominatingInfo)
 	if !anySynced {
 		return pod, nil
 	}
@@ -159,9 +162,10 @@ func (psuc *PodStatusPatchCall) Merge(oldCall fwk.APICall) error {
 	}
 	for _, cond := range oldPsuc.newConditions {
 		found := false
-		for _, newCond := range psuc.newConditions {
+		for i, newCond := range psuc.newConditions {
 			if newCond.Type == cond.Type {
 				found = true
+				psuc.newConditions[i] = cond
 				break
 			}
 		}

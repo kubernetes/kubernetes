@@ -1142,9 +1142,9 @@ func truncateMessage(message string) string {
 func updatePod(ctx context.Context, client clientset.Interface, apiCacher fwk.APICacher, pod *v1.Pod, condition *v1.PodCondition, nominatingInfo *fwk.NominatingInfo) error {
 	if apiCacher != nil {
 		// When API cacher is available, use it to patch the status.
-		conditions := make([]*v1.PodCondition, 0)
+		var conditions []*v1.PodCondition
 		if condition != nil {
-			conditions = append(conditions, condition)
+			conditions = []*v1.PodCondition{condition}
 		}
 		_, err := apiCacher.PatchPodStatus(pod, conditions, nominatingInfo)
 		return err
