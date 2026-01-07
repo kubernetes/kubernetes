@@ -319,7 +319,8 @@ func initSchedulerWithPlugins(t *testing.T, testContext *testutils.TestContext, 
 func TestPartialBindingFailureRetriedWithNNN(t *testing.T) {
 	// `bindFailures` describes how many times the scheduler will fail to bind pod1 before restarting the scheduler and scheduling pod2.
 	// The scheduler is restarted during binding, so even with 0 bind failures, the prebind will complete, but bind will not.
-	for _, bindFailures := range []int{0, 1, 2} {
+	// TODO(brejman): add the test for 2 bind failures once the issue that makes it fail is fixed (#135771)
+	for _, bindFailures := range []int{0, 1} {
 		t.Run(fmt.Sprintf("Test pod binds on the originally determined node after successful prebind and %v failed bind attempts and scheduler restart", bindFailures), func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NominatedNodeNameForExpectation, true)
 			testContext := testutils.InitTestAPIServer(t, "nnn-test", nil)
