@@ -186,7 +186,26 @@ func Validate_CounterSet(ctx context.Context, op operation.Operation, fldPath *f
 			return
 		}(fldPath.Child("name"), &obj.Name, safe.Field(oldObj, func(oldObj *resourcev1beta2.CounterSet) *string { return &oldObj.Name }), oldObj != nil)...)
 
-	// field resourcev1beta2.CounterSet.Counters has no validation
+	// field resourcev1beta2.CounterSet.Counters
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj map[string]resourcev1beta2.Counter, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredMap(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			errs = append(errs, validate.EachMapKey(ctx, op, fldPath, obj, oldObj, validate.ShortName)...)
+			return
+		}(fldPath.Child("counters"), obj.Counters, safe.Field(oldObj, func(oldObj *resourcev1beta2.CounterSet) map[string]resourcev1beta2.Counter { return oldObj.Counters }), oldObj != nil)...)
+
 	return errs
 }
 
@@ -913,7 +932,28 @@ func Validate_DeviceCounterConsumption(ctx context.Context, op operation.Operati
 			return
 		}(fldPath.Child("counterSet"), &obj.CounterSet, safe.Field(oldObj, func(oldObj *resourcev1beta2.DeviceCounterConsumption) *string { return &oldObj.CounterSet }), oldObj != nil)...)
 
-	// field resourcev1beta2.DeviceCounterConsumption.Counters has no validation
+	// field resourcev1beta2.DeviceCounterConsumption.Counters
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj map[string]resourcev1beta2.Counter, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredMap(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			errs = append(errs, validate.EachMapKey(ctx, op, fldPath, obj, oldObj, validate.ShortName)...)
+			return
+		}(fldPath.Child("counters"), obj.Counters, safe.Field(oldObj, func(oldObj *resourcev1beta2.DeviceCounterConsumption) map[string]resourcev1beta2.Counter {
+			return oldObj.Counters
+		}), oldObj != nil)...)
+
 	return errs
 }
 
