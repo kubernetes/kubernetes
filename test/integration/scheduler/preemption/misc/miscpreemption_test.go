@@ -92,7 +92,7 @@ func TestNonPreemption(t *testing.T) {
 		Priority:  &lowPriority,
 		Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 			v1.ResourceCPU:    *resource.NewMilliQuantity(400, resource.DecimalSI),
-			v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+			v1.ResourceMemory: *resource.NewQuantity(200*1024, resource.DecimalSI)},
 		},
 	})
 
@@ -102,7 +102,7 @@ func TestNonPreemption(t *testing.T) {
 		Priority:  &highPriority,
 		Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 			v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
-			v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+			v1.ResourceMemory: *resource.NewQuantity(200*1024, resource.DecimalSI)},
 		},
 	})
 
@@ -110,7 +110,7 @@ func TestNonPreemption(t *testing.T) {
 	nodeRes := map[v1.ResourceName]string{
 		v1.ResourcePods:   "32",
 		v1.ResourceCPU:    "500m",
-		v1.ResourceMemory: "500",
+		v1.ResourceMemory: "500Ki",
 	}
 	_, err := createNode(testCtx.ClientSet, st.MakeNode().Name("node1").Capacity(nodeRes).Obj())
 	if err != nil {
@@ -170,7 +170,7 @@ func TestDisablePreemption(t *testing.T) {
 					Priority:  &lowPriority,
 					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 						v1.ResourceCPU:    *resource.NewMilliQuantity(400, resource.DecimalSI),
-						v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+						v1.ResourceMemory: *resource.NewQuantity(200*1024, resource.DecimalSI)},
 					},
 				}),
 			},
@@ -180,7 +180,7 @@ func TestDisablePreemption(t *testing.T) {
 				Priority:  &highPriority,
 				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 					v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
-					v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+					v1.ResourceMemory: *resource.NewQuantity(200*1024, resource.DecimalSI)},
 				},
 			}),
 		},
@@ -190,7 +190,7 @@ func TestDisablePreemption(t *testing.T) {
 	nodeRes := map[v1.ResourceName]string{
 		v1.ResourcePods:   "32",
 		v1.ResourceCPU:    "500m",
-		v1.ResourceMemory: "500",
+		v1.ResourceMemory: "500Ki",
 	}
 	_, err := createNode(testCtx.ClientSet, st.MakeNode().Name("node1").Capacity(nodeRes).Obj())
 	if err != nil {
@@ -299,7 +299,7 @@ func TestPodPriorityResolution(t *testing.T) {
 	nodeRes := map[v1.ResourceName]string{
 		v1.ResourcePods:   "32",
 		v1.ResourceCPU:    "500m",
-		v1.ResourceMemory: "500",
+		v1.ResourceMemory: "500Ki",
 	}
 	_, err := createNode(testCtx.ClientSet, st.MakeNode().Name("node1").Capacity(nodeRes).Obj())
 	if err != nil {
@@ -340,7 +340,7 @@ func TestPodPriorityResolution(t *testing.T) {
 func mkPriorityPodWithGrace(tc *testutils.TestContext, name string, priority int32, grace int64) *v1.Pod {
 	defaultPodRes := &v1.ResourceRequirements{Requests: v1.ResourceList{
 		v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
-		v1.ResourceMemory: *resource.NewQuantity(100, resource.DecimalSI)},
+		v1.ResourceMemory: *resource.NewQuantity(100*1024, resource.DecimalSI)},
 	}
 	pod := initPausePod(&testutils.PausePodConfig{
 		Name:      name,
@@ -380,7 +380,7 @@ func TestPreemptionStarvation(t *testing.T) {
 				Priority:  &highPriority,
 				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 					v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
-					v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+					v1.ResourceMemory: *resource.NewQuantity(200*1024, resource.DecimalSI)},
 				},
 			}),
 		},
@@ -390,7 +390,7 @@ func TestPreemptionStarvation(t *testing.T) {
 	nodeRes := map[v1.ResourceName]string{
 		v1.ResourcePods:   "32",
 		v1.ResourceCPU:    "500m",
-		v1.ResourceMemory: "500",
+		v1.ResourceMemory: "500Ki",
 	}
 	_, err := createNode(testCtx.ClientSet, st.MakeNode().Name("node1").Capacity(nodeRes).Obj())
 	if err != nil {
@@ -628,12 +628,12 @@ func TestPDBInPreemption(t *testing.T) {
 
 	defaultPodRes := &v1.ResourceRequirements{Requests: v1.ResourceList{
 		v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
-		v1.ResourceMemory: *resource.NewQuantity(100, resource.DecimalSI)},
+		v1.ResourceMemory: *resource.NewQuantity(100*1024, resource.DecimalSI)},
 	}
 	defaultNodeRes := map[v1.ResourceName]string{
 		v1.ResourcePods:   "32",
 		v1.ResourceCPU:    "500m",
-		v1.ResourceMemory: "500",
+		v1.ResourceMemory: "500Ki",
 	}
 
 	tests := []struct {
@@ -680,7 +680,7 @@ func TestPDBInPreemption(t *testing.T) {
 				Priority:  &highPriority,
 				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 					v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
-					v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+					v1.ResourceMemory: *resource.NewQuantity(200*1024, resource.DecimalSI)},
 				},
 			}),
 			preemptedPodIndexes: map[int]struct{}{2: {}},
@@ -715,7 +715,7 @@ func TestPDBInPreemption(t *testing.T) {
 				Priority:  &highPriority,
 				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 					v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
-					v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+					v1.ResourceMemory: *resource.NewQuantity(200*1024, resource.DecimalSI)},
 				},
 			}),
 			preemptedPodIndexes: map[int]struct{}{1: {}},
@@ -791,7 +791,7 @@ func TestPDBInPreemption(t *testing.T) {
 				Priority:  &highPriority,
 				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 					v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
-					v1.ResourceMemory: *resource.NewQuantity(400, resource.DecimalSI)},
+					v1.ResourceMemory: *resource.NewQuantity(400*1024, resource.DecimalSI)},
 				},
 			}),
 			// The third node is chosen because PDB is not violated for node 3 and the victims have lower priority than node-2.
@@ -1179,7 +1179,7 @@ func TestReadWriteOncePodPreemption(t *testing.T) {
 	nodeRes := map[v1.ResourceName]string{
 		v1.ResourcePods:   "32",
 		v1.ResourceCPU:    "500m",
-		v1.ResourceMemory: "500",
+		v1.ResourceMemory: "500Ki",
 	}
 	nodeObject := st.MakeNode().Name("node1").Capacity(nodeRes).Label("node", "node1").Obj()
 	if _, err := createNode(cs, nodeObject); err != nil {

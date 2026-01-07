@@ -352,7 +352,7 @@ func TestAllocatable(t *testing.T) {
 	nodeRes := map[v1.ResourceName]string{
 		v1.ResourcePods:   "32",
 		v1.ResourceCPU:    "30m",
-		v1.ResourceMemory: "30",
+		v1.ResourceMemory: "30Ki",
 	}
 	allocNode, err := testutils.CreateNode(testCtx.ClientSet, st.MakeNode().Name("node-allocatable-scheduler-test-node").Capacity(nodeRes).Obj())
 	if err != nil {
@@ -363,7 +363,7 @@ func TestAllocatable(t *testing.T) {
 	podName := "pod-test-allocatable"
 	podRes := &v1.ResourceList{
 		v1.ResourceCPU:    *resource.NewMilliQuantity(20, resource.DecimalSI),
-		v1.ResourceMemory: *resource.NewQuantity(20, resource.BinarySI),
+		v1.ResourceMemory: *resource.NewQuantity(20*1024, resource.BinarySI),
 	}
 	testAllocPod, err := testutils.CreatePausePodWithResource(testCtx.ClientSet, podName, testCtx.NS.Name, podRes)
 	if err != nil {
@@ -383,12 +383,12 @@ func TestAllocatable(t *testing.T) {
 		Capacity: v1.ResourceList{
 			v1.ResourcePods:   *resource.NewQuantity(32, resource.DecimalSI),
 			v1.ResourceCPU:    *resource.NewMilliQuantity(30, resource.DecimalSI),
-			v1.ResourceMemory: *resource.NewQuantity(30, resource.BinarySI),
+			v1.ResourceMemory: *resource.NewQuantity(30*1024, resource.BinarySI),
 		},
 		Allocatable: v1.ResourceList{
 			v1.ResourcePods:   *resource.NewQuantity(32, resource.DecimalSI),
 			v1.ResourceCPU:    *resource.NewMilliQuantity(10, resource.DecimalSI),
-			v1.ResourceMemory: *resource.NewQuantity(10, resource.BinarySI),
+			v1.ResourceMemory: *resource.NewQuantity(10*1024, resource.BinarySI),
 		},
 	}
 
@@ -424,12 +424,12 @@ func TestSchedulerInformers(t *testing.T) {
 
 	defaultPodRes := &v1.ResourceRequirements{Requests: v1.ResourceList{
 		v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
-		v1.ResourceMemory: *resource.NewQuantity(200, resource.BinarySI)},
+		v1.ResourceMemory: *resource.NewQuantity(200*1024, resource.BinarySI)},
 	}
 	defaultNodeRes := map[v1.ResourceName]string{
 		v1.ResourcePods:   "32",
 		v1.ResourceCPU:    "500m",
-		v1.ResourceMemory: "500",
+		v1.ResourceMemory: "500Ki",
 	}
 
 	type nodeConfig struct {
@@ -568,7 +568,7 @@ func TestNodeEvents(t *testing.T) {
 		Capacity(map[v1.ResourceName]string{
 			v1.ResourcePods:   "32",
 			v1.ResourceCPU:    "100m",
-			v1.ResourceMemory: "30",
+			v1.ResourceMemory: "30Ki",
 		}).Obj())
 	if err != nil {
 		t.Fatalf("Failed to create %s: %v", node1.Name, err)
@@ -598,7 +598,7 @@ func TestNodeEvents(t *testing.T) {
 		Capacity(map[v1.ResourceName]string{
 			v1.ResourcePods:   "32",
 			v1.ResourceCPU:    "100m",
-			v1.ResourceMemory: "30",
+			v1.ResourceMemory: "30Ki",
 		}).
 		Label("affinity-key", "affinity-value").
 		Taints([]v1.Taint{{Key: "taint-key", Effect: v1.TaintEffectNoSchedule}}).Obj()

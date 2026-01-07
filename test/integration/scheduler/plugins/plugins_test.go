@@ -2438,17 +2438,17 @@ func TestPreemptWithPermitPlugin(t *testing.T) {
 	lowPriority, highPriority := int32(100), int32(300)
 	resReq := map[v1.ResourceName]string{
 		v1.ResourceCPU:    "200m",
-		v1.ResourceMemory: "200",
+		v1.ResourceMemory: "200Ki",
 	}
 	preemptorReq := map[v1.ResourceName]string{
 		v1.ResourceCPU:    "400m",
-		v1.ResourceMemory: "400",
+		v1.ResourceMemory: "400Ki",
 	}
 
 	nodeRes := map[v1.ResourceName]string{
 		v1.ResourcePods:   "32",
 		v1.ResourceCPU:    "500m",
-		v1.ResourceMemory: "500",
+		v1.ResourceMemory: "500Ki",
 	}
 
 	tests := []struct {

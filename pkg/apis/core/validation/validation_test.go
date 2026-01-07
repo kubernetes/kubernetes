@@ -9257,8 +9257,8 @@ func TestValidateContainers(t *testing.T) {
 			Name:  "abc-123",
 			Image: "image",
 			Resources: core.ResourceRequirements{
-				Limits:   getResources("5", "3", "", ""),
-				Requests: getResources("6", "3", "", ""),
+				Limits:   getResources("5", "1Gi", "", ""),
+				Requests: getResources("6", "1Gi", "", ""),
 			},
 			ImagePullPolicy:          "IfNotPresent",
 			TerminationMessagePolicy: "File",
@@ -9289,8 +9289,8 @@ func TestValidateContainers(t *testing.T) {
 			Name:  "abc-123",
 			Image: "image",
 			Resources: core.ResourceRequirements{
-				Limits:   getResources("5", "3", "", ""),
-				Requests: getResources("6", "3", "", ""),
+				Limits:   getResources("5", "1Gi", "", ""),
+				Requests: getResources("6", "1Gi", "", ""),
 			},
 			ImagePullPolicy:          "IfNotPresent",
 			TerminationMessagePolicy: "File",
@@ -9303,8 +9303,8 @@ func TestValidateContainers(t *testing.T) {
 			Name:  "abc-123",
 			Image: "image",
 			Resources: core.ResourceRequirements{
-				Limits:   getResources("5", "3", "", ""),
-				Requests: getResources("5", "4", "", ""),
+				Limits:   getResources("5", "1Gi", "", ""),
+				Requests: getResources("5", "2Gi", "", ""),
 			},
 			ImagePullPolicy:          "IfNotPresent",
 			TerminationMessagePolicy: "File",
