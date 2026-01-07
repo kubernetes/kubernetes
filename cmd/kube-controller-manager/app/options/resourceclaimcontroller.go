@@ -35,7 +35,7 @@ func (o *ResourceClaimControllerOptions) AddFlags(fs *pflag.FlagSet) {
 		return
 	}
 
-	fs.Int32Var(&o.ConcurrentSyncs, "concurrent-resource-claim-syncs", o.ConcurrentSyncs, "The number of operations (creating or deleting ResourceClaims) allowed to run concurrently. Larger number = more responsive, but more CPU (and network) load")
+	fs.Int32Var(&o.ConcurrentSyncs, "concurrent-resourceclaim-syncs", o.ConcurrentSyncs, "The number of operations (creating or deleting ResourceClaims) allowed to run concurrently. Larger number = more responsive, but more CPU (and network) load")
 }
 
 // ApplyTo fills up ResourceClaimController config with options.
@@ -57,7 +57,7 @@ func (o *ResourceClaimControllerOptions) Validate() []error {
 
 	var errs []error
 	if o.ConcurrentSyncs <= 0 {
-		errs = append(errs, fmt.Errorf("concurrent-resource-claim-syncs must be larger than 0, got %d", o.ConcurrentSyncs))
+		errs = append(errs, fmt.Errorf("concurrent-resourceclaim-syncs must be larger than 0, got %d", o.ConcurrentSyncs))
 	}
 	return errs
 }
