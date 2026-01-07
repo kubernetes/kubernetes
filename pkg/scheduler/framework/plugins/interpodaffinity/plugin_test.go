@@ -154,6 +154,18 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 			oldPod:       st.MakePod().Node("fake-node").PodAntiAffinityIn("service", "region", []string{"securityscan", "value2"}, st.PodAntiAffinityWithRequiredReq).Label("service", "foo").Obj(),
 			expectedHint: fwk.QueueSkip,
 		},
+		{
+			name:         "delete a nominated pod which doesn't match pod's anti-affinity",
+			pod:          st.MakePod().Name("p").PodAntiAffinityIn("service", "region", []string{"securityscan", "value2"}, st.PodAntiAffinityWithRequiredReq).Obj(),
+			oldPod:       st.MakePod().NominatedNodeName("fake-node").Label("aaa", "a").Obj(),
+			expectedHint: fwk.QueueSkip,
+		},
+		{
+			name:         "delete a nominated pod which matches pod's anti-affinity",
+			pod:          st.MakePod().Name("p").PodAntiAffinityIn("service", "region", []string{"securityscan", "value2"}, st.PodAntiAffinityWithRequiredReq).Obj(),
+			oldPod:       st.MakePod().NominatedNodeName("fake-node").Label("service", "securityscan").Obj(),
+			expectedHint: fwk.Queue,
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
