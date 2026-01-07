@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -288,13 +289,41 @@ type tracker struct {
 	scheme  ObjectScheme
 	decoder runtime.Decoder
 	lock    sync.RWMutex
-	objects map[schema.GroupVersionResource]map[types.NamespacedName]runtime.Object
+	objects map[schema.GroupVersionResource]map[types.NamespacedName]versionedObject
 	// The value type of watchers is a map of which the key is either a namespace or
 	// all/non namespace aka "" and its value is list of fake watchers.
 	// Manipulations on resources will broadcast the notification events into the
 	// watchers' channel. Note that too many unhandled events (currently 100,
 	// see apimachinery/pkg/watch.DefaultChanSize) will cause a panic.
 	watchers map[schema.GroupVersionResource]map[string][]*watch.RaceFreeFakeWatcher
+	// resourceVersions is the highest resource version of any tracked object with
+	// a certain gvr. The resource version for that set of objects gets bumped before
+	// storing a new or modified object, so all entries are larger than 0.
+	// Object content does not get changed to preserve the traditional behavior
+	// (hence also the versionedObject type instead of storing a runtime.Object
+	// with modified ResourceVersion).
+	//
+	// Resource version support (https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions)
+	// is very limited. It only supports one particular use case:
+	// List (no resource version check, returned ListMeta has ResourceVersion set) +
+	// Watch (Exact match for the ResourceVersion returned by List).
+	//
+	// This is sufficient for Reflector.ListAndWatch (https://github.com/kubernetes/kubernetes/blob/b53b9fb5573323484af9a19cf3f5bfe80760abba/staging/src/k8s.io/client-go/tools/cache/reflector.go#L401)
+	// when setting up informers in an informer factory.
+	//
+	// Strictly speaking, this should be by GroupVersion. But objects are
+	// also tracked by GroupVersionResource instead of GroupVersion, so the
+	// same is done here to match how List is implemented.
+	resourceVersions map[schema.GroupVersionResource]int64
+}
+
+// versionedObject stores an object together with the resource version that was
+// assigned to it by the tracker. The version could be stored inline in the object,
+// but this is not how fake client-go has traditionally worked and starting to do
+// that now might break tests.
+type versionedObject struct {
+	resourceVersion int64
+	runtime.Object
 }
 
 var _ ObjectTracker = &tracker{}
@@ -303,10 +332,11 @@ var _ ObjectTracker = &tracker{}
 // of objects for the fake clientset. Mostly useful for unit tests.
 func NewObjectTracker(scheme ObjectScheme, decoder runtime.Decoder) ObjectTracker {
 	return &tracker{
-		scheme:   scheme,
-		decoder:  decoder,
-		objects:  make(map[schema.GroupVersionResource]map[types.NamespacedName]runtime.Object),
-		watchers: make(map[schema.GroupVersionResource]map[string][]*watch.RaceFreeFakeWatcher),
+		scheme:           scheme,
+		decoder:          decoder,
+		objects:          make(map[schema.GroupVersionResource]map[types.NamespacedName]versionedObject),
+		watchers:         make(map[schema.GroupVersionResource]map[string][]*watch.RaceFreeFakeWatcher),
+		resourceVersions: make(map[schema.GroupVersionResource]int64),
 	}
 }
 
@@ -343,12 +373,19 @@ func (t *tracker) List(gvr schema.GroupVersionResource, gvk schema.GroupVersionK
 		return list, nil
 	}
 
-	matchingObjs, err := filterByNamespace(objs, ns)
+	matchingVersionedObjs, err := filterByNamespace(objs, ns)
 	if err != nil {
 		return nil, err
 	}
+	matchingObjs := make([]runtime.Object, len(matchingVersionedObjs))
+	for i, obj := range matchingVersionedObjs {
+		matchingObjs[i] = obj.Object
+	}
 	if err := meta.SetList(list, matchingObjs); err != nil {
 		return nil, err
+	}
+	if listMeta, err := meta.ListAccessor(list); err == nil {
+		listMeta.SetResourceVersion(fmt.Sprintf("%d", t.resourceVersions[gvr]))
 	}
 	return list.DeepCopyObject(), nil
 }
@@ -357,6 +394,17 @@ func (t *tracker) Watch(gvr schema.GroupVersionResource, ns string, opts ...meta
 	_, err := assertOptionalSingleArgument(opts)
 	if err != nil {
 		return nil, err
+	}
+	// By default, emulate the traditional behavior of the tracker and don't deliver
+	// *any* existing objects. This ensures compatibility which users
+	// which don't pass options and then also don't expect the additional objects.
+	resourceVersion := int64(-1)
+	if len(opts) > 0 && opts[0].ResourceVersion != "" {
+		rv, err := strconv.ParseInt(opts[0].ResourceVersion, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid ResourceVersion %q in ListOptions, must be int64: %w", opts[0].ResourceVersion, err)
+		}
+		resourceVersion = rv
 	}
 
 	t.lock.Lock()
@@ -368,6 +416,22 @@ func (t *tracker) Watch(gvr schema.GroupVersionResource, ns string, opts ...meta
 		t.watchers[gvr] = make(map[string][]*watch.RaceFreeFakeWatcher)
 	}
 	t.watchers[gvr][ns] = append(t.watchers[gvr][ns], fakewatcher)
+
+	// Deliver all objects that match the list options, for example
+	// between the initial List and the following Watch.
+	if resourceVersion != -1 {
+		objs := t.objects[gvr]
+		matchingObjs, err := filterByNamespace(objs, ns)
+		if err != nil {
+			return nil, err
+		}
+		for _, obj := range matchingObjs {
+			if resourceVersion == 0 || resourceVersion < obj.resourceVersion {
+				fakewatcher.Add(obj.Object)
+			}
+		}
+	}
+
 	return fakewatcher, nil
 }
 
@@ -565,17 +629,19 @@ func (t *tracker) add(gvr schema.GroupVersionResource, obj runtime.Object, ns st
 
 	_, ok := t.objects[gvr]
 	if !ok {
-		t.objects[gvr] = make(map[types.NamespacedName]runtime.Object)
+		t.objects[gvr] = make(map[types.NamespacedName]versionedObject)
 	}
 
 	namespacedName := types.NamespacedName{Namespace: newMeta.GetNamespace(), Name: newMeta.GetName()}
 	if _, ok = t.objects[gvr][namespacedName]; ok {
 		if replaceExisting {
+			resourceVersion := t.resourceVersions[gvr] + 1
+			t.resourceVersions[gvr] = resourceVersion
 			for _, w := range t.getWatches(gvr, ns) {
 				// To avoid the object from being accidentally modified by watcher
 				w.Modify(obj.DeepCopyObject())
 			}
-			t.objects[gvr][namespacedName] = obj
+			t.objects[gvr][namespacedName] = versionedObject{resourceVersion, obj}
 			return nil
 		}
 		return apierrors.NewAlreadyExists(gr, newMeta.GetName())
@@ -586,7 +652,9 @@ func (t *tracker) add(gvr schema.GroupVersionResource, obj runtime.Object, ns st
 		return apierrors.NewNotFound(gr, newMeta.GetName())
 	}
 
-	t.objects[gvr][namespacedName] = obj
+	resourceVersion := t.resourceVersions[gvr] + 1
+	t.resourceVersions[gvr] = resourceVersion
+	t.objects[gvr][namespacedName] = versionedObject{resourceVersion, obj}
 
 	for _, w := range t.getWatches(gvr, ns) {
 		// To avoid the object from being accidentally modified by watcher
@@ -841,11 +909,11 @@ func (d *objectDefaulter) Default(_ runtime.Object) {}
 // filterByNamespace returns all objects in the collection that
 // match provided namespace. Empty namespace matches
 // non-namespaced objects.
-func filterByNamespace(objs map[types.NamespacedName]runtime.Object, ns string) ([]runtime.Object, error) {
-	var res []runtime.Object
+func filterByNamespace(objs map[types.NamespacedName]versionedObject, ns string) ([]versionedObject, error) {
+	var res []versionedObject
 
 	for _, obj := range objs {
-		acc, err := meta.Accessor(obj)
+		acc, err := meta.Accessor(obj.Object)
 		if err != nil {
 			return nil, err
 		}
@@ -857,8 +925,8 @@ func filterByNamespace(objs map[types.NamespacedName]runtime.Object, ns string) 
 
 	// Sort res to get deterministic order.
 	sort.Slice(res, func(i, j int) bool {
-		acc1, _ := meta.Accessor(res[i])
-		acc2, _ := meta.Accessor(res[j])
+		acc1, _ := meta.Accessor(res[i].Object)
+		acc2, _ := meta.Accessor(res[j].Object)
 		if acc1.GetNamespace() != acc2.GetNamespace() {
 			return acc1.GetNamespace() < acc2.GetNamespace()
 		}
