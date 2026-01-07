@@ -18,7 +18,6 @@ package metrics
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -32,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	utilsets "k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -574,15 +572,8 @@ func RecordLongRunning(req *http.Request, requestInfo *request.RequestInfo, comp
 }
 
 // RecordWatchListLatency simply records response latency for watch list requests.
-func RecordWatchListLatency(ctx context.Context, gvr schema.GroupVersionResource, metricsScope string) {
-	requestReceivedTimestamp, ok := request.ReceivedTimestampFrom(ctx)
-	if !ok {
-		utilruntime.HandleError(fmt.Errorf("unable to measure watchlist latency because no received ts found in the ctx, gvr: %s", gvr))
-		return
-	}
-	elapsedSeconds := time.Since(requestReceivedTimestamp).Seconds()
-
-	watchListLatencies.WithContext(ctx).WithLabelValues(gvr.Group, gvr.Version, gvr.Resource, metricsScope).Observe(elapsedSeconds)
+func RecordWatchListLatency(ctx context.Context, gvr schema.GroupVersionResource, metricsScope string, elapsed time.Duration) {
+	watchListLatencies.WithContext(ctx).WithLabelValues(gvr.Group, gvr.Version, gvr.Resource, metricsScope).Observe(elapsed.Seconds())
 }
 
 // MonitorRequest handles standard transformations for client and the reported verb and then invokes Monitor to record

@@ -32,13 +32,16 @@ import (
 	"k8s.io/apimachinery/pkg/util/httpstream/wsstream"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/server/httplog"
 	"k8s.io/apiserver/pkg/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	compbasemetrics "k8s.io/component-base/metrics"
+	"k8s.io/klog/v2"
 )
 
 // timeoutFactory abstracts watch timeout logic for testing
@@ -308,7 +311,17 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 				flusher.Flush()
 			}
 			if isWatchListLatencyRecordingRequired {
-				metrics.RecordWatchListLatency(req.Context(), s.Scope.Resource, s.metricsScope)
+				// Record completion of initial listing phase for WatchList
+				receivedTimestamp, ok := apirequest.ReceivedTimestampFrom(req.Context())
+				if !ok {
+					utilruntime.HandleError(fmt.Errorf("unable to measure watchlist latency because no received ts found in the ctx, gvr: %s", s.Scope.Resource))
+				} else {
+					initLatency := time.Since(receivedTimestamp)
+					metrics.RecordWatchListLatency(req.Context(), s.Scope.Resource, s.metricsScope, initLatency)
+					auditID := audit.GetAuditIDTruncated(req.Context())
+					klog.V(3).InfoS("WatchList initial events sent", "path", req.URL.Path, "auditID", auditID, "initLatency", initLatency)
+					httplog.AddKeyValue(req.Context(), "watchlist_init_latency", initLatency)
+				}
 			}
 		}
 	}
