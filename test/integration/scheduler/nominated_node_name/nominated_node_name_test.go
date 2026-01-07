@@ -312,11 +312,13 @@ func initSchedulerWithPlugins(t *testing.T, testContext *testutils.TestContext, 
 // The test does the following:
 // 1. Set up 2 nodes able to hold one pod each
 // 2. Try to schedule pod1 with dynamically provisioned pvc1 N times, but force failure at pod binding each time
-// 3. Schedule pod2 with dynamically provisioned pvc2, preferring the same node as pod1
-// 4. Schedule pod1
-// 5. Verify that pod1 and pod2 have been scheduled successfully
+// 3. Restart the scheduler during pod1 binding
+// 4. Schedule pod2 with dynamically provisioned pvc2, preferring the same node as pod1
+// 5. Schedule pod1
+// 6. Verify that pod1 and pod2 have been scheduled successfully
 func TestPartialBindingFailureRetriedWithNNN(t *testing.T) {
-	// `bindFailures` describes how many times the scheduler will fail to bind pod1 before scheduling pod2.
+	// `bindFailures` describes how many times the scheduler will fail to bind pod1 before restarting the scheduler and scheduling pod2.
+	// The scheduler is restarted during binding, so even with 0 bind failures, the prebind will complete, but bind will not.
 	for _, bindFailures := range []int{0, 1, 2} {
 		t.Run(fmt.Sprintf("Test pod binds on the originally determined node after successful prebind and %v failed bind attempts and scheduler restart", bindFailures), func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NominatedNodeNameForExpectation, true)

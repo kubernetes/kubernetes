@@ -143,7 +143,8 @@ func CreateResourceClaimController(ctx context.Context, tb ktesting.TB, clientSe
 	}
 }
 
-// StartFakePVController is a simplified pv controller logic that sets PVC VolumeName and annotation for each PV binding.
+// StartFakePVController is a simplified pv controller logic that sets PVC VolumeName and annotation for each PV binding
+// and creates PVs for PVCs that use dynamic provisioning.
 // TODO(mborsz): Use a real PV controller here.
 func StartFakePVController(ctx context.Context, clientSet clientset.Interface, informerFactory informers.SharedInformerFactory) {
 	pvInformer := informerFactory.Core().V1().PersistentVolumes()
