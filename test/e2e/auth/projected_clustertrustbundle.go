@@ -162,7 +162,7 @@ var _ = SIGDescribe(framework.WithFeatureGate(features.ClusterTrustBundle), fram
 		}
 	})
 
-	ginkgo.Describe("should prevent a pod from starting if: ", func() {
+	ginkgo.Describe("should prevent a pod from starting if:", func() {
 
 		for _, tt := range []struct {
 			name string

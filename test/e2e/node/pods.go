@@ -1136,7 +1136,7 @@ var _ = SIGDescribe("Pod Extended (RestartAllContainers)", framework.WithFeature
 			framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, f.ClientSet, f.Namespace.Name, podName, "regular", 3*time.Minute))
 		})
 
-		ginkgo.It("should restart all containers on a previously restarted regular container exit ", func(ctx context.Context) {
+		ginkgo.It("should restart all containers on a previously restarted regular container exit", func(ctx context.Context) {
 			podName := "restart-rules-exit-code-" + string(uuid.NewUUID())
 			pod := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
