@@ -36,6 +36,8 @@ import (
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	"k8s.io/client-go/tools/cache"
 	testingclock "k8s.io/utils/clock/testing"
+
+	cachertesting "k8s.io/apiserver/pkg/storage/cacher/testing"
 )
 
 // verifies the cacheWatcher.process goroutine is properly cleaned up even if
@@ -246,7 +248,7 @@ func TestCacheWatcherStoppedInAnotherGoroutine(t *testing.T) {
 }
 
 func TestCacheWatcherStoppedOnDestroy(t *testing.T) {
-	backingStorage := &dummyStorage{}
+	backingStorage := &cachertesting.MockStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
 	if err != nil {
 		t.Fatalf("Couldn't create cacher: %v", err)
