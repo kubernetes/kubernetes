@@ -31,6 +31,13 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
 
+func SetDefaults_EndpointSlice(obj *discoveryv1.EndpointSlice) {
+	// Ensure Endpoints is an empty slice instead of nil to satisfy OpenAPI required field contract (must not be null).
+	if obj.Endpoints == nil {
+		obj.Endpoints = []discoveryv1.Endpoint{}
+	}
+}
+
 func SetDefaults_EndpointPort(obj *discoveryv1.EndpointPort) {
 	if obj.Name == nil {
 		obj.Name = &defaultPortName

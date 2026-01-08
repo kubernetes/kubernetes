@@ -23,10 +23,12 @@ import (
 	"net"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	types "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/resourceversion"
@@ -37,6 +39,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/network/common"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -677,6 +680,109 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		execHostnameTest(*pausePod0, dest1, serverPod1.Name)
 		execHostnameTest(*pausePod0, dest2, serverPod2.Name)
 
+	})
+
+	ginkgo.It("should output empty array (not null) when scaled to 0 and not loop indefinitely", func(ctx context.Context) {
+		ns := f.Namespace.Name
+		name := "scale-zero-test"
+
+		deployment := e2edeployment.NewDeployment(name, 1, map[string]string{"app": name}, "nginx", imageutils.GetE2EImage(imageutils.Nginx), appsv1.RollingUpdateDeploymentStrategyType)
+		_, err := f.ClientSet.AppsV1().Deployments(ns).Create(ctx, deployment, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+
+		err = e2edeployment.WaitForDeploymentComplete(f.ClientSet, deployment)
+		framework.ExpectNoError(err)
+
+		// Scale to 0
+		scale, err := f.ClientSet.AppsV1().Deployments(ns).GetScale(ctx, name, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+		scale.Spec.Replicas = 0
+		_, err = f.ClientSet.AppsV1().Deployments(ns).UpdateScale(ctx, name, scale, metav1.UpdateOptions{})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Waiting for Deployment status to report 0 replicas")
+		err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 1*time.Minute, true, func(ctx context.Context) (bool, error) {
+			d, err := f.ClientSet.AppsV1().Deployments(ns).Get(ctx, name, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+			return d.Status.Replicas == 0, nil
+		})
+		framework.ExpectNoError(err)
+
+		// Verify EndpointSlice JSON has empty 'endpoints': [] instead of nil/empty
+		var esName string
+		var initialResourceVersion string
+
+		ginkgo.By("Waiting for EndpointSlice to have empty endpoints list []")
+		err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 1*time.Minute, true, func(ctx context.Context) (bool, error) {
+			// List slices by label
+			slices, err := f.DynamicClient.Resource(discoveryv1.SchemeGroupVersion.WithResource("endpointslices")).Namespace(ns).List(ctx, metav1.ListOptions{
+				LabelSelector: "app=" + name,
+			})
+			if err != nil {
+				return false, err
+			}
+			if len(slices.Items) == 0 {
+				return false, nil
+			}
+
+			slice := slices.Items[0]
+			esName = slice.GetName()
+
+			// Inspect Unstructured Map
+			endpoints, found, _ := unstructured.NestedFieldNoCopy(slice.Object, "endpoints")
+
+			// If missing or nil, we are not done yet (or it's broken, but we wait for consistency)
+			if !found || endpoints == nil {
+				return false, nil
+			}
+
+			// If it exists, verify it is a list
+			epList, ok := endpoints.([]interface{})
+			if !ok {
+				return false, fmt.Errorf("endpoints field is present but not a list")
+			}
+
+			// If list is not empty yet, wait
+			if len(epList) != 0 {
+				return false, nil
+			}
+
+			// Success: We found an empty list []
+			initialResourceVersion = slice.GetResourceVersion()
+			return true, nil
+		})
+		framework.ExpectNoError(err, "Timed out waiting for EndpointSlice to have endpoints=[]")
+
+		// Verify No Infinite Loop
+		ginkgo.By("Verifying ResourceVersion stability (checking for controller hot-loop)")
+
+		stabilityDuration := 10 * time.Second
+		pollInterval := 1 * time.Second
+		err = wait.PollUntilContextTimeout(ctx, pollInterval, stabilityDuration, true, func(ctx context.Context) (bool, error) {
+			currentSlice, err := f.DynamicClient.Resource(discoveryv1.SchemeGroupVersion.WithResource("endpointslices")).Namespace(ns).Get(ctx, esName, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+
+			if currentSlice.GetResourceVersion() != initialResourceVersion {
+				// It changed! Return true to stop the poll and signal "condition met"
+				return true, fmt.Errorf("ResourceVersion changed from %s to %s", initialResourceVersion, currentSlice.GetResourceVersion())
+			}
+
+			// It hasn't changed, return false to keep polling
+			return false, nil
+		})
+
+		if err == nil {
+			// If err is nil, the Poll function returned true, meaning the ResourceVersion CHANGED.
+			framework.Failf("EndpointSlice unstable: ResourceVersion changed during stability check")
+		} else if !wait.Interrupted(err) {
+			// If it's a real error (not a timeout), fail
+			framework.ExpectNoError(err)
+		}
+		// The resource version didn't change, so the controller is not hot-looping
 	})
 
 })

@@ -36,6 +36,7 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 }
 
 func SetObjectDefaults_EndpointSlice(in *discoveryv1.EndpointSlice) {
+	SetDefaults_EndpointSlice(in)
 	for i := range in.Ports {
 		a := &in.Ports[i]
 		SetDefaults_EndpointPort(a)

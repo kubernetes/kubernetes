@@ -25,9 +25,13 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/endpoint"
@@ -297,5 +301,50 @@ func validateLabelsOnEndpointAndEndpointSlice(t *testing.T, tCtx context.Context
 	})
 	if err != nil {
 		t.Fatalf("Timed out waiting for EndpointSlice labels: %v", err)
+	}
+}
+
+// TestEndpointSliceDefaulting checks that the Endpoints field is defaulted to an empty slice
+// Ref: https://issues.k8s.io/135968
+func TestEndpointSliceDefaulting(t *testing.T) {
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	// This ensures we are testing the JSON serialization path
+	// We use the Typed client for easy setup
+	client := kubernetes.NewForConfigOrDie(server.ClientConfig)
+	// We use the Dynamic client for accurate verification of the wire format
+	dynamicClient := dynamic.NewForConfigOrDie(server.ClientConfig)
+	ns := framework.CreateNamespaceOrDie(client, "es-default-test", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+	esName := "test-slice-nil"
+	es := &discovery.EndpointSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: esName,
+		},
+		AddressType: discovery.AddressTypeIPv4,
+		Endpoints:   nil, // explicitly nil
+	}
+
+	_, err := client.DiscoveryV1().EndpointSlices(ns.Name).Create(context.TODO(), es, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create EndpointSlice: %v", err)
+	}
+
+	gvr := schema.GroupVersionResource{Group: "discovery.k8s.io", Version: "v1", Resource: "endpointslices"}
+	unstructObj, err := dynamicClient.Resource(gvr).Namespace(ns.Name).Get(context.TODO(), esName, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to get EndpointSlice via dynamic client: %v", err)
+	}
+	got := &discovery.EndpointSlice{}
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructObj.Object, got); err != nil {
+		t.Fatalf("Failed to convert Unstructured to EndpointSlice: %v", err)
+	}
+	// It should be an empty slice (Not Nil)
+	if got.Endpoints == nil {
+		t.Errorf("Expected Endpoints to be defaulted to empty slice [], but got nil")
+	} else if len(got.Endpoints) != 0 {
+		t.Errorf("Expected Endpoints to be empty, got len %d", len(got.Endpoints))
 	}
 }
