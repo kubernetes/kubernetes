@@ -950,12 +950,6 @@ const (
 	// service account tokens bound to Pod objects.
 	ServiceAccountTokenPodNodeInfo featuregate.Feature = "ServiceAccountTokenPodNodeInfo"
 
-	// owner: @gauravkghildiyal @robscott
-	// kep: https://kep.k8s.io/4444
-	//
-	// Enables trafficDistribution field on Services.
-	ServiceTrafficDistribution featuregate.Feature = "ServiceTrafficDistribution"
-
 	// owner: @gjkim42 @SergeyKanzhelev @matthyx @tzneal
 	// kep: http://kep.k8s.io/753
 	//
@@ -1023,12 +1017,6 @@ const (
 	//
 	// Enables numeric comparison operators (Lt, Gt) for tolerations to match taints with threshold-based values.
 	TaintTolerationComparisonOperators featuregate.Feature = "TaintTolerationComparisonOperators"
-
-	// owner: @robscott
-	// kep: https://kep.k8s.io/2433
-	//
-	// Enables topology aware hints for EndpointSlices
-	TopologyAwareHints featuregate.Feature = "TopologyAwareHints"
 
 	// owner: @PiotrProkop
 	// kep: https://kep.k8s.io/3545
@@ -1809,12 +1797,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	},
 
-	ServiceTrafficDistribution: {
-		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA and LockToDefault in 1.33, remove in 1.36
-	},
-
 	SidecarContainers: {
 		{Version: version.MustParse("1.28"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.29"), Default: true, PreRelease: featuregate.Beta},
@@ -1868,13 +1850,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	TaintTolerationComparisonOperators: {
 		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
-	},
-
-	TopologyAwareHints: {
-		{Version: version.MustParse("1.21"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.23"), Default: false, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.24"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	},
 
 	TopologyManagerPolicyAlphaOptions: {
@@ -2447,8 +2422,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	ServiceAccountTokenPodNodeInfo: {},
 
-	ServiceTrafficDistribution: {},
-
 	SidecarContainers: {},
 
 	StatefulSetSemanticRevisionComparison: {},
@@ -2470,8 +2443,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	SystemdWatchdog: {},
 
 	TaintTolerationComparisonOperators: {},
-
-	TopologyAwareHints: {},
 
 	TopologyManagerPolicyAlphaOptions: {},
 
