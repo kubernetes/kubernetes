@@ -398,7 +398,7 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 		if fldPath.String() != t.String() {
 			panic(fmt.Sprintf("path for type != the type name: %s, %s", t.String(), fldPath.String()))
 		}
-		consts, _ := td.constantsByType[t]
+		consts := td.constantsByType[t]
 		context := validators.Context{
 			Scope:      validators.ScopeType,
 			Type:       t,
