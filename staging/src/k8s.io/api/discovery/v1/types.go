@@ -52,6 +52,7 @@ type EndpointSlice struct {
 
 	// endpoints is a list of unique endpoints in this slice. Each slice may
 	// include a maximum of 1000 endpoints.
+	// +optional
 	// +listType=atomic
 	Endpoints []Endpoint `json:"endpoints" protobuf:"bytes,2,rep,name=endpoints"`
 
