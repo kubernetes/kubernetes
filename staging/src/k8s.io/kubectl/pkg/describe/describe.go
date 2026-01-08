@@ -41,12 +41,10 @@ import (
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	batchv1 "k8s.io/api/batch/v1"
-	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	certificatesv1 "k8s.io/api/certificates/v1"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
-	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -210,7 +208,6 @@ func describerMap(clientConfig *rest.Config) (map[schema.GroupKind]ResourceDescr
 		{Group: corev1.GroupName, Kind: "PriorityClass"}:                     &PriorityClassDescriber{c},
 		{Group: discoveryv1.GroupName, Kind: "EndpointSlice"}:                &EndpointSliceDescriber{c},
 		{Group: autoscalingv2.GroupName, Kind: "HorizontalPodAutoscaler"}:    &HorizontalPodAutoscalerDescriber{c},
-		{Group: extensionsv1beta1.GroupName, Kind: "Ingress"}:                &IngressDescriber{c},
 		{Group: networkingv1.GroupName, Kind: "Ingress"}:                     &IngressDescriber{c},
 		{Group: networkingv1.GroupName, Kind: "IngressClass"}:                &IngressClassDescriber{c},
 		{Group: networkingv1beta1.GroupName, Kind: "ServiceCIDR"}:            &ServiceCIDRDescriber{c},
@@ -219,7 +216,6 @@ func describerMap(clientConfig *rest.Config) (map[schema.GroupKind]ResourceDescr
 		{Group: networkingv1.GroupName, Kind: "IPAddress"}:                   &IPAddressDescriber{c},
 		{Group: batchv1.GroupName, Kind: "Job"}:                              &JobDescriber{c},
 		{Group: batchv1.GroupName, Kind: "CronJob"}:                          &CronJobDescriber{c},
-		{Group: batchv1beta1.GroupName, Kind: "CronJob"}:                     &CronJobDescriber{c},
 		{Group: appsv1.GroupName, Kind: "StatefulSet"}:                       &StatefulSetDescriber{c},
 		{Group: appsv1.GroupName, Kind: "Deployment"}:                        &DeploymentDescriber{c},
 		{Group: appsv1.GroupName, Kind: "DaemonSet"}:                         &DaemonSetDescriber{c},
