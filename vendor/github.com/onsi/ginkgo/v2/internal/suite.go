@@ -208,9 +208,12 @@ func (suite *Suite) PushNode(node Node) error {
 
 				// Ensure that code running in the body of the container node
 				// has access to information about the current container node(s).
+				// The current one (nil in top-level container nodes, non-nil in an
+				// embedded container node) gets restored when the node is done.
+				oldConstructionNodeReport := suite.currentConstructionNodeReport
 				suite.currentConstructionNodeReport = constructionNodeReportForTreeNode(suite.tree)
 				defer func() {
-					suite.currentConstructionNodeReport = nil
+					suite.currentConstructionNodeReport = oldConstructionNodeReport
 				}()
 
 				node.Body(nil)

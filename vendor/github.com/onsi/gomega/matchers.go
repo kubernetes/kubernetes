@@ -146,6 +146,24 @@ func MatchError(expected any, functionErrorDescription ...any) types.GomegaMatch
 	}
 }
 
+// MatchErrorStrictly succeeds iff actual is a non-nil error that matches the passed in
+// expected error according to errors.Is(actual, expected).
+//
+// This behavior differs from MatchError where
+//
+//	Expect(errors.New("some error")).To(MatchError(errors.New("some error")))
+//
+// succeeds, but errors.Is would return false so:
+//
+//	Expect(errors.New("some error")).To(MatchErrorStrictly(errors.New("some error")))
+//
+// fails.
+func MatchErrorStrictly(expected error) types.GomegaMatcher {
+	return &matchers.MatchErrorStrictlyMatcher{
+		Expected: expected,
+	}
+}
+
 // BeClosed succeeds if actual is a closed channel.
 // It is an error to pass a non-channel to BeClosed, it is also an error to pass nil
 //
