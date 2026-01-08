@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -39,7 +39,7 @@ import (
 
 func TestURLErrorNotExistNoUpdate(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
-	ch := make(chan interface{})
+	ch := make(chan sourceUpdate)
 	NewSourceURL(logger, "http://localhost:49575/_not_found_", http.Header{}, "localhost", time.Millisecond, ch)
 	select {
 	case got := <-ch:
@@ -50,7 +50,7 @@ func TestURLErrorNotExistNoUpdate(t *testing.T) {
 
 func TestExtractFromHttpBadness(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
-	ch := make(chan interface{}, 1)
+	ch := make(chan sourceUpdate, 1)
 	c := sourceURL{"http://localhost:49575/_not_found_", http.Header{}, "other", ch, nil, 0, http.DefaultClient}
 	if err := c.extractFromURL(logger); err == nil {
 		t.Errorf("Expected error")
@@ -120,7 +120,7 @@ func TestExtractInvalidPods(t *testing.T) {
 		}
 		testServer := httptest.NewServer(&fakeHandler)
 		defer testServer.Close()
-		ch := make(chan interface{}, 1)
+		ch := make(chan sourceUpdate, 1)
 		c := sourceURL{testServer.URL, http.Header{}, "localhost", ch, nil, 0, http.DefaultClient}
 		if err := c.extractFromURL(logger); err == nil {
 			t.Errorf("%s: Expected error", testCase.desc)
@@ -137,7 +137,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 	var testCases = []struct {
 		desc     string
 		pods     runtime.Object
-		expected kubetypes.PodUpdate
+		expected sourceUpdate
 	}{
 		{
 			desc: "Single pod",
@@ -161,8 +161,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 					Phase: v1.PodPending,
 				},
 			},
-			expected: CreatePodUpdate(kubetypes.SET,
-				kubetypes.HTTPSource,
+			expected: createSourceUpdate(
 				&v1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						UID:         "111",
@@ -232,8 +231,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 					},
 				},
 			},
-			expected: CreatePodUpdate(kubetypes.SET,
-				kubetypes.HTTPSource,
+			expected: createSourceUpdate(
 				&v1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						UID:         "111",
@@ -304,13 +302,13 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 		}
 		testServer := httptest.NewServer(&fakeHandler)
 		defer testServer.Close()
-		ch := make(chan interface{}, 1)
+		ch := make(chan sourceUpdate, 1)
 		c := sourceURL{testServer.URL, http.Header{}, types.NodeName(nodeName), ch, nil, 0, http.DefaultClient}
 		if err := c.extractFromURL(logger); err != nil {
 			t.Errorf("%s: Unexpected error: %v", testCase.desc, err)
 			continue
 		}
-		update := (<-ch).(kubetypes.PodUpdate)
+		update := <-ch
 
 		if !apiequality.Semantic.DeepEqual(testCase.expected, update) {
 			t.Errorf("%s: Expected: %#v, Got: %#v", testCase.desc, testCase.expected, update)
@@ -356,14 +354,14 @@ func TestURLWithHeader(t *testing.T) {
 	defer testServer.Close()
 
 	logger, _ := ktesting.NewTestContext(t)
-	ch := make(chan interface{}, 1)
+	ch := make(chan sourceUpdate, 1)
 	header := make(http.Header)
 	header.Set("Metadata-Flavor", "Google")
 	c := sourceURL{testServer.URL, header, "localhost", ch, nil, 0, http.DefaultClient}
 	if err := c.extractFromURL(logger); err != nil {
 		t.Fatalf("Unexpected error extracting from URL: %v", err)
 	}
-	update := (<-ch).(kubetypes.PodUpdate)
+	update := <-ch
 
 	headerVal := fakeHandler.RequestReceived.Header["Metadata-Flavor"]
 	if len(headerVal) != 1 || headerVal[0] != "Google" {
