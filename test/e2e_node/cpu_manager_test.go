@@ -1030,6 +1030,69 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 				gomega.Expect(pod).To(HaveContainerCPUsThreadSiblings(cnt.Name))
 			}
 		})
+
+		ginkgo.It("should count for pre-allocated CPUs after kubelet restart", func(ctx context.Context) {
+			// This test verifies that pods with pre-allocated CPUs (from the checkpoint file)
+			// are not rejected after kubelet restart when SMT alignment is enabled.
+			// Regression test for the fix where the container presence check was moved
+			// before the SMT alignment check.
+
+			// The key is to request enough CPUs so that if pre-allocated CPUs are not
+			// counted, the SMT alignment check would fail due to insufficient available
+			// physical CPUs.
+
+			// Calculate the maximum SMT-aligned CPUs we can request
+			// We need to request most of the allocatable CPUs to trigger the bug
+			nodeCPUDetails := cpuDetailsFromNode(getLocalNode(ctx, f))
+			allocatableCPUs := int(nodeCPUDetails.Allocatable) - reservedCPUs.Size()
+
+			// Round down to the nearest multiple of smtLevel for SMT alignment
+			cpuCount := (allocatableCPUs / smtLevel) * smtLevel
+
+			// We need at least 2*smtLevel CPUs to make this test meaningful
+			// (one set for the pod, leaving less than smtLevel available which would fail the check)
+			if cpuCount < 2*smtLevel {
+				e2eskipper.Skipf("Not enough allocatable CPUs for this test: need at least %d, have %d", 2*smtLevel, allocatableCPUs)
+			}
+
+			ginkgo.By(fmt.Sprintf("creating the testing pod cpuRequest=%d (allocatable=%d, reserved=%d)", cpuCount, allocatableCPUs, reservedCPUs.Size()))
+			pod := makeCPUManagerPod("gu-pod", []ctnAttribute{
+				{
+					ctnName:    "gu-container",
+					cpuRequest: fmt.Sprintf("%d", cpuCount),
+					cpuLimit:   fmt.Sprintf("%d", cpuCount),
+				},
+			})
+			ginkgo.By("creating the test pod")
+			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+			podMap[string(pod.UID)] = pod
+
+			ginkgo.By("verifying the pod is running with allocated CPUs")
+			cpusBeforeRestart, err := getContainerAllowedCPUs(pod, "gu-container", false)
+			framework.ExpectNoError(err, "cannot get CPUs for container gu-container before restart")
+			framework.Logf("CPUs before kubelet restart: %s (count=%d)", cpusBeforeRestart.String(), cpusBeforeRestart.Size())
+			gomega.Expect(cpusBeforeRestart.Size()).To(gomega.Equal(cpuCount))
+
+			ginkgo.By("restarting the kubelet")
+			restartKubelet := mustStopKubelet(ctx, f)
+			restartKubelet(ctx)
+
+			ginkgo.By("ensuring kubelet is healthy after restart")
+			gomega.Eventually(ctx, func() bool {
+				return kubeletHealthCheck(kubeletHealthCheckURL)
+			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeTrueBecause("kubelet should be healthy after restart"))
+
+			ginkgo.By("verifying pod is still running after kubelet restart")
+			pod, err = e2epod.NewPodClient(f).Get(ctx, pod.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err, "failed to get pod after kubelet restart")
+			gomega.Expect(pod.Status.Phase).To(gomega.Equal(v1.PodRunning), "pod should still be running after kubelet restart")
+
+			ginkgo.By("verifying container still has the same CPUs after restart")
+			cpusAfterRestart, err := getContainerAllowedCPUs(pod, "gu-container", false)
+			framework.ExpectNoError(err, "cannot get CPUs for container gu-container after restart")
+			framework.Logf("CPUs after kubelet restart: %s (count=%d)", cpusAfterRestart, cpusAfterRestart.Size())
+			gomega.Expect(pod).To(HaveContainerCPUsEqualTo("gu-container", cpusBeforeRestart))
+		})
 	})
 
 	ginkgo.When("running with Uncore Cache Alignment", ginkgo.Label("prefer-align-cpus-by-uncore-cache"), func() {
