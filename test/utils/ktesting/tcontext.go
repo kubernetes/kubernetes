@@ -21,11 +21,14 @@ import (
 	"flag"
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 	"testing/synctest"
 	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/onsi/gomega"
+
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
@@ -56,169 +59,19 @@ type Underlier = ktesting.Underlier
 // CleanupGracePeriod is ignored because Ginkgo itself manages timeouts.
 const CleanupGracePeriod = 5 * time.Second
 
-// TContext combines [context.Context], [TB] and some additional
-// methods.  Log output is associated with the current test. Errors ([Error],
-// [Errorf]) are recorded with "ERROR" as prefix, fatal errors ([Fatal],
-// [Fatalf]) with "FATAL ERROR".
-//
-// TContext provides features offered by Ginkgo also when using normal Go [testing]:
-//   - The context contains a deadline that expires soon enough before
-//     the overall timeout that cleanup code can still run.
-//   - Cleanup callbacks can get their own, separate contexts when
-//     registered via [CleanupCtx].
-//   - CTRL-C aborts, prints a progress report, and then cleans up
-//     before terminating.
-//   - SIGUSR1 prints a progress report without aborting.
-//
-// Progress reporting is more informative when doing polling with
-// [gomega.Eventually] and [gomega.Consistently]. Without that, it
-// can only report which tests are active.
-type TContext interface {
-	context.Context
-	TB
-
-	// Parallel signals that this test is to be run in parallel with (and
-	// only with) other parallel tests. In other words, it needs to be
-	// called in each test which is meant to run in parallel.
-	//
-	// Only supported in Go unit tests. When such a test is run multiple
-	// times due to use of -test.count or -test.cpu, multiple instances of
-	// a single test never run in parallel with each other.
-	Parallel()
-
-	// Run runs f as a subtest of t called name. It blocks until f returns or
-	// calls t.Parallel to become a parallel test.
-	//
-	// Only supported in Go unit tests or benchmarks. It fails the current
-	// test when called elsewhere.
-	Run(name string, f func(tCtx TContext)) bool
-
-	// SyncTest uses [synctest.Test] to execute the callback inside a bubble.
-	// Creates a new subtest if the name is non-empty, otherwise it creates
-	// the bubble directly in the current test context.
-	//
-	// Only works in Go unit tests.
-	SyncTest(name string, f func(tCtx TContext)) bool
-
-	// IsSyncTest returns true if the context was created by SyncTest.
-	//
-	// Inside such a context, Wait is usable. This can be used in
-	// code which runs inside synctest bubbles and outside:
-	// - Inside a bubble, Wait can be used to block until
-	//   background activity has settled down (= "durably blocked").
-	//   Eventually and Consistently both call Wait and then check
-	//   the condition.
-	// - Outside, polling or some synchronization mechanism has to be used.
-	IsSyncTest() bool
-
-	// Wait calls [synctest.Wait] and thus ensures that all background
-	// activity has settled down (= "durably blocked").
-	//
-	// Only works inside a bubble started by SyncTest (can be checked with
-	// IsSyncTest), panics elsewhere.
-	Wait()
-
-	// Cancel can be invoked to cancel the context before the test is completed.
-	// Tests which use the context to control goroutines and then wait for
-	// termination of those goroutines must call Cancel to avoid a deadlock.
-	//
-	// The cause, if non-empty, is turned into an error which is equivalend
-	// to context.Canceled. context.Cause will return that error for the
-	// context.
-	Cancel(cause string)
-
-	// Cleanup registers a callback that will get invoked when the test
-	// has finished. Callbacks get invoked in last-in-first-out order (LIFO).
-	//
-	// Beware of context cancellation. The following cleanup code
-	// will use a canceled context, which is not desirable:
-	//
-	//    tCtx.Cleanup(func() { /* do something with tCtx */ })
-	//    tCtx.Cancel()
-	//
-	// A safer way to run cleanup code is:
-	//
-	//    tCtx.CleanupCtx(func (tCtx ktesting.TContext) { /* do something with cleanup tCtx */ })
-	Cleanup(func())
-
-	// CleanupCtx is an alternative for Cleanup. The callback is passed a
-	// new TContext with the same logger and clients as the one CleanupCtx
-	// was invoked for.
-	CleanupCtx(func(TContext))
-
-	// Expect wraps [gomega.Expect] such that a failure will be reported via
-	// [TContext.Fatal]. As with [gomega.Expect], additional values
-	// may get passed. Those values then all must be nil for the assertion
-	// to pass. This can be used with functions which return a value
-	// plus error:
-	//
-	//     myAmazingThing := func(int, error) { ...}
-	//     tCtx.Expect(myAmazingThing()).Should(gomega.Equal(1))
-	Expect(actual interface{}, extra ...interface{}) gomega.Assertion
-
-	// ExpectNoError asserts that no error has occurred.
-	//
-	// As in [gomega], the optional explanation can be:
-	//   - a [fmt.Sprintf] format string plus its argument
-	//   - a function returning a string, which will be called
-	//     lazy to construct the explanation if needed
-	//
-	// If an explanation is provided, then it replaces the default "Unexpected
-	// error" in the failure message. It's combined with additional details by
-	// adding a colon at the end, as when wrapping an error. Therefore it should
-	// not end with a punctuation mark or line break.
-	//
-	// Using ExpectNoError instead of the corresponding Gomega or testify
-	// assertions has the advantage that the failure message is short (good for
-	// aggregation in https://go.k8s.io/triage) with more details captured in the
-	// test log output (good when investigating one particular failure).
-	ExpectNoError(err error, explain ...interface{})
-
-	// Logger returns a logger for the current test. This is a shortcut
-	// for calling klog.FromContext.
-	//
-	// Output emitted via this logger and the TB interface (like Logf)
-	// is formatted consistently. The TB interface generates a single
-	// message string, while Logger enables structured logging and can
-	// be passed down into code which expects a logger.
-	//
-	// To skip intermediate helper functions during stack unwinding,
-	// TB.Helper can be called in those functions.
-	Logger() klog.Logger
-
-	// TB returns the underlying TB. This can be used to "break the glass"
-	// and cast back into a testing.T or TB. Calling TB is necessary
-	// because TContext wraps the underlying TB.
-	TB() TB
-
-	// RESTConfig returns a config for a rest client with the UserAgent set
-	// to include the current test name or nil if not available. Several
-	// typed clients using this config are available through [Client],
-	// [Dynamic], [APIExtensions].
-	RESTConfig() *rest.Config
-
-	RESTMapper() *restmapper.DeferredDiscoveryRESTMapper
-	Client() clientset.Interface
-	Dynamic() dynamic.Interface
-	APIExtensions() apiextensions.Interface
-
-	// The following methods must be implemented by every implementation
-	// of TContext to ensure that the leaf TContext is used, not some
-	// embedded TContext:
-	// - CleanupCtx
-	// - Expect
-	// - ExpectNoError
-	// - Run
-	// - Logger
-	//
-	// Usually these methods would be stand-alone functions with a TContext
-	// parameter. Offering them as methods simplifies the test code.
-}
-
 // TB is the interface common to [testing.T], [testing.B], [testing.F] and
-// [github.com/onsi/ginkgo/v2]. In contrast to [testing.TB], it can be
-// implemented also outside of the testing package.
+// [github.com/onsi/ginkgo/v2] which ktesting relies upon itself or
+// passes through (like Chdir, TempDir).
+//
+// In contrast to [testing.TB], it can be implemented also outside of the
+// testing package.
+//
+// Fatal/Error/Skip are used by ktesting instead of Log + FailNow/Failed/SkipNow
+// because when implemented by Ginkgo it is better to pass the reason for
+// a failure or skip directly to Ginkgo in the method intended for that purpose.
 type TB interface {
+	Attr(key, value string)
+	Chdir(dir string)
 	Cleanup(func())
 	Error(args ...any)
 	Errorf(format string, args ...any)
@@ -233,8 +86,8 @@ type TB interface {
 	Name() string
 	Setenv(key, value string)
 	Skip(args ...any)
-	SkipNow()
 	Skipf(format string, args ...any)
+	SkipNow()
 	Skipped() bool
 	TempDir() string
 }
@@ -284,10 +137,11 @@ func Init(tb TB, opts ...InitOption) TContext {
 	})
 
 	ctx := interruptCtx
+	var header func() string
 	if c.PerTestOutput {
 		logger := newLogger(tb, c.BufferLogs)
 		ctx = klog.NewContext(interruptCtx, logger)
-		tb = withKlogHeader(tb)
+		header = klogHeader
 	}
 
 	if deadlineOK {
@@ -295,15 +149,16 @@ func Init(tb TB, opts ...InitOption) TContext {
 			timeLeft := time.Until(deadline)
 			timeLeft -= CleanupGracePeriod
 			ctx, cancel := withTimeout(ctx, tb, timeLeft, fmt.Sprintf("test suite deadline (%s) is close, need to clean up before the %s cleanup grace period", deadline.Truncate(time.Second), CleanupGracePeriod))
-			tCtx := tContext{
+			tc := TC{
 				Context:   ctx,
 				testingTB: testingTB{TB: tb},
 				cancel:    cancel,
 			}
-			return tCtx
+			return &tc
 		}
 	}
 	tCtx := WithCancel(InitCtx(ctx, tb))
+	tCtx.perTestHeader = header
 	tCtx.Cleanup(func() {
 		tCtx.Cancel(cleanupErr(tCtx.Name()).Error())
 	})
@@ -358,15 +213,16 @@ type InitOption = initoption.InitOption
 // Functional options are part of the API, but currently
 // there are none which have an effect.
 func InitCtx(ctx context.Context, tb TB, _ ...InitOption) TContext {
-	tCtx := tContext{
+	tc := TC{
 		Context:   ctx,
 		testingTB: testingTB{TB: tb},
 	}
-	return tCtx
+	return &tc
 }
 
-// WithTB constructs a new TContext with a different TB instance.
-// This can be used to set up some of the context, in particular
+// withTB constructs a new TContext with a different TB instance.
+//
+// This is used internally to set up some of the context, in particular
 // clients, in the root test and then run sub-tests:
 //
 //	func TestSomething(t *testing.T) {
@@ -379,31 +235,24 @@ func InitCtx(ctx context.Context, tb TB, _ ...InitOption) TContext {
 //	       ...
 //	   })
 //
-// WithTB sets up cancellation for the sub-test and uses per-test output.
-//
-// A simpler API is to use TContext.Run as replacement
-// for [testing.T.Run].
-func WithTB(parentCtx TContext, tb TB) TContext {
-	// TODO: honor the initial settings for logging.
-	tCtx := InitCtx(klog.NewContext(parentCtx, newLogger(tb, false /* don't buffer log output */)), withKlogHeader(tb))
-
-	tCtx = WithCancel(tCtx)
-	tCtx = WithClients(tCtx,
-		parentCtx.RESTConfig(),
-		parentCtx.RESTMapper(),
-		parentCtx.Client(),
-		parentCtx.Dynamic(),
-		parentCtx.APIExtensions(),
-	)
-	return tCtx
+// withTB sets up cancellation for the sub-test and uses per-test output.
+func (tc *TC) withTB(tb TB) TContext {
+	tc = tc.clone()
+	tc.testingTB.TB = tb
+	if tc.perTestHeader != nil {
+		logger := newLogger(tb, false /* don't buffer logs in sub-test */)
+		tc.Context = klog.NewContext(tc.Context, logger)
+	}
+	tc = WithCancel(tc)
+	return tc
 }
 
 // run implements the different Run and SyncTest methods. It's not an exported
 // method because tCtx.Run is more discoverable (same usage as
 // with normal Go).
-func run(tCtx TContext, name string, syncTest bool, cb func(tCtx TContext)) bool {
-	tCtx.Helper()
-	switch tb := tCtx.TB().(type) {
+func run(tc *TC, name string, syncTest bool, cb func(tc *TC)) bool {
+	tc.Helper()
+	switch tb := tc.TB().(type) {
 	case *testing.T:
 		if syncTest {
 			f := func(t *testing.T) {
@@ -413,7 +262,10 @@ func run(tCtx TContext, name string, syncTest bool, cb func(tCtx TContext)) bool
 				//
 				// Sync tests shouldn't need the overall suite timeout,
 				// so this seems okay.
-				cb(synctestContext{TContext: WithTB(WithoutCancel(tCtx), t)})
+				tc = tc.clone()
+				tc.isSyncTest = true
+				tc = tc.WithoutCancel().withTB(t)
+				cb(tc)
 			}
 			if name != "" {
 				return tb.Run(name, func(t *testing.T) { synctest.Test(t, f) })
@@ -421,10 +273,14 @@ func run(tCtx TContext, name string, syncTest bool, cb func(tCtx TContext)) bool
 			synctest.Test(tb, f)
 			return true
 		}
-		return tb.Run(name, func(t *testing.T) { cb(WithTB(tCtx, t)) })
+		return tb.Run(name, func(t *testing.T) {
+			cb(tc.withTB(t))
+		})
 	case *testing.B:
 		if !syncTest {
-			return tb.Run(name, func(b *testing.B) { cb(WithTB(tCtx, b)) })
+			return tb.Run(name, func(b *testing.B) {
+				cb(tc.withTB(b))
+			})
 		}
 	}
 
@@ -432,17 +288,14 @@ func run(tCtx TContext, name string, syncTest bool, cb func(tCtx TContext)) bool
 	if syncTest {
 		what = "SyncTest"
 	}
-	tCtx.Fatalf("%s not implemented, underlying %T does not support it", what, tCtx.TB())
+	tc.Fatalf("%s not implemented, underlying %T does not support it", what, tc.TB())
 
 	return false
 }
 
-type synctestContext struct {
-	TContext
-}
-
-func (s synctestContext) IsSyncTest() bool {
-	return true
+// Deprecated: use tCtx.WithContext instead
+func WithContext(tCtx TContext, ctx context.Context) TContext {
+	return tCtx.WithContext(ctx)
 }
 
 // WithContext constructs a new TContext with a different Context instance.
@@ -455,157 +308,313 @@ func (s synctestContext) IsSyncTest() bool {
 //
 // This is important because the Context in the callback could have
 // a different deadline than in the parent TContext.
-func WithContext(parentCtx TContext, ctx context.Context) TContext {
-	tCtx := InitCtx(ctx, parentCtx.TB())
-	tCtx = WithClients(tCtx,
-		parentCtx.RESTConfig(),
-		parentCtx.RESTMapper(),
-		parentCtx.Client(),
-		parentCtx.Dynamic(),
-		parentCtx.APIExtensions(),
-	)
-	return tCtx
+func (tc *TC) WithContext(ctx context.Context) TContext {
+	tc = tc.clone()
+	logger := tc.Logger()
+	tc.Context = ctx
+	if _, err := logr.FromContext(ctx); err != nil {
+		// Keep using the logger from the parent context.
+		tc = tc.WithLogger(logger)
+	}
+	return tc
 }
 
-// WithValue wraps context.WithValue such that the result is again a TContext.
-func WithValue(parentCtx TContext, key, val any) TContext {
-	ctx := context.WithValue(parentCtx, key, val)
-	return WithContext(parentCtx, ctx)
+// Deprecated: use tCtx.WithValue instead
+func WithValue(tCtx TContext, key, val any) TContext {
+	return tCtx.WithValue(key, val)
 }
 
-type tContext struct {
+// WithValue wraps [context.WithValue] such that the result is again a TContext.
+func (tc *TC) WithValue(key, val any) TContext {
+	ctx := context.WithValue(tc, key, val)
+	return tc.WithContext(ctx)
+}
+
+// TContext is the recommended type for storing a [TC] instance.
+// The type alias is necessary because TContext used to be an interface.
+type TContext = *TC
+
+// TC implements [context.Context], [testing.TB] and some additional
+// methods. [TContext] is the public pointer type for referencing a TC.
+// Variables are usually called tCtx. To ensure that test code does not
+// use `t` directly unintentionally, it is recommended to use two functions:
+//
+//	func TestSomething(t *testing.T) { testSomething(ktesting.Init(t)) }
+//	func testSomething(tCtx ktesting.TContext) { ... }
+//
+// Log output is associated with the current test and includes a header similar
+// to klog, which enables post-processing to distinguish between log output
+// (starts with header) and failure messages (header comes later). Errors
+// ([Error], [Errorf]) are recorded with "ERROR" as prefix, fatal errors
+// ([Fatal], [Fatalf]) with "FATAL ERROR". Indention is used to ensure that
+// follow-up lines belonging to the same log entry can be handled properly
+// by post-processing and to make the header stand out more.
+//
+// tCtx provides features offered by Ginkgo also when using normal Go [testing]:
+//   - The context contains a deadline that expires soon enough before
+//     the overall timeout that cleanup code can still run.
+//   - Cleanup callbacks can get their own, separate contexts when
+//     registered via [CleanupCtx].
+//   - CTRL-C aborts, prints a progress report, and then cleans up
+//     before terminating.
+//   - SIGUSR1 prints a progress report without aborting.
+//
+// Progress reporting is more informative when doing polling with
+// [gomega.Eventually] and [gomega.Consistently]. Without that, it
+// can only report which tests are active.
+type TC struct {
+	// Context makes the methods of the underlying context
+	// available. It must not be modified.
 	context.Context
+
+	// testingTB makes the methods of the underlying test implementation
+	// available. Its embedded TB must not be modified.
 	testingTB
+
+	// perTestHeader is an optional function which produces a klog-like perTestHeader when
+	// not using some global logger.
+	perTestHeader func() string
+
+	// for Cancel
 	cancel func(cause string)
+
+	// steps is a concatenation ("step1: step2: step3: ") of steps passed to WithStep.
+	// It's empty if there are no steps.
+	steps string
+
+	// for SyncTest
+	isSyncTest bool
+
+	// for WithClient
+	restConfig    *rest.Config
+	restMapper    *restmapper.DeferredDiscoveryRESTMapper
+	client        clientset.Interface
+	dynamic       dynamic.Interface
+	apiextensions apiextensions.Interface
+
+	// for WithNamespace
+	namespace string
+
+	// capture, if non-nil, changes Error/Errorf/Fatal/Fatalf/Fail/FailNow so
+	// that they intercept the problem and convert to errors. Log messages
+	// are passed through.
+	//
+	// Used by WithError.
+	capture *capture
+}
+
+type capture struct {
+	mutex  sync.Mutex
+	errors []error
+	failed bool
+}
+
+// tc makes a shallow copy.
+func (tc *TC) clone() *TC {
+	clone := *tc
+	return &clone
 }
 
 // testingTB is needed to avoid a name conflict
 // between field and method in tContext.
 type testingTB struct {
+	// TB makes the methods of the underlying test implementation available.
+	// In particular Helper must be called directly, not via a wrapper.
+	// It must not be modified.
 	TB
 }
 
-func (tCtx tContext) Parallel() {
-	if tb, ok := tCtx.TB().(interface{ Parallel() }); ok {
+var _ TContext = &TC{}
+
+// Parallel signals that this test is to be run in parallel with (and
+// only with) other parallel tests. In other words, it needs to be
+// called in each test which is meant to run in parallel.
+//
+// Only supported in Go unit tests, calling it elsewhere causes a test failure.
+//
+// When a unit test is run multiple times due to use of -test.count or -test.cpu,
+// multiple instances of a single test never run in parallel with each other.
+func (tc *TC) Parallel() {
+	if tb, ok := tc.TB().(interface{ Parallel() }); ok {
 		tb.Parallel()
+	} else {
+		tc.Fatalf("Parallel not implemented, underlying %T does not support it", tc.TB())
 	}
 }
 
-func (tCtx tContext) Cancel(cause string) {
-	if tCtx.cancel != nil {
-		tCtx.cancel(cause)
+// Cancel can be invoked to cancel the context before the test is completed.
+// Tests which use the context to control goroutines and then wait for
+// termination of those goroutines must call Cancel to avoid a deadlock.
+//
+// The cause, if non-empty, is turned into an error which is equivalent
+// to context.Canceled. context.Cause will return that error for the
+// context.
+func (tc *TC) Cancel(cause string) {
+	if tc.cancel != nil {
+		tc.cancel(cause)
 	}
 }
 
-func (tCtx tContext) CleanupCtx(cb func(TContext)) {
-	tCtx.Helper()
-	cleanupCtx(tCtx, cb)
-}
+// CleanupCtx registers a callback that will get invoked when the test
+// has finished. Callbacks get invoked in last-in-first-out order (LIFO).
+//
+// Using CleanupCtx is preferred because of the automatic context cancellation.
+// The following broken (!) cleanup code will use a canceled context,
+// which is not desirable:
+//
+//	// tCtx gets canceled when the test ends and before the callback runs.
+//	tCtx.Cleanup(func() { /* do something with the test's tCtx */ })
+//
+// A safer way to run cleanup code is:
+//
+//	tCtx.CleanupCtx(func (tCtx ktesting.TContext) { /* do something with the cleanup's tCtx */ })
+//
+// The logger and clients are the same as in the TContext that CleanupCtx
+// is invoked on.
+func (tc *TC) CleanupCtx(cb func(TContext)) {
+	tc.Helper()
 
-func (tCtx tContext) Expect(actual interface{}, extra ...interface{}) gomega.Assertion {
-	tCtx.Helper()
-	return expect(tCtx, actual, extra...)
-}
-
-func (tCtx tContext) ExpectNoError(err error, explain ...interface{}) {
-	tCtx.Helper()
-	expectNoError(tCtx, err, explain...)
-}
-
-func cleanupCtx(tCtx TContext, cb func(TContext)) {
-	tCtx.Helper()
-
-	if tb, ok := tCtx.TB().(ContextTB); ok {
+	if tb, ok := tc.TB().(ContextTB); ok {
 		// Use context from base TB (most likely Ginkgo).
 		tb.CleanupCtx(func(ctx context.Context) {
-			tCtx := WithContext(tCtx, ctx)
+			tCtx := WithContext(tc, ctx)
 			cb(tCtx)
 		})
 		return
 	}
 
-	tCtx.Cleanup(func() {
+	tc.Cleanup(func() {
 		// Use new context. This is the code path for "go test". The
 		// context then has *no* deadline. In the code path above for
 		// Ginkgo, Ginkgo is more sophisticated and also applies
 		// timeouts to cleanup calls which accept a context.
-		childCtx := WithContext(tCtx, context.WithoutCancel(tCtx))
+		childCtx := WithContext(tc, context.WithoutCancel(tc))
 		cb(childCtx)
 	})
 }
 
-func (cCtx tContext) Run(name string, cb func(tCtx TContext)) bool {
-	return run(cCtx, name, false, cb)
+// Run runs cb as a subtest called name. It blocks until cb returns or
+// calls t.Parallel to become a parallel test.
+//
+// Only supported in Go unit tests or benchmarks. It fails the current
+// test when called elsewhere.
+func (tc *TC) Run(name string, cb func(tCtx TContext)) bool {
+	return run(tc, name, false, cb)
 }
 
-func (cCtx tContext) SyncTest(name string, cb func(tCtx TContext)) bool {
-	return run(cCtx, name, true, cb)
+// SyncTest uses [synctest.Test] to execute the callback inside a bubble.
+// Creates a new subtest if the name is non-empty, otherwise it creates
+// the bubble directly in the current test context.
+//
+// Only works in Go unit tests.
+func (tc *TC) SyncTest(name string, cb func(tCtx TContext)) bool {
+	return run(tc, name, true, cb)
 }
 
-func (cCtx tContext) IsSyncTest() bool {
-	return false
+// IsSyncTest returns true if the context was created by SyncTest.
+//
+// Inside such a context, Wait is usable. This can be used in
+// code which runs inside synctest bubbles and outside:
+//   - Inside a bubble, Wait can be used to block until
+//     background activity has settled down (= "durably blocked").
+//     Eventually and Consistently both call Wait and then check
+//     the condition.
+//   - Outside, polling or some synchronization mechanism has to be used.
+func (tc *TC) IsSyncTest() bool {
+	return tc.isSyncTest
 }
 
-func (cCtx tContext) Wait() {
+// Wait calls [synctest.Wait] and thus ensures that all background
+// activity has settled down (= "durably blocked").
+//
+// Only works inside a bubble started by SyncTest (can be checked with
+// IsSyncTest), panics elsewhere.
+func (tc *TC) Wait() {
 	synctest.Wait()
 }
 
-func (tCtx tContext) Logger() klog.Logger {
-	return klog.FromContext(tCtx)
+// TB returns the underlying TB. This can be used to "break the glass"
+// and cast back into a testing.T or TB. Calling TB is necessary
+// because TContext wraps the underlying TB.
+//
+// For example, in benchmarks it is necessary to cast back to
+// a testing.B because not all benchmark-only methods are provided.
+// This examples uses separate functions again to ensure that
+// b isn't used unintentionally:
+//
+//	func BenchmarkSomething(b *testing.B) { benchmarkSomething(ktesting.Init(b) }
+//	func benchmarkSomething(tCtx ktesting.TContext) {
+//	    ... set up with tCtx ...
+//	    for tCtx.TB().(*testing.B).Loop() {
+//	        ...
+//	    }
+//	}
+func (tc *TC) TB() TB { return tc.testingTB.TB }
+
+// Logger returns a logger for the current test. This is a shortcut
+// for calling klog.FromContext.
+//
+// Output emitted via this logger and the TB interface (like Logf)
+// is formatted consistently. The TB interface generates a single
+// message string, while Logger enables structured logging and can
+// be passed down into code which expects a logger.
+//
+// To skip intermediate helper functions during stack unwinding,
+// TB.Helper can be called in those functions.
+func (tc *TC) Logger() klog.Logger {
+	return klog.FromContext(tc.Context)
 }
 
-func (tCtx tContext) Error(args ...any) {
-	tCtx.Helper()
-	args = append([]any{"ERROR:"}, args...)
-	tCtx.testingTB.Error(args...)
+// RESTConfig returns a copy of the config for a rest client with the UserAgent
+// set to include the current test name or nil if not available. Several typed
+// clients using this config are available through [Client], [Dynamic],
+// [APIExtensions].
+func (tc *TC) RESTConfig() *rest.Config {
+	return rest.CopyConfig(tc.restConfig)
 }
 
-func (tCtx tContext) Errorf(format string, args ...any) {
-	tCtx.Helper()
-	error := fmt.Sprintf(format, args...)
-	error = "ERROR: " + error
-	tCtx.testingTB.Error(error)
+func (tc *TC) RESTMapper() *restmapper.DeferredDiscoveryRESTMapper { return tc.restMapper }
+func (tc *TC) Client() clientset.Interface                         { return tc.client }
+func (tc *TC) Dynamic() dynamic.Interface                          { return tc.dynamic }
+func (tc *TC) APIExtensions() apiextensions.Interface              { return tc.apiextensions }
+
+// Expect wraps [gomega.Expect] such that a failure will be reported via
+// [TContext.Fatal]. As with [gomega.Expect], additional values
+// may get passed. Those values then all must be nil for the assertion
+// to pass. This can be used with functions which return a value
+// plus error. The error gets checked automatically.
+//
+//	myAmazingThing := func(int, error) { ...}
+//	tCtx.Expect(myAmazingThing()).Should(gomega.Equal(1))
+func (tc *TC) Expect(actual interface{}, extra ...interface{}) gomega.Assertion {
+	return gomegaAssertion(tc, true, actual, extra...)
 }
 
-func (tCtx tContext) Fatal(args ...any) {
-	tCtx.Helper()
-	args = append([]any{"FATAL ERROR:"}, args...)
-	tCtx.testingTB.Fatal(args...)
+// Require is an alias for Expect.
+func (tc *TC) Require(actual interface{}, extra ...interface{}) gomega.Assertion {
+	return gomegaAssertion(tc, true, actual, extra...)
 }
 
-func (tCtx tContext) Fatalf(format string, args ...any) {
-	tCtx.Helper()
-	error := fmt.Sprintf(format, args...)
-	error = "FATAL ERROR: " + error
-	tCtx.testingTB.Fatal(error)
+// Assert also wraps [gomega.Expect], but in contrast to Expect = Require,
+// it reports a failure through [TContext.Error]. This makes it possible
+// to test several different assertions.
+func (tc *TC) Assert(actual interface{}, extra ...interface{}) gomega.Assertion {
+	return gomegaAssertion(tc, false, actual, extra...)
 }
 
-func (tCtx tContext) TB() TB {
-	// Might have to unwrap twice, depending on how
-	// this tContext was constructed.
-	tb := tCtx.testingTB.TB
-	if k, ok := tb.(klogTB); ok {
-		return k.TB
-	}
-	return tb
+// WithNamespace creates a new context with a Kubernetes namespace name for retrieval through [Namespace].
+func (tc *TC) WithNamespace(namespace string) TContext {
+	tc = tc.clone()
+	tc.namespace = namespace
+	return tc
 }
 
-func (tCtx tContext) RESTConfig() *rest.Config {
-	return nil
-}
-
-func (tCtx tContext) RESTMapper() *restmapper.DeferredDiscoveryRESTMapper {
-	return nil
-}
-
-func (tCtx tContext) Client() clientset.Interface {
-	return nil
-}
-
-func (tCtx tContext) Dynamic() dynamic.Interface {
-	return nil
-}
-
-func (tCtx tContext) APIExtensions() apiextensions.Interface {
-	return nil
+// Namespace returns the Kubernetes namespace name that was set previously
+// through WithNamespace and the empty string if none is available.
+//
+// This namespace is the one to be used by tests which need to create namespace-scoped
+// objects. The name is guaranteed to be unique for the test context, so tests running
+// in parallel need to be set up so that each test has its own namespace.
+func (tc *TC) Namespace() string {
+	return tc.namespace
 }

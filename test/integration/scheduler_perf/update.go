@@ -102,7 +102,7 @@ func (c *updateAny) run(tCtx ktesting.TContext) {
 		for index := 0; index < count; index++ {
 			err := c.update(tCtx, map[string]any{"Index": index, "Count": count})
 			if err != nil {
-				tCtx.Fatalf("Failed to update object: %w", err)
+				tCtx.Fatalf("Failed to update object: %v", err)
 			}
 		}
 		return
@@ -115,7 +115,7 @@ func (c *updateAny) run(tCtx ktesting.TContext) {
 		case <-ticker.C:
 			err := c.update(tCtx, map[string]any{"Index": index, "Count": count})
 			if err != nil {
-				tCtx.Fatalf("Failed to update object: %w", err)
+				tCtx.Fatalf("Failed to update object: %v", err)
 			}
 		case <-tCtx.Done():
 			return
