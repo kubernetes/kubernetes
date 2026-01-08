@@ -462,6 +462,8 @@ func (ev *Evaluator) SelectCandidate(ctx context.Context, candidates []Candidate
 // - Reject the victim pods if they are in waitingPod map
 // - Clear the low-priority pods' nominatedNodeName status if needed
 func (ev *Evaluator) prepareCandidate(ctx context.Context, c Candidate, pod *v1.Pod, pluginName string) *fwk.Status {
+	metrics.PreemptionVictims.Observe(float64(len(c.Victims().Pods)))
+
 	fh := ev.Handler
 	cs := ev.Handler.ClientSet()
 
@@ -483,8 +485,6 @@ func (ev *Evaluator) prepareCandidate(ctx context.Context, c Candidate, pod *v1.
 	if err := errCh.ReceiveError(); err != nil {
 		return fwk.AsStatus(err)
 	}
-
-	metrics.PreemptionVictims.Observe(float64(len(c.Victims().Pods)))
 
 	// Lower priority pods nominated to run on this node, may no longer fit on
 	// this node. So, we should remove their nomination. Removing their
@@ -532,8 +532,6 @@ func clearNominatedNodeName(ctx context.Context, cs clientset.Interface, apiCach
 //
 // See http://kep.k8s.io/4832 for how the async preemption works.
 func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName string) {
-	metrics.PreemptionVictims.Observe(float64(len(c.Victims().Pods)))
-
 	// Intentionally create a new context, not using a ctx from the scheduling cycle, to create ctx,
 	// because this process could continue even after this scheduling cycle finishes.
 	ctx, cancel := context.WithCancel(context.Background())
@@ -552,6 +550,8 @@ func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName 
 		cancel()
 		return
 	}
+
+	metrics.PreemptionVictims.Observe(float64(len(c.Victims().Pods)))
 
 	errCh := parallelize.NewErrorChannel()
 	preemptPod := func(index int) {
