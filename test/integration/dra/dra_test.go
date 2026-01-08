@@ -151,7 +151,9 @@ func TestDRA(t *testing.T) {
 			features: map[featuregate.Feature]bool{},
 			f: func(tCtx ktesting.TContext) {
 				tCtx.Run("Pod", func(tCtx ktesting.TContext) { testPod(tCtx, true) })
-				tCtx.Run("FilterTimeout", testFilterTimeout)
+				// Number of devices per slice is chosen so that Filter takes a few seconds:
+				// without a timeout, the test doesn't run too long, but long enough that a short timeout triggers.
+				tCtx.Run("FilterTimeout", func(tCtx ktesting.TContext) { testFilterTimeout(tCtx, 9) })
 			},
 		},
 		"GA": {
@@ -243,6 +245,10 @@ func TestDRA(t *testing.T) {
 				tCtx.Run("EvictClusterWithRule", func(tCtx ktesting.TContext) { testEvictCluster(tCtx, true) })
 				tCtx.Run("EvictClusterWithSlices", func(tCtx ktesting.TContext) { testEvictCluster(tCtx, false) })
 				tCtx.Run("InvalidResourceSlices", testInvalidResourceSlices)
+				// Number of devices per slice is chosen so that Filter takes a few seconds: The allocator
+				// in the experimental channel has an improvement that requires a higher number here than
+				// in the incubating and stable channels.
+				tCtx.Run("FilterTimeout", func(tCtx ktesting.TContext) { testFilterTimeout(tCtx, 20) })
 			},
 		},
 	} {
@@ -516,13 +522,9 @@ func testAdminAccess(tCtx ktesting.TContext, adminAccessEnabled bool) {
 // testFilterTimeout covers the scheduler plugin's filter timeout configuration and behavior.
 //
 // It runs the scheduler with non-standard settings and thus cannot run in parallel.
-func testFilterTimeout(tCtx ktesting.TContext) {
+func testFilterTimeout(tCtx ktesting.TContext, devicesPerSlice int) {
 	namespace := createTestNamespace(tCtx, nil)
 	class, driverName := createTestClass(tCtx, namespace)
-	// Chosen so that Filter takes a few seconds:
-	// without a timeout, the test doesn't run too long,
-	// but long enough that a short timeout triggers.
-	devicesPerSlice := 9
 	deviceNames := make([]string, devicesPerSlice)
 	for i := 0; i < devicesPerSlice; i++ {
 		deviceNames[i] = fmt.Sprintf("dev-%d", i)
