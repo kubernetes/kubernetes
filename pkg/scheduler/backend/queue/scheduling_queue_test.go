@@ -720,9 +720,7 @@ func Test_InFlightPods(t *testing.T) {
 				{podPopped: pod2},
 				// Simulate a bug, putting pod into activeQ, while pod is being scheduled.
 				{callback: func(t *testing.T, q *PriorityQueue) {
-					q.activeQ.underLock(func(unlocked unlockedActiveQueuer) {
-						unlocked.add(logger, newQueuedPodInfoForLookup(pod1), framework.EventUnscheduledPodAdd.Label())
-					})
+					q.activeQ.add(logger, newQueuedPodInfoForLookup(pod1), framework.EventUnscheduledPodAdd.Label())
 				}},
 				// At this point, in the activeQ, we have pod1 and pod3 in this order.
 				{podCreated: pod3},
@@ -1482,9 +1480,7 @@ func TestPriorityQueue_Activate(t *testing.T) {
 
 			if tt.qPodInInFlightPod != nil {
 				// Put -> Pop the Pod to make it registered in inFlightPods.
-				q.activeQ.underLock(func(unlockedActiveQ unlockedActiveQueuer) {
-					unlockedActiveQ.add(logger, newQueuedPodInfoForLookup(tt.qPodInInFlightPod), framework.EventUnscheduledPodAdd.Label())
-				})
+				q.activeQ.add(logger, newQueuedPodInfoForLookup(tt.qPodInInFlightPod), framework.EventUnscheduledPodAdd.Label())
 				p, err := q.activeQ.pop(logger)
 				if err != nil {
 					t.Fatalf("Pop failed: %v", err)
@@ -3285,9 +3281,7 @@ var (
 		queue.Add(logger, pInfo.Pod)
 	}
 	addPodActiveQDirectly = func(t *testing.T, logger klog.Logger, queue *PriorityQueue, pInfo *framework.QueuedPodInfo) {
-		queue.activeQ.underLock(func(unlockedActiveQ unlockedActiveQueuer) {
-			unlockedActiveQ.add(logger, pInfo, framework.EventUnscheduledPodAdd.Label())
-		})
+		queue.activeQ.add(logger, pInfo, framework.EventUnscheduledPodAdd.Label())
 	}
 	addPodUnschedulablePods = func(t *testing.T, logger klog.Logger, queue *PriorityQueue, pInfo *framework.QueuedPodInfo) {
 		if !pInfo.Gated() {
@@ -4650,9 +4644,7 @@ func TestPriorityQueue_GetPod(t *testing.T) {
 
 	logger, ctx := ktesting.NewTestContext(t)
 	q := NewTestQueue(ctx, newDefaultQueueSort())
-	q.activeQ.underLock(func(unlockedActiveQ unlockedActiveQueuer) {
-		unlockedActiveQ.add(logger, newQueuedPodInfoForLookup(activeQPod), framework.EventUnscheduledPodAdd.Label())
-	})
+	q.activeQ.add(logger, newQueuedPodInfoForLookup(activeQPod), framework.EventUnscheduledPodAdd.Label())
 	q.backoffQ.add(logger, newQueuedPodInfoForLookup(backoffQPod), framework.EventUnscheduledPodAdd.Label())
 	q.unschedulablePods.addOrUpdate(newQueuedPodInfoForLookup(unschedPod), false, framework.EventUnscheduledPodAdd.Label())
 

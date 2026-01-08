@@ -60,10 +60,6 @@ type activeQueuer interface {
 // underLock() method should be used to protect these methods.
 type unlockedActiveQueuer interface {
 	unlockedActiveQueueReader
-	// add adds a new pod to the activeQ.
-	// The event should show which event triggered this addition and is used for the metric recording.
-	// This method should be called in activeQueue.underLock().
-	add(logger klog.Logger, pInfo *framework.QueuedPodInfo, event string)
 	// update updates the pod in activeQ if oldPodInfo is already in the queue.
 	// It returns new pod info if updated, nil otherwise.
 	update(newPod *v1.Pod, oldPodInfo *framework.QueuedPodInfo) *framework.QueuedPodInfo
@@ -79,9 +75,6 @@ type unlockedActiveQueueReader interface {
 	// Returns false if the pInfo doesn't exist in the queue.
 	// This method should be called in activeQueue.underLock() or activeQueue.underRLock().
 	get(pInfo *framework.QueuedPodInfo) (*framework.QueuedPodInfo, bool)
-	// has returns if pInfo exists in the queue.
-	// This method should be called in activeQueue.underLock() or activeQueue.underRLock().
-	has(pInfo *framework.QueuedPodInfo) bool
 }
 
 // unlockedActiveQueue defines activeQ methods that are not protected by the lock itself.
@@ -100,15 +93,6 @@ func newUnlockedActiveQueue(queue *heap.Heap[*framework.QueuedPodInfo], inFlight
 		inFlightEvents:  inFlightEvents,
 		metricsRecorder: metricsRecorder,
 	}
-}
-
-// add adds a new pod to the activeQ.
-// The event should show which event triggered this addition and is used for the metric recording.
-// This method should be called in activeQueue.underLock().
-func (uaq *unlockedActiveQueue) add(logger klog.Logger, pInfo *framework.QueuedPodInfo, event string) {
-	uaq.queue.AddOrUpdate(pInfo)
-	metrics.SchedulerQueueIncomingPods.WithLabelValues("active", event).Inc()
-	logger.V(5).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pInfo.Pod), "event", event, "queue", activeQ)
 }
 
 // update updates the pod in activeQ if oldPodInfo is already in the queue.
@@ -144,12 +128,6 @@ func (uaq *unlockedActiveQueue) addEventsIfPodInFlight(oldPod, newPod *v1.Pod, e
 // This method should be called in activeQueue.underLock() or activeQueue.underRLock().
 func (uaq *unlockedActiveQueue) get(pInfo *framework.QueuedPodInfo) (*framework.QueuedPodInfo, bool) {
 	return uaq.queue.Get(pInfo)
-}
-
-// has returns if pInfo exists in the queue.
-// This method should be called in activeQueue.underLock() or activeQueue.underRLock().
-func (uaq *unlockedActiveQueue) has(pInfo *framework.QueuedPodInfo) bool {
-	return uaq.queue.Has(pInfo)
 }
 
 // backoffQPopper defines method that is used to pop from the backoffQ when the activeQ is empty.
@@ -359,7 +337,10 @@ func (aq *activeQueue) add(logger klog.Logger, pInfo *framework.QueuedPodInfo, e
 	aq.lock.Lock()
 	defer aq.lock.Unlock()
 
-	aq.unlockedQueue.add(logger, pInfo, event)
+	aq.queue.AddOrUpdate(pInfo)
+	metrics.SchedulerQueueIncomingPods.WithLabelValues("active", event).Inc()
+	logger.V(5).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pInfo.Pod), "event", event, "queue", activeQ)
+	aq.cond.Signal()
 }
 
 // listInFlightEvents returns all inFlightEvents.

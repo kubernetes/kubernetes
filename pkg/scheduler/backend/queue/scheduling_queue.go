@@ -638,6 +638,7 @@ func (p *PriorityQueue) AddNominatedPod(logger klog.Logger, pi fwk.PodInfo, nomi
 // If the pod doesn't pass PreEnqueue plugins, it gets added to unschedulablePods instead.
 // movesFromBackoffQ should be set to true, if the pod directly moves from the backoffQ, so the PreEnqueue call can be skipped.
 // It returns a boolean flag to indicate whether the pod is added successfully.
+// Pod should be removed from the backoffQ before calling moveToActiveQ
 func (p *PriorityQueue) moveToActiveQ(logger klog.Logger, pInfo *framework.QueuedPodInfo, event string, movesFromBackoffQ bool) bool {
 	gatedBefore := pInfo.Gated()
 	// If SchedulerPopFromBackoffQ feature gate is enabled,
@@ -650,7 +651,9 @@ func (p *PriorityQueue) moveToActiveQ(logger klog.Logger, pInfo *framework.Queue
 
 	if pInfo.Gated() {
 		p.unschedulablePods.addOrUpdate(pInfo, gatedBefore, event)
-		logger.V(5).Info("Pod moved to an internal scheduling queue, because the pod is gated", "pod", klog.KObj(pInfo.Pod), "event", event, "queue", unschedulableQ)
+		if p.unschedulablePods.get(pInfo.Pod) == nil {
+			logger.V(5).Info("Pod moved to an internal scheduling queue, because the pod is gated", "pod", klog.KObj(pInfo.Pod), "event", event, "queue", unschedulableQ)
+		}
 		return false
 	}
 
