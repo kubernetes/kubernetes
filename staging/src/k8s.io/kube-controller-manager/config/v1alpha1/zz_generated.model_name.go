@@ -152,6 +152,11 @@ func (in ReplicationControllerConfiguration) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in ResourceClaimControllerConfiguration) OpenAPIModelName() string {
+	return "io.k8s.kube-controller-manager.config.v1alpha1.ResourceClaimControllerConfiguration"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in ResourceQuotaControllerConfiguration) OpenAPIModelName() string {
 	return "io.k8s.kube-controller-manager.config.v1alpha1.ResourceQuotaControllerConfiguration"
 }

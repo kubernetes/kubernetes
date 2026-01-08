@@ -460,8 +460,6 @@ func newEphemeralVolumeController(ctx context.Context, controllerContext Control
 	}, controllerName), nil
 }
 
-const defaultResourceClaimControllerWorkers = 50
-
 func newResourceClaimControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:        names.ResourceClaimController,
@@ -494,7 +492,7 @@ func newResourceClaimController(ctx context.Context, controllerContext Controlle
 	}
 
 	return newControllerLoop(func(ctx context.Context) {
-		ephemeralController.Run(ctx, defaultResourceClaimControllerWorkers)
+		ephemeralController.Run(ctx, int(controllerContext.ComponentConfig.ResourceClaimController.ConcurrentSyncs))
 	}, controllerName), nil
 }
 
