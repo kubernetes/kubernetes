@@ -40,8 +40,8 @@ require (
 	github.com/moby/ipvs v1.1.0
 	github.com/moby/sys/userns v0.1.0
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
-	github.com/onsi/ginkgo/v2 v2.27.3
-	github.com/onsi/gomega v1.38.3
+	github.com/onsi/ginkgo/v2 v2.27.4
+	github.com/onsi/gomega v1.39.0
 	github.com/opencontainers/cgroups v0.0.6
 	github.com/opencontainers/selinux v1.13.0
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2
