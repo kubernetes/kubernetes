@@ -404,9 +404,18 @@ func (jm *ControllerV2) updateCronJob(logger klog.Logger, old interface{}, curr 
 			jm.recorder.Eventf(newCJ, corev1.EventTypeWarning, "UnParseableCronJobSchedule", "unparseable schedule for cronjob: %s", newCJ.Spec.Schedule)
 			return
 		}
-		now := jm.now()
-		t := nextScheduleTimeDuration(newCJ, now, sched)
 
+		now := jm.now()
+
+		// Immediately calculate and update NextScheduleTime when schedule changes
+		cronJobCopy := newCJ.DeepCopy()
+		nextScheduleTime := calculateNextScheduleTime(cronJobCopy, now, sched)
+		cronJobCopy.Status.NextScheduleTime = &metav1.Time{Time: *nextScheduleTime}
+		if _, err := jm.cronJobControl.UpdateStatus(context.TODO(), cronJobCopy); err != nil {
+			logger.V(2).Info("Unable to update status for cronjob after schedule change", "cronjob", klog.KObj(newCJ), "err", err)
+		}
+
+		t := nextScheduleTimeDuration(newCJ, now, sched)
 		jm.enqueueControllerAfter(curr, *t)
 		return
 	}
@@ -416,6 +425,9 @@ func (jm *ControllerV2) updateCronJob(logger klog.Logger, old interface{}, curr 
 	// during the next schedule
 	// TODO: need to handle the change of spec.JobTemplate.metadata.labels explicitly
 	//   to cleanup jobs with old labels
+
+	// Suspend state changes are handled during normal sync
+
 	jm.enqueueController(curr)
 }
 
@@ -539,6 +551,7 @@ func (jm *ControllerV2) syncCronJob(
 		// Otherwise, the queue is always suppose to trigger sync function at the time of
 		// the scheduled time, that will give atleast 1 unmet time schedule
 		logger.V(4).Info("No unmet start times", "cronjob", klog.KObj(cronJob))
+
 		t := nextScheduleTimeDuration(cronJob, now, sched)
 		return t, updateStatus, nil
 	}
@@ -558,6 +571,7 @@ func (jm *ControllerV2) syncCronJob(
 		// Status.LastScheduleTime, Status.LastMissedTime), and then so we won't generate
 		// and event the next time we process it, and also so the user looking at the status
 		// can see easily that there was a missed execution.
+
 		t := nextScheduleTimeDuration(cronJob, now, sched)
 		return t, updateStatus, nil
 	}
@@ -567,6 +581,7 @@ func (jm *ControllerV2) syncCronJob(
 			Namespace: cronJob.Namespace,
 		}}) || cronJob.Status.LastScheduleTime.Equal(&metav1.Time{Time: *scheduledTime}) {
 		logger.V(4).Info("Not starting job because the scheduled time is already processed", "cronjob", klog.KObj(cronJob), "schedule", scheduledTime)
+
 		t := nextScheduleTimeDuration(cronJob, now, sched)
 		return t, updateStatus, nil
 	}
@@ -582,6 +597,7 @@ func (jm *ControllerV2) syncCronJob(
 		// But that would mean that you could not inspect prior successes or failures of Forbid jobs.
 		logger.V(4).Info("Not starting job because prior execution is still running and concurrency policy is Forbid", "cronjob", klog.KObj(cronJob))
 		jm.recorder.Eventf(cronJob, corev1.EventTypeNormal, "JobAlreadyActive", "Not starting job because prior execution is running and concurrency policy is Forbid")
+
 		t := nextScheduleTimeDuration(cronJob, now, sched)
 		return t, updateStatus, nil
 	}
@@ -667,6 +683,11 @@ func (jm *ControllerV2) syncCronJob(
 	}
 	cronJob.Status.Active = append(cronJob.Status.Active, *jobRef)
 	cronJob.Status.LastScheduleTime = &metav1.Time{Time: *scheduledTime}
+
+	// Calculate and store next schedule time
+	nextScheduleTime := calculateNextScheduleTime(cronJob, now, sched)
+	cronJob.Status.NextScheduleTime = &metav1.Time{Time: *nextScheduleTime}
+
 	updateStatus = true
 
 	t := nextScheduleTimeDuration(cronJob, now, sched)

@@ -268,6 +268,18 @@ func (m *CronJobStatus) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.NextScheduleTime != nil {
+		{
+			size, err := m.NextScheduleTime.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x32
+	}
 	if m.LastSuccessfulTime != nil {
 		{
 			size, err := m.LastSuccessfulTime.MarshalToSizedBuffer(dAtA[:i])
@@ -1139,6 +1151,10 @@ func (m *CronJobStatus) Size() (n int) {
 		l = m.LastSuccessfulTime.Size()
 		n += 1 + l + sovGenerated(uint64(l))
 	}
+	if m.NextScheduleTime != nil {
+		l = m.NextScheduleTime.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
 	return n
 }
 
@@ -1497,6 +1513,7 @@ func (this *CronJobStatus) String() string {
 		`Active:` + repeatedStringForActive + `,`,
 		`LastScheduleTime:` + strings.Replace(fmt.Sprintf("%v", this.LastScheduleTime), "Time", "v1.Time", 1) + `,`,
 		`LastSuccessfulTime:` + strings.Replace(fmt.Sprintf("%v", this.LastSuccessfulTime), "Time", "v1.Time", 1) + `,`,
+		`NextScheduleTime:` + strings.Replace(fmt.Sprintf("%v", this.NextScheduleTime), "Time", "v1.Time", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -2364,6 +2381,42 @@ func (m *CronJobStatus) Unmarshal(dAtA []byte) error {
 				m.LastSuccessfulTime = &v1.Time{}
 			}
 			if err := m.LastSuccessfulTime.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 6:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field NextScheduleTime", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.NextScheduleTime == nil {
+				m.NextScheduleTime = &v1.Time{}
+			}
+			if err := m.NextScheduleTime.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex

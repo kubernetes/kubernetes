@@ -52,6 +52,7 @@ import (
 	"k8s.io/client-go/util/certificate/csr"
 	"k8s.io/utils/ptr"
 
+	"github.com/robfig/cron/v3"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	podutilv1 "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
@@ -190,6 +191,7 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "Suspend", Type: "boolean", Description: batchv1beta1.CronJobSpec{}.SwaggerDoc()["suspend"]},
 		{Name: "Active", Type: "integer", Description: batchv1beta1.CronJobStatus{}.SwaggerDoc()["active"]},
 		{Name: "Last Schedule", Type: "string", Description: batchv1beta1.CronJobStatus{}.SwaggerDoc()["lastScheduleTime"]},
+		{Name: "Next Schedule", Type: "string", Priority: 1, Description: batchv1beta1.CronJobStatus{}.SwaggerDoc()["nextScheduleTime"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 		{Name: "Containers", Type: "string", Priority: 1, Description: "Names of each container in the template."},
 		{Name: "Images", Type: "string", Priority: 1, Description: "Images referenced by each container in the template."},
@@ -1302,10 +1304,40 @@ func printCronJob(obj *batch.CronJob, options printers.GenerateOptions) ([]metav
 		timeZone = *obj.Spec.TimeZone
 	}
 
-	row.Cells = append(row.Cells, obj.Name, obj.Spec.Schedule, timeZone, printBoolPtr(obj.Spec.Suspend), int64(len(obj.Status.Active)), lastScheduleTime, translateTimestampSince(obj.CreationTimestamp))
 	if options.Wide {
+		// Show Next Schedule Time - use status value or calculate dynamically
+		var nextScheduleTime string
+		if obj.Status.NextScheduleTime != nil {
+			nextScheduleTime = translateTimestampUntil(*obj.Status.NextScheduleTime)
+		} else {
+			// Calculate dynamically for newly created CronJobs
+			nextScheduleTime = calculateNextScheduleTimeForDisplay(obj)
+		}
+
 		names, images := layoutContainerCells(obj.Spec.JobTemplate.Spec.Template.Spec.Containers)
-		row.Cells = append(row.Cells, names, images, metav1.FormatLabelSelector(obj.Spec.JobTemplate.Spec.Selector))
+		row.Cells = append(row.Cells,
+			obj.Name,
+			obj.Spec.Schedule,
+			timeZone,
+			printBoolPtr(obj.Spec.Suspend),
+			int64(len(obj.Status.Active)),
+			lastScheduleTime,
+			nextScheduleTime,
+			translateTimestampSince(obj.CreationTimestamp),
+			names,
+			images,
+			metav1.FormatLabelSelector(obj.Spec.JobTemplate.Spec.Selector),
+		)
+	} else {
+		row.Cells = append(row.Cells,
+			obj.Name,
+			obj.Spec.Schedule,
+			timeZone,
+			printBoolPtr(obj.Spec.Suspend),
+			int64(len(obj.Status.Active)),
+			lastScheduleTime,
+			translateTimestampSince(obj.CreationTimestamp),
+		)
 	}
 	return []metav1.TableRow{row}, nil
 }
@@ -3384,4 +3416,50 @@ func isPodInitializedConditionTrue(status *api.PodStatus) bool {
 		return condition.Status == api.ConditionTrue
 	}
 	return false
+}
+
+// calculateNextScheduleTimeForDisplay calculates the next schedule time for a CronJob for display purposes
+func calculateNextScheduleTimeForDisplay(cj *batch.CronJob) string {
+	// Check if suspended
+	if cj.Spec.Suspend != nil && *cj.Spec.Suspend {
+		return "<suspended>"
+	}
+
+	// Handle timezone
+	schedule := cj.Spec.Schedule
+	if cj.Spec.TimeZone != nil && *cj.Spec.TimeZone != "" {
+		if _, err := time.LoadLocation(*cj.Spec.TimeZone); err != nil {
+			return "<invalid>"
+		}
+		if !strings.Contains(schedule, "TZ=") {
+			schedule = fmt.Sprintf("TZ=%s %s", *cj.Spec.TimeZone, schedule)
+		}
+	}
+
+	// Parse the cron schedule
+	parser := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor)
+	sched, err := parser.Parse(schedule)
+	if err != nil {
+		return "<invalid>"
+	}
+
+	now := time.Now()
+	var baseTime time.Time
+
+	// Use last schedule time as base, or creation time if never scheduled
+	if cj.Status.LastScheduleTime != nil {
+		baseTime = cj.Status.LastScheduleTime.Time
+	} else {
+		baseTime = cj.CreationTimestamp.Time
+	}
+
+	// Calculate next execution time
+	nextTime := sched.Next(baseTime)
+
+	// If the next time is in the past, get the next one from now
+	if nextTime.Before(now) {
+		nextTime = sched.Next(now)
+	}
+
+	return translateTimestampUntil(metav1.Time{Time: nextTime})
 }

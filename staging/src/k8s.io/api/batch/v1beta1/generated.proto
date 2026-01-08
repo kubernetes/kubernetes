@@ -125,6 +125,10 @@ message CronJobStatus {
   // Information when was the last time the job successfully completed.
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastSuccessfulTime = 5;
+
+  // Information when was the next time the job will be scheduled.
+  // +optional
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time nextScheduleTime = 6;
 }
 
 // JobTemplateSpec describes the data a Job should have when created from a template

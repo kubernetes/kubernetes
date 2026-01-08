@@ -5588,6 +5588,9 @@ func TestPrintCronJob(t *testing.T) {
 	timeZone := "LOCAL"
 	completions := int32(2)
 	suspend := false
+	// Use current time for stable testing
+	now := time.Now()
+	futureTime := now.Add(25 * time.Hour)
 	tests := []struct {
 		cronjob  batch.CronJob
 		options  printers.GenerateOptions
@@ -5705,11 +5708,12 @@ func TestPrintCronJob(t *testing.T) {
 				},
 				Status: batch.CronJobStatus{
 					LastScheduleTime: &metav1.Time{Time: time.Now().Add(1.9e9)},
+					NextScheduleTime: &metav1.Time{Time: futureTime}, // exactly 5 minutes in the future
 				},
 			},
 			options: printers.GenerateOptions{Wide: true},
-			// Columns: Name, Schedule, Suspend, Active, Last Schedule, Age
-			expected: []metav1.TableRow{{Cells: []interface{}{"cronjob1", "0/5 * * * ?", "<none>", "False", int64(0), "0s", "0s", "fake-job-container1,fake-job-container2", "fake-job-image1,fake-job-image2", "a=b"}}},
+			// Columns: Name, Schedule, Timezone, Suspend, Active, Last Schedule, Next Schedule, Age, Containers, Images, Selector
+			expected: []metav1.TableRow{{Cells: []interface{}{"cronjob1", "0/5 * * * ?", "<none>", "False", int64(0), "0s", "24h", "0s", "fake-job-container1,fake-job-container2", "fake-job-image1,fake-job-image2", "a=b"}}},
 		},
 		// CronJob with Last Schedule and Age
 		{
