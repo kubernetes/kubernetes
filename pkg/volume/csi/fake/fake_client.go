@@ -89,6 +89,7 @@ type NodeClient struct {
 	nodeVolumeStatsResp      *csipb.NodeGetVolumeStatsResponse
 	FakeNodeExpansionRequest *csipb.NodeExpandVolumeRequest
 	nextErr                  error
+	getCapabilitiesErr       error
 }
 
 // NewNodeClient returns fake node client
@@ -148,6 +149,10 @@ func NewNodeClientWithVolumeMountGroup(stageUnstageSet, volumeMountGroupSet bool
 // SetNextError injects next expected error
 func (f *NodeClient) SetNextError(err error) {
 	f.nextErr = err
+}
+
+func (f *NodeClient) SetGetCapabilitiesErr(err error) {
+	f.getCapabilitiesErr = err
 }
 
 func (f *NodeClient) SetNodeGetInfoResp(resp *csipb.NodeGetInfoResponse) {
@@ -354,6 +359,10 @@ func (f *NodeClient) NodeGetCapabilities(ctx context.Context, in *csipb.NodeGetC
 	resp := &csipb.NodeGetCapabilitiesResponse{
 		Capabilities: []*csipb.NodeServiceCapability{},
 	}
+	if f.getCapabilitiesErr != nil {
+		return resp, f.getCapabilitiesErr
+	}
+
 	if f.stageUnstageSet {
 		resp.Capabilities = append(resp.Capabilities, &csipb.NodeServiceCapability{
 			Type: &csipb.NodeServiceCapability_Rpc{
