@@ -4093,6 +4093,53 @@ func TestConvertToAPIContainerStatuses(t *testing.T) {
 	}
 }
 
+func TestConvertToAPIContainerStatusesWithOOMKilledEvent(t *testing.T) {
+	fakeRecorder := record.NewFakeRecorder(1)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet.kubelet.recorder = fakeRecorder
+	defer testKubelet.Cleanup()
+
+	expectedEvent := "Warning ContainerOOMKilled container containerA was killed due to OOM"
+
+	testPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "podFoo",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{Name: "containerA"}},
+		},
+		Status: v1.PodStatus{
+			ContainerStatuses: []v1.ContainerStatus{
+				runningState("containerA"),
+			},
+		},
+	}
+
+	testKubelet.kubelet.convertToAPIContainerStatuses(
+		testPod,
+		&kubecontainer.PodStatus{
+			ContainerStatuses: []*kubecontainer.Status{{
+				Name:     "containerA",
+				State:    kubecontainer.ContainerStateExited,
+				ExitCode: 137,
+				Reason:   "OOMKilled",
+			}},
+		},
+		[]v1.ContainerStatus{
+			runningState("containerA"),
+		},
+		testPod.Spec.Containers,
+		nil,
+		false,
+		false,
+		false,
+	)
+
+	assert.Len(t, fakeRecorder.Events, 1)
+	event := <-fakeRecorder.Events
+	assert.Equal(t, expectedEvent, event)
+}
+
 // imageDigestRuntime is a simple wrapper that returns a fixed digest for image volumes
 type imageDigestRuntime struct {
 	*containertest.FakeRuntime
