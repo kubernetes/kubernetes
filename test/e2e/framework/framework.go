@@ -180,7 +180,9 @@ var _ ktesting.ContextTB = &Framework{}
 func (f *Framework) TContext(ctx context.Context) ktesting.TContext {
 	tCtx := ktesting.InitCtx(ctx, f)
 	tCtx = tCtx.WithClients(f.clientConfig, f.restMapper, f.ClientSet, f.DynamicClient, apiextensions.NewForConfigOrDie(f.clientConfig))
-	tCtx = tCtx.WithNamespace(f.Namespace.Name)
+	if f.Namespace != nil {
+		tCtx = tCtx.WithNamespace(f.Namespace.Name)
+	}
 	tCtx = ensureLogger(tCtx)
 	return tCtx
 }
