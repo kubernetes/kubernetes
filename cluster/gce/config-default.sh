@@ -96,7 +96,18 @@ export MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-${IMAGE_PROJECT}}
 export NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${GCI_VERSION}}
 export NODE_IMAGE_FAMILY=${KUBE_GCE_NODE_IMAGE_FAMILY:-${IMAGE_FAMILY}}
 export NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-${IMAGE_PROJECT}}
+
+# Fix for https://github.com/kubernetes/kubernetes/issues/136113
+# The Ubuntu 24.04 image is currently broken. Force stable Ubuntu 22.04.
+if [[ "${NODE_OS_DISTRIBUTION}" == "ubuntu" ]]; then
+    IMAGE_PROJECT="ubuntu-os-gke-cloud"
+    IMAGE_FAMILY="ubuntu-gke-2204-1-34-amd64"
+    export NODE_IMAGE_PROJECT="${IMAGE_PROJECT}"
+    export NODE_IMAGE_FAMILY="${IMAGE_FAMILY}"
+fi
+
 export NODE_SERVICE_ACCOUNT=${KUBE_GCE_NODE_SERVICE_ACCOUNT:-default}
+
 
 # KUBELET_TEST_ARGS are extra arguments passed to kubelet.
 export KUBELET_TEST_ARGS=${KUBE_KUBELET_EXTRA_ARGS:-}
