@@ -122,6 +122,13 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 				field.TooMany(field.NewPath("endpoints").Index(0).Child("addresses"), 101, 100).WithOrigin("maxItems"),
 			},
 		},
+		"invalid update addressType immutable": {
+			oldObj:    mkValidEndpointSlice(),
+			updateObj: mkValidEndpointSlice(tweakAddressType(discovery.AddressTypeIPv6)),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("addressType"), discovery.AddressTypeIPv6, "field is immutable").WithOrigin("immutable"),
+			},
+		},
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {

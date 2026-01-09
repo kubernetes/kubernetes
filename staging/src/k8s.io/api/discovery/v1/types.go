@@ -50,6 +50,7 @@ type EndpointSlice struct {
 	// the "FQDN" type.
 	// +required
 	// +k8s:required
+	// +k8s:immutable
 	AddressType AddressType `json:"addressType" protobuf:"bytes,4,rep,name=addressType"`
 
 	// endpoints is a list of unique endpoints in this slice. Each slice may
