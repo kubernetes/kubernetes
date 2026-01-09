@@ -76,6 +76,12 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				field.Required(field.NewPath("addressType"), ""),
 			},
 		},
+		"invalid addressType not supported": {
+			input: mkValidEndpointSlice(tweakAddressType("invalid")),
+			expectedErrs: field.ErrorList{
+				field.NotSupported(field.NewPath("addressType"), discovery.AddressType("invalid"), []string{string(discovery.AddressTypeIPv4), string(discovery.AddressTypeIPv6), string(discovery.AddressTypeFQDN)}),
+			},
+		},
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {

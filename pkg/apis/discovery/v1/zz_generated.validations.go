@@ -31,6 +31,7 @@ import (
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	sets "k8s.io/apimachinery/pkg/util/sets"
 	field "k8s.io/apimachinery/pkg/util/validation/field"
 )
 
@@ -48,6 +49,16 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
 	return nil
+}
+
+var symbolsForAddressType = sets.New(discoveryv1.AddressTypeFQDN, discoveryv1.AddressTypeIPv4, discoveryv1.AddressTypeIPv6)
+
+// Validate_AddressType validates an instance of AddressType according
+// to declarative validation rules in the API schema.
+func Validate_AddressType(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *discoveryv1.AddressType) (errs field.ErrorList) {
+	errs = append(errs, validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForAddressType, nil)...)
+
+	return errs
 }
 
 // Validate_Endpoint validates an instance of Endpoint according
@@ -112,6 +123,8 @@ func Validate_EndpointSlice(ctx context.Context, op operation.Operation, fldPath
 			if earlyReturn {
 				return // do not proceed
 			}
+			// call the type's validation function
+			errs = append(errs, Validate_AddressType(ctx, op, fldPath, obj, oldObj)...)
 			return
 		}(fldPath.Child("addressType"), &obj.AddressType, safe.Field(oldObj, func(oldObj *discoveryv1.EndpointSlice) *discoveryv1.AddressType { return &oldObj.AddressType }), oldObj != nil)...)
 
