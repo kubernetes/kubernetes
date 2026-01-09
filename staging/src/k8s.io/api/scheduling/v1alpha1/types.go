@@ -37,6 +37,8 @@ type PriorityClass struct {
 
 	// value represents the integer value of this priority class. This is the actual priority that pods
 	// receive when they have the name of this class in their pod spec.
+	// +optional
+	// +k8s:optional
 	// +k8s:immutable
 	Value int32 `json:"value" protobuf:"bytes,2,opt,name=value"`
 
@@ -52,6 +54,7 @@ type PriorityClass struct {
 	// description is an arbitrary string that usually provides guidelines on
 	// when this priority class should be used.
 	// +optional
+	// +k8s:optional
 	Description string `json:"description,omitempty" protobuf:"bytes,4,opt,name=description"`
 
 	// preemptionPolicy is the Policy for preempting pods with lower priority.

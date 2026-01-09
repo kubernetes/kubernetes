@@ -27,7 +27,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	schedulingv1alpha1 "k8s.io/api/scheduling/v1alpha1"
-	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
@@ -45,14 +44,6 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 		switch op.Request.SubresourcePath() {
 		case "/":
 			return Validate_PriorityClass(ctx, op, nil /* fldPath */, obj.(*schedulingv1alpha1.PriorityClass), safe.Cast[*schedulingv1alpha1.PriorityClass](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
-	// type PriorityClassList
-	scheme.AddValidationFunc((*schedulingv1alpha1.PriorityClassList)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_PriorityClassList(ctx, op, nil /* fldPath */, obj.(*schedulingv1alpha1.PriorityClassList), safe.Cast[*schedulingv1alpha1.PriorityClassList](oldObj))
 		}
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
@@ -76,6 +67,9 @@ func Validate_PriorityClass(ctx context.Context, op operation.Operation, fldPath
 			earlyReturn := false
 			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
@@ -102,7 +96,23 @@ func Validate_PriorityClass(ctx context.Context, op operation.Operation, fldPath
 			return
 		}(fldPath.Child("globalDefault"), &obj.GlobalDefault, safe.Field(oldObj, func(oldObj *schedulingv1alpha1.PriorityClass) *bool { return &oldObj.GlobalDefault }), oldObj != nil)...)
 
-	// field schedulingv1alpha1.PriorityClass.Description has no validation
+	// field schedulingv1alpha1.PriorityClass.Description
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("description"), &obj.Description, safe.Field(oldObj, func(oldObj *schedulingv1alpha1.PriorityClass) *string { return &oldObj.Description }), oldObj != nil)...)
 
 	// field schedulingv1alpha1.PriorityClass.PreemptionPolicy
 	errs = append(errs,
@@ -121,29 +131,6 @@ func Validate_PriorityClass(ctx context.Context, op operation.Operation, fldPath
 			}
 			return
 		}(fldPath.Child("preemptionPolicy"), obj.PreemptionPolicy, safe.Field(oldObj, func(oldObj *schedulingv1alpha1.PriorityClass) *v1.PreemptionPolicy { return oldObj.PreemptionPolicy }), oldObj != nil)...)
-
-	return errs
-}
-
-// Validate_PriorityClassList validates an instance of PriorityClassList according
-// to declarative validation rules in the API schema.
-func Validate_PriorityClassList(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *schedulingv1alpha1.PriorityClassList) (errs field.ErrorList) {
-	// field schedulingv1alpha1.PriorityClassList.TypeMeta has no validation
-	// field schedulingv1alpha1.PriorityClassList.ListMeta has no validation
-
-	// field schedulingv1alpha1.PriorityClassList.Items
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []schedulingv1alpha1.PriorityClass, oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
-			}
-			// iterate the list and call the type's validation function
-			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_PriorityClass)...)
-			return
-		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *schedulingv1alpha1.PriorityClassList) []schedulingv1alpha1.PriorityClass {
-			return oldObj.Items
-		}), oldObj != nil)...)
 
 	return errs
 }

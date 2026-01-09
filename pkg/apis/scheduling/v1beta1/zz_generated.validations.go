@@ -27,7 +27,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
-	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
@@ -45,14 +44,6 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 		switch op.Request.SubresourcePath() {
 		case "/":
 			return Validate_PriorityClass(ctx, op, nil /* fldPath */, obj.(*schedulingv1beta1.PriorityClass), safe.Cast[*schedulingv1beta1.PriorityClass](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
-	// type PriorityClassList
-	scheme.AddValidationFunc((*schedulingv1beta1.PriorityClassList)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_PriorityClassList(ctx, op, nil /* fldPath */, obj.(*schedulingv1beta1.PriorityClassList), safe.Cast[*schedulingv1beta1.PriorityClassList](oldObj))
 		}
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
@@ -76,6 +67,9 @@ func Validate_PriorityClass(ctx context.Context, op operation.Operation, fldPath
 			earlyReturn := false
 			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
@@ -137,29 +131,6 @@ func Validate_PriorityClass(ctx context.Context, op operation.Operation, fldPath
 			}
 			return
 		}(fldPath.Child("preemptionPolicy"), obj.PreemptionPolicy, safe.Field(oldObj, func(oldObj *schedulingv1beta1.PriorityClass) *v1.PreemptionPolicy { return oldObj.PreemptionPolicy }), oldObj != nil)...)
-
-	return errs
-}
-
-// Validate_PriorityClassList validates an instance of PriorityClassList according
-// to declarative validation rules in the API schema.
-func Validate_PriorityClassList(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *schedulingv1beta1.PriorityClassList) (errs field.ErrorList) {
-	// field schedulingv1beta1.PriorityClassList.TypeMeta has no validation
-	// field schedulingv1beta1.PriorityClassList.ListMeta has no validation
-
-	// field schedulingv1beta1.PriorityClassList.Items
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []schedulingv1beta1.PriorityClass, oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
-			}
-			// iterate the list and call the type's validation function
-			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_PriorityClass)...)
-			return
-		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *schedulingv1beta1.PriorityClassList) []schedulingv1beta1.PriorityClass {
-			return oldObj.Items
-		}), oldObj != nil)...)
 
 	return errs
 }

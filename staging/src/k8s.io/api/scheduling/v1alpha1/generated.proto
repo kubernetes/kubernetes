@@ -86,6 +86,8 @@ message PriorityClass {
 
   // value represents the integer value of this priority class. This is the actual priority that pods
   // receive when they have the name of this class in their pod spec.
+  // +optional
+  // +k8s:optional
   // +k8s:immutable
   optional int32 value = 2;
 
@@ -101,6 +103,7 @@ message PriorityClass {
   // description is an arbitrary string that usually provides guidelines on
   // when this priority class should be used.
   // +optional
+  // +k8s:optional
   optional string description = 4;
 
   // preemptionPolicy is the Policy for preempting pods with lower priority.
