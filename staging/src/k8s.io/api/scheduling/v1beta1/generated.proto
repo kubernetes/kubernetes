@@ -40,6 +40,9 @@ message PriorityClass {
 
   // value represents the integer value of this priority class. This is the actual priority that pods
   // receive when they have the name of this class in their pod spec.
+  // +optional
+  // +k8s:optional
+  // +k8s:immutable
   optional int32 value = 2;
 
   // globalDefault specifies whether this PriorityClass should be considered as
@@ -48,17 +51,20 @@ message PriorityClass {
   // one PriorityClasses exists with their `globalDefault` field set to true,
   // the smallest value of such global default PriorityClasses will be used as the default priority.
   // +optional
+  // +k8s:optional
   optional bool globalDefault = 3;
 
   // description is an arbitrary string that usually provides guidelines on
   // when this priority class should be used.
   // +optional
+  // +k8s:optional
   optional string description = 4;
 
   // preemptionPolicy is the Policy for preempting pods with lower priority.
   // One of Never, PreemptLowerPriority.
   // Defaults to PreemptLowerPriority if unset.
   // +optional
+  // +k8s:optional
   optional string preemptionPolicy = 5;
 }
 
