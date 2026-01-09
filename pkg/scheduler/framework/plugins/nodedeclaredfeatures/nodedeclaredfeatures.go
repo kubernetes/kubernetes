@@ -28,7 +28,6 @@ import (
 	versionutil "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/component-base/version"
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
-	"k8s.io/component-helpers/nodedeclaredfeatures/features"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
@@ -76,10 +75,7 @@ func New(ctx context.Context, plArgs runtime.Object, fh fwk.Handle, fts feature.
 		// Disabled, won't do anything.
 		return &NodeDeclaredFeatures{}, nil
 	}
-	ndfFramework, err := ndf.New(features.AllFeatures)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create node feature framework: %w", err)
-	}
+	ndfFramework := ndf.DefaultFramework
 	ver, err := versionutil.Parse(version.Get().String())
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse version: %w", err)

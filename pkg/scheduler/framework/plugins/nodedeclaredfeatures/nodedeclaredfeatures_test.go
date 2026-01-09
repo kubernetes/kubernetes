@@ -121,10 +121,7 @@ func TestPreFilter(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			ndfFramework, err := ndf.New(tc.nodeFeatures)
-			if err != nil {
-				t.Fatalf("Failed to create framework: %v", err)
-			}
+			ndfFramework := ndf.New(tc.nodeFeatures)
 
 			plugin := &NodeDeclaredFeatures{
 				ndfFramework: ndfFramework,
@@ -235,12 +232,8 @@ func TestFilter(t *testing.T) {
 			nodeInfo := framework.NewNodeInfo()
 			nodeInfo.SetNode(tc.node)
 
-			ndfFramework, err := ndf.New([]ndf.Feature{})
-			if err != nil {
-				t.Fatalf("Failed to create framework: %v", err)
-			}
 			plugin := &NodeDeclaredFeatures{
-				ndfFramework: ndfFramework,
+				ndfFramework: ndf.DefaultFramework,
 				version:      version.MustParseSemantic("1.35.0"),
 				enabled:      tc.pluginEnabled,
 			}
@@ -297,10 +290,7 @@ func TestEnqueueExtensionsNodeUpdate(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			ndfFramework, err := ndf.New([]ndf.Feature{})
-			if err != nil {
-				t.Fatalf("Failed to create framework: %v", err)
-			}
+			ndfFramework := ndf.New([]ndf.Feature{})
 			plugin := &NodeDeclaredFeatures{
 				ndfFramework: ndfFramework,
 				version:      version.MustParseSemantic("1.35.0"),
@@ -427,10 +417,7 @@ func TestEnqueueExtensionsPodUpdate(t *testing.T) {
 			mockF := ndftesting.NewMockFeature(t)
 			tc.setupMock(mockF)
 
-			ndfFramework, err := ndf.New([]ndf.Feature{mockF})
-			if err != nil {
-				t.Fatalf("Failed to create framework: %v", err)
-			}
+			ndfFramework := ndf.New([]ndf.Feature{mockF})
 			plugin := &NodeDeclaredFeatures{
 				ndfFramework: ndfFramework,
 				version:      tc.componenetVersion,
