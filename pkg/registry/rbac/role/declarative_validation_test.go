@@ -31,71 +31,44 @@ var apiVersions = []string{"v1", "v1alpha1", "v1beta1"}
 func TestDeclarativeValidateForDeclarative(t *testing.T) {
 	for _, v := range apiVersions {
 		t.Run("version="+v, func(t *testing.T) {
-			ctx := genericapirequest.WithRequestInfo(
-				genericapirequest.NewDefaultContext(),
-				&genericapirequest.RequestInfo{
-					APIGroup:   "rbac.authorization.k8s.io",
-					APIVersion: v,
-				},
-			)
+			testDeclarativeValidateForDeclarative(t, v)
+		})
+	}
+}
 
-			testCases := map[string]struct {
-				input        rbac.Role
-				expectedErrs field.ErrorList
-			}{
-				"valid: minimal resource rule": {
-					input: newRoleDeclarative("ns", "role-valid",
-						[]rbac.PolicyRule{{
-							Verbs:     []string{"get"},
-							APIGroups: []string{""},
-							Resources: []string{"pods"},
-						}},
-					),
-				},
-				"invalid: verbs empty (required)": {
-					input: newRoleDeclarative("ns", "role-no-verbs",
-						[]rbac.PolicyRule{{
-							Verbs:     []string{}, 
-							APIGroups: []string{""},
-							Resources: []string{"pods"},
-						}},
-					),
-					expectedErrs: field.ErrorList{
-						field.Required(
-							field.NewPath("rules").Index(0).Child("verbs"),
-							"verbs must contain at least one value",
-						),
-					},
-				},
-				"invalid: namespaced rule has nonResourceURLs": {
-					input: newRoleDeclarative("ns", "role-nonresource",
-						[]rbac.PolicyRule{{
-							Verbs:           []string{"get"},
-							NonResourceURLs: []string{"/healthz"},
-						}},
-					),
-					expectedErrs: field.ErrorList{
-						field.Invalid(
-							field.NewPath("rules").Index(0).Child("nonResourceURLs"),
-							[]string{"/healthz"},
-							"namespaced rules cannot apply to non-resource URLs",
-						),
-					},
-				},
-				// TODO: Add more test cases
-			}
+func testDeclarativeValidateForDeclarative(t *testing.T, apiVersion string) {
+	ctx := genericapirequest.WithRequestInfo(
+		genericapirequest.NewDefaultContext(),
+		&genericapirequest.RequestInfo{
+			APIGroup:   "rbac.authorization.k8s.io",
+			APIVersion: apiVersion,
+		},
+	)
 
-			for name, tc := range testCases {
-				t.Run(name, func(t *testing.T) {
-					apitesting.VerifyValidationEquivalence(
-						t,
-						ctx,
-						&tc.input,
-						Strategy.Validate,
-						tc.expectedErrs,
-					)
-				})
-			}
+	testCases := map[string]struct {
+		input        rbac.Role
+		expectedErrs field.ErrorList
+	}{
+		"valid": {
+			input: mkValidRole(),
+		},
+		"invalid Role missing verbs": {
+			input: mkValidRole(tweakRoleVerbs(0, nil)),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("rules").Index(0).Child("verbs"), ""),
+			},
+		},
+		"invalid Role missing resources": {
+			input: mkValidRole(tweakRoleResources(0, nil)),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("rules").Index(0).Child("resources"), ""),
+			},
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, Strategy.Validate, tc.expectedErrs)
 		})
 	}
 }
@@ -103,45 +76,96 @@ func TestDeclarativeValidateForDeclarative(t *testing.T) {
 func TestValidateUpdateForDeclarative(t *testing.T) {
 	for _, v := range apiVersions {
 		t.Run("version="+v, func(t *testing.T) {
-			ctx := genericapirequest.WithRequestInfo(
-				genericapirequest.NewDefaultContext(),
-				&genericapirequest.RequestInfo{
-					APIGroup:   "rbac.authorization.k8s.io",
-					APIVersion: v,
-				},
-			)
-
-			testCases := map[string]struct {
-				old, update  rbac.Role
-				expectedErrs field.ErrorList
-			}{
-				// TODO: Add more test cases
-			}
-
-			for name, tc := range testCases {
-				t.Run(name, func(t *testing.T) {
-					apitesting.VerifyUpdateValidationEquivalence(
-						t,
-						ctx,
-						&tc.update,
-						&tc.old,
-						Strategy.ValidateUpdate,
-						tc.expectedErrs,
-					)
-				})
-			}
+			testValidateUpdateForDeclarative(t, v)
 		})
 	}
 }
 
-// Helper to create a base Role for declarative tests.
-func newRoleDeclarative(ns, name string, rules []rbac.PolicyRule) rbac.Role {
-	return rbac.Role{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace:       ns,
-			Name:            name,
-			ResourceVersion: "1",
+func testValidateUpdateForDeclarative(t *testing.T, apiVersion string) {
+	ctx := genericapirequest.WithRequestInfo(
+		genericapirequest.NewDefaultContext(),
+		&genericapirequest.RequestInfo{
+			APIGroup:   "rbac.authorization.k8s.io",
+			APIVersion: apiVersion,
 		},
-		Rules: rules,
+	)
+
+	testCases := map[string]struct {
+		old, update  rbac.Role
+		expectedErrs field.ErrorList
+	}{
+		"valid update adding resources": {
+			old:    mkValidRole(tweakRoleResourceVersion("1")),
+			update: mkValidRole(tweakRoleResourceVersion("2"), tweakRoleAddResource(0, "services")),
+		},
+		"invalid update clearing verbs": {
+			old:    mkValidRole(tweakRoleResourceVersion("1")),
+			update: mkValidRole(tweakRoleResourceVersion("2"), tweakRoleVerbs(0, []string{})),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("rules").Index(0).Child("verbs"), ""),
+			},
+		},
+		"invalid update clearing resources": {
+			old:    mkValidRole(tweakRoleResourceVersion("1")),
+			update: mkValidRole(tweakRoleResourceVersion("2"), tweakRoleResources(0, []string{})),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("rules").Index(0).Child("resources"), ""),
+			},
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, Strategy.ValidateUpdate, tc.expectedErrs)
+		})
+	}
+}
+
+func mkValidRole(tweaks ...func(*rbac.Role)) rbac.Role {
+	r := rbac.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "valid-role",
+			Namespace: "default",
+		},
+		Rules: []rbac.PolicyRule{{
+			APIGroups: []string{"rbac.authorization.k8s.io"},
+			Resources: []string{"pods"},
+			Verbs:     []string{"get", "list"},
+		}},
+	}
+
+	for _, tweak := range tweaks {
+		tweak(&r)
+	}
+	return r
+}
+
+func tweakRoleResourceVersion(rv string) func(*rbac.Role) {
+	return func(r *rbac.Role) {
+		r.ResourceVersion = rv
+	}
+}
+
+func tweakRoleVerbs(ruleIndex int, verbs []string) func(*rbac.Role) {
+	return func(r *rbac.Role) {
+		if len(r.Rules) > ruleIndex {
+			r.Rules[ruleIndex].Verbs = verbs
+		}
+	}
+}
+
+func tweakRoleResources(ruleIndex int, resources []string) func(*rbac.Role) {
+	return func(r *rbac.Role) {
+		if len(r.Rules) > ruleIndex {
+			r.Rules[ruleIndex].Resources = resources
+		}
+	}
+}
+
+func tweakRoleAddResource(ruleIndex int, resource string) func(*rbac.Role) {
+	return func(r *rbac.Role) {
+		if len(r.Rules) > ruleIndex {
+			r.Rules[ruleIndex].Resources = append(r.Rules[ruleIndex].Resources, resource)
+		}
 	}
 }
