@@ -1658,7 +1658,6 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 			tx.Add(&knftables.Rule{
 				Chain: endpointChain,
 				Rule: knftables.Concat(
-					"meta l4proto", protocol,
 					"dnat to", epInfo.String(),
 				),
 			})

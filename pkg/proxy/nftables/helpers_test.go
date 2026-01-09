@@ -275,7 +275,7 @@ var masqueradeRegexp = regexp.MustCompile(`^jump ` + markMasqChain + `$`)
 var jumpRegexp = regexp.MustCompile(`^(jump|goto) (\S+)$`)
 var returnRegexp = regexp.MustCompile(`^return$`)
 var verdictRegexp = regexp.MustCompile(`^(drop|reject)$`)
-var dnatRegexp = regexp.MustCompile(`^meta l4proto (tcp|udp|sctp) dnat to (\S+)$`)
+var dnatRegexp = regexp.MustCompile(`^dnat to (\S+)$`)
 
 var ignoredRegexp = regexp.MustCompile(strings.Join(
 	[]string{
@@ -471,10 +471,10 @@ func (tracer *nftablesTracer) runChain(chname, sourceIP, protocol, destIP, destP
 				return false
 
 			case dnatRegexp.MatchString(rule):
-				// `meta l4proto (tcp|udp|sctp) dnat to (\S+)`
+				// `dnat to (\S+)`
 				// DNAT to an endpoint IP and terminate processing.
 				match := dnatRegexp.FindStringSubmatch(rule)
-				destEndpoint := match[2]
+				destEndpoint := match[1]
 
 				tracer.matches = append(tracer.matches, ruleObj.Rule)
 				tracer.outputs = append(tracer.outputs, destEndpoint)
@@ -608,7 +608,7 @@ var testInput = dedent.Dedent(`
 
 	add chain ip testing endpoint-5OJB2KTY-ns1/svc1/tcp/p80__10.180.0.1/80
 	add rule ip testing endpoint-5OJB2KTY-ns1/svc1/tcp/p80__10.180.0.1/80 ip saddr 10.180.0.1 jump mark-for-masquerade
-	add rule ip testing endpoint-5OJB2KTY-ns1/svc1/tcp/p80__10.180.0.1/80 meta l4proto tcp dnat to 10.180.0.1:80
+	add rule ip testing endpoint-5OJB2KTY-ns1/svc1/tcp/p80__10.180.0.1/80 dnat to 10.180.0.1:80
 
 	add element ip testing service-ips { 172.30.0.41 . tcp . 80 : goto service-ULMVA6XW-ns1/svc1/tcp/p80 }
 
@@ -622,7 +622,7 @@ var testInput = dedent.Dedent(`
 	add rule ip testing external-42NFTM6N-ns2/svc2/tcp/p80 fib saddr type local goto service-42NFTM6N-ns2/svc2/tcp/p80 comment "short-circuit local traffic"
 	add chain ip testing endpoint-SGOXE6O3-ns2/svc2/tcp/p80__10.180.0.2/80
 	add rule ip testing endpoint-SGOXE6O3-ns2/svc2/tcp/p80__10.180.0.2/80 ip saddr 10.180.0.2 jump mark-for-masquerade
-	add rule ip testing endpoint-SGOXE6O3-ns2/svc2/tcp/p80__10.180.0.2/80 meta l4proto tcp dnat to 10.180.0.2:80
+	add rule ip testing endpoint-SGOXE6O3-ns2/svc2/tcp/p80__10.180.0.2/80 dnat to 10.180.0.2:80
 
 	add element ip testing service-ips { 172.30.0.42 . tcp . 80 : goto service-42NFTM6N-ns2/svc2/tcp/p80 }
 	add element ip testing service-ips { 192.168.99.22 . tcp . 80 : goto external-42NFTM6N-ns2/svc2/tcp/p80 }
@@ -646,9 +646,9 @@ var testExpected = dedent.Dedent(`
 	add chain ip testing service-42NFTM6N-ns2/svc2/tcp/p80
 	add chain ip testing service-ULMVA6XW-ns1/svc1/tcp/p80
 	add rule ip testing endpoint-5OJB2KTY-ns1/svc1/tcp/p80__10.180.0.1/80 ip saddr 10.180.0.1 jump mark-for-masquerade
-	add rule ip testing endpoint-5OJB2KTY-ns1/svc1/tcp/p80__10.180.0.1/80 meta l4proto tcp dnat to 10.180.0.1:80
+	add rule ip testing endpoint-5OJB2KTY-ns1/svc1/tcp/p80__10.180.0.1/80 dnat to 10.180.0.1:80
 	add rule ip testing endpoint-SGOXE6O3-ns2/svc2/tcp/p80__10.180.0.2/80 ip saddr 10.180.0.2 jump mark-for-masquerade
-	add rule ip testing endpoint-SGOXE6O3-ns2/svc2/tcp/p80__10.180.0.2/80 meta l4proto tcp dnat to 10.180.0.2:80
+	add rule ip testing endpoint-SGOXE6O3-ns2/svc2/tcp/p80__10.180.0.2/80 dnat to 10.180.0.2:80
 	add rule ip testing external-42NFTM6N-ns2/svc2/tcp/p80 ip saddr 10.0.0.0/8 goto service-42NFTM6N-ns2/svc2/tcp/p80 comment "short-circuit pod traffic"
 	add rule ip testing external-42NFTM6N-ns2/svc2/tcp/p80 fib saddr type local jump mark-for-masquerade comment "masquerade local traffic"
 	add rule ip testing external-42NFTM6N-ns2/svc2/tcp/p80 fib saddr type local goto service-42NFTM6N-ns2/svc2/tcp/p80 comment "short-circuit local traffic"
@@ -837,7 +837,7 @@ func TestTracePacketV4(t *testing.T) {
 		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-5OJB2KTY-ns1/svc1/tcp/p80__10.180.0.1/80 }
 
 		add rule ip kube-proxy endpoint-5OJB2KTY-ns1/svc1/tcp/p80__10.180.0.1/80 ip saddr 10.180.0.1 jump mark-for-masquerade
-		add rule ip kube-proxy endpoint-5OJB2KTY-ns1/svc1/tcp/p80__10.180.0.1/80 meta l4proto tcp dnat to 10.180.0.1:80
+		add rule ip kube-proxy endpoint-5OJB2KTY-ns1/svc1/tcp/p80__10.180.0.1/80 dnat to 10.180.0.1:80
 
 		add element ip kube-proxy service-ips { 172.30.0.41 . tcp . 80 : goto service-ULMVA6XW-ns1/svc1/tcp/p80 }
 
@@ -848,7 +848,7 @@ func TestTracePacketV4(t *testing.T) {
 		add rule ip kube-proxy external-42NFTM6N-ns2/svc2/tcp/p80 fib saddr type local jump mark-for-masquerade comment "masquerade local traffic"
 		add rule ip kube-proxy external-42NFTM6N-ns2/svc2/tcp/p80 fib saddr type local goto service-42NFTM6N-ns2/svc2/tcp/p80 comment "short-circuit local traffic"
 		add rule ip kube-proxy endpoint-SGOXE6O3-ns2/svc2/tcp/p80__10.180.0.2/80 ip saddr 10.180.0.2 jump mark-for-masquerade
-		add rule ip kube-proxy endpoint-SGOXE6O3-ns2/svc2/tcp/p80__10.180.0.2/80 meta l4proto tcp dnat to 10.180.0.2:80
+		add rule ip kube-proxy endpoint-SGOXE6O3-ns2/svc2/tcp/p80__10.180.0.2/80 dnat to 10.180.0.2:80
 
 		add element ip kube-proxy service-ips { 172.30.0.42 . tcp . 80 : goto service-42NFTM6N-ns2/svc2/tcp/p80 }
 		add element ip kube-proxy service-ips { 192.168.99.22 . tcp . 80 : goto external-42NFTM6N-ns2/svc2/tcp/p80 }
@@ -865,7 +865,7 @@ func TestTracePacketV4(t *testing.T) {
 		add rule ip kube-proxy external-4AT6LBPK-ns3/svc3/tcp/p80 jump mark-for-masquerade
 		add rule ip kube-proxy external-4AT6LBPK-ns3/svc3/tcp/p80 goto service-4AT6LBPK-ns3/svc3/tcp/p80
 		add rule ip kube-proxy endpoint-UEIP74TE-ns3/svc3/tcp/p80__10.180.0.3/80 ip saddr 10.180.0.3 jump mark-for-masquerade
-		add rule ip kube-proxy endpoint-UEIP74TE-ns3/svc3/tcp/p80__10.180.0.3/80 meta l4proto tcp dnat to 10.180.0.3:80
+		add rule ip kube-proxy endpoint-UEIP74TE-ns3/svc3/tcp/p80__10.180.0.3/80 dnat to 10.180.0.3:80
 
 		add element ip kube-proxy service-ips { 172.30.0.43 . tcp . 80 : goto service-4AT6LBPK-ns3/svc3/tcp/p80 }
 		add element ip kube-proxy service-nodeports { tcp . 3003 : goto external-4AT6LBPK-ns3/svc3/tcp/p80 }
@@ -876,9 +876,9 @@ func TestTracePacketV4(t *testing.T) {
 		add rule ip kube-proxy external-LAUZTJTB-ns4/svc4/tcp/p80 jump mark-for-masquerade
 		add rule ip kube-proxy external-LAUZTJTB-ns4/svc4/tcp/p80 goto service-LAUZTJTB-ns4/svc4/tcp/p80
 		add rule ip kube-proxy endpoint-5RFCDDV7-ns4/svc4/tcp/p80__10.180.0.5/80 ip saddr 10.180.0.5 jump mark-for-masquerade
-		add rule ip kube-proxy endpoint-5RFCDDV7-ns4/svc4/tcp/p80__10.180.0.5/80 meta l4proto tcp dnat to 10.180.0.5:80
+		add rule ip kube-proxy endpoint-5RFCDDV7-ns4/svc4/tcp/p80__10.180.0.5/80 dnat to 10.180.0.5:80
 		add rule ip kube-proxy endpoint-UNZV3OEC-ns4/svc4/tcp/p80__10.180.0.4/80 ip saddr 10.180.0.4 jump mark-for-masquerade
-		add rule ip kube-proxy endpoint-UNZV3OEC-ns4/svc4/tcp/p80__10.180.0.4/80 meta l4proto tcp dnat to 10.180.0.4:80
+		add rule ip kube-proxy endpoint-UNZV3OEC-ns4/svc4/tcp/p80__10.180.0.4/80 dnat to 10.180.0.4:80
 
 		add element ip kube-proxy service-ips { 172.30.0.44 . tcp . 80 : goto service-LAUZTJTB-ns4/svc4/tcp/p80 }
 		add element ip kube-proxy service-ips { 192.168.99.33 . tcp . 80 : goto external-LAUZTJTB-ns4/svc4/tcp/p80 }
@@ -893,7 +893,7 @@ func TestTracePacketV4(t *testing.T) {
 
 		add rule ip kube-proxy endpoint-GTK6MW7G-ns5/svc5/tcp/p80__10.180.0.3/80 ip saddr 10.180.0.3 jump mark-for-masquerade
 		add rule ip kube-proxy endpoint-GTK6MW7G-ns5/svc5/tcp/p80__10.180.0.3/80 update @affinity-GTK6MW7G-ns5/svc5/tcp/p80__10.180.0.3/80 { ip saddr }
-		add rule ip kube-proxy endpoint-GTK6MW7G-ns5/svc5/tcp/p80__10.180.0.3/80 meta l4proto tcp dnat to 10.180.0.3:80
+		add rule ip kube-proxy endpoint-GTK6MW7G-ns5/svc5/tcp/p80__10.180.0.3/80 dnat to 10.180.0.3:80
 
 		add rule ip kube-proxy firewall-HVFWP5L3-ns5/svc5/tcp/p80 ip saddr != { 203.0.113.0/25 } drop
 
@@ -1012,9 +1012,9 @@ func TestTracePacketV6(t *testing.T) {
 		add rule ip6 kube-proxy cluster-ips-check ip6 daddr @cluster-ips reject comment "Reject traffic to invalid ports of ClusterIPs"
 		add rule ip6 kube-proxy cluster-ips-check ip6 daddr { fd00:10:96::/112 } drop comment "Drop traffic to unallocated ClusterIPs"
 		add rule ip6 kube-proxy endpoint-2CRNCTTE-ns1/svc1/tcp/p80__fd00.10.180..2.1/80 ip6 saddr fd00:10:180::2:1 jump mark-for-masquerade
-		add rule ip6 kube-proxy endpoint-2CRNCTTE-ns1/svc1/tcp/p80__fd00.10.180..2.1/80 meta l4proto tcp dnat to [fd00:10:180::2:1]:80
+		add rule ip6 kube-proxy endpoint-2CRNCTTE-ns1/svc1/tcp/p80__fd00.10.180..2.1/80 dnat to [fd00:10:180::2:1]:80
 		add rule ip6 kube-proxy endpoint-ZVRFLKHO-ns1/svc1/tcp/p80__fd00.10.180..1/80 ip6 saddr fd00:10:180::1 jump mark-for-masquerade
-		add rule ip6 kube-proxy endpoint-ZVRFLKHO-ns1/svc1/tcp/p80__fd00.10.180..1/80 meta l4proto tcp dnat to [fd00:10:180::1]:80
+		add rule ip6 kube-proxy endpoint-ZVRFLKHO-ns1/svc1/tcp/p80__fd00.10.180..1/80 dnat to [fd00:10:180::1]:80
 		add rule ip6 kube-proxy external-ULMVA6XW-ns1/svc1/tcp/p80 jump mark-for-masquerade
 		add rule ip6 kube-proxy external-ULMVA6XW-ns1/svc1/tcp/p80 goto service-ULMVA6XW-ns1/svc1/tcp/p80
 		add rule ip6 kube-proxy filter-forward ct state new jump service-endpoints-check
