@@ -322,6 +322,7 @@ type tracker struct {
 // but this is not how fake client-go has traditionally worked and starting to do
 // that now might break tests.
 type versionedObject struct {
+	// resourceVersion is always > 0 for a stored object.
 	resourceVersion int64
 	runtime.Object
 }
@@ -368,6 +369,10 @@ func (t *tracker) List(gvr schema.GroupVersionResource, gvk schema.GroupVersionK
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
+	if listMeta, err := meta.ListAccessor(list); err == nil {
+		listMeta.SetResourceVersion(fmt.Sprintf("%d", t.resourceVersions[gvr]))
+	}
+
 	objs, ok := t.objects[gvr]
 	if !ok {
 		return list, nil
@@ -384,9 +389,6 @@ func (t *tracker) List(gvr schema.GroupVersionResource, gvk schema.GroupVersionK
 	if err := meta.SetList(list, matchingObjs); err != nil {
 		return nil, err
 	}
-	if listMeta, err := meta.ListAccessor(list); err == nil {
-		listMeta.SetResourceVersion(fmt.Sprintf("%d", t.resourceVersions[gvr]))
-	}
 	return list.DeepCopyObject(), nil
 }
 
@@ -395,16 +397,26 @@ func (t *tracker) Watch(gvr schema.GroupVersionResource, ns string, opts ...meta
 	if err != nil {
 		return nil, err
 	}
+
 	// By default, emulate the traditional behavior of the tracker and don't deliver
-	// *any* existing objects. This ensures compatibility which users
-	// which don't pass options and then also don't expect the additional objects.
-	resourceVersion := int64(-1)
-	if len(opts) > 0 && opts[0].ResourceVersion != "" {
-		rv, err := strconv.ParseInt(opts[0].ResourceVersion, 10, 64)
-		if err != nil {
-			return nil, fmt.Errorf("invalid ResourceVersion %q in ListOptions, must be int64: %w", opts[0].ResourceVersion, err)
+	// *any* existing objects unless list options are provided.
+	addExisting := false
+	addFromRV := int64(0)
+	if len(opts) > 0 {
+		// Providing options, as the generated client-go fake does, enables support
+		// for existing objects depending on the resource version.
+		//
+		// The default if ResourceVersion is empty is "start at most recent",
+		// which includes delivering all existing objects. addFromRV == 0
+		// matches all objects below because all stored objects have addFromRV > 0.
+		addExisting = true
+		if opts[0].ResourceVersion != "" {
+			rv, err := strconv.ParseInt(opts[0].ResourceVersion, 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("invalid ResourceVersion %q in ListOptions, must be int64: %w", opts[0].ResourceVersion, err)
+			}
+			addFromRV = rv
 		}
-		resourceVersion = rv
 	}
 
 	t.lock.Lock()
@@ -419,14 +431,14 @@ func (t *tracker) Watch(gvr schema.GroupVersionResource, ns string, opts ...meta
 
 	// Deliver all objects that match the list options, for example
 	// between the initial List and the following Watch.
-	if resourceVersion != -1 {
+	if addExisting {
 		objs := t.objects[gvr]
 		matchingObjs, err := filterByNamespace(objs, ns)
 		if err != nil {
 			return nil, err
 		}
 		for _, obj := range matchingObjs {
-			if resourceVersion == 0 || resourceVersion < obj.resourceVersion {
+			if addFromRV < obj.resourceVersion {
 				fakewatcher.Add(obj.Object)
 			}
 		}

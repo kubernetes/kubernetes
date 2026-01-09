@@ -369,7 +369,7 @@ func TestListWithNoFixturesAndTypedScheme(t *testing.T) {
 
 	expectedList := &unstructured.UnstructuredList{}
 	expectedList.SetGroupVersionKind(listGVK)
-	expectedList.SetResourceVersion("") // by product of the fake setting resource version
+	expectedList.SetResourceVersion("0") // No objects created so far.
 	expectedList.SetContinue("")
 
 	if diff := cmp.Diff(expectedList, list); diff != "" {
