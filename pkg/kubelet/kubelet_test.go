@@ -4841,8 +4841,7 @@ func TestSyncPodNodeDeclaredFeaturesUpdate(t *testing.T) {
 			recorder := record.NewFakeRecorder(10)
 			kubelet.recorder = recorder
 
-			framework, err := ndf.New(tc.registeredFeatures)
-			require.NoError(t, err)
+			framework := ndf.New(tc.registeredFeatures)
 			kubelet.nodeDeclaredFeaturesFramework = framework
 			kubelet.nodeDeclaredFeatures = tc.nodeFeatures
 			kubelet.nodeDeclaredFeaturesSet = ndf.NewFeatureSet(kubelet.nodeDeclaredFeatures...)

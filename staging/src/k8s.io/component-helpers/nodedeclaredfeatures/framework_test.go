@@ -62,14 +62,6 @@ func newMockFeatureGate(features map[string]bool) *mockFeatureGate {
 	return &mockFeatureGate{features: features}
 }
 
-func TestNewFramework(t *testing.T) {
-	_, err := New(nil)
-	require.Error(t, err, "NewFramework should return an error with a nil registry")
-
-	_, err = New([]types.Feature{})
-	require.NoError(t, err, "NewFramework should not return an error with an empty registry")
-}
-
 func TestDiscoverNodeFeatures(t *testing.T) {
 	featureMaxVersion := version.MustParse("1.38.0")
 	registry := []types.Feature{
@@ -89,7 +81,7 @@ func TestDiscoverNodeFeatures(t *testing.T) {
 		},
 	}
 
-	framework, _ := New(registry)
+	framework := New(registry)
 
 	testCases := []struct {
 		name     string
@@ -258,7 +250,7 @@ func TestInferForPodScheduling(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			framework, _ := New(tc.registry)
+			framework := New(tc.registry)
 			reqs, err := framework.InferForPodScheduling(&types.PodInfo{Spec: &tc.newPod.Spec, Status: &tc.newPod.Status}, tc.targetVersion)
 
 			if tc.expectErr {
@@ -387,7 +379,7 @@ func TestInferForPodUpdate(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			framework, _ := New(tc.registry)
+			framework := New(tc.registry)
 			reqs, err := framework.InferForPodUpdate(&types.PodInfo{Spec: &tc.oldPod.Spec, Status: &tc.oldPod.Status}, &types.PodInfo{Spec: &tc.newPod.Spec, Status: &tc.newPod.Status}, tc.targetVersion)
 
 			if tc.expectErr {

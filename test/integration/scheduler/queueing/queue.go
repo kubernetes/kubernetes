@@ -2719,6 +2719,9 @@ func RunTestCoreResourceEnqueue(t *testing.T, tt *CoreResourceEnqueueTestCase) {
 		})
 		mockFeature.EXPECT().MaxVersion().Return(nil).Maybe()
 
+		framework := ndf.New([]ndf.Feature{mockFeature})
+		ndftesting.SetFrameworkDuringTest(t, *framework)
+
 		originalAllFeatures := ndffeatures.AllFeatures
 		ndffeatures.AllFeatures = []ndf.Feature{mockFeature}
 		defer func() {

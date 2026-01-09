@@ -23,6 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/component-helpers/nodedeclaredfeatures/features"
 	"k8s.io/component-helpers/nodedeclaredfeatures/types"
 )
 
@@ -55,14 +56,13 @@ func (s *FeatureSet) Clone() FeatureSet {
 	return FeatureSet{Set: s.Set.Clone()}
 }
 
+var DefaultFramework = New(features.AllFeatures)
+
 // New creates a new instance of the Framework.
-func New(registry []types.Feature) (*Framework, error) {
-	if registry == nil {
-		return nil, fmt.Errorf("registry must not be nil")
-	}
+func New(registry []types.Feature) *Framework {
 	return &Framework{
 		registry: registry,
-	}, nil
+	}
 }
 
 // DiscoverNodeFeatures determines which features from the registry are enabled

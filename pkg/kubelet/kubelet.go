@@ -43,7 +43,6 @@ import (
 
 	"k8s.io/client-go/informers"
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
-	ndffeatures "k8s.io/component-helpers/nodedeclaredfeatures/features"
 	"k8s.io/mount-utils"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -1029,10 +1028,7 @@ func NewMainKubelet(ctx context.Context,
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse version: %w", err)
 		}
-		framework, err := ndf.New(ndffeatures.AllFeatures)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create node feature helper: %w", err)
-		}
+		framework := ndf.DefaultFramework
 		klet.version = v
 		klet.nodeDeclaredFeaturesFramework = framework
 		klet.nodeDeclaredFeatures = klet.discoverNodeDeclaredFeatures()
