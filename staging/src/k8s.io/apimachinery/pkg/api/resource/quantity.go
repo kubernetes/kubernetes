@@ -640,6 +640,8 @@ func (q *Quantity) Mul(y int64) bool {
 	return q.ToDec().d.Dec.Mul(q.d.Dec, inf.NewDec(y, inf.Scale(0))).UnscaledBig().IsInt64()
 }
 
+// QuoRound divides the current value by y and rounds the division result by roundVal digits.
+// the function panics on y=0 or roundVal < 0
 func (q *Quantity) QuoRound(y int64, roundVal int64) bool {
 	if y == 0 {
 		panic(zeroDivErrMsg)
@@ -682,9 +684,12 @@ func (q *Quantity) QuoRound(y int64, roundVal int64) bool {
 		q.d.Dec = infDec
 		return false
 	}
-	return q.ToDec().d.Dec.QuoRound(q.d.Dec, inf.NewDec(y, inf.Scale(0)), inf.Scale(roundVal), inf.RoundDown).UnscaledBig().IsInt64()
+	ret := q.ToDec().d.Dec.QuoRound(q.d.Dec, inf.NewDec(y, inf.Scale(0)), inf.Scale(roundVal), inf.RoundDown).UnscaledBig().IsInt64()
+	return ret
 }
 
+// QuoIntegerDivision integer divides the current value by y and rounds towards zero (round down).
+// the function panics on y=0
 func (q *Quantity) QuoIntegerDivision(y int64) bool {
 	if y == 0 {
 		panic(zeroDivErrMsg)
