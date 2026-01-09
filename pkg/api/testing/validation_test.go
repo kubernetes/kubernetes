@@ -60,6 +60,12 @@ func TestVersionedValidationByFuzzing(t *testing.T) {
 
 	for _, gv := range typesWithDeclarativeValidation {
 		for kind := range legacyscheme.Scheme.KnownTypes(gv) {
+			// Scale is a virtual subresource and does not have declarative
+			// validation implemented in any API group. Skip it entirely,
+			// as validation equivalence cannot be meaningfully tested.
+			if kind == "Scale" {
+				continue
+			}
 			gvk := gv.WithKind(kind)
 			t.Run(gvk.String(), func(t *testing.T) {
 				for i := 0; i < fuzzIters; i++ {
@@ -76,6 +82,11 @@ func TestVersionedValidationByFuzzing(t *testing.T) {
 					allRules := append([]field.NormalizationRule{}, resourcevalidation.ResourceNormalizationRules...)
 					allRules = append(allRules, nodevalidation.NodeNormalizationRules...)
 					opts = append(opts, WithNormalizationRules(allRules...))
+
+					// Fuzzing can produce objects that cannot be converted to all API versions.
+					// Ignore conversion failures so validation equivalence can still be tested
+					// for versions where conversion succeeds.
+					opts = append(opts, WithIgnoreObjectConversionErrors())
 
 					VerifyVersionedValidationEquivalence(t, obj, nil, opts...)
 
