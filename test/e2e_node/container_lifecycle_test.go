@@ -6932,3 +6932,156 @@ var _ = SIGDescribe(framework.WithSerial(), "Not Change Container Status", frame
 		})
 	})
 })
+
+// Test for issue #136047: Container status ready stays true while started is false after container restart
+var _ = SIGDescribe("Container Status After Restart", func() {
+	f := framework.NewDefaultFramework("container-status-after-restart")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+
+	/*
+		Release: v1.33
+		Testname: Container status ready should be false when started is false after restart
+		Description: When a container restarts (e.g., due to liveness probe failure), the ready
+		field should be set to false while the started field is false (waiting for startup probe).
+		This ensures the invariant that ready can only be true when started is true.
+	*/
+	ginkgo.It("should set ready=false when started=false after container restart", func(ctx context.Context) {
+		client := e2epod.NewPodClient(f)
+
+		// Create a pod with:
+		// - startupProbe that checks for a file (takes ~10s to pass)
+		// - readinessProbe that always passes
+		// - livenessProbe that will fail after startup completes (to trigger restart)
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "container-restart-status-test",
+			},
+			Spec: v1.PodSpec{
+				RestartPolicy: v1.RestartPolicyAlways,
+				Containers: []v1.Container{
+					{
+						Name:  "main",
+						Image: busyboxImage,
+						Command: []string{
+							"sh", "-c",
+							// Create /started after 10s, create /live briefly, then remove it to trigger liveness failure
+							"sleep 10 && touch /started && touch /live && sleep 20 && rm /live && sleep 3600",
+						},
+						StartupProbe: &v1.Probe{
+							ProbeHandler: v1.ProbeHandler{
+								Exec: &v1.ExecAction{
+									Command: []string{"cat", "/started"},
+								},
+							},
+							InitialDelaySeconds: 0,
+							PeriodSeconds:       2,
+							FailureThreshold:    15,
+						},
+						ReadinessProbe: &v1.Probe{
+							ProbeHandler: v1.ProbeHandler{
+								Exec: &v1.ExecAction{
+									Command: []string{"/bin/true"},
+								},
+							},
+							PeriodSeconds: 1,
+						},
+						LivenessProbe: &v1.Probe{
+							ProbeHandler: v1.ProbeHandler{
+								Exec: &v1.ExecAction{
+									Command: []string{"cat", "/live"},
+								},
+							},
+							InitialDelaySeconds: 0,
+							PeriodSeconds:       3,
+							FailureThreshold:    3,
+						},
+					},
+				},
+			},
+		}
+
+		pod = client.Create(ctx, pod)
+
+		ginkgo.By("Waiting for the pod to be running and ready (startup probe passes)")
+		err := e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "Ready", f.Timeouts.PodStart,
+			func(p *v1.Pod) (bool, error) {
+				if len(p.Status.ContainerStatuses) == 0 {
+					return false, nil
+				}
+				cs := p.Status.ContainerStatuses[0]
+				return cs.Ready && cs.Started != nil && *cs.Started, nil
+			})
+		framework.ExpectNoError(err, "Pod should become ready after startup probe passes")
+
+		ginkgo.By("Waiting for container to restart (liveness probe fails after /live is removed)")
+		err = e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "ContainerRestarted", 2*time.Minute,
+			func(p *v1.Pod) (bool, error) {
+				if len(p.Status.ContainerStatuses) == 0 {
+					return false, nil
+				}
+				return p.Status.ContainerStatuses[0].RestartCount >= 1, nil
+			})
+		framework.ExpectNoError(err, "Container should restart due to liveness probe failure")
+
+		ginkgo.By("Verifying that invariant holds: ready=false when started=false after restart")
+		// Watch for pod status updates during the restart and recovery period
+		// We want to verify that at no point is ready=true while started=false
+		watcher, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Watch(ctx, metav1.ListOptions{
+			FieldSelector: "metadata.name=" + pod.Name,
+		})
+		framework.ExpectNoError(err, "Failed to create pod watcher")
+		defer watcher.Stop()
+
+		// Watch for up to 30 seconds to catch all status transitions
+		timeout := time.After(30 * time.Second)
+		sawNotStartedState := false
+		for {
+			select {
+			case event, ok := <-watcher.ResultChan():
+				if !ok {
+					goto done
+				}
+				if event.Type != watch.Modified {
+					continue
+				}
+				p, ok := event.Object.(*v1.Pod)
+				if !ok {
+					continue
+				}
+				if len(p.Status.ContainerStatuses) == 0 {
+					continue
+				}
+				cs := p.Status.ContainerStatuses[0]
+
+				// Verify the invariant: if started is false, ready must also be false
+				if cs.Started != nil && !*cs.Started {
+					sawNotStartedState = true
+					gomega.Expect(cs.Ready).To(gomega.BeFalse(),
+						"Bug #136047: ready should be false when started is false. "+
+							"Got ready=%v, started=%v", cs.Ready, *cs.Started)
+				}
+
+				// If we've seen the not-started state and now the container is ready again, we're done
+				if sawNotStartedState && cs.Started != nil && *cs.Started && cs.Ready {
+					goto done
+				}
+			case <-timeout:
+				goto done
+			}
+		}
+	done:
+
+		// Final verification: pod should eventually become ready again
+		err = e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "ReadyAgain", f.Timeouts.PodStart,
+			func(p *v1.Pod) (bool, error) {
+				if len(p.Status.ContainerStatuses) == 0 {
+					return false, nil
+				}
+				cs := p.Status.ContainerStatuses[0]
+				return cs.Ready && cs.Started != nil && *cs.Started && cs.RestartCount >= 1, nil
+			})
+		framework.ExpectNoError(err, "Pod should become ready again after container restart")
+
+		framework.Logf("Test passed: verified ready=false when started=false after container restart")
+	})
+})
