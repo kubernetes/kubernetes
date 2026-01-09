@@ -27,12 +27,6 @@ import (
 	_ "k8s.io/component-base/logs/testinit"
 )
 
-func init() {
-	// This is a good default for unit tests. Benchmarks should add their own
-	// init function or TestMain to lower the default, for example to 2.
-	SetDefaultVerbosity(5)
-}
-
 // SetDefaultVerbosity can be called during init to modify the default
 // log verbosity of the program.
 //
