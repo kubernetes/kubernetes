@@ -26,6 +26,9 @@ import (
 
 	"github.com/google/cadvisor/container/crio"
 	cadvisorfs "github.com/google/cadvisor/fs"
+	"k8s.io/utils/ptr"
+
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 )
 
 func TestImageFsInfoLabel(t *testing.T) {
@@ -83,5 +86,73 @@ func TestContainerFsInfoLabel(t *testing.T) {
 			assert.Equal(t, tc.expectedLabel, label)
 			assert.Equal(t, tc.expectedError, err)
 		})
+	}
+}
+
+func TestProcessMetricsConfiguration(t *testing.T) {
+	tests := []struct {
+		name                 string
+		cadvisorConfig       *kubeletconfig.CAdvisorConfiguration
+		expectProcessMetrics bool
+	}{
+		{
+			name:                 "nil config - ProcessMetrics enabled (backward compatible)",
+			cadvisorConfig:       nil,
+			expectProcessMetrics: true,
+		},
+		{
+			name:                 "empty config - ProcessMetrics enabled (backward compatible)",
+			cadvisorConfig:       &kubeletconfig.CAdvisorConfiguration{},
+			expectProcessMetrics: true,
+		},
+		{
+			name: "ProcessMetrics nil - enabled (backward compatible)",
+			cadvisorConfig: &kubeletconfig.CAdvisorConfiguration{
+				IncludedMetrics: kubeletconfig.CAdvisorIncludedMetrics{
+					ProcessMetrics: nil,
+				},
+			},
+			expectProcessMetrics: true,
+		},
+		{
+			name: "ProcessMetrics explicitly true - enabled",
+			cadvisorConfig: &kubeletconfig.CAdvisorConfiguration{
+				IncludedMetrics: kubeletconfig.CAdvisorIncludedMetrics{
+					ProcessMetrics: ptr.To(true),
+				},
+			},
+			expectProcessMetrics: true,
+		},
+		{
+			name: "ProcessMetrics explicitly false - disabled",
+			cadvisorConfig: &kubeletconfig.CAdvisorConfiguration{
+				IncludedMetrics: kubeletconfig.CAdvisorIncludedMetrics{
+					ProcessMetrics: ptr.To(false),
+				},
+			},
+			expectProcessMetrics: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Test the ProcessMetricsEnabled helper function
+			got := tt.cadvisorConfig.ProcessMetricsEnabled()
+			if got != tt.expectProcessMetrics {
+				t.Errorf("ProcessMetricsEnabled() = %v, want %v", got, tt.expectProcessMetrics)
+			}
+		})
+	}
+}
+
+// TestBackwardCompatibility ensures that existing KubeletConfiguration
+// without the CAdvisor field continues to work with ProcessMetrics enabled.
+func TestBackwardCompatibility(t *testing.T) {
+	// Simulate an upgrade scenario where CAdvisor config is not set
+	// (zero value of struct should enable ProcessMetrics)
+	config := &kubeletconfig.CAdvisorConfiguration{}
+
+	if !config.ProcessMetricsEnabled() {
+		t.Error("ProcessMetrics should be enabled by default for backward compatibility")
 	}
 }

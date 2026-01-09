@@ -49,6 +49,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/utils/ptr"
 )
 
@@ -88,7 +89,9 @@ func init() {
 }
 
 // New creates a new cAdvisor Interface for linux systems.
-func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots []string, usingLegacyStats, localStorageCapacityIsolation bool) (Interface, error) {
+// The cadvisorConfig parameter allows configuring which metrics are collected.
+// If nil, all metrics are collected for backward compatibility.
+func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots []string, usingLegacyStats, localStorageCapacityIsolation bool, cadvisorConfig *kubeletconfig.CAdvisorConfiguration) (Interface, error) {
 	sysFs := sysfs.NewRealSysFs()
 
 	includedMetrics := cadvisormetrics.MetricSet{
@@ -98,8 +101,22 @@ func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots [
 		cadvisormetrics.DiskIOMetrics:       struct{}{},
 		cadvisormetrics.NetworkUsageMetrics: struct{}{},
 		cadvisormetrics.AppMetrics:          struct{}{},
-		cadvisormetrics.ProcessMetrics:      struct{}{},
 		cadvisormetrics.OOMMetrics:          struct{}{},
+	}
+
+	// ProcessMetrics - configurable via KubeletConfiguration.CAdvisor.IncludedMetrics.ProcessMetrics
+	// Default: enabled for backward compatibility.
+	// Disabling significantly reduces kubelet CPU on high-density nodes (100+ pods)
+	// by avoiding /proc scans for every thread in every container.
+	if utilfeature.DefaultFeatureGate.Enabled(features.ConfigurableCAdvisorMetrics) {
+		if cadvisorConfig.ProcessMetricsEnabled() {
+			includedMetrics[cadvisormetrics.ProcessMetrics] = struct{}{}
+		} else {
+			klog.InfoS("ProcessMetrics collection disabled via KubeletConfiguration.cadvisor.includedMetrics.processMetrics")
+		}
+	} else {
+		// Feature gate disabled - always collect ProcessMetrics for backward compatibility
+		includedMetrics[cadvisormetrics.ProcessMetrics] = struct{}{}
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPSI) {

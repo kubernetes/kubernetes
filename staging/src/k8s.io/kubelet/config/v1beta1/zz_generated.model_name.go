@@ -22,6 +22,16 @@ limitations under the License.
 package v1beta1
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in CAdvisorConfiguration) OpenAPIModelName() string {
+	return "io.k8s.kubelet.config.v1beta1.CAdvisorConfiguration"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in CAdvisorIncludedMetrics) OpenAPIModelName() string {
+	return "io.k8s.kubelet.config.v1beta1.CAdvisorIncludedMetrics"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in CrashLoopBackOffConfig) OpenAPIModelName() string {
 	return "io.k8s.kubelet.config.v1beta1.CrashLoopBackOffConfig"
 }

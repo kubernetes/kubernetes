@@ -1426,6 +1426,8 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		kubeletconfigv1alpha1.ImagePullSecret{}.OpenAPIModelName():                                                      schema_k8sio_kubelet_config_v1alpha1_ImagePullSecret(ref),
 		kubeletconfigv1alpha1.ImagePullServiceAccount{}.OpenAPIModelName():                                              schema_k8sio_kubelet_config_v1alpha1_ImagePullServiceAccount(ref),
 		kubeletconfigv1alpha1.ImagePulledRecord{}.OpenAPIModelName():                                                    schema_k8sio_kubelet_config_v1alpha1_ImagePulledRecord(ref),
+		kubeletconfigv1beta1.CAdvisorConfiguration{}.OpenAPIModelName():                                                 schema_k8sio_kubelet_config_v1beta1_CAdvisorConfiguration(ref),
+		kubeletconfigv1beta1.CAdvisorIncludedMetrics{}.OpenAPIModelName():                                               schema_k8sio_kubelet_config_v1beta1_CAdvisorIncludedMetrics(ref),
 		kubeletconfigv1beta1.CrashLoopBackOffConfig{}.OpenAPIModelName():                                                schema_k8sio_kubelet_config_v1beta1_CrashLoopBackOffConfig(ref),
 		kubeletconfigv1beta1.CredentialProvider{}.OpenAPIModelName():                                                    schema_k8sio_kubelet_config_v1beta1_CredentialProvider(ref),
 		kubeletconfigv1beta1.CredentialProviderConfig{}.OpenAPIModelName():                                              schema_k8sio_kubelet_config_v1beta1_CredentialProviderConfig(ref),
@@ -69452,6 +69454,48 @@ func schema_k8sio_kubelet_config_v1alpha1_ImagePulledRecord(ref common.Reference
 	}
 }
 
+func schema_k8sio_kubelet_config_v1beta1_CAdvisorConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CAdvisorConfiguration contains settings for the embedded cAdvisor.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"includedMetrics": {
+						SchemaProps: spec.SchemaProps{
+							Description: "IncludedMetrics specifies which cAdvisor metric collectors are enabled. All collectors are enabled by default for backward compatibility.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(kubeletconfigv1beta1.CAdvisorIncludedMetrics{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			kubeletconfigv1beta1.CAdvisorIncludedMetrics{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_kubelet_config_v1beta1_CAdvisorIncludedMetrics(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CAdvisorIncludedMetrics specifies which cAdvisor metric collectors to enable. All fields default to true for backward compatibility.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"processMetrics": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ProcessMetrics enables collection of process/thread metrics. These metrics scan /proc for every thread in every container, which causes significant CPU overhead on high-density nodes (100+ pods). Disabling this can reduce kubelet CPU usage by up to 99% on such nodes.\n\nAffected metrics when disabled:\n  - container_processes\n  - container_threads\n  - container_file_descriptors\n  - container_sockets\n  - container_ulimits_soft\n  - container_ulimits_hard\n\nDefault: true (enabled for backward compatibility)",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 func schema_k8sio_kubelet_config_v1beta1_CrashLoopBackOffConfig(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -70978,12 +71022,19 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							Ref:         ref(kubeletconfigv1beta1.UserNamespaces{}.OpenAPIModelName()),
 						},
 					},
+					"cadvisor": {
+						SchemaProps: spec.SchemaProps{
+							Description: "CAdvisor contains configuration for the embedded cAdvisor metrics collector. This allows disabling expensive metric collectors like ProcessMetrics which can reduce kubelet CPU usage significantly on high-density nodes.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(kubeletconfigv1beta1.CAdvisorConfiguration{}.OpenAPIModelName()),
+						},
+					},
 				},
 				Required: []string{"containerRuntimeEndpoint"},
 			},
 		},
 		Dependencies: []string{
-			corev1.Taint{}.OpenAPIModelName(), metav1.Duration{}.OpenAPIModelName(), logsapiv1.LoggingConfiguration{}.OpenAPIModelName(), apiv1.TracingConfiguration{}.OpenAPIModelName(), kubeletconfigv1beta1.CrashLoopBackOffConfig{}.OpenAPIModelName(), kubeletconfigv1beta1.KubeletAuthentication{}.OpenAPIModelName(), kubeletconfigv1beta1.KubeletAuthorization{}.OpenAPIModelName(), kubeletconfigv1beta1.MemoryReservation{}.OpenAPIModelName(), kubeletconfigv1beta1.MemorySwapConfiguration{}.OpenAPIModelName(), kubeletconfigv1beta1.ShutdownGracePeriodByPodPriority{}.OpenAPIModelName(), kubeletconfigv1beta1.UserNamespaces{}.OpenAPIModelName()},
+			corev1.Taint{}.OpenAPIModelName(), metav1.Duration{}.OpenAPIModelName(), logsapiv1.LoggingConfiguration{}.OpenAPIModelName(), apiv1.TracingConfiguration{}.OpenAPIModelName(), kubeletconfigv1beta1.CAdvisorConfiguration{}.OpenAPIModelName(), kubeletconfigv1beta1.CrashLoopBackOffConfig{}.OpenAPIModelName(), kubeletconfigv1beta1.KubeletAuthentication{}.OpenAPIModelName(), kubeletconfigv1beta1.KubeletAuthorization{}.OpenAPIModelName(), kubeletconfigv1beta1.MemoryReservation{}.OpenAPIModelName(), kubeletconfigv1beta1.MemorySwapConfiguration{}.OpenAPIModelName(), kubeletconfigv1beta1.ShutdownGracePeriodByPodPriority{}.OpenAPIModelName(), kubeletconfigv1beta1.UserNamespaces{}.OpenAPIModelName()},
 	}
 }
 
