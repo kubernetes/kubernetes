@@ -70,6 +70,12 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				field.TooMany(field.NewPath("endpoints").Index(0).Child("addresses"), 101, 100).WithOrigin("maxItems"),
 			},
 		},
+		"invalid missing addressType": {
+			input: mkValidEndpointSlice(tweakAddressType("")),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("addressType"), ""),
+			},
+		},
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
@@ -162,5 +168,11 @@ func tweakAddresses(count int) func(*discovery.EndpointSlice) {
 			addrs[i] = fmt.Sprintf("10.0.0.%d", i%255)
 		}
 		obj.Endpoints[0].Addresses = addrs
+	}
+}
+
+func tweakAddressType(addrType discovery.AddressType) func(*discovery.EndpointSlice) {
+	return func(obj *discovery.EndpointSlice) {
+		obj.AddressType = addrType
 	}
 }

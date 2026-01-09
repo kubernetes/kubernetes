@@ -91,7 +91,25 @@ func Validate_Endpoint(ctx context.Context, op operation.Operation, fldPath *fie
 func Validate_EndpointSlice(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *discoveryv1.EndpointSlice) (errs field.ErrorList) {
 	// field discoveryv1.EndpointSlice.TypeMeta has no validation
 	// field discoveryv1.EndpointSlice.ObjectMeta has no validation
-	// field discoveryv1.EndpointSlice.AddressType has no validation
+
+	// field discoveryv1.EndpointSlice.AddressType
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *discoveryv1.AddressType, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("addressType"), &obj.AddressType, safe.Field(oldObj, func(oldObj *discoveryv1.EndpointSlice) *discoveryv1.AddressType { return &oldObj.AddressType }), oldObj != nil)...)
 
 	// field discoveryv1.EndpointSlice.Endpoints
 	errs = append(errs,

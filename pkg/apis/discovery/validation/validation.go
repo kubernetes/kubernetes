@@ -207,7 +207,7 @@ func validateAddressType(addressType discovery.AddressType) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if addressType == "" {
-		allErrs = append(allErrs, field.Required(field.NewPath("addressType"), ""))
+		allErrs = append(allErrs, field.Required(field.NewPath("addressType"), "").MarkCoveredByDeclarative())
 	} else if !supportedAddressTypes.Has(addressType) {
 		allErrs = append(allErrs, field.NotSupported(field.NewPath("addressType"), addressType, sets.List(supportedAddressTypes)))
 	}

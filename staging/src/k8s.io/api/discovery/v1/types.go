@@ -48,6 +48,8 @@ type EndpointSlice struct {
 	// The EndpointSlice controller only generates, and kube-proxy only processes,
 	// slices of addressType "IPv4" and "IPv6". No semantics are defined for
 	// the "FQDN" type.
+	// +required
+	// +k8s:required
 	AddressType AddressType `json:"addressType" protobuf:"bytes,4,rep,name=addressType"`
 
 	// endpoints is a list of unique endpoints in this slice. Each slice may
