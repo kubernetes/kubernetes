@@ -556,6 +556,7 @@ func (s *sharedIndexInformer) RunWithContext(ctx context.Context) {
 
 		s.controller = New(cfg)
 		s.controller.(*controller).clock = s.clock
+		s.controller.(*controller).clientStore = s.indexer
 		s.started = true
 	}()
 

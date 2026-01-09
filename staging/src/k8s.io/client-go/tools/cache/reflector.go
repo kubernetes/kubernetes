@@ -101,6 +101,9 @@ type Reflector struct {
 	expectedGVK *schema.GroupVersionKind
 	// The destination to sync up with the watch source
 	store ReflectorStore
+	// clientStore allows access to existing cache objects.
+	// TODO: consider narrowing this to KeyListerGetter.
+	clientStore Store
 	// listerWatcher is used to perform lists and watches.
 	listerWatcher ListerWatcherWithContext
 	// backoff manages backoff of ListWatch
