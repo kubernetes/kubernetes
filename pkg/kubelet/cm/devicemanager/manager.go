@@ -250,7 +250,7 @@ func (m *ManagerImpl) PluginDisconnected(logger klog.Logger, resourceName string
 
 	if ep, exists := m.endpoints[resourceName]; exists {
 		m.markResourceUnhealthy(logger, resourceName)
-		logger.V(2).Info("Endpoint became unhealthy", "resourceName", resourceName, "endpoint", ep)
+		logger.V(2).Info("Endpoint became unhealthy", "resourceName", resourceName)
 
 		ep.e.setStopTime(time.Now())
 	}
