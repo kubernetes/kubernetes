@@ -657,7 +657,7 @@ func (m *mockCSIDriver) PrepareTest(ctx context.Context, f *framework.Framework)
 			VolumeMountGroupRequired:    m.enableVolumeMountGroup,
 			EnableTopology:              m.enableTopology,
 			IO: proxy.PodDirIO{
-				TCtx:          f.TContext(ctx),
+				F:             f,
 				Namespace:     m.driverNamespace.Name,
 				PodName:       podname,
 				ContainerName: "busybox",

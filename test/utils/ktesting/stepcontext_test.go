@@ -35,13 +35,11 @@ func TestStepContext(t *testing.T) {
 				tCtx.Error("Error", "a", "b", 42)
 				tCtx.Errorf("Errorf %s %s %d", "a", "b", 42)
 			},
-			expectTrace: `(LOG) <klog header>: step: Log a b 42
-(LOG) <klog header>: step: Logf a b 42
-(ERROR) ERROR: <klog header>:
-	step: Error a b 42
-(ERROR) ERROR: <klog header>:
-	step: Errorf a b 42
+			expectLog: `<klog header>: step: Log a b 42
+<klog header>: step: Logf a b 42
 `,
+			expectError: `step: Error a b 42
+step: Errorf a b 42`,
 		},
 		"fatal": {
 			cb: func(tCtx TContext) {
@@ -50,9 +48,7 @@ func TestStepContext(t *testing.T) {
 				// not reached
 				tCtx.Log("Log")
 			},
-			expectTrace: `(FATAL) FATAL ERROR: <klog header>:
-	step: Error a b 42
-`,
+			expectError: `step: Error a b 42`,
 		},
 		"fatalf": {
 			cb: func(tCtx TContext) {
@@ -61,9 +57,7 @@ func TestStepContext(t *testing.T) {
 				// not reached
 				tCtx.Log("Log")
 			},
-			expectTrace: `(FATAL) FATAL ERROR: <klog header>:
-	step: Error a b 42
-`,
+			expectError: `step: Error a b 42`,
 		},
 		"progress": {
 			cb: func(tCtx TContext) {
@@ -82,11 +76,12 @@ func TestStepContext(t *testing.T) {
 				noSuchValue := tCtx.Value("some other key")
 				assert.Nil(tCtx, noSuchValue, "value for unknown context value key")
 			},
-			expectTrace: `(LOG) <klog header>: step: You requested a progress report.
-	
-	step: hello world
+			expectLog: `<klog header>: step: You requested a progress report.
+
+step: hello world
 `,
 			expectDuration: 5 * time.Second,
+			expectNoFail:   true,
 		},
 	} {
 		tc := tc

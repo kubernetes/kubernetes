@@ -182,7 +182,7 @@ processLocalUpClusterOutput:
 		select {
 		case <-tCtx.Done():
 			c.Stop(tCtx)
-			tCtx.Fatalf("interrupted cluster startup: %v", context.Cause(tCtx))
+			tCtx.Fatalf("interrupted cluster startup: %w", context.Cause(tCtx))
 		case output := <-lines:
 			if c.processLocalUpClusterOutput(tCtx, output) {
 				break processLocalUpClusterOutput
@@ -354,7 +354,8 @@ func (c *Cluster) Modify(tCtx ktesting.TContext, options ModifyOptions) ModifyOp
 
 func (c *Cluster) modifyComponent(tCtx ktesting.TContext, options ModifyOptions, component KubeComponentName, restore *ModifyOptions) {
 	tCtx.Helper()
-	tCtx = tCtx.WithStep(fmt.Sprintf("modify %s", component))
+	tCtx = ktesting.Begin(tCtx, fmt.Sprintf("modify %s", component))
+	defer ktesting.End(tCtx)
 
 	// We could also do things like turning feature gates on or off.
 	// For now we only support replacing the file.
@@ -429,7 +430,8 @@ func (c *Cluster) runComponentWithRetry(tCtx ktesting.TContext, cmd *Cmd) {
 func (c *Cluster) checkReadiness(tCtx ktesting.TContext, cmd *Cmd) {
 	restConfig := c.LoadConfig(tCtx)
 	tCtx = ktesting.WithRESTConfig(tCtx, restConfig)
-	tCtx = tCtx.WithStep(fmt.Sprintf("wait for %s readiness", cmd.Name))
+	tCtx = ktesting.Begin(tCtx, fmt.Sprintf("wait for %s readiness", cmd.Name))
+	defer ktesting.End(tCtx)
 
 	switch KubeComponentName(cmd.Name) {
 	case KubeAPIServer:
@@ -444,7 +446,9 @@ func (c *Cluster) checkReadiness(tCtx ktesting.TContext, cmd *Cmd) {
 		c.checkHealthz(tCtx, cmd, "https", c.settings["KUBELET_HOST"], c.settings["KUBELET_PORT"])
 
 		// Also wait for the node to be ready.
-		ktesting.Eventually(tCtx.WithStep("wait for node ready"), func(tCtx ktesting.TContext) []corev1.Node {
+		tCtx = ktesting.Begin(tCtx, "wait for node ready")
+		defer ktesting.End(tCtx)
+		ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) []corev1.Node {
 			nodes, err := tCtx.Client().CoreV1().Nodes().List(tCtx, metav1.ListOptions{})
 			tCtx.ExpectNoError(err, "list nodes")
 			return nodes.Items

@@ -110,7 +110,7 @@ func log(offset int, msg string) {
 	}
 	_, month, day := now.Date()
 	hour, minute, second := now.Clock()
-	header := fmt.Sprintf("I%02d%02d %02d:%02d:%02d.%06d %7d %s:%d]",
+	header := fmt.Sprintf("I%02d%02d %02d:%02d:%02d.%06d %d %s:%d]",
 		month, day, hour, minute, second, now.Nanosecond()/1000, Pid, file, line)
 
 	fmt.Fprintln(ginkgo.GinkgoWriter, header, msg)

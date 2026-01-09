@@ -16,10 +16,13 @@ limitations under the License.
 
 package ktesting
 
-// Deprecated: use tCtx.WithStep instead
-func WithStep(tCtx TContext, step string) TContext {
-	return tCtx.WithStep(step)
-}
+import (
+	"fmt"
+	"strings"
+	"time"
+
+	"k8s.io/klog/v2"
+)
 
 // WithStep creates a context where a prefix is added to all errors and log
 // messages, similar to how errors are wrapped. This can be nested, leaving a
@@ -31,16 +34,14 @@ func WithStep(tCtx TContext, step string) TContext {
 // The string should describe the operation that is about to happen ("starting
 // the controller", "list items") or what is being operated on ("HTTP server").
 // Multiple different prefixes get concatenated with a colon.
-func (tc *TC) WithStep(step string) *TC {
-	tc = tc.clone()
-	tc.steps += step + ": "
-	return tc
-}
-
-// Deprecated: use tCtx.Step instead
-func Step(tCtx TContext, step string, cb func(tCtx TContext)) {
-	tCtx.Helper()
-	tCtx.Step(step, cb)
+func WithStep(tCtx TContext, what string) TContext {
+	sCtx := &stepContext{
+		TContext:  WithLogger(tCtx, klog.LoggerWithName(tCtx.Logger(), what)),
+		parentCtx: tCtx,
+		what:      what,
+		start:     time.Now(),
+	}
+	return sCtx
 }
 
 // Step is useful when the context with the step information is
@@ -56,27 +57,88 @@ func Step(tCtx TContext, step string, cb func(tCtx TContext)) {
 // Inside the callback, the tCtx variable is the one where the step
 // has been added. This avoids the need to introduce multiple different
 // context variables and risk of using the wrong one.
-func (tc *TC) Step(step string, cb func(tCtx TContext)) {
-	tc.Helper()
-	cb(WithStep(tc, step))
+func Step(tCtx TContext, what string, cb func(tCtx TContext)) {
+	tCtx.Helper()
+	cb(WithStep(tCtx, what))
 }
 
-// Value intercepts a search for the special "GINKGO_SPEC_CONTEXT" and
-// wraps the underlying reporter so that the steps are visible in the report.
-func (tc *TC) Value(key any) any {
-	if tc.steps != "" {
-		if s, ok := key.(string); ok && s == ginkgoSpecContextKey {
-			if reporter, ok := tc.Context.Value(key).(ginkgoReporter); ok {
-				return ginkgoReporter(&stepReporter{reporter: reporter, steps: tc.steps})
-			}
+// Begin and End can be used instead of Step to execute some instructions
+// with a new context without using a callback method. This is useful
+// when some local variables need to be set which are read later one.
+// Log entries document the start and end of the step, including its duration.
+//
+//	tCtx = ktesting.Begin(tCtx, "step 1")
+//	.. do something with tCtx
+//	tCtx = ktesting.End(tCtx)
+func Begin(tCtx TContext, what string) TContext {
+	tCtx.Helper()
+	tCtx = WithStep(tCtx, what)
+	tCtx.Log("Starting...")
+	return tCtx
+}
+
+// End complements Begin and returns the original context that was passed to Begin.
+// It must be called on the context returned by Begin.
+func End(tCtx TContext) TContext {
+	tCtx.Helper()
+	sCtx, ok := tCtx.(*stepContext)
+	if !ok {
+		tCtx.Fatalf("expected result of Begin, got instead %T", tCtx)
+	}
+	tCtx.Logf("Done, duration %s", time.Since(sCtx.start))
+	return sCtx.parentCtx
+}
+
+type stepContext struct {
+	TContext
+	parentCtx TContext
+	what      string
+	start     time.Time
+}
+
+func (sCtx *stepContext) Log(args ...any) {
+	sCtx.Helper()
+	sCtx.TContext.Log(sCtx.what + ": " + strings.TrimSpace(fmt.Sprintln(args...)))
+}
+
+func (sCtx *stepContext) Logf(format string, args ...any) {
+	sCtx.Helper()
+	sCtx.TContext.Log(sCtx.what + ": " + strings.TrimSpace(fmt.Sprintf(format, args...)))
+}
+
+func (sCtx *stepContext) Error(args ...any) {
+	sCtx.Helper()
+	sCtx.TContext.Error(sCtx.what + ": " + strings.TrimSpace(fmt.Sprintln(args...)))
+}
+
+func (sCtx *stepContext) Errorf(format string, args ...any) {
+	sCtx.Helper()
+	sCtx.TContext.Error(sCtx.what + ": " + strings.TrimSpace(fmt.Sprintf(format, args...)))
+}
+
+func (sCtx *stepContext) Fatal(args ...any) {
+	sCtx.Helper()
+	sCtx.TContext.Fatal(sCtx.what + ": " + strings.TrimSpace(fmt.Sprintln(args...)))
+}
+
+func (sCtx *stepContext) Fatalf(format string, args ...any) {
+	sCtx.Helper()
+	sCtx.TContext.Fatal(sCtx.what + ": " + strings.TrimSpace(fmt.Sprintf(format, args...)))
+}
+
+// Value intercepts a search for the special "GINKGO_SPEC_CONTEXT".
+func (sCtx *stepContext) Value(key any) any {
+	if s, ok := key.(string); ok && s == ginkgoSpecContextKey {
+		if reporter, ok := sCtx.TContext.Value(key).(ginkgoReporter); ok {
+			return ginkgoReporter(&stepReporter{reporter: reporter, what: sCtx.what})
 		}
 	}
-	return tc.Context.Value(key)
+	return sCtx.TContext.Value(key)
 }
 
 type stepReporter struct {
 	reporter ginkgoReporter
-	steps    string
+	what     string
 }
 
 var _ ginkgoReporter = &stepReporter{}
@@ -84,6 +146,6 @@ var _ ginkgoReporter = &stepReporter{}
 func (s *stepReporter) AttachProgressReporter(reporter func() string) func() {
 	return s.reporter.AttachProgressReporter(func() string {
 		report := reporter()
-		return s.steps + report
+		return s.what + ": " + report
 	})
 }

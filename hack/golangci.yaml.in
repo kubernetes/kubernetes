@@ -133,7 +133,7 @@ linters:
 
       - linters:
           - govet
-        text: "lostcancel"
+        text: "lostcancel|printf"
 
       - linters:
           - ginkgolinter
