@@ -19,11 +19,11 @@ package inplacepodresize
 import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/version"
-	"k8s.io/component-helpers/nodedeclaredfeatures"
+	"k8s.io/component-helpers/nodedeclaredfeatures/types"
 )
 
 // Ensure the feature struct implements the unified Feature interface.
-var _ nodedeclaredfeatures.Feature = &guaranteedQoSPodCPUResizeFeature{}
+var _ types.Feature = &guaranteedQoSPodCPUResizeFeature{}
 
 const (
 	// IPPRExclusiveCPUsFeatureGate is the feature gate for IPPRExclusiveCPUsFeatureGate.
@@ -45,7 +45,7 @@ func (f *guaranteedQoSPodCPUResizeFeature) Name() string {
 	return GuaranteedQoSPodCPUResize
 }
 
-func (f *guaranteedQoSPodCPUResizeFeature) Discover(cfg *nodedeclaredfeatures.NodeConfiguration) bool {
+func (f *guaranteedQoSPodCPUResizeFeature) Discover(cfg *types.NodeConfiguration) bool {
 	featureGateEnabled := cfg.FeatureGates.Enabled(IPPRExclusiveCPUsFeatureGate)
 	cpuManagerPolicy := cfg.StaticConfig.CPUManagerPolicy
 	if (featureGateEnabled && cpuManagerPolicy == CPUManagerPolicyStatic) || (cpuManagerPolicy == CPUManagerPolicyNone) {
@@ -54,12 +54,12 @@ func (f *guaranteedQoSPodCPUResizeFeature) Discover(cfg *nodedeclaredfeatures.No
 	return false
 }
 
-func (f *guaranteedQoSPodCPUResizeFeature) InferForScheduling(podInfo *nodedeclaredfeatures.PodInfo) bool {
+func (f *guaranteedQoSPodCPUResizeFeature) InferForScheduling(podInfo *types.PodInfo) bool {
 	// This feature is only relevant for pod updates (resizes).
 	return false
 }
 
-func (f *guaranteedQoSPodCPUResizeFeature) InferForUpdate(oldPodInfo, newPodInfo *nodedeclaredfeatures.PodInfo) bool {
+func (f *guaranteedQoSPodCPUResizeFeature) InferForUpdate(oldPodInfo, newPodInfo *types.PodInfo) bool {
 	// Since this is an update, the QOS class must already be se ans must be the same for old and new pod spec.
 	if oldPodInfo.Status != nil && oldPodInfo.Status.QOSClass != v1.PodQOSGuaranteed {
 		return false

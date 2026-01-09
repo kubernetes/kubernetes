@@ -23,8 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/component-helpers/nodedeclaredfeatures"
-	test "k8s.io/component-helpers/nodedeclaredfeatures/testing"
+	"k8s.io/component-helpers/nodedeclaredfeatures/types"
 )
 
 func TestGuaranteedQoSPodCPUResizeFeature_Discover(t *testing.T) {
@@ -63,12 +62,9 @@ func TestGuaranteedQoSPodCPUResizeFeature_Discover(t *testing.T) {
 	feature := &guaranteedQoSPodCPUResizeFeature{}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			mockFG := test.NewMockFeatureGate(t)
-			mockFG.EXPECT().Enabled(IPPRExclusiveCPUsFeatureGate).Return(tc.gateEnabled)
-
-			config := &nodedeclaredfeatures.NodeConfiguration{
-				FeatureGates: mockFG,
-				StaticConfig: nodedeclaredfeatures.StaticConfiguration{CPUManagerPolicy: tc.cpuManagerPolicy},
+			config := &types.NodeConfiguration{
+				FeatureGates: types.FeatureGateMap{IPPRExclusiveCPUsFeatureGate: tc.gateEnabled},
+				StaticConfig: types.StaticConfiguration{CPUManagerPolicy: tc.cpuManagerPolicy},
 			}
 			enabled := feature.Discover(config)
 			assert.Equal(t, tc.expected, enabled)
@@ -78,7 +74,7 @@ func TestGuaranteedQoSPodCPUResizeFeature_Discover(t *testing.T) {
 
 func TestGuaranteedQoSPodCPUResizeFeature_InferForScheduling(t *testing.T) {
 	feature := &guaranteedQoSPodCPUResizeFeature{}
-	assert.False(t, feature.InferForScheduling(&nodedeclaredfeatures.PodInfo{Spec: &v1.PodSpec{}, Status: &v1.PodStatus{}}), "InferForScheduling should always be false")
+	assert.False(t, feature.InferForScheduling(&types.PodInfo{Spec: &v1.PodSpec{}, Status: &v1.PodStatus{}}), "InferForScheduling should always be false")
 }
 
 func TestGuaranteedQoSPodCPUResizeFeature_InferFromUpdate(t *testing.T) {
@@ -145,8 +141,8 @@ func TestGuaranteedQoSPodCPUResizeFeature_InferFromUpdate(t *testing.T) {
 	feature := &guaranteedQoSPodCPUResizeFeature{}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			oldPodInfo := &nodedeclaredfeatures.PodInfo{Spec: &tc.oldPod.Spec, Status: &tc.oldPod.Status}
-			newPodInfo := &nodedeclaredfeatures.PodInfo{Spec: &tc.newPod.Spec, Status: &tc.newPod.Status}
+			oldPodInfo := &types.PodInfo{Spec: &tc.oldPod.Spec, Status: &tc.oldPod.Status}
+			newPodInfo := &types.PodInfo{Spec: &tc.newPod.Spec, Status: &tc.newPod.Status}
 			assert.Equal(t, tc.expected, feature.InferForUpdate(oldPodInfo, newPodInfo))
 		})
 	}

@@ -23,12 +23,13 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/component-helpers/nodedeclaredfeatures/types"
 )
 
 // Framework provides functions for discovering node features and inferring pod feature requirements.
 // It is stateful and holds the feature registry.
 type Framework struct {
-	registry []Feature
+	registry []types.Feature
 }
 
 // FeatureSet is a set of node features.
@@ -55,7 +56,7 @@ func (s *FeatureSet) Clone() FeatureSet {
 }
 
 // New creates a new instance of the Framework.
-func New(registry []Feature) (*Framework, error) {
+func New(registry []types.Feature) (*Framework, error) {
 	if registry == nil {
 		return nil, fmt.Errorf("registry must not be nil")
 	}
@@ -66,7 +67,7 @@ func New(registry []Feature) (*Framework, error) {
 
 // DiscoverNodeFeatures determines which features from the registry are enabled
 // for a specific node configuration. It returns a sorted, unique list of feature names.
-func (f *Framework) DiscoverNodeFeatures(cfg *NodeConfiguration) []string {
+func (f *Framework) DiscoverNodeFeatures(cfg *types.NodeConfiguration) []string {
 	var enabledFeatures []string
 	for _, f := range f.registry {
 		if f.Discover(cfg) {
@@ -81,7 +82,7 @@ func (f *Framework) DiscoverNodeFeatures(cfg *NodeConfiguration) []string {
 }
 
 // InferForPodScheduling determines which features from the registry are required by a pod scheduling for a given target version.
-func (f *Framework) InferForPodScheduling(podInfo *PodInfo, targetVersion *version.Version) (FeatureSet, error) {
+func (f *Framework) InferForPodScheduling(podInfo *types.PodInfo, targetVersion *version.Version) (FeatureSet, error) {
 	if targetVersion == nil {
 		return FeatureSet{}, fmt.Errorf("target version cannot be nil")
 	}
@@ -99,7 +100,7 @@ func (f *Framework) InferForPodScheduling(podInfo *PodInfo, targetVersion *versi
 }
 
 // InferForPodUpdate determines which features are required by a pod update operation for a given target version.
-func (f *Framework) InferForPodUpdate(oldPodInfo, newPodInfo *PodInfo, targetVersion *version.Version) (FeatureSet, error) {
+func (f *Framework) InferForPodUpdate(oldPodInfo, newPodInfo *types.PodInfo, targetVersion *version.Version) (FeatureSet, error) {
 	if targetVersion == nil {
 		return FeatureSet{}, fmt.Errorf("target version cannot be nil")
 	}

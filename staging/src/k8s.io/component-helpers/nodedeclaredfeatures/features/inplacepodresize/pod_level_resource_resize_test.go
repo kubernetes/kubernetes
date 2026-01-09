@@ -22,8 +22,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/component-helpers/nodedeclaredfeatures"
-	test "k8s.io/component-helpers/nodedeclaredfeatures/testing"
+	"k8s.io/component-helpers/nodedeclaredfeatures/types"
 )
 
 func TestPodLevelResourcesResizeFeatureDiscover(t *testing.T) {
@@ -46,10 +45,7 @@ func TestPodLevelResourcesResizeFeatureDiscover(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockFG := test.NewMockFeatureGate(t)
-			mockFG.EXPECT().Enabled(IPPRPodLevelResourcesFeatureGate).Return(tt.featureGate)
-
-			cfg := &nodedeclaredfeatures.NodeConfiguration{FeatureGates: mockFG}
+			cfg := &types.NodeConfiguration{FeatureGates: types.FeatureGateMap{IPPRPodLevelResourcesFeatureGate: tt.featureGate}}
 			enabled := PodLevelResourcesResizeFeature.Discover(cfg)
 			assert.Equal(t, tt.expected, enabled)
 		})
@@ -57,20 +53,20 @@ func TestPodLevelResourcesResizeFeatureDiscover(t *testing.T) {
 }
 
 func TestPodLevelResourcesResizeFeatureInferForScheduling(t *testing.T) {
-	podInfo := &nodedeclaredfeatures.PodInfo{Spec: &v1.PodSpec{}, Status: &v1.PodStatus{}}
+	podInfo := &types.PodInfo{Spec: &v1.PodSpec{}, Status: &v1.PodStatus{}}
 	assert.False(t, PodLevelResourcesResizeFeature.InferForScheduling(podInfo), "InferForScheduling should always be false")
 }
 
 func TestPodLevelResourcesResizeFeatureInferForUpdate(t *testing.T) {
 	tests := []struct {
 		name       string
-		oldPodInfo *nodedeclaredfeatures.PodInfo
-		newPodInfo *nodedeclaredfeatures.PodInfo
+		oldPodInfo *types.PodInfo
+		newPodInfo *types.PodInfo
 		expected   bool
 	}{
 		{
 			name: "NoResourcesChanged",
-			oldPodInfo: &nodedeclaredfeatures.PodInfo{
+			oldPodInfo: &types.PodInfo{
 				Spec: &v1.PodSpec{
 					Resources: &v1.ResourceRequirements{
 						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
@@ -79,7 +75,7 @@ func TestPodLevelResourcesResizeFeatureInferForUpdate(t *testing.T) {
 				},
 				Status: &v1.PodStatus{},
 			},
-			newPodInfo: &nodedeclaredfeatures.PodInfo{
+			newPodInfo: &types.PodInfo{
 				Spec: &v1.PodSpec{
 					Resources: &v1.ResourceRequirements{
 						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
@@ -92,11 +88,11 @@ func TestPodLevelResourcesResizeFeatureInferForUpdate(t *testing.T) {
 		},
 		{
 			name: "ResourcesAdded",
-			oldPodInfo: &nodedeclaredfeatures.PodInfo{
+			oldPodInfo: &types.PodInfo{
 				Spec:   &v1.PodSpec{},
 				Status: &v1.PodStatus{},
 			},
-			newPodInfo: &nodedeclaredfeatures.PodInfo{
+			newPodInfo: &types.PodInfo{
 				Spec: &v1.PodSpec{
 					Resources: &v1.ResourceRequirements{
 						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
@@ -109,7 +105,7 @@ func TestPodLevelResourcesResizeFeatureInferForUpdate(t *testing.T) {
 		},
 		{
 			name: "ResourcesRemoved",
-			oldPodInfo: &nodedeclaredfeatures.PodInfo{
+			oldPodInfo: &types.PodInfo{
 				Spec: &v1.PodSpec{
 					Resources: &v1.ResourceRequirements{
 						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
@@ -118,7 +114,7 @@ func TestPodLevelResourcesResizeFeatureInferForUpdate(t *testing.T) {
 				},
 				Status: &v1.PodStatus{},
 			},
-			newPodInfo: &nodedeclaredfeatures.PodInfo{
+			newPodInfo: &types.PodInfo{
 				Spec:   &v1.PodSpec{},
 				Status: &v1.PodStatus{},
 			},
@@ -126,7 +122,7 @@ func TestPodLevelResourcesResizeFeatureInferForUpdate(t *testing.T) {
 		},
 		{
 			name: "ResourcesChanged",
-			oldPodInfo: &nodedeclaredfeatures.PodInfo{
+			oldPodInfo: &types.PodInfo{
 				Spec: &v1.PodSpec{
 					Resources: &v1.ResourceRequirements{
 						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
@@ -135,7 +131,7 @@ func TestPodLevelResourcesResizeFeatureInferForUpdate(t *testing.T) {
 				},
 				Status: &v1.PodStatus{},
 			},
-			newPodInfo: &nodedeclaredfeatures.PodInfo{
+			newPodInfo: &types.PodInfo{
 				Spec: &v1.PodSpec{
 					Resources: &v1.ResourceRequirements{
 						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
@@ -148,11 +144,11 @@ func TestPodLevelResourcesResizeFeatureInferForUpdate(t *testing.T) {
 		},
 		{
 			name: "NilResources",
-			oldPodInfo: &nodedeclaredfeatures.PodInfo{
+			oldPodInfo: &types.PodInfo{
 				Spec:   &v1.PodSpec{},
 				Status: &v1.PodStatus{},
 			},
-			newPodInfo: &nodedeclaredfeatures.PodInfo{
+			newPodInfo: &types.PodInfo{
 				Spec:   &v1.PodSpec{},
 				Status: &v1.PodStatus{},
 			},
