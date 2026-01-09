@@ -64,7 +64,7 @@ func TestKubeVersionGetterClusterVersion(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client := clientsetfake.NewSimpleClientset()
+			client := clientsetfake.NewClientset()
 			client.Discovery().(*fakediscovery.FakeDiscovery).FakedServerVersion = tt.version
 
 			g := &KubeVersionGetter{
@@ -123,7 +123,7 @@ func TestKubeVersionGetterVersionFromCILabel(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			g := &KubeVersionGetter{
-				client: clientsetfake.NewSimpleClientset(),
+				client: clientsetfake.NewClientset(),
 			}
 			cliVersion, parsedVersion, err := g.VersionFromCILabel(tt.ciVersionLabel, "test VersionFromCILabel")
 			if (err != nil) != tt.wantErr {
@@ -214,7 +214,7 @@ func TestKubeVersionGetterKubeletVersions(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		client := clientsetfake.NewSimpleClientset()
+		client := clientsetfake.NewClientset()
 		t.Run(tt.name, func(t *testing.T) {
 			for _, node := range tt.nodes.Items {
 				err := client.Tracker().Create(schema.GroupVersionResource{Version: "v1", Resource: "nodes"}, &node, "")

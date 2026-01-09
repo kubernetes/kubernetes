@@ -35,7 +35,7 @@ func TestAllowBootstrapTokensToPostCSRs(t *testing.T) {
 	}{
 		{
 			name:   "ClusterRoleBindings is empty",
-			client: clientsetfake.NewSimpleClientset(),
+			client: clientsetfake.NewClientset(),
 		},
 		{
 			name: "ClusterRoleBindings already exists",
@@ -92,7 +92,7 @@ func TestAutoApproveNodeBootstrapTokens(t *testing.T) {
 	}{
 		{
 			name:   "ClusterRoleBindings is empty",
-			client: clientsetfake.NewSimpleClientset(),
+			client: clientsetfake.NewClientset(),
 		},
 		{
 			name: "ClusterRoleBindings already exists",
@@ -149,7 +149,7 @@ func TestAutoApproveNodeCertificateRotation(t *testing.T) {
 	}{
 		{
 			name:   "ClusterRoleBindings is empty",
-			client: clientsetfake.NewSimpleClientset(),
+			client: clientsetfake.NewClientset(),
 		},
 		{
 			name: "ClusterRoleBindings already exists",
@@ -206,7 +206,7 @@ func TestAllowBootstrapTokensToGetNodes(t *testing.T) {
 	}{
 		{
 			name:   "RBAC rules are empty",
-			client: clientsetfake.NewSimpleClientset(),
+			client: clientsetfake.NewClientset(),
 		},
 		{
 			name: "RBAC rules already exists",
@@ -279,7 +279,7 @@ func TestAllowBootstrapTokensToGetNodes(t *testing.T) {
 }
 
 func newMockClusterRoleBinddingClientForTest(t *testing.T, clusterRoleBinding *rbac.ClusterRoleBinding) *clientsetfake.Clientset {
-	client := clientsetfake.NewSimpleClientset()
+	client := clientsetfake.NewClientset()
 	_, err := client.RbacV1().ClusterRoleBindings().Create(context.TODO(), clusterRoleBinding, metav1.CreateOptions{})
 
 	if err != nil {
@@ -289,7 +289,7 @@ func newMockClusterRoleBinddingClientForTest(t *testing.T, clusterRoleBinding *r
 }
 
 func newMockRbacClientForTest(t *testing.T, clusterRole *rbac.ClusterRole, clusterRoleBinding *rbac.ClusterRoleBinding) *clientsetfake.Clientset {
-	client := clientsetfake.NewSimpleClientset()
+	client := clientsetfake.NewClientset()
 	_, err := client.RbacV1().ClusterRoles().Create(context.TODO(), clusterRole, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("error creating ClusterRoles: %v", err)

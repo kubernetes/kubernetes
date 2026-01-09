@@ -41,7 +41,7 @@ import (
 
 func TestCreateConfigMap(t *testing.T) {
 	nodeName := "fake-node"
-	client := fake.NewSimpleClientset()
+	client := fake.NewClientset()
 	client.PrependReactor("get", "nodes", func(action core.Action) (bool, runtime.Object, error) {
 		return true, &v1.Node{
 			ObjectMeta: metav1.ObjectMeta{
@@ -71,7 +71,7 @@ func TestCreateConfigMap(t *testing.T) {
 }
 
 func TestCreateConfigMapRBACRules(t *testing.T) {
-	client := fake.NewSimpleClientset()
+	client := fake.NewClientset()
 	client.PrependReactor("create", "roles", func(action core.Action) (bool, runtime.Object, error) {
 		return true, nil, nil
 	})
