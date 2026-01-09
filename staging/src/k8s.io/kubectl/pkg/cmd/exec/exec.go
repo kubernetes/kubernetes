@@ -205,12 +205,18 @@ type ExecOptions struct {
 
 // Complete verifies command line arguments and loads data from the command environment
 func (p *ExecOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn []string, argsLenAtDash int) error {
+	// first arg before "--" is the resource
 	if len(argsIn) > 0 && argsLenAtDash != 0 {
 		p.ResourceName = argsIn[0]
 	}
 	if argsLenAtDash > -1 {
+		// We don't allow any commands after the resource name, i.e. "exec -it resource COMMAND -- COMMAND"
+		if argsLenAtDash > 1 {
+			return cmdutil.UsageErrorf(cmd, "exec [POD] [COMMAND] is not supported anymore. Use exec [POD] -- [COMMAND] instead")
+		}
 		p.Command = argsIn[argsLenAtDash:]
 	} else if len(argsIn) > 1 || (len(argsIn) > 0 && len(p.FilenameOptions.Filenames) != 0) {
+		// We don't allow command execution without "--", i.e. "exec -it resource COMMAND"
 		return cmdutil.UsageErrorf(cmd, "exec [POD] [COMMAND] is not supported anymore. Use exec [POD] -- [COMMAND] instead")
 	}
 
