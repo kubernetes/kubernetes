@@ -27,7 +27,7 @@ import (
 )
 
 var (
-	interruptCtx context.Context
+	interruptCtx = context.Background()
 
 	defaultProgressReporter = new(progressReporter)
 	defaultSignalChannel    chan os.Signal
@@ -39,7 +39,10 @@ type ginkgoReporter interface {
 	AttachProgressReporter(reporter func() string) func()
 }
 
-func init() {
+// InitSignals is meant to be used in unit or integration tests.
+// It implements support for triggering a progress report in
+// a running test when sending it a USR1 signal.
+func InitSignals() {
 	// Setting up signals is intentionally done in an init function because
 	// then importing ktesting in a unit or integration test is sufficient
 	// to activate the signal behavior.
