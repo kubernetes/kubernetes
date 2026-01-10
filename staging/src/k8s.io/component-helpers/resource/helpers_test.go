@@ -2319,7 +2319,193 @@ func getPod(cname string, resources podResources) *v1.Pod {
 					Resources: r,
 				},
 			},
-			Overhead: overhead,
+		Overhead: overhead,
+	},
+}
+}
+
+func TestAllContainersHaveLimitForResource(t *testing.T) {
+	testCases := []struct {
+		name     string
+		pod      *v1.Pod
+		resource v1.ResourceName
+		expected bool
+	}{
+		{
+			name: "all containers have CPU limit",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "container1",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceCPU: resource.MustParse("100m"),
+								},
+							},
+						},
+						{
+							Name: "container2",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceCPU: resource.MustParse("200m"),
+								},
+							},
+						},
+					},
+				},
+			},
+			resource: v1.ResourceCPU,
+			expected: true,
 		},
+		{
+			name: "one container missing CPU limit",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "container1",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceCPU: resource.MustParse("100m"),
+								},
+							},
+						},
+						{
+							Name: "container2",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceMemory: resource.MustParse("512Mi"),
+								},
+							},
+						},
+					},
+				},
+			},
+			resource: v1.ResourceCPU,
+			expected: false,
+		},
+		{
+			name: "all containers including init containers have memory limit",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "container1",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceMemory: resource.MustParse("256Mi"),
+								},
+							},
+						},
+					},
+					InitContainers: []v1.Container{
+						{
+							Name: "init1",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceMemory: resource.MustParse("128Mi"),
+								},
+							},
+						},
+					},
+				},
+			},
+			resource: v1.ResourceMemory,
+			expected: true,
+		},
+		{
+			name: "init container missing memory limit",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "container1",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceMemory: resource.MustParse("256Mi"),
+								},
+							},
+						},
+					},
+					InitContainers: []v1.Container{
+						{
+							Name: "init1",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceCPU: resource.MustParse("100m"),
+								},
+							},
+						},
+					},
+				},
+			},
+			resource: v1.ResourceMemory,
+			expected: false,
+		},
+		{
+			name: "restartable init container (sidecar) has limit",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "container1",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceCPU: resource.MustParse("100m"),
+								},
+							},
+						},
+					},
+					InitContainers: []v1.Container{
+						{
+							Name:          "sidecar",
+							RestartPolicy: ptr.To(v1.ContainerRestartPolicyAlways),
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceCPU: resource.MustParse("50m"),
+								},
+							},
+						},
+					},
+				},
+			},
+			resource: v1.ResourceCPU,
+			expected: true,
+		},
+		{
+			name: "empty pod",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{},
+				},
+			},
+			resource: v1.ResourceCPU,
+			expected: true,
+		},
+		{
+			name: "container with no limits at all",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:      "container1",
+							Resources: v1.ResourceRequirements{},
+						},
+					},
+				},
+			},
+			resource: v1.ResourceCPU,
+			expected: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := AllContainersHaveLimitForResource(tc.pod, tc.resource)
+			if result != tc.expected {
+				t.Errorf("expected %v, got %v", tc.expected, result)
+			}
+		})
 	}
 }
