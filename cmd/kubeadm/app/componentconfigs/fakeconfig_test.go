@@ -350,7 +350,7 @@ func TestGeneratedConfigFromCluster(t *testing.T) {
 					}
 				}
 
-				client := clientsetfake.NewSimpleClientset(configMap)
+				client := clientsetfake.NewClientset(configMap)
 				cfg, err := clusterConfigHandler.FromCluster(client, testClusterCfg())
 				if err != nil {
 					t.Fatalf("unexpected failure of FromCluster: %v", err)
@@ -472,7 +472,7 @@ func TestLoadingFromDocumentMap(t *testing.T) {
 
 func TestLoadingFromCluster(t *testing.T) {
 	runClusterConfigFromTest(t, func(t *testing.T, in string) (kubeadmapi.ComponentConfig, error) {
-		client := clientsetfake.NewSimpleClientset(
+		client := clientsetfake.NewClientset(
 			testClusterConfigMap(in, false),
 		)
 
@@ -522,7 +522,7 @@ func TestGetVersionStates(t *testing.T) {
 
 		for _, test := range cases {
 			t.Run(test.desc, func(t *testing.T) {
-				client := clientsetfake.NewSimpleClientset(test.obj)
+				client := clientsetfake.NewClientset(test.obj)
 
 				clusterCfg := testClusterCfg()
 

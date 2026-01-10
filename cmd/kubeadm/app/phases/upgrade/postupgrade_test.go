@@ -372,7 +372,7 @@ func TestUnupgradedControlPlaneInstances(t *testing.T) {
 			for _, pod := range tc.pods {
 				runtimeObjs = append(runtimeObjs, &pod) // Use pointer
 			}
-			client := fake.NewSimpleClientset(runtimeObjs...)
+			client := fake.NewClientset(runtimeObjs...)
 
 			nodes, err := UnupgradedControlPlaneInstances(client, tc.currentNode)
 			if tc.expectError != (err != nil) {
