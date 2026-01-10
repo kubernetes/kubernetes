@@ -68,7 +68,7 @@ type DryRun struct {
 // NewDryRun creates a new DryRun object that only has a fake client.
 func NewDryRun() *DryRun {
 	d := &DryRun{}
-	d.fakeClient = fake.NewSimpleClientset()
+	d.fakeClient = fake.NewClientset()
 	d.addReactors()
 	return d
 }

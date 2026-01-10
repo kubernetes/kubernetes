@@ -560,7 +560,7 @@ kubernetesVersion: %s`,
 
 	// fakeClientSetFromFile returns a fake clientset with kubeadm config map
 	var fakeClientSetFromFile = func(_ string) (kubernetes.Interface, error) {
-		client := fakeclientset.NewSimpleClientset()
+		client := fakeclientset.NewClientset()
 		client.PrependReactor("get", "configmaps", func(action clientgotesting.Action) (bool, runtime.Object, error) {
 			getAction := action.(clientgotesting.GetAction)
 			if getAction.GetNamespace() == metav1.NamespaceSystem && getAction.GetName() == kubeadmconstants.KubeadmConfigConfigMap {

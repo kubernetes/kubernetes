@@ -202,7 +202,7 @@ func TestGetEtcdEndpointsWithBackoff(t *testing.T) {
 	}
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
-			client := clientsetfake.NewSimpleClientset()
+			client := clientsetfake.NewClientset()
 			for _, pod := range rt.pods {
 				if err := pod.Create(client); err != nil {
 					t.Errorf("error setting up test creating pod for node %q", pod.NodeName)
@@ -284,7 +284,7 @@ func TestGetRawEtcdEndpointsFromPodAnnotation(t *testing.T) {
 	}
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
-			client := clientsetfake.NewSimpleClientset()
+			client := clientsetfake.NewClientset()
 			for i, pod := range rt.pods {
 				if err := pod.CreateWithPodSuffix(client, strconv.Itoa(i)); err != nil {
 					t.Errorf("error setting up test creating pod for node %q", pod.NodeName)
@@ -383,7 +383,7 @@ func TestGetRawEtcdEndpointsFromPodAnnotationWithoutRetry(t *testing.T) {
 	}
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
-			client := clientsetfake.NewSimpleClientset()
+			client := clientsetfake.NewClientset()
 			for _, pod := range rt.pods {
 				if err := pod.Create(client); err != nil {
 					t.Errorf("error setting up test creating pod for node %q", pod.NodeName)

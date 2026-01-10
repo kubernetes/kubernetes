@@ -77,7 +77,7 @@ func TestFor(t *testing.T) {
 			config.Timeouts = &kubeadm.Timeouts{
 				Discovery: &metav1.Duration{Duration: 1 * time.Minute},
 			}
-			client := fakeclient.NewSimpleClientset()
+			client := fakeclient.NewClientset()
 			_, actual := For(client, &config)
 			if (actual == nil) != rt.expect {
 				t.Errorf(
