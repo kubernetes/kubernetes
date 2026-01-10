@@ -580,19 +580,31 @@ func (d *initData) WaitControlPlaneClient() (clientset.Interface, error) {
 	if err != nil {
 		return nil, err
 	}
-	for _, v := range config.Clusters {
-		v.Server = fmt.Sprintf("https://%s",
-			net.JoinHostPort(
-				d.Cfg().LocalAPIEndpoint.AdvertiseAddress,
-				strconv.Itoa(int(d.Cfg().LocalAPIEndpoint.BindPort)),
-			),
-		)
+
+	// Construct the local URL
+	localAPIEndpoint := fmt.Sprintf("https://%s",
+		net.JoinHostPort(
+			d.Cfg().LocalAPIEndpoint.AdvertiseAddress,
+			strconv.Itoa(int(d.Cfg().LocalAPIEndpoint.BindPort)),
+		),
+	)
+
+	// Explicitly override the server URL to use the local endpoint.
+	// This ensures the client connects to the local API server even if admin.conf
+	// points to a Load Balancer.
+	overrides := &clientcmd.ConfigOverrides{
+		ClusterInfo: clientcmdapi.Cluster{
+			Server: localAPIEndpoint,
+		},
 	}
-	client, err := kubeconfigutil.ToClientSet(config)
+
+	clientConfig := clientcmd.NewDefaultClientConfig(*config, overrides)
+	restConfig, err := clientConfig.ClientConfig()
 	if err != nil {
 		return nil, err
 	}
-	return client, nil
+
+	return clientset.NewForConfig(restConfig)
 }
 
 // Tokens returns an array of token strings.
