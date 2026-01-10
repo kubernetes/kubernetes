@@ -24,6 +24,7 @@ import (
 	discoveryv1 "k8s.io/api/discovery/v1"
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/operation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -31,6 +32,7 @@ import (
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -91,8 +93,8 @@ func (endpointSliceStrategy) PrepareForUpdate(ctx context.Context, obj, old runt
 // Validate validates a new EndpointSlice.
 func (endpointSliceStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	endpointSlice := obj.(*discovery.EndpointSlice)
-	err := validation.ValidateEndpointSliceCreate(endpointSlice)
-	return err
+	allErrs := validation.ValidateEndpointSliceCreate(endpointSlice)
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, endpointSlice, nil, allErrs, operation.Create)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -120,7 +122,8 @@ func (endpointSliceStrategy) AllowCreateOnUpdate() bool {
 func (endpointSliceStrategy) ValidateUpdate(ctx context.Context, new, old runtime.Object) field.ErrorList {
 	newEPS := new.(*discovery.EndpointSlice)
 	oldEPS := old.(*discovery.EndpointSlice)
-	return validation.ValidateEndpointSliceUpdate(newEPS, oldEPS)
+	allErrs := validation.ValidateEndpointSliceUpdate(newEPS, oldEPS)
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newEPS, oldEPS, allErrs, operation.Update)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
