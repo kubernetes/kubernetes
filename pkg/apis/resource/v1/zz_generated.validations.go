@@ -111,6 +111,14 @@ func Validate_AllocatedDeviceStatus(ctx context.Context, op operation.Operation,
 				return nil
 			}
 			// call field-attached validations
+			earlyReturn := false
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 8); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			// lists with map semantics require unique keys
 			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a metav1.Condition, b metav1.Condition) bool { return a.Type == b.Type })...)
 			return

@@ -1290,7 +1290,7 @@ func validateDeviceStatus(device resource.AllocatedDeviceStatus, fldPath *field.
 		allErrs = append(allErrs, field.Invalid(fldPath, sharedDeviceID, "must be an allocated device in the claim"))
 	}
 	if len(device.Conditions) > resource.AllocatedDeviceStatusMaxConditions {
-		allErrs = append(allErrs, field.TooMany(fldPath.Child("conditions"), len(device.Conditions), resource.AllocatedDeviceStatusMaxConditions))
+		allErrs = append(allErrs, field.TooMany(fldPath.Child("conditions"), len(device.Conditions), resource.AllocatedDeviceStatusMaxConditions).MarkCoveredByDeclarative())
 	}
 	allErrs = append(allErrs, metav1validation.ValidateConditions(device.Conditions, fldPath.Child("conditions"))...)
 	if device.Data != nil && len(device.Data.Raw) > 0 { // Data is an optional field.

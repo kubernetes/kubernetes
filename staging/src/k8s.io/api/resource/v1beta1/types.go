@@ -1982,6 +1982,7 @@ type AllocatedDeviceStatus struct {
 	// +listMapKey=type
 	// +k8s:listType=map
 	// +k8s:listMapKey=type
+	// +k8s:maxItems=8
 	Conditions []metav1.Condition `json:"conditions" protobuf:"bytes,4,opt,name=conditions"`
 
 	// Data contains arbitrary driver-specific data.
