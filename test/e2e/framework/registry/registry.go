@@ -118,7 +118,8 @@ func podManifest(podTestLabel string) (*v1.Pod, error) {
 	pod.Spec.Containers[0].Name = "registry"
 	pod.Spec.Containers[0].Image = imageutils.GetE2EImage(imageutils.Agnhost)
 	pod.Spec.Containers[0].ImagePullPolicy = v1.PullIfNotPresent
-	pod.Spec.Containers[0].Args = []string{"fake-registry-server", "--private"}
+	pod.Spec.Containers[0].Command = []string{"powershell", "-Command"}
+	pod.Spec.Containers[0].Args = []string{"Copy-Item c:\\hpc\\agnhost -Destination c:\\hpc\\agnhost.exe; c:\\hpc\\agnhost.exe fake-registry-server --private"}
 	pod.Spec.Containers[0].Ports = []v1.ContainerPort{
 		{
 			Name:          "http",
@@ -127,6 +128,10 @@ func podManifest(podTestLabel string) (*v1.Pod, error) {
 		},
 	}
 	pod.Spec.Containers[0].SecurityContext.RunAsUser = ptr.To[int64](5123)
+	pod.Spec.Containers[0].SecurityContext.WindowsOptions = &v1.WindowsSecurityContextOptions{
+		RunAsUserName: ptr.To("NT AUTHORITY\\SYSTEM"),
+		HostProcess:   ptr.To(true),
+	}
 	// setting HostNetwork to true so that the registry is accessible on localhost:<hostport>
 	// and we don't have to deal with any CNI quirks.
 	pod.Spec.HostNetwork = true
