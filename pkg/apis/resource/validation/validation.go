@@ -1293,13 +1293,7 @@ func validateDeviceStatus(device resource.AllocatedDeviceStatus, fldPath *field.
 		allErrs = append(allErrs, field.TooMany(fldPath.Child("conditions"), len(device.Conditions), resource.AllocatedDeviceStatusMaxConditions).WithOrigin("maxItems").MarkCoveredByDeclarative())
 	}
 	// Allow declarative validation to handle duplicates (via +listType=map)
-	for _, err := range metav1validation.ValidateConditions(device.Conditions, fldPath.Child("conditions")) {
-		if err.Type == field.ErrorTypeDuplicate {
-			allErrs = append(allErrs, err.MarkCoveredByDeclarative())
-		} else {
-			allErrs = append(allErrs, err)
-		}
-	}
+	allErrs = append(allErrs, metav1validation.ValidateConditions(device.Conditions, fldPath.Child("conditions"))...)
 	if device.Data != nil && len(device.Data.Raw) > 0 { // Data is an optional field.
 		allErrs = append(allErrs, validateRawExtension(*device.Data, fldPath.Child("data"), false, resource.AllocatedDeviceStatusDataMaxLength)...)
 	}
