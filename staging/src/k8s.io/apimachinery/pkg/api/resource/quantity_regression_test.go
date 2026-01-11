@@ -41,7 +41,7 @@ func TestMustParseMaxInt64(t *testing.T) {
 	// Verify the value is correct
 	val, ok := q.AsInt64()
 	if !ok {
-		t.Errorf("AsInt64() returned false for valid int64 input")
+		t.Errorf("AsInt64() returned error (false) for valid int64 input")
 	}
 	if val != math.MaxInt64 {
 		t.Errorf("Expected %d, got %d", int64(math.MaxInt64), val)
