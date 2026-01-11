@@ -18,9 +18,9 @@ import (
 var ShiftJIS encoding.Encoding = &shiftJIS
 
 var shiftJIS = internal.Encoding{
-	&internal.SimpleEncoding{shiftJISDecoder{}, shiftJISEncoder{}},
-	"Shift JIS",
-	identifier.ShiftJIS,
+	Encoding: &internal.SimpleEncoding{Decoder: shiftJISDecoder{}, Encoder: shiftJISEncoder{}},
+	Name:     "Shift JIS",
+	MIB:      identifier.ShiftJIS,
 }
 
 type shiftJISDecoder struct{ transform.NopResetter }

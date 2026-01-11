@@ -20,9 +20,9 @@ var All = []encoding.Encoding{Big5}
 var Big5 encoding.Encoding = &big5
 
 var big5 = internal.Encoding{
-	&internal.SimpleEncoding{big5Decoder{}, big5Encoder{}},
-	"Big5",
-	identifier.Big5,
+	Encoding: &internal.SimpleEncoding{Decoder: big5Decoder{}, Encoder: big5Encoder{}},
+	Name:     "Big5",
+	MIB:      identifier.Big5,
 }
 
 type big5Decoder struct{ transform.NopResetter }
