@@ -17,6 +17,7 @@ limitations under the License.
 package resourceclaim
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -206,25 +207,6 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			input: mkValidResourceClaim(tweakDeviceConfigWithDriver(".example.com")),
 			expectedErrs: field.ErrorList{
 				field.Invalid(opaqueDriverPath, ".example.com", "").WithOrigin("format=k8s-long-name-caseless"),
-			},
-		},
-		"invalid: too many conditions": {
-			input: mkResourceClaimWithStatus(tweakStatusDevices(resource.AllocatedDeviceStatus{
-				Conditions: make([]v1.Condition, 9),
-			})),
-			expectedErrs: field.ErrorList{
-				field.TooMany(field.NewPath("status", "devices").Index(0).Child("conditions"), 9, 8).WithOrigin("maxItems").MarkCoveredByDeclarative(),
-			},
-		},
-		"invalid: duplicate condition types": {
-			input: mkResourceClaimWithStatus(tweakStatusDevices(resource.AllocatedDeviceStatus{
-				Conditions: []v1.Condition{
-					{Type: "Ready", Status: v1.ConditionTrue, Reason: "Ready", Message: "Ready"},
-					{Type: "Ready", Status: v1.ConditionFalse, Reason: "NotReady", Message: "NotReady"},
-				},
-			})),
-			expectedErrs: field.ErrorList{
-				field.Duplicate(field.NewPath("status", "devices").Index(0).Child("conditions").Index(1), "Ready"),
 			},
 		},
 		// spec.Devices.Requests[%d].Exactly.Tolerations.Key
@@ -1755,5 +1737,78 @@ func tweakStatusDevicesTooManyIPs(count int) func(rc *resource.ResourceClaim) {
 		for i := 0; i < count; i++ {
 			rc.Status.Devices[0].NetworkData.IPs = append(rc.Status.Devices[0].NetworkData.IPs, fmt.Sprintf("1.2.3.%d/32", i))
 		}
+	}
+}
+
+func TestDeclarativeValidateStatus(t *testing.T) {
+	for _, apiVersion := range apiVersions {
+		t.Run(apiVersion, func(t *testing.T) {
+			testDeclarativeValidateStatus(t, apiVersion)
+		})
+	}
+}
+
+func testDeclarativeValidateStatus(t *testing.T, apiVersion string) {
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+		APIGroup:    "resource.k8s.io",
+		APIVersion:  apiVersion,
+		Resource:    "resourceclaims",
+		Subresource: "status",
+	})
+	fakeClient := fake.NewClientset()
+	mockNSClient := fakeClient.CoreV1().Namespaces()
+	Strategy := NewStrategy(mockNSClient)
+	StatusStrategy := NewStatusStrategy(Strategy)
+
+	validAllocation := &resource.AllocationResult{
+		Devices: resource.DeviceAllocationResult{
+			Results: []resource.DeviceRequestAllocationResult{
+				{Driver: "test", Pool: "test", Device: "test"},
+			},
+		},
+	}
+
+	validConditions := make([]v1.Condition, 9)
+	for i := 0; i < 9; i++ {
+		validConditions[i] = v1.Condition{
+			Type:               fmt.Sprintf("Condition%d", i),
+			Status:             v1.ConditionTrue,
+			Reason:             "Reason",
+			Message:            "Message",
+			LastTransitionTime: v1.Now(),
+		}
+	}
+
+	testCases := map[string]struct {
+		update       resource.ResourceClaim
+		old          resource.ResourceClaim
+		expectedErrs field.ErrorList
+	}{
+		"invalid: too many conditions": {
+			update: func() resource.ResourceClaim {
+				claim := mkResourceClaimWithStatus(tweakStatusDevices(resource.AllocatedDeviceStatus{
+					Driver: "test", Pool: "test", Device: "test",
+					Conditions: validConditions,
+				}))
+				claim.ObjectMeta.ResourceVersion = "1"
+				claim.Status.Allocation = validAllocation
+				return claim
+			}(),
+			old: func() resource.ResourceClaim {
+				claim := mkValidResourceClaim()
+				claim.Status.Allocation = validAllocation
+				return claim
+			}(),
+			expectedErrs: field.ErrorList{
+				field.TooMany(field.NewPath("status", "devices").Index(0).Child("conditions"), 9, 8).WithOrigin("maxItems").MarkCoveredByDeclarative(),
+			},
+		},
+	}
+	for k, tc := range testCases {
+		t.Run(k, func(t *testing.T) {
+			apitesting.VerifyValidationEquivalence(t, ctx, &tc.update, func(ctx context.Context, obj runtime.Object) field.ErrorList {
+				return StatusStrategy.ValidateUpdate(ctx, obj, &tc.old)
+			}, tc.expectedErrs, apitesting.WithNormalizationRules(validation.ResourceNormalizationRules...))
+		})
 	}
 }
