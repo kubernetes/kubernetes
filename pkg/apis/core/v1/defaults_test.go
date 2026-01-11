@@ -3727,10 +3727,255 @@ func TestDefaultPodLimits(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "defaults pod-level limits with mixed initContainers and containers when all have cpu+memory limits and pod-level requests are set",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("500m"),
+							v1.ResourceMemory: resource.MustParse("512Mi"),
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "container1",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("200m"),
+									v1.ResourceMemory: resource.MustParse("256Mi"),
+								},
+							},
+						},
+						{
+							Name: "container2",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("300m"),
+									v1.ResourceMemory: resource.MustParse("256Mi"),
+								},
+							},
+						},
+					},
+					InitContainers: []v1.Container{
+						{
+							Name: "init1",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("128Mi"),
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("500m"),
+							v1.ResourceMemory: resource.MustParse("512Mi"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("500m"),  // max(sum(containers), max(init))
+							v1.ResourceMemory: resource.MustParse("512Mi"), // max(sum(containers), max(init))
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "container1",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("200m"),
+									v1.ResourceMemory: resource.MustParse("256Mi"),
+								},
+							},
+						},
+						{
+							Name: "container2",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("300m"),
+									v1.ResourceMemory: resource.MustParse("256Mi"),
+								},
+							},
+						},
+					},
+					InitContainers: []v1.Container{
+						{
+							Name: "init1",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("128Mi"),
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "does not override pod-level limits when they are already set",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("500m"),
+							v1.ResourceMemory: resource.MustParse("512Mi"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("1000m"),  // already set
+							v1.ResourceMemory: resource.MustParse("1024Mi"), // already set
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "container1",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("200m"),
+									v1.ResourceMemory: resource.MustParse("256Mi"),
+								},
+							},
+						},
+						{
+							Name: "container2",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("300m"),
+									v1.ResourceMemory: resource.MustParse("256Mi"),
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("500m"),
+							v1.ResourceMemory: resource.MustParse("512Mi"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("1000m"),  // unchanged
+							v1.ResourceMemory: resource.MustParse("1024Mi"), // unchanged
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "container1",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("200m"),
+									v1.ResourceMemory: resource.MustParse("256Mi"),
+								},
+							},
+						},
+						{
+							Name: "container2",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("300m"),
+									v1.ResourceMemory: resource.MustParse("256Mi"),
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "defaults pod-level limits per-resource when any container is missing cpu or memory limit (partial limits A/B/C example)",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("500m"),
+							v1.ResourceMemory: resource.MustParse("512Mi"),
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "containerA",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("200m"),
+									v1.ResourceMemory: resource.MustParse("256Mi"),
+								},
+							},
+						},
+						{
+							Name: "containerB",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("300m"),
+									v1.ResourceMemory: resource.MustParse("256Mi"),
+								},
+							},
+						},
+						{
+							Name: "containerC",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceCPU: resource.MustParse("100m"),
+									// memory limit missing
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("500m"),
+							v1.ResourceMemory: resource.MustParse("512Mi"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("600m"), // CPU defaulted (all containers have CPU limits)
+							// memory NOT defaulted (per-resource: containerC is missing memory limit)
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "containerA",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("200m"),
+									v1.ResourceMemory: resource.MustParse("256Mi"),
+								},
+							},
+						},
+						{
+							Name: "containerB",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("300m"),
+									v1.ResourceMemory: resource.MustParse("256Mi"),
+								},
+							},
+						},
+						{
+							Name: "containerC",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceCPU: resource.MustParse("100m"),
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
 			// Apply defaulting
 			obj := roundTrip(t, runtime.Object(tc.pod))
 			pod := obj.(*v1.Pod)
