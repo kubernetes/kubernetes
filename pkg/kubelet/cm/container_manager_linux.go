@@ -1114,6 +1114,28 @@ func (cm *containerManagerImpl) UpdateAllocatedResourcesStatus(pod *v1.Pod, stat
 			cm.draManager.UpdateAllocatedResourcesStatus(pod, status)
 		}
 	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.InPlacePodVerticalScaling) {
+		for i := range status.ContainerStatuses {
+			containerStatus := &status.ContainerStatuses[i]
+			// We find the corresponding container in the spec to get the 'allocated' values
+			for _, container := range pod.Spec.Containers {
+				if container.Name == containerStatus.Name {
+					if containerStatus.AllocatedResources == nil {
+						containerStatus.AllocatedResources = make(v1.ResourceList)
+					}
+					// For CPU and Memory, 'Allocated' is essentially what the Kubelet has
+					// admitted from the Spec.Requests during the resize process.
+					for resName, resQuantity := range container.Resources.Requests {
+						if resName == v1.ResourceCPU || resName == v1.ResourceMemory {
+							containerStatus.AllocatedResources[resName] = resQuantity.DeepCopy()
+						}
+					}
+					break
+				}
+			}
+		}
+	}
 }
 
 func (cm *containerManagerImpl) Updates() <-chan resourceupdates.Update {

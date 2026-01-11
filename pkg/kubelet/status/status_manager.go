@@ -837,6 +837,21 @@ func (m *manager) updateStatusInternal(logger klog.Logger, pod *v1.Pod, status v
 
 	normalizeStatus(pod, &status)
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
+		podAllocated := v1.ResourceList{}
+		for _, container := range pod.Spec.Containers {
+			for resName, resQuantity := range container.Resources.Requests {
+				if val, ok := podAllocated[resName]; ok {
+					val.Add(resQuantity)
+					podAllocated[resName] = val
+				} else {
+					podAllocated[resName] = resQuantity.DeepCopy()
+				}
+			}
+		}
+		status.AllocatedResources = podAllocated
+	}
+
 	// Perform some more extensive logging of container termination state to assist in
 	// debugging production races (generally not needed).
 	if loggerV := logger.V(5); loggerV.Enabled() {
