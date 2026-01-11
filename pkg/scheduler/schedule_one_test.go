@@ -1056,6 +1056,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 						}
 
 						ar := metrics.NewMetricsAsyncRecorder(10, 1*time.Second, ctx.Done())
+						go ar.Run()
 						queue := internalqueue.NewSchedulingQueue(nil, informerFactory, internalqueue.WithMetricsRecorder(ar), internalqueue.WithAPIDispatcher(apiDispatcher))
 						if asyncAPICallsEnabled {
 							schedFramework.SetAPICacher(apicache.New(queue, cache))
@@ -1606,6 +1607,7 @@ func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {
 
 					informerFactory := informers.NewSharedInformerFactory(client, 0)
 					ar := metrics.NewMetricsAsyncRecorder(10, 1*time.Second, ctx.Done())
+					go ar.Run()
 					queue := internalqueue.NewSchedulingQueue(nil, informerFactory, internalqueue.WithMetricsRecorder(ar), internalqueue.WithAPIDispatcher(apiDispatcher))
 
 					schedFramework, err := NewFakeFramework(
@@ -2259,6 +2261,7 @@ func TestSchedulerBinding(t *testing.T) {
 				if asyncAPICallsEnabled {
 					informerFactory := informers.NewSharedInformerFactory(client, 0)
 					ar := metrics.NewMetricsAsyncRecorder(10, 1*time.Second, ctx.Done())
+					go ar.Run()
 					queue := internalqueue.NewSchedulingQueue(nil, informerFactory, internalqueue.WithMetricsRecorder(ar), internalqueue.WithAPIDispatcher(apiDispatcher))
 					fwk.SetAPICacher(apicache.New(queue, cache))
 				}
@@ -2514,6 +2517,7 @@ func TestUpdatePodStatus(t *testing.T) {
 
 					informerFactory := informers.NewSharedInformerFactory(cs, 0)
 					ar := metrics.NewMetricsAsyncRecorder(10, 1*time.Second, ctx.Done())
+					go ar.Run()
 					queue := internalqueue.NewSchedulingQueue(nil, informerFactory, internalqueue.WithMetricsRecorder(ar), internalqueue.WithAPIDispatcher(apiDispatcher))
 					apiCacher = apicache.New(queue, nil)
 				}
