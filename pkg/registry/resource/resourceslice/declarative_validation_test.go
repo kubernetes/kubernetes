@@ -91,6 +91,12 @@ func TestDeclarativeValidate(t *testing.T) {
 							resource.DeviceTaintEffect("Invalid"), []string{}),
 					},
 				},
+				"invalid: max taints exceeded": {
+					input: mkResourceSliceWithDevices(tweakDeviceTaints(17)),
+					expectedErrs: field.ErrorList{
+						field.TooMany(field.NewPath("spec", "devices").Index(0).Child("taints"), 17, 16),
+					},
+				},
 				"invalid: taint empty": {
 					input: mkResourceSliceWithDevices(tweakDeviceTaintEffect("")),
 					expectedErrs: field.ErrorList{
@@ -619,5 +625,18 @@ func tweakDeviceCounter(counters map[string]resource.Counter) func(*resource.Res
 func counters(key string) map[string]resource.Counter {
 	return map[string]resource.Counter{
 		key: {},
+	}
+}
+
+func tweakDeviceTaints(count int) func(*resource.ResourceSlice) {
+	return func(rs *resource.ResourceSlice) {
+		rs.Spec.Devices[0].Taints = make([]resource.DeviceTaint, count)
+		for i := range rs.Spec.Devices[0].Taints {
+			rs.Spec.Devices[0].Taints[i] = resource.DeviceTaint{
+				Key:    fmt.Sprintf("key-%d", i),
+				Value:  "val",
+				Effect: resource.DeviceTaintEffectNoSchedule,
+			}
+		}
 	}
 }

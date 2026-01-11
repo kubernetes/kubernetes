@@ -410,6 +410,7 @@ message Device {
   // +optional
   // +listType=atomic
   // +featureGate=DRADeviceTaints
+  // +k8s:maxItems=16
   repeated DeviceTaint taints = 8;
 
   // BindsToNode indicates if the usage of an allocation involving this device
