@@ -208,6 +208,17 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				field.Invalid(opaqueDriverPath, ".example.com", "").WithOrigin("format=k8s-long-name-caseless"),
 			},
 		},
+                "invalid: duplicate condition types": {
+                        input: mkResourceClaimWithStatus(tweakStatusDevices(resource.AllocatedDeviceStatus{
+                                Conditions: []v1.Condition{
+                                        {Type: "Ready", Status: v1.ConditionTrue, Reason: "Ready", Message: "Ready"},
+                                        {Type: "Ready", Status: v1.ConditionFalse, Reason: "NotReady", Message: "NotReady"},
+                                },
+                        })),
+                        expectedErrs: field.ErrorList{
+                                field.Duplicate(field.NewPath("status", "devices").Index(0).Child("conditions").Index(1), "Ready"),
+                        },
+                },
 		// spec.Devices.Requests[%d].Exactly.Tolerations.Key
 		"valid Exactly.Tolerations.Key": {
 			input: mkValidResourceClaim(tweakExactlyTolerations([]resource.DeviceToleration{
