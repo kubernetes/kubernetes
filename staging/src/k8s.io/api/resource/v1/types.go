@@ -790,6 +790,7 @@ type DeviceTaint struct {
 	// Must be a label name.
 	//
 	// +required
+	// +k8s:validation:MinLength=1
 	Key string `json:"key" protobuf:"bytes,1,name=key"`
 
 	// The taint value corresponding to the taint key.
