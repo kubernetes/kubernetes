@@ -146,7 +146,19 @@ func Validate_AllocatedDeviceStatus(
 		errs = append(errs, fn(fldPath.Child("shareID"), obj.ShareID, oldVal, oldObj != nil)...)
 	}
 
-	// field resourcev1.AllocatedDeviceStatus.Conditions has no validation
+	// field resourcev1.AllocatedDeviceStatus.Conditions
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []metav1.Condition, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			// lists with map semantics require unique keys
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a metav1.Condition, b metav1.Condition) bool { return a.Type == b.Type })...)
+			return
+		}(fldPath.Child("conditions"), obj.Conditions, safe.Field(oldObj, func(oldObj *resourcev1.AllocatedDeviceStatus) []metav1.Condition { return oldObj.Conditions }), oldObj != nil)...)
+
 	// field resourcev1.AllocatedDeviceStatus.Data has no validation
 
 	{ // field resourcev1.AllocatedDeviceStatus.NetworkData
