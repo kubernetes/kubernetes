@@ -174,6 +174,9 @@ func Validate_AllocatedDeviceStatus(
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
 			if earlyReturn {
 				return // do not proceed
 			}

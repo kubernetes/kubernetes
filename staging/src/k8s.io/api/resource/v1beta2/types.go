@@ -775,7 +775,6 @@ type DeviceTaint struct {
 	// Must be a label name.
 	//
 	// +required
-	// +k8s:validation:MinLength=1
 	Key string `json:"key" protobuf:"bytes,1,name=key"`
 
 	// The taint value corresponding to the taint key.
@@ -2287,6 +2286,7 @@ type AllocatedDeviceStatus struct {
 	// +optional
 	// +listType=map
 	// +listMapKey=type
+	// +k8s:optional
 	// +k8s:listType=map
 	// +k8s:listMapKey=type
 	// +k8s:maxItems=8
