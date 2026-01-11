@@ -23,12 +23,13 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/onsi/ginkgo/v2"
+
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -38,7 +39,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 // LoadFromManifests loads .yaml or .json manifest files and returns
@@ -121,31 +121,31 @@ func visitManifests(cb func([]byte) error, files ...string) error {
 // - only some common items are supported, unknown ones trigger an error
 // - only the latest stable API version for each item is supported
 func PatchItems(f *framework.Framework, driverNamespace *v1.Namespace, items ...interface{}) error {
-	tCtx := f.TContext(context.Background())
-	if driverNamespace != nil {
-		tCtx = tCtx.WithNamespace(driverNamespace.Name)
-	}
-	return PatchItemsTCtx(tCtx, items...)
-}
-
-// PatchItemsTCtx is a variant of PatchItems where all parameters, including
-// the namespace, are passed through a TContext.
-func PatchItemsTCtx(tCtx ktesting.TContext, items ...interface{}) error {
 	for _, item := range items {
 		// Uncomment when debugging the loading and patching of items.
 		// Logf("patching original content of %T:\n%s", item, PrettyPrint(item))
-		if err := patchItemRecursively(tCtx, item); err != nil {
+		if err := patchItemRecursively(f, driverNamespace, item); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// createItems creates the items. Each of them must be an API object
+// CreateItems creates the items. Each of them must be an API object
 // of a type that is registered in Factory.
 //
-// Object get deleted automatically during test cleanup.
-func createItems(tCtx ktesting.TContext, items ...interface{}) error {
+// It returns either a cleanup function or an error, but never both.
+//
+// Cleaning up after a test can be triggered in two ways:
+//   - the test invokes the returned cleanup function,
+//     usually in an AfterEach
+//   - the test suite terminates, potentially after
+//     skipping the test's AfterEach (https://github.com/onsi/ginkgo/issues/222)
+//
+// PatchItems has the some limitations as LoadFromManifests:
+// - only some common items are supported, unknown ones trigger an error
+// - only the latest stable API version for each item is supported
+func CreateItems(ctx context.Context, f *framework.Framework, ns *v1.Namespace, items ...interface{}) error {
 	var result error
 	for _, item := range items {
 		// Each factory knows which item(s) it supports, so try each one.
@@ -153,17 +153,11 @@ func createItems(tCtx ktesting.TContext, items ...interface{}) error {
 		description := describeItem(item)
 		// Uncomment this line to get a full dump of the entire item.
 		// description = fmt.Sprintf("%s:\n%s", description, PrettyPrint(item))
-		tCtx.Logf("creating %s", description)
+		framework.Logf("creating %s", description)
 		for _, factory := range factories {
-			destructor, err := factory.Create(tCtx, item)
+			destructor, err := factory.Create(ctx, f, ns, item)
 			if destructor != nil {
-				tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
-					err := destructor(tCtx)
-					if apierrors.IsNotFound(err) {
-						return
-					}
-					tCtx.ExpectNoError(err, fmt.Sprintf("deleting %s", description))
-				})
+				ginkgo.DeferCleanup(framework.IgnoreNotFound(destructor), framework.AnnotatedLocation(fmt.Sprintf("deleting %s", description)))
 			}
 			if err == nil {
 				done = true
@@ -184,25 +178,13 @@ func createItems(tCtx ktesting.TContext, items ...interface{}) error {
 
 // CreateFromManifests is a combination of LoadFromManifests,
 // PatchItems, patching with an optional custom function,
-// and creating the resulting items.
-//
-// Objects get deleted automatically during test cleanup.
+// and CreateItems.
 func CreateFromManifests(ctx context.Context, f *framework.Framework, driverNamespace *v1.Namespace, patch func(item interface{}) error, files ...string) error {
-	tCtx := f.TContext(ctx)
-	if driverNamespace != nil {
-		tCtx = tCtx.WithNamespace(driverNamespace.Name)
-	}
-	return CreateFromManifestsTCtx(tCtx, patch, files...)
-}
-
-// CreateFromManifestsTCtx is a variant of CreateFromManifests where all parameters, including
-// the driver namespace, are passed through a TContext. It is therefore usable from Go unit tests.
-func CreateFromManifestsTCtx(tCtx ktesting.TContext, patch func(item interface{}) error, files ...string) error {
 	items, err := LoadFromManifests(files...)
 	if err != nil {
 		return fmt.Errorf("CreateFromManifests: %w", err)
 	}
-	if err := PatchItemsTCtx(tCtx, items...); err != nil {
+	if err := PatchItems(f, driverNamespace, items...); err != nil {
 		return err
 	}
 	if patch != nil {
@@ -212,7 +194,7 @@ func CreateFromManifestsTCtx(tCtx ktesting.TContext, patch func(item interface{}
 			}
 		}
 	}
-	return createItems(tCtx, items...)
+	return CreateItems(ctx, f, driverNamespace, items...)
 }
 
 // What is a subset of metav1.TypeMeta which (in contrast to
@@ -252,7 +234,7 @@ type ItemFactory interface {
 	// error or a cleanup function for the created item.
 	// If the item is of an unsupported type, it must return
 	// an error that has errorItemNotSupported as cause.
-	Create(tCtx ktesting.TContext, item interface{}) (func(ctx context.Context) error, error)
+	Create(ctx context.Context, f *framework.Framework, ns *v1.Namespace, item interface{}) (func(ctx context.Context) error, error)
 }
 
 // describeItem always returns a string that describes the item,
@@ -289,79 +271,82 @@ var factories = map[What]ItemFactory{
 	{"CustomResourceDefinition"}: &customResourceDefinitionFactory{},
 }
 
-// patchName makes the name of some item unique by appending the
+// PatchName makes the name of some item unique by appending the
 // generated unique name.
-func patchName(uniqueName string, item *string) {
+func PatchName(f *framework.Framework, item *string) {
 	if *item != "" {
-		*item = *item + "-" + uniqueName
+		*item = *item + "-" + f.UniqueName
 	}
 }
 
-// patchNamespace moves the item into the test's namespace.  Not
+// PatchNamespace moves the item into the test's namespace.  Not
 // all items can be namespaced. For those, the name also needs to be
 // patched.
-func patchNamespace(tCtx ktesting.TContext, item *string) {
-	namespace := tCtx.Namespace()
-	if namespace != "" {
-		*item = namespace
+func PatchNamespace(f *framework.Framework, driverNamespace *v1.Namespace, item *string) {
+	if driverNamespace != nil {
+		*item = driverNamespace.GetName()
+		return
+	}
+
+	if f.Namespace != nil {
+		*item = f.Namespace.GetName()
 	}
 }
 
-func patchItemRecursively(tCtx ktesting.TContext, item interface{}) error {
-	uniqueName := tCtx.Namespace()
+func patchItemRecursively(f *framework.Framework, driverNamespace *v1.Namespace, item interface{}) error {
 	switch item := item.(type) {
 	case *rbacv1.Subject:
-		patchNamespace(tCtx, &item.Namespace)
+		PatchNamespace(f, driverNamespace, &item.Namespace)
 	case *rbacv1.RoleRef:
 		// TODO: avoid hard-coding this special name. Perhaps add a Framework.PredefinedRoles
 		// which contains all role names that are defined cluster-wide before the test starts?
 		// All those names are exempt from renaming. That list could be populated by querying
 		// and get extended by tests.
 		if item.Name != "e2e-test-privileged-psp" {
-			patchName(uniqueName, &item.Name)
+			PatchName(f, &item.Name)
 		}
 	case *rbacv1.ClusterRole:
-		patchName(uniqueName, &item.Name)
+		PatchName(f, &item.Name)
 	case *rbacv1.Role:
-		patchNamespace(tCtx, &item.Namespace)
+		PatchNamespace(f, driverNamespace, &item.Namespace)
 		// Roles are namespaced, but because for RoleRef above we don't
 		// know whether the referenced role is a ClusterRole or Role
 		// and therefore always renames, we have to do the same here.
-		patchName(uniqueName, &item.Name)
+		PatchName(f, &item.Name)
 	case *storagev1.StorageClass:
-		patchName(uniqueName, &item.Name)
+		PatchName(f, &item.Name)
 	case *storagev1.VolumeAttributesClass:
-		patchName(uniqueName, &item.Name)
+		PatchName(f, &item.Name)
 	case *storagev1.CSIDriver:
-		patchName(uniqueName, &item.Name)
+		PatchName(f, &item.Name)
 	case *v1.ServiceAccount:
-		patchNamespace(tCtx, &item.ObjectMeta.Namespace)
+		PatchNamespace(f, driverNamespace, &item.ObjectMeta.Namespace)
 	case *v1.Secret:
-		patchNamespace(tCtx, &item.ObjectMeta.Namespace)
+		PatchNamespace(f, driverNamespace, &item.ObjectMeta.Namespace)
 	case *rbacv1.ClusterRoleBinding:
-		patchName(uniqueName, &item.Name)
+		PatchName(f, &item.Name)
 		for i := range item.Subjects {
-			if err := patchItemRecursively(tCtx, &item.Subjects[i]); err != nil {
-				return fmt.Errorf("%T: %w", &item.Subjects[i], err)
+			if err := patchItemRecursively(f, driverNamespace, &item.Subjects[i]); err != nil {
+				return fmt.Errorf("%T: %w", f, err)
 			}
 		}
-		if err := patchItemRecursively(tCtx, &item.RoleRef); err != nil {
-			return fmt.Errorf("%T: %w", &item.RoleRef, err)
+		if err := patchItemRecursively(f, driverNamespace, &item.RoleRef); err != nil {
+			return fmt.Errorf("%T: %w", f, err)
 		}
 	case *rbacv1.RoleBinding:
-		patchNamespace(tCtx, &item.Namespace)
+		PatchNamespace(f, driverNamespace, &item.Namespace)
 		for i := range item.Subjects {
-			if err := patchItemRecursively(tCtx, &item.Subjects[i]); err != nil {
-				return fmt.Errorf("%T: %w", &item.Subjects[i], err)
+			if err := patchItemRecursively(f, driverNamespace, &item.Subjects[i]); err != nil {
+				return fmt.Errorf("%T: %w", f, err)
 			}
 		}
-		if err := patchItemRecursively(tCtx, &item.RoleRef); err != nil {
-			return fmt.Errorf("%T: %w", &item.RoleRef, err)
+		if err := patchItemRecursively(f, driverNamespace, &item.RoleRef); err != nil {
+			return fmt.Errorf("%T: %w", f, err)
 		}
 	case *v1.Service:
-		patchNamespace(tCtx, &item.ObjectMeta.Namespace)
+		PatchNamespace(f, driverNamespace, &item.ObjectMeta.Namespace)
 	case *appsv1.StatefulSet:
-		patchNamespace(tCtx, &item.ObjectMeta.Namespace)
+		PatchNamespace(f, driverNamespace, &item.ObjectMeta.Namespace)
 		if err := patchContainerImages(item.Spec.Template.Spec.Containers); err != nil {
 			return err
 		}
@@ -369,7 +354,7 @@ func patchItemRecursively(tCtx ktesting.TContext, item interface{}) error {
 			return err
 		}
 	case *appsv1.Deployment:
-		patchNamespace(tCtx, &item.ObjectMeta.Namespace)
+		PatchNamespace(f, driverNamespace, &item.ObjectMeta.Namespace)
 		if err := patchContainerImages(item.Spec.Template.Spec.Containers); err != nil {
 			return err
 		}
@@ -377,7 +362,7 @@ func patchItemRecursively(tCtx ktesting.TContext, item interface{}) error {
 			return err
 		}
 	case *appsv1.DaemonSet:
-		patchNamespace(tCtx, &item.ObjectMeta.Namespace)
+		PatchNamespace(f, driverNamespace, &item.ObjectMeta.Namespace)
 		if err := patchContainerImages(item.Spec.Template.Spec.Containers); err != nil {
 			return err
 		}
@@ -385,7 +370,7 @@ func patchItemRecursively(tCtx ktesting.TContext, item interface{}) error {
 			return err
 		}
 	case *appsv1.ReplicaSet:
-		patchNamespace(tCtx, &item.ObjectMeta.Namespace)
+		PatchNamespace(f, driverNamespace, &item.ObjectMeta.Namespace)
 		if err := patchContainerImages(item.Spec.Template.Spec.Containers); err != nil {
 			return err
 		}
@@ -411,13 +396,13 @@ func (f *serviceAccountFactory) New() runtime.Object {
 	return &v1.ServiceAccount{}
 }
 
-func (*serviceAccountFactory) Create(tCtx ktesting.TContext, i interface{}) (func(ctx context.Context) error, error) {
+func (*serviceAccountFactory) Create(ctx context.Context, f *framework.Framework, ns *v1.Namespace, i interface{}) (func(ctx context.Context) error, error) {
 	item, ok := i.(*v1.ServiceAccount)
 	if !ok {
 		return nil, errorItemNotSupported
 	}
-	client := tCtx.Client().CoreV1().ServiceAccounts(tCtx.Namespace())
-	if _, err := client.Create(tCtx, item, metav1.CreateOptions{}); err != nil {
+	client := f.ClientSet.CoreV1().ServiceAccounts(ns.Name)
+	if _, err := client.Create(ctx, item, metav1.CreateOptions{}); err != nil {
 		return nil, fmt.Errorf("create ServiceAccount: %w", err)
 	}
 	return func(ctx context.Context) error {
@@ -431,15 +416,15 @@ func (f *clusterRoleFactory) New() runtime.Object {
 	return &rbacv1.ClusterRole{}
 }
 
-func (*clusterRoleFactory) Create(tCtx ktesting.TContext, i interface{}) (func(ctx context.Context) error, error) {
+func (*clusterRoleFactory) Create(ctx context.Context, f *framework.Framework, ns *v1.Namespace, i interface{}) (func(ctx context.Context) error, error) {
 	item, ok := i.(*rbacv1.ClusterRole)
 	if !ok {
 		return nil, errorItemNotSupported
 	}
 
-	tCtx.Logf("define cluster role %v", item.GetName())
-	client := tCtx.Client().RbacV1().ClusterRoles()
-	if _, err := client.Create(tCtx, item, metav1.CreateOptions{}); err != nil {
+	framework.Logf("Define cluster role %v", item.GetName())
+	client := f.ClientSet.RbacV1().ClusterRoles()
+	if _, err := client.Create(ctx, item, metav1.CreateOptions{}); err != nil {
 		return nil, fmt.Errorf("create ClusterRole: %w", err)
 	}
 	return func(ctx context.Context) error {
@@ -453,14 +438,14 @@ func (f *clusterRoleBindingFactory) New() runtime.Object {
 	return &rbacv1.ClusterRoleBinding{}
 }
 
-func (*clusterRoleBindingFactory) Create(tCtx ktesting.TContext, i interface{}) (func(ctx context.Context) error, error) {
+func (*clusterRoleBindingFactory) Create(ctx context.Context, f *framework.Framework, ns *v1.Namespace, i interface{}) (func(ctx context.Context) error, error) {
 	item, ok := i.(*rbacv1.ClusterRoleBinding)
 	if !ok {
 		return nil, errorItemNotSupported
 	}
 
-	client := tCtx.Client().RbacV1().ClusterRoleBindings()
-	if _, err := client.Create(tCtx, item, metav1.CreateOptions{}); err != nil {
+	client := f.ClientSet.RbacV1().ClusterRoleBindings()
+	if _, err := client.Create(ctx, item, metav1.CreateOptions{}); err != nil {
 		return nil, fmt.Errorf("create ClusterRoleBinding: %w", err)
 	}
 	return func(ctx context.Context) error {
@@ -474,14 +459,14 @@ func (f *roleFactory) New() runtime.Object {
 	return &rbacv1.Role{}
 }
 
-func (*roleFactory) Create(tCtx ktesting.TContext, i interface{}) (func(ctx context.Context) error, error) {
+func (*roleFactory) Create(ctx context.Context, f *framework.Framework, ns *v1.Namespace, i interface{}) (func(ctx context.Context) error, error) {
 	item, ok := i.(*rbacv1.Role)
 	if !ok {
 		return nil, errorItemNotSupported
 	}
 
-	client := tCtx.Client().RbacV1().Roles(tCtx.Namespace())
-	if _, err := client.Create(tCtx, item, metav1.CreateOptions{}); err != nil {
+	client := f.ClientSet.RbacV1().Roles(ns.Name)
+	if _, err := client.Create(ctx, item, metav1.CreateOptions{}); err != nil {
 		return nil, fmt.Errorf("create Role: %w", err)
 	}
 	return func(ctx context.Context) error {
@@ -495,14 +480,14 @@ func (f *roleBindingFactory) New() runtime.Object {
 	return &rbacv1.RoleBinding{}
 }
 
-func (*roleBindingFactory) Create(tCtx ktesting.TContext, i interface{}) (func(ctx context.Context) error, error) {
+func (*roleBindingFactory) Create(ctx context.Context, f *framework.Framework, ns *v1.Namespace, i interface{}) (func(ctx context.Context) error, error) {
 	item, ok := i.(*rbacv1.RoleBinding)
 	if !ok {
 		return nil, errorItemNotSupported
 	}
 
-	client := tCtx.Client().RbacV1().RoleBindings(tCtx.Namespace())
-	if _, err := client.Create(tCtx, item, metav1.CreateOptions{}); err != nil {
+	client := f.ClientSet.RbacV1().RoleBindings(ns.Name)
+	if _, err := client.Create(ctx, item, metav1.CreateOptions{}); err != nil {
 		return nil, fmt.Errorf("create RoleBinding: %w", err)
 	}
 	return func(ctx context.Context) error {
@@ -516,14 +501,14 @@ func (f *serviceFactory) New() runtime.Object {
 	return &v1.Service{}
 }
 
-func (*serviceFactory) Create(tCtx ktesting.TContext, i interface{}) (func(ctx context.Context) error, error) {
+func (*serviceFactory) Create(ctx context.Context, f *framework.Framework, ns *v1.Namespace, i interface{}) (func(ctx context.Context) error, error) {
 	item, ok := i.(*v1.Service)
 	if !ok {
 		return nil, errorItemNotSupported
 	}
 
-	client := tCtx.Client().CoreV1().Services(tCtx.Namespace())
-	if _, err := client.Create(tCtx, item, metav1.CreateOptions{}); err != nil {
+	client := f.ClientSet.CoreV1().Services(ns.Name)
+	if _, err := client.Create(ctx, item, metav1.CreateOptions{}); err != nil {
 		return nil, fmt.Errorf("create Service: %w", err)
 	}
 	return func(ctx context.Context) error {
@@ -537,14 +522,14 @@ func (f *statefulSetFactory) New() runtime.Object {
 	return &appsv1.StatefulSet{}
 }
 
-func (*statefulSetFactory) Create(tCtx ktesting.TContext, i interface{}) (func(ctx context.Context) error, error) {
+func (*statefulSetFactory) Create(ctx context.Context, f *framework.Framework, ns *v1.Namespace, i interface{}) (func(ctx context.Context) error, error) {
 	item, ok := i.(*appsv1.StatefulSet)
 	if !ok {
 		return nil, errorItemNotSupported
 	}
 
-	client := tCtx.Client().AppsV1().StatefulSets(tCtx.Namespace())
-	if _, err := client.Create(tCtx, item, metav1.CreateOptions{}); err != nil {
+	client := f.ClientSet.AppsV1().StatefulSets(ns.Name)
+	if _, err := client.Create(ctx, item, metav1.CreateOptions{}); err != nil {
 		return nil, fmt.Errorf("create StatefulSet: %w", err)
 	}
 	return func(ctx context.Context) error {
@@ -558,14 +543,14 @@ func (f *deploymentFactory) New() runtime.Object {
 	return &appsv1.Deployment{}
 }
 
-func (*deploymentFactory) Create(tCtx ktesting.TContext, i interface{}) (func(ctx context.Context) error, error) {
+func (*deploymentFactory) Create(ctx context.Context, f *framework.Framework, ns *v1.Namespace, i interface{}) (func(ctx context.Context) error, error) {
 	item, ok := i.(*appsv1.Deployment)
 	if !ok {
 		return nil, errorItemNotSupported
 	}
 
-	client := tCtx.Client().AppsV1().Deployments(tCtx.Namespace())
-	if _, err := client.Create(tCtx, item, metav1.CreateOptions{}); err != nil {
+	client := f.ClientSet.AppsV1().Deployments(ns.Name)
+	if _, err := client.Create(ctx, item, metav1.CreateOptions{}); err != nil {
 		return nil, fmt.Errorf("create Deployment: %w", err)
 	}
 	return func(ctx context.Context) error {
@@ -579,14 +564,14 @@ func (f *daemonSetFactory) New() runtime.Object {
 	return &appsv1.DaemonSet{}
 }
 
-func (*daemonSetFactory) Create(tCtx ktesting.TContext, i interface{}) (func(ctx context.Context) error, error) {
+func (*daemonSetFactory) Create(ctx context.Context, f *framework.Framework, ns *v1.Namespace, i interface{}) (func(ctx context.Context) error, error) {
 	item, ok := i.(*appsv1.DaemonSet)
 	if !ok {
 		return nil, errorItemNotSupported
 	}
 
-	client := tCtx.Client().AppsV1().DaemonSets(tCtx.Namespace())
-	if _, err := client.Create(tCtx, item, metav1.CreateOptions{}); err != nil {
+	client := f.ClientSet.AppsV1().DaemonSets(ns.Name)
+	if _, err := client.Create(ctx, item, metav1.CreateOptions{}); err != nil {
 		return nil, fmt.Errorf("create DaemonSet: %w", err)
 	}
 	return func(ctx context.Context) error {
@@ -600,14 +585,14 @@ func (f *replicaSetFactory) New() runtime.Object {
 	return &appsv1.ReplicaSet{}
 }
 
-func (*replicaSetFactory) Create(tCtx ktesting.TContext, i interface{}) (func(ctx context.Context) error, error) {
+func (*replicaSetFactory) Create(ctx context.Context, f *framework.Framework, ns *v1.Namespace, i interface{}) (func(ctx context.Context) error, error) {
 	item, ok := i.(*appsv1.ReplicaSet)
 	if !ok {
 		return nil, errorItemNotSupported
 	}
 
-	client := tCtx.Client().AppsV1().ReplicaSets(tCtx.Namespace())
-	if _, err := client.Create(tCtx, item, metav1.CreateOptions{}); err != nil {
+	client := f.ClientSet.AppsV1().ReplicaSets(ns.Name)
+	if _, err := client.Create(ctx, item, metav1.CreateOptions{}); err != nil {
 		return nil, fmt.Errorf("create ReplicaSet: %w", err)
 	}
 	return func(ctx context.Context) error {
@@ -621,14 +606,14 @@ func (f *storageClassFactory) New() runtime.Object {
 	return &storagev1.StorageClass{}
 }
 
-func (*storageClassFactory) Create(tCtx ktesting.TContext, i interface{}) (func(ctx context.Context) error, error) {
+func (*storageClassFactory) Create(ctx context.Context, f *framework.Framework, ns *v1.Namespace, i interface{}) (func(ctx context.Context) error, error) {
 	item, ok := i.(*storagev1.StorageClass)
 	if !ok {
 		return nil, errorItemNotSupported
 	}
 
-	client := tCtx.Client().StorageV1().StorageClasses()
-	if _, err := client.Create(tCtx, item, metav1.CreateOptions{}); err != nil {
+	client := f.ClientSet.StorageV1().StorageClasses()
+	if _, err := client.Create(ctx, item, metav1.CreateOptions{}); err != nil {
 		return nil, fmt.Errorf("create StorageClass: %w", err)
 	}
 	return func(ctx context.Context) error {
@@ -642,14 +627,14 @@ func (f *volumeAttributesClassFactory) New() runtime.Object {
 	return &storagev1.VolumeAttributesClass{}
 }
 
-func (*volumeAttributesClassFactory) Create(tCtx ktesting.TContext, i interface{}) (func(ctx context.Context) error, error) {
+func (*volumeAttributesClassFactory) Create(ctx context.Context, f *framework.Framework, ns *v1.Namespace, i interface{}) (func(ctx context.Context) error, error) {
 	item, ok := i.(*storagev1.VolumeAttributesClass)
 	if !ok {
 		return nil, errorItemNotSupported
 	}
 
-	client := tCtx.Client().StorageV1().VolumeAttributesClasses()
-	if _, err := client.Create(tCtx, item, metav1.CreateOptions{}); err != nil {
+	client := f.ClientSet.StorageV1().VolumeAttributesClasses()
+	if _, err := client.Create(ctx, item, metav1.CreateOptions{}); err != nil {
 		return nil, fmt.Errorf("create VolumeAttributesClass: %w", err)
 	}
 	return func(ctx context.Context) error {
@@ -663,14 +648,14 @@ func (f *csiDriverFactory) New() runtime.Object {
 	return &storagev1.CSIDriver{}
 }
 
-func (*csiDriverFactory) Create(tCtx ktesting.TContext, i interface{}) (func(ctx context.Context) error, error) {
+func (*csiDriverFactory) Create(ctx context.Context, f *framework.Framework, ns *v1.Namespace, i interface{}) (func(ctx context.Context) error, error) {
 	item, ok := i.(*storagev1.CSIDriver)
 	if !ok {
 		return nil, errorItemNotSupported
 	}
 
-	client := tCtx.Client().StorageV1().CSIDrivers()
-	if _, err := client.Create(tCtx, item, metav1.CreateOptions{}); err != nil {
+	client := f.ClientSet.StorageV1().CSIDrivers()
+	if _, err := client.Create(ctx, item, metav1.CreateOptions{}); err != nil {
 		return nil, fmt.Errorf("create CSIDriver: %w", err)
 	}
 	return func(ctx context.Context) error {
@@ -684,14 +669,14 @@ func (f *secretFactory) New() runtime.Object {
 	return &v1.Secret{}
 }
 
-func (*secretFactory) Create(tCtx ktesting.TContext, i interface{}) (func(ctx context.Context) error, error) {
+func (*secretFactory) Create(ctx context.Context, f *framework.Framework, ns *v1.Namespace, i interface{}) (func(ctx context.Context) error, error) {
 	item, ok := i.(*v1.Secret)
 	if !ok {
 		return nil, errorItemNotSupported
 	}
 
-	client := tCtx.Client().CoreV1().Secrets(tCtx.Namespace())
-	if _, err := client.Create(tCtx, item, metav1.CreateOptions{}); err != nil {
+	client := f.ClientSet.CoreV1().Secrets(ns.Name)
+	if _, err := client.Create(ctx, item, metav1.CreateOptions{}); err != nil {
 		return nil, fmt.Errorf("create Secret: %w", err)
 	}
 	return func(ctx context.Context) error {
@@ -705,7 +690,7 @@ func (f *customResourceDefinitionFactory) New() runtime.Object {
 	return &apiextensionsv1.CustomResourceDefinition{}
 }
 
-func (*customResourceDefinitionFactory) Create(tCtx ktesting.TContext, i interface{}) (func(ctx context.Context) error, error) {
+func (*customResourceDefinitionFactory) Create(ctx context.Context, f *framework.Framework, ns *v1.Namespace, i interface{}) (func(ctx context.Context) error, error) {
 	var err error
 	unstructCRD := &unstructured.Unstructured{}
 	gvr := schema.GroupVersionResource{Group: "apiextensions.k8s.io", Version: "v1", Resource: "customresourcedefinitions"}
@@ -720,11 +705,11 @@ func (*customResourceDefinitionFactory) Create(tCtx ktesting.TContext, i interfa
 		return nil, err
 	}
 
-	if _, err = tCtx.Dynamic().Resource(gvr).Create(tCtx, unstructCRD, metav1.CreateOptions{}); err != nil {
+	if _, err = f.DynamicClient.Resource(gvr).Create(ctx, unstructCRD, metav1.CreateOptions{}); err != nil {
 		return nil, fmt.Errorf("create CustomResourceDefinition: %w", err)
 	}
 	return func(ctx context.Context) error {
-		return tCtx.Dynamic().Resource(gvr).Delete(ctx, item.GetName(), metav1.DeleteOptions{})
+		return f.DynamicClient.Resource(gvr).Delete(ctx, item.GetName(), metav1.DeleteOptions{})
 	}, nil
 }
 
