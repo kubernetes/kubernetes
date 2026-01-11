@@ -26,6 +26,7 @@ import (
 	fmt "fmt"
 
 	storagev1 "k8s.io/api/storage/v1"
+	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
@@ -46,27 +47,11 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 		}
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
-	// type StorageClassList
-	scheme.AddValidationFunc((*storagev1.StorageClassList)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_StorageClassList(ctx, op, nil /* fldPath */, obj.(*storagev1.StorageClassList), safe.Cast[*storagev1.StorageClassList](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
 	// type VolumeAttachment
 	scheme.AddValidationFunc((*storagev1.VolumeAttachment)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
 		switch op.Request.SubresourcePath() {
 		case "/":
 			return Validate_VolumeAttachment(ctx, op, nil /* fldPath */, obj.(*storagev1.VolumeAttachment), safe.Cast[*storagev1.VolumeAttachment](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
-	// type VolumeAttachmentList
-	scheme.AddValidationFunc((*storagev1.VolumeAttachmentList)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_VolumeAttachmentList(ctx, op, nil /* fldPath */, obj.(*storagev1.VolumeAttachmentList), safe.Cast[*storagev1.VolumeAttachmentList](oldObj))
 		}
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
@@ -107,27 +92,6 @@ func Validate_StorageClass(ctx context.Context, op operation.Operation, fldPath 
 	return errs
 }
 
-// Validate_StorageClassList validates an instance of StorageClassList according
-// to declarative validation rules in the API schema.
-func Validate_StorageClassList(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *storagev1.StorageClassList) (errs field.ErrorList) {
-	// field storagev1.StorageClassList.TypeMeta has no validation
-	// field storagev1.StorageClassList.ListMeta has no validation
-
-	// field storagev1.StorageClassList.Items
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []storagev1.StorageClass, oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
-			}
-			// iterate the list and call the type's validation function
-			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_StorageClass)...)
-			return
-		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *storagev1.StorageClassList) []storagev1.StorageClass { return oldObj.Items }), oldObj != nil)...)
-
-	return errs
-}
-
 // Validate_VolumeAttachment validates an instance of VolumeAttachment according
 // to declarative validation rules in the API schema.
 func Validate_VolumeAttachment(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *storagev1.VolumeAttachment) (errs field.ErrorList) {
@@ -147,27 +111,6 @@ func Validate_VolumeAttachment(ctx context.Context, op operation.Operation, fldP
 		}(fldPath.Child("spec"), &obj.Spec, safe.Field(oldObj, func(oldObj *storagev1.VolumeAttachment) *storagev1.VolumeAttachmentSpec { return &oldObj.Spec }), oldObj != nil)...)
 
 	// field storagev1.VolumeAttachment.Status has no validation
-	return errs
-}
-
-// Validate_VolumeAttachmentList validates an instance of VolumeAttachmentList according
-// to declarative validation rules in the API schema.
-func Validate_VolumeAttachmentList(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *storagev1.VolumeAttachmentList) (errs field.ErrorList) {
-	// field storagev1.VolumeAttachmentList.TypeMeta has no validation
-	// field storagev1.VolumeAttachmentList.ListMeta has no validation
-
-	// field storagev1.VolumeAttachmentList.Items
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []storagev1.VolumeAttachment, oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
-			}
-			// iterate the list and call the type's validation function
-			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_VolumeAttachment)...)
-			return
-		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *storagev1.VolumeAttachmentList) []storagev1.VolumeAttachment { return oldObj.Items }), oldObj != nil)...)
-
 	return errs
 }
 

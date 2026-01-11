@@ -47,14 +47,6 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 		}
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
-	// type VolumeAttachmentList
-	scheme.AddValidationFunc((*storagev1alpha1.VolumeAttachmentList)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_VolumeAttachmentList(ctx, op, nil /* fldPath */, obj.(*storagev1alpha1.VolumeAttachmentList), safe.Cast[*storagev1alpha1.VolumeAttachmentList](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
 	return nil
 }
 
@@ -79,29 +71,6 @@ func Validate_VolumeAttachment(ctx context.Context, op operation.Operation, fldP
 		}), oldObj != nil)...)
 
 	// field storagev1alpha1.VolumeAttachment.Status has no validation
-	return errs
-}
-
-// Validate_VolumeAttachmentList validates an instance of VolumeAttachmentList according
-// to declarative validation rules in the API schema.
-func Validate_VolumeAttachmentList(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *storagev1alpha1.VolumeAttachmentList) (errs field.ErrorList) {
-	// field storagev1alpha1.VolumeAttachmentList.TypeMeta has no validation
-	// field storagev1alpha1.VolumeAttachmentList.ListMeta has no validation
-
-	// field storagev1alpha1.VolumeAttachmentList.Items
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []storagev1alpha1.VolumeAttachment, oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
-			}
-			// iterate the list and call the type's validation function
-			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_VolumeAttachment)...)
-			return
-		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *storagev1alpha1.VolumeAttachmentList) []storagev1alpha1.VolumeAttachment {
-			return oldObj.Items
-		}), oldObj != nil)...)
-
 	return errs
 }
 

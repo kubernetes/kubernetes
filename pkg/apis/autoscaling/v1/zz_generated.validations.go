@@ -47,14 +47,6 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 		}
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
-	// type HorizontalPodAutoscalerList
-	scheme.AddValidationFunc((*autoscalingv1.HorizontalPodAutoscalerList)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_HorizontalPodAutoscalerList(ctx, op, nil /* fldPath */, obj.(*autoscalingv1.HorizontalPodAutoscalerList), safe.Cast[*autoscalingv1.HorizontalPodAutoscalerList](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
 	// type Scale
 	scheme.AddValidationFunc((*autoscalingv1.Scale)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
 		switch op.Request.SubresourcePath() {
@@ -132,29 +124,6 @@ func Validate_HorizontalPodAutoscaler(ctx context.Context, op operation.Operatio
 		}), oldObj != nil)...)
 
 	// field autoscalingv1.HorizontalPodAutoscaler.Status has no validation
-	return errs
-}
-
-// Validate_HorizontalPodAutoscalerList validates an instance of HorizontalPodAutoscalerList according
-// to declarative validation rules in the API schema.
-func Validate_HorizontalPodAutoscalerList(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *autoscalingv1.HorizontalPodAutoscalerList) (errs field.ErrorList) {
-	// field autoscalingv1.HorizontalPodAutoscalerList.TypeMeta has no validation
-	// field autoscalingv1.HorizontalPodAutoscalerList.ListMeta has no validation
-
-	// field autoscalingv1.HorizontalPodAutoscalerList.Items
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []autoscalingv1.HorizontalPodAutoscaler, oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
-			}
-			// iterate the list and call the type's validation function
-			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_HorizontalPodAutoscaler)...)
-			return
-		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *autoscalingv1.HorizontalPodAutoscalerList) []autoscalingv1.HorizontalPodAutoscaler {
-			return oldObj.Items
-		}), oldObj != nil)...)
-
 	return errs
 }
 
