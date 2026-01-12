@@ -700,7 +700,7 @@ func (cm *containerManagerImpl) Start(ctx context.Context, node *v1.Node,
 	}
 
 	// Starts device manager.
-	if err := cm.deviceManager.Start(klog.FromContext(ctx), devicemanager.ActivePodsFunc(activePods), sourcesReady, containerMap.Clone(), containerRunningSet); err != nil {
+	if err := cm.deviceManager.Start(ctx, devicemanager.ActivePodsFunc(activePods), sourcesReady, containerMap.Clone(), containerRunningSet); err != nil {
 		return err
 	}
 
