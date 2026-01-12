@@ -192,7 +192,10 @@ func PatchNodeOnce(client clientset.Interface, nodeName string, patchFn func(*v1
 
 		if _, err := client.CoreV1().Nodes().Patch(ctx, n.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}); err != nil {
 			*lastError = errors.Wrapf(err, "error patching Node %q", n.Name)
-			return false, nil
+			if apierrors.IsTimeout(err) || apierrors.IsConflict(err) || apierrors.IsServerTimeout(err) || apierrors.IsServiceUnavailable(err) {
+				return false, nil
+			}
+			return false, *lastError
 		}
 
 		return true, nil
