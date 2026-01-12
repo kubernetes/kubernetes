@@ -40,6 +40,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	kubeletdevicepluginv1beta1 "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	admissionapi "k8s.io/pod-security-admission/api"
+	"k8s.io/utils/ptr"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -940,7 +941,13 @@ func testDevicePluginNodeReboot(f *framework.Framework, pluginSockDir string) {
 		// exposing those devices as resource has restarted. The expected behavior is that the application pod fails at admission time.
 		framework.It("Does not keep device plugin assignments across node reboots if fails admission (no pod restart, no device plugin re-registration)", func(ctx context.Context) {
 			podRECMD := fmt.Sprintf("devs=$(ls /tmp/ | egrep '^Dev-[0-9]+$') && echo stub devices: $devs && sleep %s", sleepIntervalForever)
-			pod1 := e2epod.NewPodClient(f).CreateSync(ctx, makeBusyboxPod(SampleDeviceResourceName, podRECMD))
+			testPod := makeBusyboxPod(SampleDeviceResourceName, podRECMD)
+			// Set a short termination grace period to speed up the test.
+			// After kubelet restart, this pod will fail admission and need to be terminated.
+			// The default 30s grace period causes the test to timeout waiting for the pod
+			// to be filtered from the active pods list.
+			testPod.Spec.TerminationGracePeriodSeconds = ptr.To(int64(1))
+			pod1 := e2epod.NewPodClient(f).CreateSync(ctx, testPod)
 			deviceIDRE := "stub devices: (Dev-[0-9]+)"
 			devID1, err := parseLog(ctx, f, pod1.Name, pod1.Name, deviceIDRE)
 			framework.ExpectNoError(err, "getting logs for pod %q", pod1.Name)
@@ -984,19 +991,23 @@ func testDevicePluginNodeReboot(f *framework.Framework, pluginSockDir string) {
 			// never restarted (runs "forever" from this test timescale perspective) hence re-doing this check
 			// is useless.
 			ginkgo.By("Verifying the device assignment after kubelet restart using podresources API")
-			gomega.Eventually(ctx, func() error {
-				v1PodResources, err = getV1NodeDevices(ctx)
-				return err
-			}, 30*time.Second, framework.Poll).ShouldNot(gomega.HaveOccurred(), "cannot fetch the compute resource assignment after kubelet restart")
 
 			// if we got this far, podresources API will now report only the sample device plugin pod,
 			// because pods that failed admission are no longer reported in the list
 			// (see https://github.com/kubernetes/kubernetes/pull/132028).
 			// Hence, we verify that our test pod is NOT present in the podresources response.
 
-			_, found := checkPodResourcesAssignment(v1PodResources, pod1.Namespace, pod1.Name, pod1.Spec.Containers[0].Name, SampleDeviceResourceName, []string{})
-			framework.ExpectNoError(err, "unexpected device assignment mismatch for %s/%s", pod1.Namespace, pod1.Name)
-			gomega.Expect(found).To(gomega.BeFalseBecause("%s/%s/%s failed admission, so it must not appear in podresources list", pod1.Namespace, pod1.Name, pod1.Spec.Containers[0].Name))
+			// We need to poll because there's a delay between the pod failing admission and being
+			// removed from the podresources list.
+			gomega.Eventually(ctx, func(ctx context.Context) bool {
+				v1PodResources, err := getV1NodeDevices(ctx)
+				if err != nil {
+					framework.Logf("Failed to get node devices: %v, will retry", err)
+					return true // Return true to continue polling on error
+				}
+				_, found := checkPodResourcesAssignment(v1PodResources, pod1.Namespace, pod1.Name, pod1.Spec.Containers[0].Name, SampleDeviceResourceName, []string{})
+				return found
+			}, 30*time.Second, framework.Poll).Should(gomega.BeFalseBecause("%s/%s/%s failed admission, so it must not appear in podresources list", pod1.Namespace, pod1.Name, pod1.Spec.Containers[0].Name))
 		})
 	})
 }
