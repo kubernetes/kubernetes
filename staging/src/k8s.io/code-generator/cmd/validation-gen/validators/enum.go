@@ -194,7 +194,7 @@ func (etv *enumTagValidator) GetValidations(context Context, _ codetags.Tag) (Va
 func (etv *enumTagValidator) Docs() TagDoc {
 	return TagDoc{
 		Tag:            etv.TagName(),
-		StabilityLevel: Beta,
+		StabilityLevel: Stable,
 		Scopes:         etv.ValidScopes().UnsortedList(),
 		Description:    "Indicates that a string type is an enum. All constant values of this type are considered values in the enum unless excluded using +k8s:enumExclude.",
 	}
