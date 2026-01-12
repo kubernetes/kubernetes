@@ -26,6 +26,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -34,20 +35,25 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const tcpPrefix = "SERVE_PORT_"
-const sctpPrefix = "SERVE_SCTP_PORT_"
-const tlsPrefix = "SERVE_TLS_PORT_"
+const (
+	portPrefix = "SERVE_PORT_"
+	tcpPrefix  = "SERVE_TCP_PORT_"
+	udpPrefix  = "SERVE_UDP_PORT_"
+	tlsPrefix  = "SERVE_TLS_PORT_"
+	sctpPrefix = "SERVE_SCTP_PORT_"
+)
 
 // CmdPorter is used by agnhost Cobra.
 var CmdPorter = &cobra.Command{
 	Use:   "porter",
 	Short: "Serves requested data on ports specified in ENV variables",
-	Long: `Serves requested data on ports specified in environment variables of the form SERVE_{PORT,TLS_PORT,SCTP_PORT}_[NNNN]. 
+	Long: `Serves requested data on ports specified in environment variables of the form SERVE_{PORT,TCP_PORT,UDP_PORT,TLS_PORT,SCTP_PORT}_[NNNN]. 
 	
 eg:
-* SERVE_PORT_9001 - serve TCP connections on port 9001
+* SERVE_PORT_9001 (or SERVE_TCP_PORT_9001)- serve TCP connections on port 9001
 * SERVE_TLS_PORT_9002 - serve TLS-encrypted TCP connections on port 9002
 * SERVE_SCTP_PORT_9003 - serve SCTP connections on port 9003
+* SERVE_UDP_PORT_9004 - serve UDP connections on port 9004
 
 The included "localhost.crt" is a PEM-encoded TLS cert with SAN IPs "127.0.0.1" and "[::1]", expiring in January 2084, generated from "src/crypto/tls".
 
@@ -78,9 +84,15 @@ func main(cmd *cobra.Command, args []string) {
 		value := parts[1]
 
 		switch {
+		case strings.HasPrefix(key, portPrefix):
+			port := strings.TrimPrefix(key, portPrefix)
+			go serveTCPPort(port, value)
 		case strings.HasPrefix(key, tcpPrefix):
 			port := strings.TrimPrefix(key, tcpPrefix)
-			go servePort(port, value)
+			go serveTCPPort(port, value)
+		case strings.HasPrefix(key, udpPrefix):
+			port := strings.TrimPrefix(key, udpPrefix)
+			go serveUDPPort(port, value)
 		case strings.HasPrefix(key, sctpPrefix):
 			port := strings.TrimPrefix(key, sctpPrefix)
 			go serveSCTPPort(port, value)
@@ -93,7 +105,7 @@ func main(cmd *cobra.Command, args []string) {
 	select {}
 }
 
-func servePort(port, value string) {
+func serveTCPPort(port, value string) {
 
 	s := &http.Server{
 		Addr: "0.0.0.0:" + port,
@@ -114,6 +126,39 @@ func servePort(port, value string) {
 		}),
 	}
 	log.Printf("server on port %q failed: %v", port, s.ListenAndServe())
+}
+
+func serveUDPPort(port, value string) {
+	addr, err := net.ResolveUDPAddr("udp", "0.0.0.0:"+port)
+	if err != nil {
+		log.Fatalf("UDP: failed to resolve address: %v", err)
+	}
+	sock, err := net.ListenUDP("udp", addr)
+	if err != nil {
+		log.Fatalf("UDP: failed to listen on port %s: %v", port, err)
+	}
+	defer func() {
+		if err := sock.Close(); err != nil {
+			log.Printf("Error closing UDP socket: %v", err)
+		}
+	}()
+	log.Printf("Started UDP server on port %s", port)
+
+	payload := []byte(value)
+	buf := make([]byte, 16)
+
+	for {
+		_, cliAddr, err := sock.ReadFrom(buf)
+		if err != nil {
+			log.Printf("UDP: error from ReadFrom(): %v", err)
+			return
+		}
+		go func(targetAddr net.Addr) {
+			if _, err := sock.WriteTo(payload, targetAddr); err != nil {
+				log.Printf("UDP: error from WriteTo(): %v", err)
+			}
+		}(cliAddr)
+	}
 }
 
 func serveTLSPort(port, value string) {
