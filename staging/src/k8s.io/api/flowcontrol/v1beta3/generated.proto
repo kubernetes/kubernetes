@@ -346,6 +346,8 @@ message PriorityLevelConfigurationList {
 message PriorityLevelConfigurationReference {
   // `name` is the name of the priority level configuration being referenced
   // Required.
+  // +required
+  // +k8s:required
   optional string name = 1;
 }
 
