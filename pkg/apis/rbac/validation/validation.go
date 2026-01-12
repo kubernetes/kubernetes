@@ -17,7 +17,7 @@ limitations under the License.
 package validation
 
 import (
-	"k8s.io/apimachinery/pkg/api/validation/path"
+	"k8s.io/apimachinery/pkg/api/validate/content"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -30,7 +30,7 @@ import (
 // * https://github.com/kubernetes/kubernetes/blob/60db507b279ce45bd16ea3db49bf181f2aeb3c3d/pkg/api/validation/name.go
 // * https://github.com/openshift/origin/blob/388478c40e751c4295dcb9a44dd69e5ac65d0e3b/pkg/api/helpers.go
 func ValidateRBACName(name string, prefix bool) []string {
-	return path.IsValidPathSegmentName(name)
+	return content.IsPathSegmentName(name)
 }
 
 func ValidateRole(role *rbac.Role) field.ErrorList {
