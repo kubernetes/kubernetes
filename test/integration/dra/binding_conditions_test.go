@@ -444,7 +444,7 @@ profiles:
 
 	// The scheduler should hit the binding timeout and surface that on the pod.
 	// We poll the pod's conditions until we see a message containing "binding timeout".
-	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) *v1.Pod {
+	tCtx.Eventually(func(tCtx ktesting.TContext) *v1.Pod {
 		p, err := tCtx.Client().CoreV1().Pods(namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
 		tCtx.ExpectNoError(err, "get pod")
 		return p
@@ -465,7 +465,7 @@ profiles:
 		"bindingTimeout should trigger roughly near %s (observed %v)", wantTO, elapsed,
 	)
 	// Verify that the pod remains unscheduled after the binding timeout.
-	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) *v1.Pod {
+	tCtx.Eventually(func(tCtx ktesting.TContext) *v1.Pod {
 		pod, err := tCtx.Client().CoreV1().Pods(namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
 		tCtx.ExpectNoError(err, "get pod")
 		return pod
@@ -555,7 +555,7 @@ profiles:
 	sliceWithoutBinding = createSlice(tCtx, sliceWithoutBinding)
 
 	// Ensure the ResourceSlice has been created before the binding timeout occurs.
-	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) error {
+	tCtx.Eventually(func(tCtx ktesting.TContext) error {
 		p, err := tCtx.Client().CoreV1().Pods(namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
 		if err == nil {
 			for _, c := range p.Status.Conditions {
@@ -570,7 +570,7 @@ profiles:
 		gomega.Succeed(), "slice must be created before binding timeout")
 
 	// Wait until the binding timeout occurs.
-	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) *v1.Pod {
+	tCtx.Eventually(func(tCtx ktesting.TContext) *v1.Pod {
 		p, err := tCtx.Client().CoreV1().Pods(namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
 		tCtx.ExpectNoError(err, "get pod")
 		return p
@@ -586,7 +586,7 @@ profiles:
 	)
 
 	// Verify recovery to the newly added device without BindingConditions through rescheduling triggered by binding timeout.
-	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) *resourceapi.ResourceClaim {
+	tCtx.Eventually(func(tCtx ktesting.TContext) *resourceapi.ResourceClaim {
 		c, err := tCtx.Client().ResourceV1().ResourceClaims(namespace).Get(tCtx, claim1.Name, metav1.GetOptions{})
 		tCtx.ExpectNoError(err)
 		return c
