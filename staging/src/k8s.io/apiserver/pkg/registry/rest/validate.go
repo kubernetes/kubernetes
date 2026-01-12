@@ -345,11 +345,9 @@ func metricIdentifier(ctx context.Context, scheme *runtime.Scheme, obj runtime.O
 	return identifier, errs
 }
 
-// ValidateDeclarativelyWithMigrationChecks encapsulates the logic for running declarative validation.
+// ValidateDeclarativelyWithMigrationChecks runs declarative validation, and conditionally compares results
+// with imperative validation and merges errors based on the feature gate and `takeover` flag.
 // It proceeds if either the DeclarativeValidation feature gate is enabled or `containsDeclarativeNative` is set.
-// The function generates a validation identifier, runs declarative validation,
-// and conditionally compares results with imperative validation and merges errors based on the feature gate and `takeover` flag.
-// Declarative-native errors are always appended to the result.
 func ValidateDeclarativelyWithMigrationChecks(ctx context.Context, scheme *runtime.Scheme, obj, oldObj runtime.Object, errs field.ErrorList, opType operation.Type, configOpts ...ValidationConfig) field.ErrorList {
 	declarativeValidationEnabled := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidation)
 	takeover := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationTakeover)
@@ -370,7 +368,8 @@ func ValidateDeclarativelyWithMigrationChecks(ctx context.Context, scheme *runti
 		opt(cfg)
 	}
 
-	if !declarativeValidationEnabled && !cfg.containsDeclarativeNative {
+	// Short-circuit if neither DeclarativeValidation is enabled nor the object contains declarative native validation.
+	if !(declarativeValidationEnabled || cfg.containsDeclarativeNative) {
 		return errs
 	}
 
@@ -379,13 +378,16 @@ func ValidateDeclarativelyWithMigrationChecks(ctx context.Context, scheme *runti
 
 	mirroredDVErrors := field.ErrorList{}
 	dvNativeErrors := field.ErrorList{}
+
+	// When declarative native validation is present, we need to separate declarative native errors
+	// from mirrored declarative errors. This is to avoid comparing declarative native errors (which
+	// have no imperative equivalent) with handwritten imperative errors.
 	if cfg.containsDeclarativeNative {
 		for _, err := range declarativeErrs {
 			if err.DeclarativeNative {
 				dvNativeErrors = append(dvNativeErrors, err)
-				// Internal Error is very unlikely to happen, if that happen it should be fail the validations
-				// for both of types of validations.
 			} else if err.Type == field.ErrorTypeInternal {
+				// Internal errors should fail both types of validation.
 				dvNativeErrors = append(dvNativeErrors, err)
 				mirroredDVErrors = append(mirroredDVErrors, err)
 			} else {
