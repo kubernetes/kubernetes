@@ -99,11 +99,12 @@ var (
 // struct.
 //
 // A framework instance implements ktesting.TB and thus can be passed as
-// first parameter to [github.com/stretchr/testify/assert]. There are
-// just two caveats:
+// first parameter to [github.com/stretchr/testify/assert].
+// There are just two caveats:
 //   - Error and Errorf abort the currently running test.
-//   - The implementation is only usable while a test runs,
-//     not while defining tests.
+//   - This only works while a test runs, not while defining tests.
+//     Incorrect tests may panic. The same applies to using ginkgo.Fail
+//     outside of tests.
 type Framework struct {
 	ktesting.TB
 
@@ -178,7 +179,13 @@ var _ ktesting.ContextTB = &Framework{}
 // an interim solution. It's cleaner to rewrite that code to accept
 // a [ktesting.TContext].
 func (f *Framework) TContext(ctx context.Context) ktesting.TContext {
-	tCtx := ktesting.InitCtx(ctx, f)
+	if f.TB == nil {
+		// Test setup typically has no context, so this is unlikely to be reached.
+		// A sufficiently determined developer might pass in context.Background(),
+		// so let's be explicit anyway.
+		panic("TContext may only be used while a test runs.")
+	}
+	tCtx := ktesting.InitCtx(ctx, f /* intentionally using f here and not f.TB because f overrides some methods */)
 	tCtx = tCtx.WithClients(f.clientConfig, f.restMapper, f.ClientSet, f.DynamicClient, apiextensions.NewForConfigOrDie(f.clientConfig))
 	tCtx = tCtx.WithNamespace(f.Namespace.Name)
 	tCtx = ensureLogger(tCtx)
@@ -280,7 +287,7 @@ func NewDefaultFramework(baseName string) *Framework {
 // NewFramework creates a test framework.
 func NewFramework(baseName string, options Options, client clientset.Interface) *Framework {
 	f := &Framework{
-		TB:        ginkgo.GinkgoT(),
+		// TB initially not set yet. It may only be used while tests run.
 		BaseName:  baseName,
 		Options:   options,
 		ClientSet: client,
@@ -300,6 +307,8 @@ func NewFramework(baseName string, options Options, client clientset.Interface) 
 
 // BeforeEach gets a client and makes a namespace.
 func (f *Framework) BeforeEach(ctx context.Context) {
+	f.TB = ginkgo.GinkgoT()
+
 	// DeferCleanup, in contrast to AfterEach, triggers execution in
 	// first-in-last-out order. This ensures that the framework instance
 	// remains valid as long as possible.
@@ -484,6 +493,7 @@ func (f *Framework) AfterEach(ctx context.Context) {
 		f.clientConfig = nil
 		f.ClientSet = nil
 		f.namespacesToDelete = nil
+		f.TB = nil
 
 		// if we had errors deleting, report them now.
 		if len(nsDeletionErrors) != 0 {
