@@ -7056,9 +7056,9 @@ var _ = SIGDescribe("Container Status After Restart", func() {
 				// Verify the invariant: if started is false, ready must also be false
 				if cs.Started != nil && !*cs.Started {
 					sawNotStartedState = true
-					gomega.Expect(cs.Ready).To(gomega.BeFalse(),
+					gomega.Expect(cs.Ready).To(gomega.BeFalseBecause(
 						"Bug #136047: ready should be false when started is false. "+
-							"Got ready=%v, started=%v", cs.Ready, *cs.Started)
+							"Got ready=%v, started=%v", cs.Ready, *cs.Started))
 				}
 
 				// If we've seen the not-started state and now the container is ready again, we're done
