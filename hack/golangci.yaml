@@ -232,7 +232,7 @@ linters:
         path: "staging/src/k8s.io/api/(core/v1|extensions/v1beta1|networking/(v1|v1beta1))"
       
       # jsontags: 'Port' must be capitalized for backward compatibility
-      - text: 'jsontags: field Port json tag does not match pattern "[^"]+": Port$'
+      - text: 'jsontags: field DaemonEndpoint.Port json tag does not match'
         path: "staging/src/k8s.io/api/core/v1/types.go"
 
       - linters:
