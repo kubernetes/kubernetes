@@ -23,9 +23,11 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestNewFSPullRecordsAccessor(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	tests := []struct {
 		name            string
 		initRoot        bool
@@ -157,7 +159,7 @@ func TestNewFSPullRecordsAccessor(t *testing.T) {
 				}
 			}
 
-			_, err := NewFSPullRecordsAccessor(kubeletDir)
+			_, err := NewFSPullRecordsAccessor(logger, kubeletDir)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewFSPullRecordsAccessor() error = %v, wantErr %v", err, tt.wantErr)
 				return

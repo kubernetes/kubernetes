@@ -337,7 +337,8 @@ func (m *IssuingManager) queueAllProjectionsForPod(uid types.UID) {
 }
 
 func (m *IssuingManager) Run(ctx context.Context) {
-	klog.InfoS("podcertificate.IssuingManager starting up")
+	logger := klog.FromContext(ctx)
+	logger.Info("podcertificate.IssuingManager starting up")
 	if !cache.WaitForCacheSync(ctx.Done(), m.pcrInformer.HasSynced, m.nodeInformer.HasSynced) {
 		return
 	}
@@ -348,7 +349,7 @@ func (m *IssuingManager) Run(ctx context.Context) {
 
 	m.projectionQueue.ShutDown()
 
-	klog.InfoS("podcertificate.IssuingManager shut down")
+	logger.Info("podcertificate.IssuingManager shut down")
 }
 
 func (m *IssuingManager) runProjectionProcessor(ctx context.Context) {
@@ -377,6 +378,8 @@ func (m *IssuingManager) processNextProjection(ctx context.Context) bool {
 func (m *IssuingManager) handleProjection(ctx context.Context, key projectionKey) error {
 	// Remember, returning nil from this function indicates that the work item
 	// was successfully processed, and should be dropped from the queue.
+
+	logger := klog.FromContext(ctx)
 
 	pod, ok := m.podManager.GetPodByUID(types.UID(key.PodUID))
 	if !ok {
@@ -462,7 +465,7 @@ func (m *IssuingManager) handleProjection(ctx context.Context, key projectionKey
 		// Return nil to remove the projection from the workqueue --- it will be
 		// readded once the PodCertificateRequest appears in the informer cache,
 		// and goes through status updates.
-		klog.V(4).InfoS("PodCertificateRequest created, moving to credStateWait", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
+		logger.V(4).Info("PodCertificateRequest created, moving to credStateWait", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
 		return nil
 
 	case *credStateWait:
@@ -495,7 +498,7 @@ func (m *IssuingManager) handleProjection(ctx context.Context, key projectionKey
 					Reason:  cond.Reason,
 					Message: cond.Message,
 				}
-				klog.V(4).InfoS("PodCertificateRequest denied, moving to credStateDenied", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
+				logger.V(4).Info("PodCertificateRequest denied, moving to credStateDenied", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
 				eventMessage := fmt.Sprintf("PodCertificateRequest %s was denied, reason=%q, message=%q", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name, cond.Reason, cond.Message)
 				m.recorder.Eventf(pod, corev1.EventTypeWarning, certificatesv1beta1.PodCertificateRequestConditionTypeDenied, cond.Reason, eventMessage)
 				return nil
@@ -504,7 +507,7 @@ func (m *IssuingManager) handleProjection(ctx context.Context, key projectionKey
 					Reason:  cond.Reason,
 					Message: cond.Message,
 				}
-				klog.V(4).InfoS("PodCertificateRequest failed, moving to credStateFailed", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
+				logger.V(4).Info("PodCertificateRequest failed, moving to credStateFailed", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
 				eventMessage := fmt.Sprintf("PodCertificateRequest %s failed, reason=%q, message=%q", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name, cond.Reason, cond.Message)
 				m.recorder.Eventf(pod, corev1.EventTypeWarning, certificatesv1beta1.PodCertificateRequestConditionTypeFailed, cond.Reason, eventMessage)
 				return nil
@@ -515,7 +518,7 @@ func (m *IssuingManager) handleProjection(ctx context.Context, key projectionKey
 					beginRefreshAt: pcr.Status.BeginRefreshAt.Time.Add(jitterDuration()),
 					notAfter:       pcr.Status.NotAfter.Time,
 				}
-				klog.V(4).InfoS("PodCertificateRequest issued, moving to credStateFresh", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
+				logger.V(4).Info("PodCertificateRequest issued, moving to credStateFresh", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
 				return nil
 			}
 		}
@@ -523,17 +526,17 @@ func (m *IssuingManager) handleProjection(ctx context.Context, key projectionKey
 		// Nothing -- the request is still pending.  Return nil to remove the
 		// projection from the workqueue.  It will be redriven when the
 		// PodCertificateRequest gets an update.
-		klog.V(4).InfoS("PodCertificateRequest not in terminal state, remaining in credStateWait", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
+		logger.V(4).Info("PodCertificateRequest not in terminal state, remaining in credStateWait", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
 		return nil
 
 	case *credStateDenied:
 		// Nothing to do; this is a permanent error state for the pod.
-		klog.V(4).InfoS("staying in credStateDenied", "key", key)
+		logger.V(4).Info("staying in credStateDenied", "key", key)
 		return nil
 
 	case *credStateFailed:
 		// Nothing to do; this is a permanent error state for the pod.
-		klog.V(4).InfoS("staying in credStateFailed", "key", key)
+		logger.V(4).Info("staying in credStateFailed", "key", key)
 		return nil
 
 	case *credStateFresh:
@@ -545,18 +548,18 @@ func (m *IssuingManager) handleProjection(ctx context.Context, key projectionKey
 			return nil
 		}
 
-		klog.V(4).InfoS("Time to refresh", "key", key)
+		logger.V(4).Info("Time to refresh", "key", key)
 
 		// The current time is more than 10 minutes past the most recently issued certificate's `beginRefreshAt` timestamp but the state has not been labeled with overdue for refresh.
 		if m.clock.Now().After(state.beginRefreshAt.Add(refreshOverdueDuration)) && !state.eventEmittedForOverdueForRefresh {
-			klog.V(4).InfoS("Refresh overdue", "key", key)
+			logger.V(4).Info("Refresh overdue", "key", key)
 			m.recorder.Eventf(pod, corev1.EventTypeWarning, "CertificateOverdueForRefresh", "PodCertificate refresh overdue")
 			state.eventEmittedForOverdueForRefresh = true
 		}
 
 		// The current time is past the most recently issued certificate's `notAfter` timestamp but the state has not been labelled with expired.
 		if m.clock.Now().After(state.notAfter) && !state.eventEmittedForExpiration {
-			klog.V(4).InfoS("Certificates expired", "key", key)
+			logger.V(4).Info("Certificates expired", "key", key)
 			m.recorder.Eventf(pod, corev1.EventTypeWarning, "CertificateExpired", "PodCertificate expired")
 			state.eventEmittedForExpiration = true
 		}
@@ -602,7 +605,7 @@ func (m *IssuingManager) handleProjection(ctx context.Context, key projectionKey
 		// Return nil to remove the projection from the workqueue --- it will be
 		// readded once the PodCertificateRequest appears in the informer cache,
 		// and goes through status updates.
-		klog.V(4).InfoS("PodCertificateRequest created, moving to credStateWaitRefresh", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
+		logger.V(4).Info("PodCertificateRequest created, moving to credStateWaitRefresh", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
 		return nil
 
 	case *credStateWaitRefresh:
@@ -640,7 +643,7 @@ func (m *IssuingManager) handleProjection(ctx context.Context, key projectionKey
 					Reason:  cond.Reason,
 					Message: cond.Message,
 				}
-				klog.V(4).InfoS("PodCertificateRequest denied, moving to credStateDenied", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
+				logger.V(4).Info("PodCertificateRequest denied, moving to credStateDenied", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
 				eventMessage := fmt.Sprintf("PodCertificateRequest %s was denied, reason=%q, message=%q", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name, cond.Reason, cond.Message)
 				m.recorder.Eventf(pod, corev1.EventTypeWarning, certificatesv1beta1.PodCertificateRequestConditionTypeDenied, cond.Reason, eventMessage)
 				return nil
@@ -649,7 +652,7 @@ func (m *IssuingManager) handleProjection(ctx context.Context, key projectionKey
 					Reason:  cond.Reason,
 					Message: cond.Message,
 				}
-				klog.V(4).InfoS("PodCertificateRequest failed, moving to credStateFailed", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
+				logger.V(4).Info("PodCertificateRequest failed, moving to credStateFailed", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
 				eventMessage := fmt.Sprintf("PodCertificateRequest %s failed, reason=%q, message=%q", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name, cond.Reason, cond.Message)
 				m.recorder.Eventf(pod, corev1.EventTypeWarning, certificatesv1beta1.PodCertificateRequestConditionTypeFailed, cond.Reason, eventMessage)
 				return nil
@@ -660,7 +663,7 @@ func (m *IssuingManager) handleProjection(ctx context.Context, key projectionKey
 					beginRefreshAt: pcr.Status.BeginRefreshAt.Time.Add(jitterDuration()),
 					notAfter:       pcr.Status.NotAfter.Time,
 				}
-				klog.V(4).InfoS("PodCertificateRequest issued, moving to credStateFresh", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
+				logger.V(4).Info("PodCertificateRequest issued, moving to credStateFresh", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
 				return nil
 			}
 		}
@@ -668,18 +671,18 @@ func (m *IssuingManager) handleProjection(ctx context.Context, key projectionKey
 		// Nothing -- the request is still pending.  Return nil to remove the
 		// projection from the workqueue.  It will be redriven when the
 		// PodCertificateRequest gets an update.
-		klog.V(4).InfoS("PodCertificateRequest not in terminal state, remaining in credStateWaitRefresh", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
+		logger.V(4).Info("PodCertificateRequest not in terminal state, remaining in credStateWaitRefresh", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
 
 		// The current time is more than 10 minutes past the most recently issued certificate's `beginRefreshAt` timestamp but the state has not been labeled with overdue for refresh.
 		if m.clock.Now().After(state.beginRefreshAt.Add(refreshOverdueDuration)) && !state.eventEmittedForOverdueForRefresh {
-			klog.V(4).InfoS("Refresh overdue", "key", key)
+			logger.V(4).Info("Refresh overdue", "key", key)
 			m.recorder.Eventf(pod, corev1.EventTypeWarning, "CertificateOverdueForRefresh", "PodCertificate refresh overdue")
 			state.eventEmittedForOverdueForRefresh = true
 		}
 
 		// The current time is past the most recently issued certificate's `notAfter` timestamp but the state has not been labeled with expired.
 		if m.clock.Now().After(state.notAfter) && !state.eventEmittedForExpiration {
-			klog.V(4).InfoS("Certificates expired", "key", key)
+			logger.V(4).Info("Certificates expired", "key", key)
 			m.recorder.Eventf(pod, corev1.EventTypeWarning, "CertificateExpired", "PodCertificate expired")
 			state.eventEmittedForExpiration = true
 		}

@@ -1991,7 +1991,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 			kl.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", pod.Generation)
 		} else if generation, cleared := kl.statusManager.ClearPodResizeInProgressCondition(pod.UID); cleared {
 			// (Allocated == Actual) => clear the resize in-progress status.
-			msg := events.PodResizeCompletedMsg(pod, generation)
+			msg := events.PodResizeCompletedMsg(logger, pod, generation)
 			kl.recorder.Eventf(pod, v1.EventTypeNormal, events.ResizeCompleted, msg)
 		}
 		// TODO(natasha41575): There is a race condition here, where the goroutine in the
@@ -2167,7 +2167,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 			if r.Action == kubecontainer.ResizePodInPlace && r.Error != nil {
 				// If the condition already exists, the observedGeneration does not get updated.
 				if generation, updated := kl.statusManager.SetPodResizeInProgressCondition(pod.UID, v1.PodReasonError, r.Message, pod.Generation); updated {
-					msg := events.PodResizeErrorMsg(pod, generation, r.Message)
+					msg := events.PodResizeErrorMsg(logger, pod, generation, r.Message)
 					kl.recorder.Eventf(pod, v1.EventTypeWarning, events.ResizeError, msg)
 				}
 			}
