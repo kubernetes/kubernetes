@@ -7664,7 +7664,11 @@ func ValidateLimitRange(limitRange *core.LimitRange) field.ErrorList {
 
 // ValidateServiceAccount tests if required fields in the ServiceAccount are set.
 func ValidateServiceAccount(serviceAccount *core.ServiceAccount) field.ErrorList {
-	allErrs := ValidateObjectMeta(&serviceAccount.ObjectMeta, true, ValidateServiceAccountName, field.NewPath("metadata"))
+	validateLongName := func(fldPath *field.Path, name string) field.ErrorList {
+		return validate.LongName(context.Background(), operation.Operation{}, fldPath, &name, nil).MarkCoveredByDeclarative()
+	}
+
+	allErrs := ValidateObjectMetaWithOpts(&serviceAccount.ObjectMeta, true, validateLongName, field.NewPath("metadata"))
 	return allErrs
 }
 

@@ -42,68 +42,50 @@ func TestDeclarativeValidateForDeclarative(t *testing.T) {
 		},
 		// metadata.name
 		"name: empty": {
-			input: mkValidServiceAccount(func(sa *api.ServiceAccount) {
-				sa.Name = ""
-			}),
+			input: mkValidServiceAccount(tweakNameEmpty()),
 			expectedErrs: field.ErrorList{
 				field.Required(field.NewPath("metadata.name"), ""),
 			},
 		},
 		"name: label format": {
-			input: mkValidServiceAccount(func(sa *api.ServiceAccount) {
-				sa.Name = "this-is-a-label"
-			}),
+			input: mkValidServiceAccount(tweakNameLabelFormat()),
 		},
 		"name: subdomain format": {
-			input: mkValidServiceAccount(func(sa *api.ServiceAccount) {
-				sa.Name = "this.is.a.subdomain"
-			}),
+			input: mkValidServiceAccount(tweakNameSubdomainFormat()),
 		},
 		"name: invalid label format": {
-			input: mkValidServiceAccount(func(sa *api.ServiceAccount) {
-				sa.Name = "-this-is-not-a-label"
-			}),
+			input: mkValidServiceAccount(tweakNameInvalidLabelFormat()),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("metadata.name"), nil, ""),
+				field.Invalid(field.NewPath("metadata.name"), nil, "").WithOrigin("format=k8s-long-name"),
 			},
 		},
 		"name: invalid subdomain format": {
-			input: mkValidServiceAccount(func(sa *api.ServiceAccount) {
-				sa.Name = ".this.is.not.a.subdomain"
-			}),
+			input: mkValidServiceAccount(tweakNameInvalidSubdomainFormat()),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("metadata.name"), nil, ""),
+				field.Invalid(field.NewPath("metadata.name"), nil, "").WithOrigin("format=k8s-long-name"),
 			},
 		},
 		"name: label format with trailing dash": {
-			input: mkValidServiceAccount(func(sa *api.ServiceAccount) {
-				sa.Name = "this-is-a-label-"
-			}),
+			input: mkValidServiceAccount(tweakNameTrailingDash()),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("metadata.name"), nil, ""),
+				field.Invalid(field.NewPath("metadata.name"), nil, "").WithOrigin("format=k8s-long-name"),
 			},
 		},
 		"name: too long": {
-			input: mkValidServiceAccount(func(sa *api.ServiceAccount) {
-				sa.Name = strings.Repeat("x", 254)
-			}),
+			input: mkValidServiceAccount(tweakNameTooLong()),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("metadata.name"), nil, ""),
+				field.Invalid(field.NewPath("metadata.name"), nil, "").WithOrigin("format=k8s-long-name"),
 			},
 		},
 		// metadata.namespace
 		"namespace: empty": {
-			input: mkValidServiceAccount(func(sa *api.ServiceAccount) {
-				sa.Namespace = ""
-			}),
+			input: mkValidServiceAccount(tweakNamespaceEmpty()),
 			expectedErrs: field.ErrorList{
 				field.Required(field.NewPath("metadata.namespace"), ""),
 			},
 		},
 		"namespace: valid": {
-			input: mkValidServiceAccount(func(sa *api.ServiceAccount) {
-				sa.Namespace = "valid-namespace"
-			}),
+			input: mkValidServiceAccount(tweakNamespace("valid-namespace")),
 		},
 	}
 	for k, tc := range testCases {
@@ -130,20 +112,16 @@ func TestValidateUpdateForDeclarative(t *testing.T) {
 		},
 		// metadata.name
 		"name: changed": {
-			old: mkValidServiceAccount(),
-			update: mkValidServiceAccount(func(sa *api.ServiceAccount) {
-				sa.Name += "x"
-			}),
+			old:    mkValidServiceAccount(),
+			update: mkValidServiceAccount(tweakNameAppend("x")),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("metadata.name"), nil, ""),
 			},
 		},
 		// metadata.namespace
 		"namespace: changed": {
-			old: mkValidServiceAccount(),
-			update: mkValidServiceAccount(func(sa *api.ServiceAccount) {
-				sa.Namespace = "other-namespace"
-			}),
+			old:    mkValidServiceAccount(),
+			update: mkValidServiceAccount(tweakNamespace("other-namespace")),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("metadata.namespace"), nil, ""),
 			},
@@ -171,4 +149,56 @@ func mkValidServiceAccount(tweaks ...func(sa *api.ServiceAccount)) api.ServiceAc
 		tweak(&sa)
 	}
 	return sa
+}
+
+// Tweak functions for ServiceAccount mutations that can be reused across test cases
+
+func tweakName(name string) func(*api.ServiceAccount) {
+	return func(sa *api.ServiceAccount) {
+		sa.Name = name
+	}
+}
+
+func tweakNameAppend(suffix string) func(*api.ServiceAccount) {
+	return func(sa *api.ServiceAccount) {
+		sa.Name += suffix
+	}
+}
+
+func tweakNameEmpty() func(*api.ServiceAccount) {
+	return tweakName("")
+}
+
+func tweakNameTooLong() func(*api.ServiceAccount) {
+	return tweakName(strings.Repeat("x", 254))
+}
+
+func tweakNameInvalidLabelFormat() func(*api.ServiceAccount) {
+	return tweakName("-this-is-not-a-label")
+}
+
+func tweakNameInvalidSubdomainFormat() func(*api.ServiceAccount) {
+	return tweakName(".this.is.not.a.subdomain")
+}
+
+func tweakNameTrailingDash() func(*api.ServiceAccount) {
+	return tweakName("this-is-a-label-")
+}
+
+func tweakNameLabelFormat() func(*api.ServiceAccount) {
+	return tweakName("this-is-a-label")
+}
+
+func tweakNameSubdomainFormat() func(*api.ServiceAccount) {
+	return tweakName("this.is.a.subdomain")
+}
+
+func tweakNamespace(namespace string) func(*api.ServiceAccount) {
+	return func(sa *api.ServiceAccount) {
+		sa.Namespace = namespace
+	}
+}
+
+func tweakNamespaceEmpty() func(*api.ServiceAccount) {
+	return tweakNamespace("")
 }
