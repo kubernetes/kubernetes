@@ -247,3 +247,46 @@ func TestCompositedPolicies(t *testing.T) {
 		})
 	}
 }
+
+// TestCompilerIsolation verifies that each call to NewCompositedCompiler
+// creates an isolated environment where variables from one compiler
+// do not leak into another.
+func TestCompilerIsolation(t *testing.T) {
+	baseEnv := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion())
+
+	// Create first compiler with variable "foo"
+	compiler1, err := NewCompositedCompiler(baseEnv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	vars1 := []NamedExpressionAccessor{
+		&testVariable{name: "foo", expression: "'bar'"},
+	}
+	compiler1.CompileAndStoreVariables(vars1, OptionalVariableDeclarations{}, environment.StoredExpressions)
+
+	// Create second compiler with variable "baz"
+	compiler2, err := NewCompositedCompiler(baseEnv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	vars2 := []NamedExpressionAccessor{
+		&testVariable{name: "baz", expression: "'qux'"},
+	}
+	compiler2.CompileAndStoreVariables(vars2, OptionalVariableDeclarations{}, environment.StoredExpressions)
+
+	// Verify isolation: compiler1 should not have "baz", compiler2 should not have "foo"
+	if _, ok := compiler1.state.mapType.Fields["baz"]; ok {
+		t.Error("compiler1 should not have variable 'baz' from compiler2")
+	}
+	if _, ok := compiler2.state.mapType.Fields["foo"]; ok {
+		t.Error("compiler2 should not have variable 'foo' from compiler1")
+	}
+
+	// Verify each compiler has its own variable
+	if _, ok := compiler1.state.mapType.Fields["foo"]; !ok {
+		t.Error("compiler1 should have variable 'foo'")
+	}
+	if _, ok := compiler2.state.mapType.Fields["baz"]; !ok {
+		t.Error("compiler2 should have variable 'baz'")
+	}
+}
