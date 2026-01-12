@@ -17,12 +17,16 @@ limitations under the License.
 package delete
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/sync/errgroup"
 	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -124,6 +128,7 @@ type DeleteOptions struct {
 	WarnClusterScope    bool
 	Raw                 string
 	Interactive         bool
+	Concurrency         int
 
 	GracePeriod int
 	Timeout     time.Duration
@@ -195,6 +200,10 @@ func (o *DeleteOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Co
 	}
 	if o.ForceDeletion && o.GracePeriod < 0 {
 		o.GracePeriod = 0
+	}
+
+	if o.Concurrency < 1 {
+		o.Concurrency = 1
 	}
 
 	o.DryRunStrategy, err = cmdutil.GetDryRunStrategy(cmd)
@@ -279,6 +288,10 @@ func (o *DeleteOptions) Validate() error {
 	}
 	if o.WarningPrinter == nil {
 		return fmt.Errorf("WarningPrinter can not be used without initialization")
+	}
+
+	if o.Concurrency < 1 {
+		return fmt.Errorf("--concurrency must be greater than 0")
 	}
 
 	switch {
@@ -371,6 +384,7 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 	warnClusterScope := o.WarnClusterScope
 	deletedInfos := []*resource.Info{}
 	uidMap := cmdwait.UIDMap{}
+	uidMapLock := sync.Mutex{}
 	err := r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
 			return err
@@ -390,53 +404,126 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 		deletedInfos = append(deletedInfos, info)
 		found++
 
-		options := &metav1.DeleteOptions{}
-		if o.GracePeriod >= 0 {
-			options = metav1.NewDeleteOptions(int64(o.GracePeriod))
-		}
-		options.PropagationPolicy = &o.CascadingStrategy
-
 		if warnClusterScope && info.Mapping.Scope.Name() == meta.RESTScopeNameRoot {
 			o.WarningPrinter.Print("deleting cluster-scoped resources, not scoped to the provided namespace")
 			warnClusterScope = false
 		}
-
-		if o.DryRunStrategy == cmdutil.DryRunClient {
-			if !o.Quiet {
-				o.PrintObj(info)
-			}
-			return nil
-		}
-		response, err := o.deleteResource(info, options)
-		if err != nil {
-			return err
-		}
-		resourceLocation := cmdwait.ResourceLocation{
-			GroupResource: info.Mapping.Resource.GroupResource(),
-			Namespace:     info.Namespace,
-			Name:          info.Name,
-		}
-		if status, ok := response.(*metav1.Status); ok && status.Details != nil {
-			uidMap[resourceLocation] = status.Details.UID
-			return nil
-		}
-		responseMetadata, err := meta.Accessor(response)
-		if err != nil {
-			// we don't have UID, but we didn't fail the delete, next best thing is just skipping the UID
-			klog.V(1).Info(err)
-			return nil
-		}
-		uidMap[resourceLocation] = responseMetadata.GetUID()
-
 		return nil
 	})
 	if err != nil {
 		return err
 	}
 	if found == 0 {
-		fmt.Fprintf(o.Out, "No resources found\n")
+		fmt.Fprintf(o.Out, "No resources found\n") //nolint:errcheck
 		return nil
 	}
+
+	if o.DryRunStrategy == cmdutil.DryRunClient {
+		for _, info := range deletedInfos {
+			if !o.Quiet {
+				o.PrintObj(info)
+			}
+		}
+		return nil
+	}
+
+	options := &metav1.DeleteOptions{}
+	if o.GracePeriod >= 0 {
+		options = metav1.NewDeleteOptions(int64(o.GracePeriod))
+	}
+	options.PropagationPolicy = &o.CascadingStrategy
+
+	// Start the workers to send delete requests concurrently.
+	workerCount := o.Concurrency
+	if workerCount < 1 {
+		workerCount = 1
+	}
+	if workerCount > len(deletedInfos) {
+		workerCount = len(deletedInfos)
+	}
+	if workerCount > 1 {
+		klog.V(3).InfoS("Concurrent deletion enabled", "workers", workerCount)
+	}
+
+	queueCh := make(chan *resource.Info, o.Concurrency)
+	eg, ctx := errgroup.WithContext(context.Background())
+	var notFoundErr atomic.Pointer[error]
+	for c := 0; c < workerCount; c++ {
+		eg.Go(func() error {
+			for {
+				select {
+				case info := <-queueCh:
+					// Return when all items have been processed.
+					if info == nil {
+						return nil
+					}
+
+					response, err := o.deleteResource(info, options)
+					if err != nil {
+						// NotFound errors are handled in a special way.
+						// The first NotFound error is returned unless IgnoreNotFound,
+						// but NotFound errors never stop processing other resources.
+						if errors.IsNotFound(err) {
+							if !o.IgnoreNotFound {
+								notFoundErr.CompareAndSwap(nil, &err)
+							}
+							continue
+						}
+						return err
+					}
+
+					resourceLocation := cmdwait.ResourceLocation{
+						GroupResource: info.Mapping.Resource.GroupResource(),
+						Namespace:     info.Namespace,
+						Name:          info.Name,
+					}
+					if status, ok := response.(*metav1.Status); ok && status.Details != nil {
+						uidMapLock.Lock()
+						uidMap[resourceLocation] = status.Details.UID
+						uidMapLock.Unlock()
+						continue
+					}
+
+					responseMetadata, err := meta.Accessor(response)
+					if err != nil {
+						// we don't have UID, but we didn't fail the delete, next best thing is just skipping the UID
+						klog.V(1).Info(err)
+						continue
+					}
+
+					uidMapLock.Lock()
+					uidMap[resourceLocation] = responseMetadata.GetUID()
+					uidMapLock.Unlock()
+
+				case <-ctx.Done():
+					return nil
+				}
+			}
+		})
+	}
+
+	// Push all resources into the work queue.
+	go func() {
+		defer close(queueCh)
+		for _, info := range deletedInfos {
+			select {
+			case queueCh <- info:
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	// Wait for all workers to exit.
+	if err := eg.Wait(); err != nil {
+		return err
+	}
+
+	// Return the NotFound error in case there was any.
+	if errPtr := notFoundErr.Load(); errPtr != nil {
+		return *errPtr
+	}
+
 	if !o.WaitForDeletion {
 		return nil
 	}
