@@ -1,4 +1,5 @@
 //go:build !darwin && !linux
+// +build !darwin,!linux
 
 /*
 Copyright 2021 The Kubernetes Authors.
