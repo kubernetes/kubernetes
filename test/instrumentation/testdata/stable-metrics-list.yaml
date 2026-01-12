@@ -183,6 +183,85 @@
   help: The count of hidden metrics.
   type: Counter
   stabilityLevel: BETA
+- name: metric_computation_duration_seconds
+  subsystem: horizontal_pod_autoscaler_controller
+  help: The time(seconds) that the HPA controller takes to calculate one metric. The
+    label 'action' should be either 'scale_down', 'scale_up', or 'none'. The label
+    'error' should be either 'spec', 'internal', or 'none'. The label 'metric_type'
+    corresponds to HPA.spec.metrics[*].type
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - action
+  - error
+  - metric_type
+  buckets:
+  - 0.001
+  - 0.002
+  - 0.004
+  - 0.008
+  - 0.016
+  - 0.032
+  - 0.064
+  - 0.128
+  - 0.256
+  - 0.512
+  - 1.024
+  - 2.048
+  - 4.096
+  - 8.192
+  - 16.384
+- name: metric_computation_total
+  subsystem: horizontal_pod_autoscaler_controller
+  help: Number of metric computations. The label 'action' should be either 'scale_down',
+    'scale_up', or 'none'. Also, the label 'error' should be either 'spec', 'internal',
+    or 'none'. The label 'metric_type' corresponds to HPA.spec.metrics[*].type
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - action
+  - error
+  - metric_type
+- name: reconciliation_duration_seconds
+  subsystem: horizontal_pod_autoscaler_controller
+  help: The time(seconds) that the HPA controller takes to reconcile once. The label
+    'action' should be either 'scale_down', 'scale_up', or 'none'. Also, the label
+    'error' should be either 'spec', 'internal', or 'none'. Note that if both spec
+    and internal errors happen during a reconciliation, the first one to occur is
+    reported in `error` label.
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - action
+  - error
+  buckets:
+  - 0.001
+  - 0.002
+  - 0.004
+  - 0.008
+  - 0.016
+  - 0.032
+  - 0.064
+  - 0.128
+  - 0.256
+  - 0.512
+  - 1.024
+  - 2.048
+  - 4.096
+  - 8.192
+  - 16.384
+- name: reconciliations_total
+  subsystem: horizontal_pod_autoscaler_controller
+  help: Number of reconciliations of HPA controller. The label 'action' should be
+    either 'scale_down', 'scale_up', or 'none'. Also, the label 'error' should be
+    either 'spec', 'internal', or 'none'. Note that if both spec and internal errors
+    happen during a reconciliation, the first one to occur is reported in `error`
+    label.
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - action
+  - error
 - name: image_volume_mounted_errors_total
   subsystem: kubelet
   help: Number of failed image volume mounts.
