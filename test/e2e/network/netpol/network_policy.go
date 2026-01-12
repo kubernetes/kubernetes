@@ -1356,7 +1356,7 @@ var _ = common.SIGDescribe("Netpol", feature.SCTPConnectivity, "[LinuxOnly]", fu
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	var k8s *kubeManager
 	ginkgo.BeforeEach(func() {
-		// Windows does not support SCTP
+		// Windows does not support network policies.
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 	})
 
@@ -1448,6 +1448,9 @@ func getNamespaceNames(rootNs string) []string {
 // defaultModel creates a new "model" pod system under namespaces (x,y,z) which has pods a, b, and c.  Thus resulting in the
 // truth table matrix that is identical for all tests, comprising 81 total connections between 9 pods (x/a, x/b, x/c, ..., z/c).
 func defaultModel(namespaces []string, protocols []v1.Protocol, ports []int32) *Model {
+	if framework.NodeOSDistroIs("windows") {
+		return NewWindowsModel(namespaces, []string{"a", "b", "c"}, ports)
+	}
 	return NewModel(namespaces, []string{"a", "b", "c"}, ports, protocols)
 }
 
