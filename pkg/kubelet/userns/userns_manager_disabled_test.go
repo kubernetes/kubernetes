@@ -97,12 +97,12 @@ func TestGetOrCreateUserNamespaceMappingsDisabled(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			logger, ctx := ktesting.NewTestContext(t)
+			logger, _ := ktesting.NewTestContext(t)
 			testUserNsPodsManager := &testUserNsPodsManager{}
 			m, err := MakeUserNsManager(logger, testUserNsPodsManager, nil)
 			require.NoError(t, err)
 
-			userns, err := m.GetOrCreateUserNamespaceMappings(ctx, test.pod, "")
+			userns, err := m.GetOrCreateUserNamespaceMappings(logger, test.pod, "")
 			assert.Nil(t, userns)
 			if test.success {
 				assert.NoError(t, err)
