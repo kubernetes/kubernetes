@@ -283,7 +283,7 @@ func TestEventCorrelator(t *testing.T) {
 }
 
 func TestEventSpamFilter(t *testing.T) {
-	spamKeyFuncBasedOnObjectsAndReason := func(e *v1.Event) string {
+	spamKeyFuncBasedOnObjectsReasonAndMessage := func(e *v1.Event) string {
 		return strings.Join([]string{
 			e.Source.Component,
 			e.Source.Host,
@@ -293,6 +293,7 @@ func TestEventSpamFilter(t *testing.T) {
 			string(e.InvolvedObject.UID),
 			e.InvolvedObject.APIVersion,
 			e.Reason,
+			e.Message,
 		},
 			"")
 	}
@@ -307,20 +308,20 @@ func TestEventSpamFilter(t *testing.T) {
 		expectedSkip  bool
 		spamKeyFunc   EventSpamKeyFunc
 	}{
-		"event should be reported as spam if object reference is the same for default spam filter": {
-			newEvent:     differentReasonEvent,
-			expectedSkip: true,
-		},
-		"event should not be reported as spam if object reference is the same, but reason is different for custom spam filter": {
+		"event should not be reported as spam if object reference is the same but reason is different for default spam filter": {
 			newEvent:      differentReasonEvent,
 			expectedEvent: differentReasonEvent,
 			expectedSkip:  false,
-			spamKeyFunc:   spamKeyFuncBasedOnObjectsAndReason,
 		},
-		"event should  be reported as spam if object reference and reason is the same, but message is different for custom spam filter": {
+		"event should be reported as spam if object reference and reason are the same for default spam filter": {
 			newEvent:     spamEvent,
 			expectedSkip: true,
-			spamKeyFunc:  spamKeyFuncBasedOnObjectsAndReason,
+		},
+		"event should not be reported as spam if object reference and reason are the same but message is different for custom spam filter": {
+			newEvent:      spamEvent,
+			expectedEvent: spamEvent,
+			expectedSkip:  false,
+			spamKeyFunc:   spamKeyFuncBasedOnObjectsReasonAndMessage,
 		},
 	}
 
