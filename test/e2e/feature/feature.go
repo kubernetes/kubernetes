@@ -407,6 +407,10 @@ var (
 	// and the networking.k8s.io/v1alpha1 API.
 	ServiceCIDRs = framework.WithFeature(framework.ValidFeatures.Add("ServiceCIDRs"))
 
+	// Owned by SIG Storage
+	// KEP: https://kep.k8s.io/3314
+	SnapshotMetadata = framework.WithFeature(framework.ValidFeatures.Add("snapshotmetadata"))
+
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	StackdriverAcceleratorMonitoring = framework.WithFeature(framework.ValidFeatures.Add("StackdriverAcceleratorMonitoring"))
 
