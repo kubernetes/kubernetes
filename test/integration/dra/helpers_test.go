@@ -165,7 +165,7 @@ func createPod(tCtx ktesting.TContext, namespace string, suffix string, pod *v1.
 func waitForPodScheduled(tCtx ktesting.TContext, namespace, podName string) {
 	tCtx.Helper()
 
-	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) *v1.Pod {
+	tCtx.Eventually(func(tCtx ktesting.TContext) *v1.Pod {
 		return must(tCtx, tCtx.Client().CoreV1().Pods(namespace).Get, podName, metav1.GetOptions{})
 	}).WithTimeout(60*time.Second).Should(
 		gomega.HaveField("Status.Conditions", gomega.ContainElement(
@@ -198,7 +198,7 @@ func waitForNotFound[T any](tCtx ktesting.TContext, get func(context.Context, st
 	tCtx.Helper()
 
 	var t T
-	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) error {
+	tCtx.Eventually(func(tCtx ktesting.TContext) error {
 		_, err := get(tCtx, name, metav1.GetOptions{})
 		return err
 	}).WithTimeout(60*time.Second).Should(gomega.MatchError(apierrors.IsNotFound, "IsNotFound"), "Object %T %s should have been removed.", t, name)
@@ -207,7 +207,7 @@ func waitForNotFound[T any](tCtx ktesting.TContext, get func(context.Context, st
 func waitForClaim(tCtx ktesting.TContext, namespace, claimName string, timeout time.Duration, match gtypes.GomegaMatcher, description ...any) *resourceapi.ResourceClaim {
 	tCtx.Helper()
 	var latestClaim *resourceapi.ResourceClaim
-	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) *resourceapi.ResourceClaim {
+	tCtx.Eventually(func(tCtx ktesting.TContext) *resourceapi.ResourceClaim {
 		c, err := tCtx.Client().ResourceV1().ResourceClaims(namespace).Get(tCtx, claimName, metav1.GetOptions{})
 		tCtx.ExpectNoError(err, "get claim")
 		latestClaim = c

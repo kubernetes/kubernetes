@@ -314,7 +314,7 @@ var (
 		slice := sliceTainted.DeepCopy()
 		for i := range slice.Spec.Devices {
 			for j := range slice.Spec.Devices[i].Taints {
-				slice.Spec.Devices[i].Taints[j].Effect = resourceapi.DeviceTaintEffect("unknown-effect")
+				slice.Spec.Devices[i].Taints[j].Effect = "unknown-effect"
 			}
 		}
 		return slice
@@ -2152,7 +2152,7 @@ func newTestController(tCtx ktesting.TContext, clientSet *fake.Clientset) *Contr
 		tCtx.Wait()
 		require.Equal(tCtx, int32(5), numWatches.Load(), "All watches should be registered.")
 	} else {
-		ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) int32 {
+		tCtx.Eventually(func(tCtx ktesting.TContext) int32 {
 			return numWatches.Load()
 		}).WithTimeout(5*time.Second).Should(gomega.Equal(int32(5)), "All watches should be registered.")
 	}
@@ -2294,7 +2294,7 @@ func testEviction(tCtx ktesting.TContext) {
 		tCtx.SyncTest(name, func(tCtx ktesting.TContext) {
 			start := time.Now()
 			fakeClientset := fake.NewClientset(tt.initialObjects...)
-			tCtx = ktesting.WithClients(tCtx, nil, nil, fakeClientset, nil, nil)
+			tCtx = tCtx.WithClients(nil, nil, fakeClientset, nil, nil)
 
 			var podGets int
 			var podUpdates int
@@ -2348,7 +2348,7 @@ func testEviction(tCtx ktesting.TContext) {
 					tCtx.Fatal("controller should have synced")
 				}
 			} else {
-				ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) bool {
+				tCtx.Eventually(func(tCtx ktesting.TContext) bool {
 					return controller.hasSynced.Load() > 0
 				}).WithTimeout(30 * time.Second).Should(gomega.BeTrueBecause("controller synced"))
 				if tt.afterSync != nil {
@@ -2411,7 +2411,7 @@ func TestDeviceTaintRule(t *testing.T) { ktesting.Init(t).SyncTest("", synctestD
 func synctestDeviceTaintRule(tCtx ktesting.TContext) {
 	rule := ruleNone.DeepCopy()
 	fakeClientset := fake.NewClientset(podWithClaimName, inUseClaim, rule)
-	tCtx = ktesting.WithClients(tCtx, nil, nil, fakeClientset, nil, nil)
+	tCtx = tCtx.WithClients(nil, nil, fakeClientset, nil, nil)
 	controller := newTestController(tCtx, fakeClientset)
 
 	var wg sync.WaitGroup
@@ -2438,7 +2438,7 @@ func synctestDeviceTaintRule(tCtx ktesting.TContext) {
 			tCtx.Fatal("controller should have synced")
 		}
 	} else {
-		ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) bool {
+		tCtx.Eventually(func(tCtx ktesting.TContext) bool {
 			return controller.hasSynced.Load() > 0
 		}).WithTimeout(30 * time.Second).Should(gomega.BeTrueBecause("controller synced"))
 	}
@@ -2554,7 +2554,7 @@ func doCancelEviction(tCtx ktesting.TContext, deletePod bool) {
 		return false, nil, nil
 	})
 
-	tCtx = ktesting.WithClients(tCtx, nil, nil, fakeClientset, nil, nil)
+	tCtx = tCtx.WithClients(nil, nil, fakeClientset, nil, nil)
 	controller := newTestController(tCtx, fakeClientset)
 
 	var mutex sync.Mutex
@@ -2586,7 +2586,7 @@ func doCancelEviction(tCtx ktesting.TContext, deletePod bool) {
 	}()
 
 	// Eventually the pod gets scheduled for eviction.
-	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) bool {
+	tCtx.Eventually(func(tCtx ktesting.TContext) bool {
 		mutex.Lock()
 		defer mutex.Unlock()
 		return podEvicting
@@ -2600,7 +2600,7 @@ func doCancelEviction(tCtx ktesting.TContext, deletePod bool) {
 	}
 
 	// Shortly after deletion we should also see the cancellation.
-	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) bool {
+	tCtx.Eventually(func(tCtx ktesting.TContext) bool {
 		mutex.Lock()
 		defer mutex.Unlock()
 		return podEvicting
@@ -2609,7 +2609,7 @@ func doCancelEviction(tCtx ktesting.TContext, deletePod bool) {
 	// Whether we get an event depends on whether the pod still exists.
 	// If we expect an event, we need to wait for it.
 	if !deletePod {
-		ktesting.Eventually(tCtx, listEvents).WithTimeout(30 * time.Second).Should(matchCancellationEvent())
+		tCtx.Eventually(listEvents).WithTimeout(30 * time.Second).Should(matchCancellationEvent())
 	}
 	tCtx.Wait()
 
@@ -2654,7 +2654,7 @@ func testParallelPodDeletion(tCtx ktesting.TContext) {
 			inUseClaim,
 			pod,
 		)
-		tCtx = ktesting.WithClients(tCtx, nil, nil, fakeClientset, nil, nil)
+		tCtx = tCtx.WithClients(nil, nil, fakeClientset, nil, nil)
 
 		pod, err := fakeClientset.CoreV1().Pods(pod.Namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
 		require.NoError(tCtx, err, "get pod before eviction")
@@ -2699,7 +2699,7 @@ func testParallelPodDeletion(tCtx ktesting.TContext) {
 		}()
 
 		// Eventually the pod gets deleted, in this test by us.
-		ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) bool {
+		tCtx.Eventually(func(tCtx ktesting.TContext) bool {
 			mutex.Lock()
 			defer mutex.Unlock()
 			return podGets >= 1
@@ -2725,7 +2725,7 @@ func synctestRetry(tCtx ktesting.TContext) {
 		inUseClaim,
 		pod,
 	)
-	tCtx = ktesting.WithClients(tCtx, nil, nil, fakeClientset, nil, nil)
+	tCtx = tCtx.WithClients(nil, nil, fakeClientset, nil, nil)
 
 	pod, err := fakeClientset.CoreV1().Pods(pod.Namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
 	require.NoError(tCtx, err, "get pod before eviction")
@@ -2771,7 +2771,7 @@ func synctestRetry(tCtx ktesting.TContext) {
 	}()
 
 	// Eventually the pod gets deleted and the event is recorded.
-	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) error {
+	tCtx.Eventually(func(tCtx ktesting.TContext) error {
 		gomega.NewWithT(tCtx).Expect(listEvents(tCtx)).Should(matchDeletionEvent())
 		return testPodDeletionsMetrics(controller, 1)
 	}).WithTimeout(30*time.Second).Should(gomega.Succeed(), "pod eviction done")
