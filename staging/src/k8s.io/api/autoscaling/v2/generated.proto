@@ -248,10 +248,14 @@ message HorizontalPodAutoscalerSpec {
   // metric is configured.  Scaling is active as long as at least one metric value is
   // available.
   // +optional
+  // +k8s:optional
   optional int32 minReplicas = 2;
 
   // maxReplicas is the upper limit for the number of replicas to which the autoscaler can scale up.
   // It cannot be less that minReplicas.
+  // +required
+  // +k8s:required
+  // +k8s:minimum=1
   optional int32 maxReplicas = 3;
 
   // metrics contains the specifications for which to use to calculate the
