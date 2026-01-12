@@ -37,6 +37,7 @@ const (
 	preV4Base64WebsocketProtocol = wsstream.Base64ChannelWebSocketProtocol
 	v4BinaryWebsocketProtocol    = "v4." + wsstream.ChannelWebSocketProtocol
 	v4Base64WebsocketProtocol    = "v4." + wsstream.Base64ChannelWebSocketProtocol
+	v5BinaryWebsocketProtocol    = "v5." + wsstream.ChannelWebSocketProtocol
 )
 
 // createChannels returns the standard channel types for a shell connection (STDIN 0, STDOUT 1, STDERR 2)
@@ -93,6 +94,10 @@ func createWebSocketStreams(req *http.Request, w http.ResponseWriter, opts *Opti
 			Binary:   false,
 			Channels: channels,
 		},
+		v5BinaryWebsocketProtocol: {
+			Binary:   true,
+			Channels: channels,
+		},
 	})
 	conn.SetIdleTimeout(idleTimeout)
 	negotiatedProtocol, streams, err := conn.Open(responsewriter.GetOriginal(w), req)
@@ -122,7 +127,7 @@ func createWebSocketStreams(req *http.Request, w http.ResponseWriter, opts *Opti
 	}
 
 	switch negotiatedProtocol {
-	case v4BinaryWebsocketProtocol, v4Base64WebsocketProtocol:
+	case v4BinaryWebsocketProtocol, v4Base64WebsocketProtocol, v5BinaryWebsocketProtocol:
 		ctx.writeStatus = v4WriteStatusFunc(streams[errorChannel])
 	default:
 		ctx.writeStatus = v1WriteStatusFunc(streams[errorChannel])

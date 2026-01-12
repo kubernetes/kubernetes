@@ -149,6 +149,10 @@ func createHTTPStreamStreams(req *http.Request, w http.ResponseWriter, opts *Opt
 
 	var handler protocolHandler
 	switch protocol {
+	case remotecommandconsts.StreamProtocolV5Name:
+		// V5 is the same as V4 for SPDY streaming; the CLOSE signal
+		// is a WebSocket-specific feature handled in wsstream.
+		handler = &v4ProtocolHandler{}
 	case remotecommandconsts.StreamProtocolV4Name:
 		handler = &v4ProtocolHandler{}
 	case remotecommandconsts.StreamProtocolV3Name:
