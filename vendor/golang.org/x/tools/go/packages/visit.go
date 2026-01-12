@@ -78,7 +78,7 @@ func PrintErrors(pkgs []*Package) int {
 	return n
 }
 
-// Postorder returns an iterator over the the packages in
+// Postorder returns an iterator over the packages in
 // the import graph whose roots are pkg.
 // Packages are enumerated in dependencies-first order.
 func Postorder(pkgs []*Package) iter.Seq[*Package] {
