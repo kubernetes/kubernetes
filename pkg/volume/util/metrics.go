@@ -48,7 +48,7 @@ var StorageOperationMetric = metrics.NewHistogramVec(
 		Name:           "storage_operation_duration_seconds",
 		Help:           "Storage operation duration",
 		Buckets:        []float64{.1, .25, .5, 1, 2.5, 5, 10, 15, 25, 50, 120, 300, 600},
-		StabilityLevel: metrics.ALPHA,
+		StabilityLevel: metrics.BETA,
 	},
 	[]string{"volume_plugin", "operation_name", "status", "migrated"},
 )
@@ -58,7 +58,7 @@ var storageOperationEndToEndLatencyMetric = metrics.NewHistogramVec(
 		Name:           "volume_operation_total_seconds",
 		Help:           "Storage operation end to end duration in seconds",
 		Buckets:        []float64{.1, .25, .5, 1, 2.5, 5, 10, 15, 25, 50, 120, 300, 600},
-		StabilityLevel: metrics.ALPHA,
+		StabilityLevel: metrics.BETA,
 	},
 	[]string{"plugin_name", "operation_name"},
 )
