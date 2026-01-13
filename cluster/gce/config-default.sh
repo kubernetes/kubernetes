@@ -88,7 +88,7 @@ fi
 # By default, the latest image from the image family will be used unless an
 # explicit image will be set.
 GCI_VERSION=${KUBE_GCI_VERSION:-}
-IMAGE_FAMILY=${KUBE_GCE_IMAGE_FAMILY:-cos-121-lts}
+IMAGE_FAMILY=${KUBE_GCE_IMAGE_FAMILY:-cos-125-lts}
 IMAGE_PROJECT=${KUBE_GCE_IMAGE_PROJECT:-cos-cloud}
 export MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-}
 export MASTER_IMAGE_FAMILY=${KUBE_GCE_MASTER_IMAGE_FAMILY:-${IMAGE_FAMILY}}
