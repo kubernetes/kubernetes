@@ -109,13 +109,10 @@ var (
 	//   action: FailJob, Ignore, Count
 	PodFailuresHandledByFailurePolicy = metrics.NewCounterVec(
 		&metrics.CounterOpts{
-			Subsystem: JobControllerSubsystem,
-			Name:      "pod_failures_handled_by_failure_policy_total",
-			Help: `The number of failed Pods handled by failure policy with
-			respect to the failure policy action applied based on the matched
-			rule. Possible values of the action label correspond to the
-			possible values for the failure policy rule action, which are:
-			"FailJob", "Ignore" and "Count".`,
+			Subsystem:      JobControllerSubsystem,
+			Name:           "pod_failures_handled_by_failure_policy_total",
+			Help:           `The number of failed Pods handled by failure policy with respect to the failure policy action applied based on the matched rule. Possible values of the action label correspond to the possible values for the failure policy rule action, which are: "FailJob", "Ignore" and "Count".`,
+			StabilityLevel: metrics.BETA,
 		},
 		[]string{"action"})
 
@@ -124,11 +121,10 @@ var (
 	// regardless of whether they are owned by a Job.
 	TerminatedPodsTrackingFinalizerTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
-			Subsystem: JobControllerSubsystem,
-			Name:      "terminated_pods_tracking_finalizer_total",
-			Help: `The number of terminated pods (phase=Failed|Succeeded)
-that have the finalizer batch.kubernetes.io/job-tracking
-The event label can be "add" or "delete".`,
+			Subsystem:      JobControllerSubsystem,
+			Name:           "terminated_pods_tracking_finalizer_total",
+			Help:           `The number of terminated pods (phase=Failed|Succeeded) that have the finalizer batch.kubernetes.io/job-tracking. The event label can be "add" or "delete".`,
+			StabilityLevel: metrics.BETA,
 		}, []string{"event"})
 
 	// JobFinishedIndexesTotal records the number of finished indexes.
