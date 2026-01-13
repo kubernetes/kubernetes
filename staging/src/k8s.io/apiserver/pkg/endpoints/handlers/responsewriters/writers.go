@@ -17,7 +17,6 @@ limitations under the License.
 package responsewriters
 
 import (
-	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -25,7 +24,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -38,6 +36,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
+	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters/encodings"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -138,25 +137,11 @@ func SerializeObject(mediaType string, encoder runtime.Encoder, hw http.Response
 	w.Close()
 }
 
-var gzipPool = &sync.Pool{
-	New: func() interface{} {
-		gw, err := gzip.NewWriterLevel(nil, defaultGzipContentEncodingLevel)
-		if err != nil {
-			panic(err)
-		}
-		return gw
-	},
-}
-
 const (
-	// defaultGzipContentEncodingLevel is set to 1 which uses least CPU compared to higher levels, yet offers
-	// similar compression ratios (off by at most 1.5x, but typically within 1.1x-1.3x). For further details see -
-	// https://github.com/kubernetes/kubernetes/issues/112296
-	defaultGzipContentEncodingLevel = 1
-	// defaultGzipThresholdBytes is compared to the size of the first write from the stream
-	// (usually the entire object), and if the size is smaller no gzipping will be performed
+	// defaultEncodingThresholdBytes is compared to the size of the first write from the stream
+	// (usually the entire object), and if the size is smaller no compression will be performed
 	// if the client requests it.
-	defaultGzipThresholdBytes = 128 * 1024
+	defaultEncodingThresholdBytes = 128 * 1024
 	// Use the length of the first write to recognize streaming implementations.
 	// When streaming JSON first write is "{", while Kubernetes protobuf starts unique 4 byte header.
 	firstWriteStreamingThresholdBytes = 4
@@ -165,13 +150,13 @@ const (
 // negotiateContentEncoding returns a supported client-requested content encoding for the
 // provided request. It will return the empty string if no supported content encoding was
 // found or if response compression is disabled.
-func negotiateContentEncoding(req *http.Request) string {
+func negotiateContentEncoding(req *http.Request) encodings.Interface {
 	encoding := req.Header.Get("Accept-Encoding")
 	if len(encoding) == 0 {
-		return ""
+		return nil
 	}
 	if !utilfeature.DefaultFeatureGate.Enabled(features.APIResponseCompression) {
-		return ""
+		return nil
 	}
 	for len(encoding) > 0 {
 		var token string
@@ -182,24 +167,24 @@ func negotiateContentEncoding(req *http.Request) string {
 			token = encoding
 			encoding = ""
 		}
-		switch strings.TrimSpace(token) {
-		case "gzip":
-			return "gzip"
+		algorithm, ok := encodings.Get(strings.TrimSpace(token))
+		if ok {
+			return algorithm
 		}
 	}
-	return ""
+	return nil
 }
 
 type deferredResponseWriter struct {
 	mediaType       string
 	statusCode      int
-	contentEncoding string
+	contentEncoding encodings.Interface
 
 	hasBuffered bool
 	buffer      []byte
 	hasWritten  bool
 	hw          http.ResponseWriter
-	w           io.Writer
+	w           io.WriteCloser
 	// totalBytes is the number of bytes written to `w` and does not include buffered bytes
 	totalBytes int
 	// lastWriteErr holds the error result (if any) of the last write attempt to `w`
@@ -214,12 +199,12 @@ func (w *deferredResponseWriter) Write(p []byte) (n int, err error) {
 		// already written, cannot buffer
 		return w.unbufferedWrite(p)
 
-	case w.contentEncoding != "gzip":
-		// non-gzip, no need to buffer
+	case w.contentEncoding == nil:
+		// no encoding, no need to buffer
 		return w.unbufferedWrite(p)
 
-	case !w.hasBuffered && len(p) > defaultGzipThresholdBytes:
-		// not yet buffered, first write is long enough to trigger gzip, no need to buffer
+	case !w.hasBuffered && len(p) > defaultEncodingThresholdBytes:
+		// not yet buffered, first write is long enough to trigger compression, no need to buffer
 		return w.unbufferedWrite(p)
 
 	case !w.hasBuffered && len(p) > firstWriteStreamingThresholdBytes:
@@ -236,8 +221,8 @@ func (w *deferredResponseWriter) Write(p []byte) (n int, err error) {
 		}
 		w.buffer = append(w.buffer, p...)
 		var err error
-		if len(w.buffer) > defaultGzipThresholdBytes {
-			// we've accumulated enough to trigger gzip, write and clear buffer
+		if len(w.buffer) > defaultEncodingThresholdBytes {
+			// we've accumulated enough to trigger encoding, write and clear buffer
 			_, err = w.unbufferedWrite(w.buffer)
 			w.buffer = nil
 		}
@@ -259,16 +244,14 @@ func (w *deferredResponseWriter) unbufferedWrite(p []byte) (n int, err error) {
 	hw := w.hw
 	header := hw.Header()
 	switch {
-	case w.contentEncoding == "gzip" && len(p) > defaultGzipThresholdBytes:
-		header.Set("Content-Encoding", "gzip")
+	case w.contentEncoding != nil && len(p) > defaultEncodingThresholdBytes:
+		header.Set("Content-Encoding", w.contentEncoding.EncoderName())
 		header.Add("Vary", "Accept-Encoding")
 
-		gw := gzipPool.Get().(*gzip.Writer)
-		gw.Reset(hw)
-
+		gw := w.contentEncoding.NewWriter(hw)
 		w.w = gw
 	default:
-		w.w = hw
+		w.w = &nopWriteCloser{Writer: hw}
 	}
 
 	span := tracing.SpanFromContext(w.ctx)
@@ -304,19 +287,13 @@ func (w *deferredResponseWriter) Close() (err error) {
 		if !w.hasBuffered {
 			return nil
 		}
-		// never reached defaultGzipThresholdBytes, no need to do the gzip writer cleanup
+		// never reached defaultEncodingThresholdBytes, no need to do the encode writer cleanup
 		_, err := w.unbufferedWrite(w.buffer)
 		w.buffer = nil
 		return err
 	}
 
-	switch t := w.w.(type) {
-	case *gzip.Writer:
-		err = t.Close()
-		t.Reset(nil)
-		gzipPool.Put(t)
-	}
-	return err
+	return w.w.Close()
 }
 
 // WriteObjectNegotiated renders an object in the content type negotiated by the client.
@@ -406,4 +383,12 @@ func WriteRawJSON(statusCode int, object interface{}, w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
 	w.Write(output)
+}
+
+type nopWriteCloser struct {
+	io.Writer
+}
+
+func (n *nopWriteCloser) Close() error {
+	return nil
 }
