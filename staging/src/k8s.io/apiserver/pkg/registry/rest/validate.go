@@ -18,7 +18,6 @@ package rest
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -308,26 +307,23 @@ func panicSafeValidateFunc(
 	}
 }
 
-func metricIdentifier(ctx context.Context, scheme *runtime.Scheme, obj runtime.Object, opType operation.Type) (string, error) {
-	var errs error
+func metricIdentifier(ctx context.Context, obj runtime.Object, opType operation.Type) (string, error) {
 	var identifier string
+	var err error
 
 	identifier = "unknown_resource"
 	// Use kind for identifier.
-	if obj != nil && scheme != nil {
-		gvks, _, err := scheme.ObjectKinds(obj)
-		if err != nil {
-			errs = errors.Join(errs, err)
-		}
-		if len(gvks) > 0 {
-			identifier = strings.ToLower(gvks[0].Kind)
+	if obj != nil {
+		gvk := obj.GetObjectKind().GroupVersionKind()
+		if gvk.Kind != "" {
+			identifier = strings.ToLower(gvk.Kind)
 		}
 	}
 
 	// Use requestInfo for subresource.
 	requestInfo, found := genericapirequest.RequestInfoFrom(ctx)
 	if !found {
-		errs = errors.Join(errs, fmt.Errorf("could not find requestInfo in context"))
+		err = fmt.Errorf("could not find requestInfo in context")
 	} else if len(requestInfo.Subresource) > 0 {
 		// subresource can be a path, so replace '/' with '_'
 		identifier += "_" + strings.ReplaceAll(requestInfo.Subresource, "/", "_")
@@ -339,10 +335,12 @@ func metricIdentifier(ctx context.Context, scheme *runtime.Scheme, obj runtime.O
 	case operation.Update:
 		identifier += "_update"
 	default:
-		errs = errors.Join(errs, fmt.Errorf("unknown operation type: %v", opType))
+		if err == nil {
+			err = fmt.Errorf("unknown operation type: %v", opType)
+		}
 		identifier += "_unknown_op"
 	}
-	return identifier, errs
+	return identifier, err
 }
 
 // ValidateDeclarativelyWithMigrationChecks runs declarative validation, and conditionally compares results
@@ -352,7 +350,7 @@ func ValidateDeclarativelyWithMigrationChecks(ctx context.Context, scheme *runti
 	declarativeValidationEnabled := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidation)
 	takeover := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationTakeover)
 
-	validationIdentifier, err := metricIdentifier(ctx, scheme, obj, opType)
+	validationIdentifier, err := metricIdentifier(ctx, obj, opType)
 	if err != nil {
 		// Log the error, but continue with the best-effort identifier.
 		klog.FromContext(ctx).Error(err, "failed to generate complete validation identifier for declarative validation")

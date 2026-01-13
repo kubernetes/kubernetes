@@ -1,4 +1,5 @@
 //go:build go1.21
+// +build go1.21
 
 /*
 Copyright 2018 The Kubernetes Authors.

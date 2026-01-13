@@ -5690,28 +5690,28 @@
   subsystem: workqueue
   help: Total number of adds handled by workqueue
   type: Counter
-  stabilityLevel: BETA
+  stabilityLevel: ALPHA
   labels:
   - name
 - name: depth
   subsystem: workqueue
   help: Current depth of workqueue
   type: Gauge
-  stabilityLevel: BETA
+  stabilityLevel: ALPHA
   labels:
   - name
 - name: longest_running_processor_seconds
   subsystem: workqueue
   help: How many seconds has the longest running processor for workqueue been running.
   type: Gauge
-  stabilityLevel: BETA
+  stabilityLevel: ALPHA
   labels:
   - name
 - name: queue_duration_seconds
   subsystem: workqueue
   help: How long in seconds an item stays in workqueue before being requested.
   type: Histogram
-  stabilityLevel: BETA
+  stabilityLevel: ALPHA
   labels:
   - name
   buckets:
@@ -5729,7 +5729,7 @@
   subsystem: workqueue
   help: Total number of retries handled by workqueue
   type: Counter
-  stabilityLevel: BETA
+  stabilityLevel: ALPHA
   labels:
   - name
 - name: unfinished_work_seconds
@@ -5738,14 +5738,14 @@
     by work_duration. Large values indicate stuck threads. One can deduce the number
     of stuck threads by observing the rate at which this increases.
   type: Gauge
-  stabilityLevel: BETA
+  stabilityLevel: ALPHA
   labels:
   - name
 - name: work_duration_seconds
   subsystem: workqueue
   help: How long in seconds processing an item from workqueue takes.
   type: Histogram
-  stabilityLevel: BETA
+  stabilityLevel: ALPHA
   labels:
   - name
   buckets:
