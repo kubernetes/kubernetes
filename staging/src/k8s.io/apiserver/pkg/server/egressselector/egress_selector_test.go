@@ -210,7 +210,7 @@ func TestMetrics(t *testing.T) {
 			proxierErr:   true,
 			metrics:      []string{"apiserver_egress_dialer_dial_start_total"},
 			want: `
-	# HELP apiserver_egress_dialer_dial_start_total [ALPHA] Dial starts, labeled by the protocol (http-connect or grpc) and transport (tcp or uds).
+	# HELP apiserver_egress_dialer_dial_start_total [BETA] Dial starts, labeled by the protocol (http-connect or grpc) and transport (tcp or uds).
 	# TYPE apiserver_egress_dialer_dial_start_total counter
 	apiserver_egress_dialer_dial_start_total{protocol="fake_protocol",transport="fake_transport"} 1
 `,
@@ -220,7 +220,7 @@ func TestMetrics(t *testing.T) {
 			proxierErr:   false,
 			metrics:      []string{"apiserver_egress_dialer_dial_failure_count"},
 			want: `
-	# HELP apiserver_egress_dialer_dial_failure_count [ALPHA] Dial failure count, labeled by the protocol (http-connect or grpc), transport (tcp or uds), and stage (connect or proxy). The stage indicates at which stage the dial failed
+	# HELP apiserver_egress_dialer_dial_failure_count [BETA] Dial failure count, labeled by the protocol (http-connect or grpc), transport (tcp or uds), and stage (connect or proxy). The stage indicates at which stage the dial failed
 	# TYPE apiserver_egress_dialer_dial_failure_count counter
 	apiserver_egress_dialer_dial_failure_count{protocol="fake_protocol",stage="connect",transport="fake_transport"} 1
 `,
@@ -230,7 +230,7 @@ func TestMetrics(t *testing.T) {
 			proxierErr:   true,
 			metrics:      []string{"apiserver_egress_dialer_dial_failure_count"},
 			want: `
-	# HELP apiserver_egress_dialer_dial_failure_count [ALPHA] Dial failure count, labeled by the protocol (http-connect or grpc), transport (tcp or uds), and stage (connect or proxy). The stage indicates at which stage the dial failed
+	# HELP apiserver_egress_dialer_dial_failure_count [BETA] Dial failure count, labeled by the protocol (http-connect or grpc), transport (tcp or uds), and stage (connect or proxy). The stage indicates at which stage the dial failed
 	# TYPE apiserver_egress_dialer_dial_failure_count counter
 	apiserver_egress_dialer_dial_failure_count{protocol="fake_protocol",stage="proxy",transport="fake_transport"} 1
 `,
@@ -240,7 +240,7 @@ func TestMetrics(t *testing.T) {
 			proxierErr:   false,
 			metrics:      []string{"apiserver_egress_dialer_dial_duration_seconds"},
 			want: `
-            # HELP apiserver_egress_dialer_dial_duration_seconds [ALPHA] Dial latency histogram in seconds, labeled by the protocol (http-connect or grpc), transport (tcp or uds)
+            # HELP apiserver_egress_dialer_dial_duration_seconds [BETA] Dial latency histogram in seconds, labeled by the protocol (http-connect or grpc), transport (tcp or uds)
             # TYPE apiserver_egress_dialer_dial_duration_seconds histogram
             apiserver_egress_dialer_dial_duration_seconds_bucket{protocol="fake_protocol",transport="fake_transport",le="0.005"} 1
             apiserver_egress_dialer_dial_duration_seconds_bucket{protocol="fake_protocol",transport="fake_transport",le="0.025"} 1

@@ -418,6 +418,85 @@ func TestRecordKeyIDFromStatus(t *testing.T) {
 	}
 }
 
+func TestDekCacheMetrics(t *testing.T) {
+	testCases := []struct {
+		desc    string
+		metrics []string
+		update  func()
+		want    string
+	}{
+		{
+			desc:    "dek_cache_fill_percent gauge",
+			metrics: []string{"apiserver_envelope_encryption_dek_cache_fill_percent"},
+			update: func() {
+				RecordDekCacheFillPercent(75.5)
+			},
+			want: `
+			# HELP apiserver_envelope_encryption_dek_cache_fill_percent [BETA] Percent of the cache slots currently occupied by cached DEKs.
+			# TYPE apiserver_envelope_encryption_dek_cache_fill_percent gauge
+			apiserver_envelope_encryption_dek_cache_fill_percent 75.5
+			`,
+		},
+		{
+			desc:    "dek_cache_inter_arrival_time_seconds histogram",
+			metrics: []string{"apiserver_envelope_encryption_dek_cache_inter_arrival_time_seconds"},
+			update: func() {
+				// Record two arrivals to generate an inter-arrival time observation
+				// First call sets the initial timestamp, second call records the inter-arrival time
+				start1 := time.Now()
+				RecordArrival(FromStorageLabel, start1)
+				time.Sleep(50 * time.Millisecond)
+				start2 := time.Now()
+				RecordArrival(FromStorageLabel, start2)
+			},
+			want: "",
+		},
+	}
+
+	RegisterMetrics()
+	for _, test := range testCases {
+		t.Run(test.desc, func(t *testing.T) {
+			// Reset histogram metrics (gauge doesn't have Reset method)
+			dekCacheInterArrivals.Reset()
+			// Set gauge to 0 before test
+			if test.desc == "dek_cache_fill_percent gauge" {
+				dekCacheFillPercent.Set(0)
+			}
+			test.update()
+			// For histogram metrics with timing-dependent sum, verify help text and that values are recorded
+			if test.desc == "dek_cache_inter_arrival_time_seconds histogram" {
+				// Verify the metric is registered with BETA stability and records values
+				metrics, err := legacyregistry.DefaultGatherer.Gather()
+				if err != nil {
+					t.Fatalf("Failed to gather metrics: %v", err)
+				}
+				found := false
+				for _, mf := range metrics {
+					if mf.GetName() == "apiserver_envelope_encryption_dek_cache_inter_arrival_time_seconds" {
+						found = true
+						help := mf.GetHelp()
+						if !strings.Contains(help, "[BETA]") {
+							t.Errorf("Expected help text to contain [BETA], got: %s", help)
+						}
+						// Verify that observations were recorded (count > 0)
+						if len(mf.GetMetric()) == 0 {
+							t.Error("Metric has no observations")
+						}
+						break
+					}
+				}
+				if !found {
+					t.Error("Metric apiserver_envelope_encryption_dek_cache_inter_arrival_time_seconds not found")
+				}
+			} else {
+				if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(test.want), test.metrics...); err != nil {
+					t.Fatal(err)
+				}
+			}
+		})
+	}
+}
+
 func TestRecordInvalidKeyIDFromStatus(t *testing.T) {
 	testCases := []struct {
 		desc         string

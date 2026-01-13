@@ -457,7 +457,7 @@ func (uss *uniformScenarioState) finalReview() {
 	}
 	if uss.evalExecutingMetrics && len(uss.expectedConcurrencyInUse) > 0 {
 		e := `
-				# HELP apiserver_flowcontrol_request_concurrency_in_use [ALPHA] Concurrency (number of seats) occupied by the currently executing (initial stage for a WATCH, any stage otherwise) requests in the API Priority and Fairness subsystem
+				# HELP apiserver_flowcontrol_request_concurrency_in_use [BETA] Concurrency (number of seats) occupied by the currently executing (initial stage for a WATCH, any stage otherwise) requests in the API Priority and Fairness subsystem
 				# TYPE apiserver_flowcontrol_request_concurrency_in_use gauge
 ` + uss.expectedConcurrencyInUse
 		err := metrics.GatherAndCompare(e, "apiserver_flowcontrol_request_concurrency_in_use")
