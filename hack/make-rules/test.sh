@@ -101,7 +101,7 @@ isnum() {
   [[ "$1" =~ ^[0-9]+$ ]]
 }
 
-PARALLEL="${PARALLEL:-1}"
+PARALLEL="${PARALLEL:--1}"
 while getopts "hp:i:" opt ; do
   case ${opt} in
     h)
@@ -173,6 +173,10 @@ set -- "${testcases[@]+${testcases[@]}}"
 
 if [[ -n "${KUBE_RACE}" ]] ; then
   goflags+=("${KUBE_RACE}")
+fi
+
+if [[ "${PARALLEL}" -gt 0 ]]; then
+  goflags+=(-p "${PARALLEL}")
 fi
 
 junitFilenamePrefix() {
