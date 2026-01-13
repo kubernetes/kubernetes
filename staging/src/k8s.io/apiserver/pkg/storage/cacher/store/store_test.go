@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cacher
+package store
 
 import (
 	"testing"
@@ -29,16 +29,16 @@ import (
 
 func TestStoreSingleKey(t *testing.T) {
 	t.Run("cache.Indexer", func(t *testing.T) {
-		store := newStoreIndexer(testStoreIndexers())
+		store := NewIndexer(testStoreIndexers())
 		testStoreSingleKey(t, store)
 	})
 	t.Run("btree", func(t *testing.T) {
-		store := newThreadedBtreeStoreIndexer(storeElementIndexers(testStoreIndexers()), btreeDegree)
+		store := newThreadedBtreeStoreIndexer(ElementIndexers(testStoreIndexers()), btreeDegree)
 		testStoreSingleKey(t, store)
 	})
 }
 
-func testStoreSingleKey(t *testing.T, store storeIndexer) {
+func testStoreSingleKey(t *testing.T, store Indexer) {
 	assertStoreEmpty(t, store, "foo")
 
 	require.NoError(t, store.Add(testStorageElement("foo", "bar", 1)))
@@ -61,16 +61,16 @@ func testStoreSingleKey(t *testing.T, store storeIndexer) {
 
 func TestStoreIndexerSingleKey(t *testing.T) {
 	t.Run("cache.Indexer", func(t *testing.T) {
-		store := newStoreIndexer(testStoreIndexers())
+		store := NewIndexer(testStoreIndexers())
 		testStoreIndexerSingleKey(t, store)
 	})
 	t.Run("btree", func(t *testing.T) {
-		store := newThreadedBtreeStoreIndexer(storeElementIndexers(testStoreIndexers()), btreeDegree)
+		store := newThreadedBtreeStoreIndexer(ElementIndexers(testStoreIndexers()), btreeDegree)
 		testStoreIndexerSingleKey(t, store)
 	})
 }
 
-func testStoreIndexerSingleKey(t *testing.T, store storeIndexer) {
+func testStoreIndexerSingleKey(t *testing.T, store Indexer) {
 	items, err := store.ByIndex("by_val", "bar")
 	require.NoError(t, err)
 	assert.Empty(t, items)
@@ -122,7 +122,7 @@ func testStoreIndexerSingleKey(t *testing.T, store storeIndexer) {
 	require.NoError(t, store.Delete(testStorageElement("foo", "", 0)))
 }
 
-func assertStoreEmpty(t *testing.T, store storeIndexer, nonExistingKey string) {
+func assertStoreEmpty(t *testing.T, store Indexer, nonExistingKey string) {
 	item, ok, err := store.Get(testStorageElement(nonExistingKey, "", 0))
 	require.NoError(t, err)
 	assert.False(t, ok)
@@ -137,23 +137,23 @@ func assertStoreEmpty(t *testing.T, store storeIndexer, nonExistingKey string) {
 	assert.Empty(t, items)
 }
 
-func assertStoreSingleKey(t *testing.T, store storeIndexer, expectKey, expectValue string, expectRV int) {
+func assertStoreSingleKey(t *testing.T, store Indexer, expectKey, expectValue string, expectRV int) {
 	item, ok, err := store.Get(testStorageElement(expectKey, "", expectRV))
 	require.NoError(t, err)
 	assert.True(t, ok)
-	assert.Equal(t, expectValue, item.(*storeElement).Object.(fakeObj).value)
+	assert.Equal(t, expectValue, item.(*Element).Object.(fakeObj).value)
 
 	item, ok, err = store.GetByKey(expectKey)
 	require.NoError(t, err)
 	assert.True(t, ok)
-	assert.Equal(t, expectValue, item.(*storeElement).Object.(fakeObj).value)
+	assert.Equal(t, expectValue, item.(*Element).Object.(fakeObj).value)
 
 	items := store.List()
 	assert.Equal(t, []interface{}{testStorageElement(expectKey, expectValue, expectRV)}, items)
 }
 
-func testStorageElement(key, value string, rv int) *storeElement {
-	return &storeElement{Key: key, Object: fakeObj{value: value, rv: rv}}
+func testStorageElement(key, value string, rv int) *Element {
+	return &Element{Key: key, Object: fakeObj{value: value, rv: rv}}
 }
 
 type fakeObj struct {

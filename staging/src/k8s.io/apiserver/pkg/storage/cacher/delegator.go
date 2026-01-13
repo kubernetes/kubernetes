@@ -39,6 +39,7 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher/delegator"
 	"k8s.io/apiserver/pkg/storage/cacher/metrics"
+	"k8s.io/apiserver/pkg/storage/cacher/store"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/tracing"
 	"k8s.io/klog/v2"
@@ -111,7 +112,7 @@ func (c *CacheDelegator) Delete(ctx context.Context, key string, out runtime.Obj
 	} else if exists {
 		// DeepCopy the object since we modify resource version when serializing the
 		// current object.
-		currObj := elem.(*storeElement).Object.DeepCopyObject()
+		currObj := elem.(*store.Element).Object.DeepCopyObject()
 		return c.storage.Delete(ctx, key, out, preconditions, validateDeletion, currObj, opts)
 	}
 	// If we couldn't get the object, fallback to no-suggestion.
@@ -250,7 +251,7 @@ func (c *CacheDelegator) GuaranteedUpdate(ctx context.Context, key string, desti
 	} else if exists {
 		// DeepCopy the object since we modify resource version when serializing the
 		// current object.
-		currObj := elem.(*storeElement).Object.DeepCopyObject()
+		currObj := elem.(*store.Element).Object.DeepCopyObject()
 		return c.storage.GuaranteedUpdate(ctx, key, destination, ignoreNotFound, preconditions, tryUpdate, currObj)
 	}
 	// If we couldn't get the object, fallback to no-suggestion.

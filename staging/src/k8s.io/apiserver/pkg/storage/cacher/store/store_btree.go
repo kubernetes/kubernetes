@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cacher
+package store
 
 import (
 	"fmt"
@@ -43,7 +43,7 @@ type threadedStoreIndexer struct {
 	indexer indexer
 }
 
-var _ orderedLister = (*threadedStoreIndexer)(nil)
+var _ OrderedLister = (*threadedStoreIndexer)(nil)
 
 func (si *threadedStoreIndexer) Count(prefix, continueKey string) (count int) {
 	si.lock.RLock()
@@ -51,7 +51,7 @@ func (si *threadedStoreIndexer) Count(prefix, continueKey string) (count int) {
 	return si.store.Count(prefix, continueKey)
 }
 
-func (si *threadedStoreIndexer) Clone() orderedLister {
+func (si *threadedStoreIndexer) Clone() OrderedLister {
 	si.lock.RLock()
 	defer si.lock.RUnlock()
 	return si.store.Clone()
@@ -69,7 +69,7 @@ func (si *threadedStoreIndexer) addOrUpdate(obj interface{}) error {
 	if obj == nil {
 		return fmt.Errorf("obj cannot be nil")
 	}
-	newElem, ok := obj.(*storeElement)
+	newElem, ok := obj.(*Element)
 	if !ok {
 		return fmt.Errorf("obj not a storeElement: %#v", obj)
 	}
@@ -80,7 +80,7 @@ func (si *threadedStoreIndexer) addOrUpdate(obj interface{}) error {
 }
 
 func (si *threadedStoreIndexer) Delete(obj interface{}) error {
-	storeElem, ok := obj.(*storeElement)
+	storeElem, ok := obj.(*Element)
 	if !ok {
 		return fmt.Errorf("obj not a storeElement: %#v", obj)
 	}
@@ -141,17 +141,17 @@ func (si *threadedStoreIndexer) ByIndex(indexName, indexValue string) ([]interfa
 
 func newBtreeStore(degree int) btreeStore {
 	return btreeStore{
-		tree: btree.NewG(degree, func(a, b *storeElement) bool {
+		tree: btree.NewG(degree, func(a, b *Element) bool {
 			return a.Key < b.Key
 		}),
 	}
 }
 
 type btreeStore struct {
-	tree *btree.BTreeG[*storeElement]
+	tree *btree.BTreeG[*Element]
 }
 
-func (s *btreeStore) Clone() orderedLister {
+func (s *btreeStore) Clone() OrderedLister {
 	return &btreeStore{
 		tree: s.tree.Clone(),
 	}
@@ -161,7 +161,7 @@ func (s *btreeStore) Add(obj interface{}) error {
 	if obj == nil {
 		return fmt.Errorf("obj cannot be nil")
 	}
-	storeElem, ok := obj.(*storeElement)
+	storeElem, ok := obj.(*Element)
 	if !ok {
 		return fmt.Errorf("obj not a storeElement: %#v", obj)
 	}
@@ -173,7 +173,7 @@ func (s *btreeStore) Update(obj interface{}) error {
 	if obj == nil {
 		return fmt.Errorf("obj cannot be nil")
 	}
-	storeElem, ok := obj.(*storeElement)
+	storeElem, ok := obj.(*Element)
 	if !ok {
 		return fmt.Errorf("obj not a storeElement: %#v", obj)
 	}
@@ -185,7 +185,7 @@ func (s *btreeStore) Delete(obj interface{}) error {
 	if obj == nil {
 		return fmt.Errorf("obj cannot be nil")
 	}
-	storeElem, ok := obj.(*storeElement)
+	storeElem, ok := obj.(*Element)
 	if !ok {
 		return fmt.Errorf("obj not a storeElement: %#v", obj)
 	}
@@ -193,13 +193,13 @@ func (s *btreeStore) Delete(obj interface{}) error {
 	return nil
 }
 
-func (s *btreeStore) deleteElem(storeElem *storeElement) (*storeElement, bool) {
+func (s *btreeStore) deleteElem(storeElem *Element) (*Element, bool) {
 	return s.tree.Delete(storeElem)
 }
 
 func (s *btreeStore) List() []interface{} {
 	items := make([]interface{}, 0, s.tree.Len())
-	s.tree.Ascend(func(item *storeElement) bool {
+	s.tree.Ascend(func(item *Element) bool {
 		items = append(items, item)
 		return true
 	})
@@ -208,7 +208,7 @@ func (s *btreeStore) List() []interface{} {
 
 func (s *btreeStore) ListKeys() []string {
 	items := make([]string, 0, s.tree.Len())
-	s.tree.Ascend(func(item *storeElement) bool {
+	s.tree.Ascend(func(item *Element) bool {
 		items = append(items, item.Key)
 		return true
 	})
@@ -216,7 +216,7 @@ func (s *btreeStore) ListKeys() []string {
 }
 
 func (s *btreeStore) Get(obj interface{}) (item interface{}, exists bool, err error) {
-	storeElem, ok := obj.(*storeElement)
+	storeElem, ok := obj.(*Element)
 	if !ok {
 		return nil, false, fmt.Errorf("obj is not a storeElement")
 	}
@@ -231,7 +231,7 @@ func (s *btreeStore) GetByKey(key string) (item interface{}, exists bool, err er
 func (s *btreeStore) Replace(objs []interface{}, _ string) error {
 	s.tree.Clear(false)
 	for _, obj := range objs {
-		storeElem, ok := obj.(*storeElement)
+		storeElem, ok := obj.(*Element)
 		if !ok {
 			return fmt.Errorf("obj not a storeElement: %#v", obj)
 		}
@@ -242,13 +242,13 @@ func (s *btreeStore) Replace(objs []interface{}, _ string) error {
 
 // addOrUpdateLocked assumes a lock is held and is used for Add
 // and Update operations.
-func (s *btreeStore) addOrUpdateElem(storeElem *storeElement) *storeElement {
+func (s *btreeStore) addOrUpdateElem(storeElem *Element) *Element {
 	oldObj, _ := s.tree.ReplaceOrInsert(storeElem)
 	return oldObj
 }
 
 func (s *btreeStore) getByKey(key string) (item interface{}, exists bool, err error) {
-	keyElement := &storeElement{Key: key}
+	keyElement := &Element{Key: key}
 	item, exists = s.tree.Get(keyElement)
 	return item, exists, nil
 }
@@ -258,7 +258,7 @@ func (s *btreeStore) ListPrefix(prefix, continueKey string) []interface{} {
 		continueKey = prefix
 	}
 	var result []interface{}
-	s.tree.AscendGreaterOrEqual(&storeElement{Key: continueKey}, func(item *storeElement) bool {
+	s.tree.AscendGreaterOrEqual(&Element{Key: continueKey}, func(item *Element) bool {
 		if !strings.HasPrefix(item.Key, prefix) {
 			return false
 		}
@@ -272,7 +272,7 @@ func (s *btreeStore) Count(prefix, continueKey string) (count int) {
 	if continueKey == "" {
 		continueKey = prefix
 	}
-	s.tree.AscendGreaterOrEqual(&storeElement{Key: continueKey}, func(item *storeElement) bool {
+	s.tree.AscendGreaterOrEqual(&Element{Key: continueKey}, func(item *Element) bool {
 		if !strings.HasPrefix(item.Key, prefix) {
 			return false
 		}
@@ -292,13 +292,13 @@ func (s *btreeStore) Count(prefix, continueKey string) (count int) {
 // Difference in mutability of stored values is used for optimizing some operations in client-go Indexer.
 func newIndexer(indexers cache.Indexers) indexer {
 	return indexer{
-		indices:  map[string]map[string]map[string]*storeElement{},
+		indices:  map[string]map[string]map[string]*Element{},
 		indexers: indexers,
 	}
 }
 
 type indexer struct {
-	indices  map[string]map[string]map[string]*storeElement
+	indices  map[string]map[string]map[string]*Element
 	indexers cache.Indexers
 }
 
@@ -317,9 +317,9 @@ func (i *indexer) ByIndex(indexName, indexValue string) ([]interface{}, error) {
 }
 
 func (i *indexer) Replace(objs []interface{}, resourceVersion string) error {
-	i.indices = map[string]map[string]map[string]*storeElement{}
+	i.indices = map[string]map[string]map[string]*Element{}
 	for _, obj := range objs {
-		storeElem, ok := obj.(*storeElement)
+		storeElem, ok := obj.(*Element)
 		if !ok {
 			return fmt.Errorf("obj not a storeElement: %#v", obj)
 		}
@@ -331,7 +331,7 @@ func (i *indexer) Replace(objs []interface{}, resourceVersion string) error {
 	return nil
 }
 
-func (i *indexer) updateElem(key string, oldObj, newObj *storeElement) (err error) {
+func (i *indexer) updateElem(key string, oldObj, newObj *Element) (err error) {
 	var oldIndexValues, indexValues []string
 	for name, indexFunc := range i.indexers {
 		if oldObj != nil {
@@ -352,7 +352,7 @@ func (i *indexer) updateElem(key string, oldObj, newObj *storeElement) (err erro
 		}
 		index := i.indices[name]
 		if index == nil {
-			index = map[string]map[string]*storeElement{}
+			index = map[string]map[string]*Element{}
 			i.indices[name] = index
 		}
 		if len(indexValues) == 1 && len(oldIndexValues) == 1 && indexValues[0] == oldIndexValues[0] {
@@ -370,16 +370,16 @@ func (i *indexer) updateElem(key string, oldObj, newObj *storeElement) (err erro
 	return nil
 }
 
-func (i *indexer) add(key, value string, obj *storeElement, index map[string]map[string]*storeElement) {
+func (i *indexer) add(key, value string, obj *Element, index map[string]map[string]*Element) {
 	set := index[value]
 	if set == nil {
-		set = map[string]*storeElement{}
+		set = map[string]*Element{}
 		index[value] = set
 	}
 	set[key] = obj
 }
 
-func (i *indexer) delete(key, value string, index map[string]map[string]*storeElement) {
+func (i *indexer) delete(key, value string, index map[string]map[string]*Element) {
 	set := index[value]
 	if set == nil {
 		return
@@ -426,7 +426,7 @@ func (i *indexer) delete(key, value string, index map[string]map[string]*storeEl
 // However, this solution is more complex and is deferred for future implementation.
 //
 // TODO: Rewrite to use a cyclic buffer
-func newStoreSnapshotter() *storeSnapshotter {
+func NewSnapshotter() Snapshotter {
 	s := &storeSnapshotter{
 		snapshots: btree.NewG[rvSnapshot](btreeDegree, func(a, b rvSnapshot) bool {
 			return a.resourceVersion < b.resourceVersion
@@ -439,8 +439,8 @@ var _ Snapshotter = (*storeSnapshotter)(nil)
 
 type Snapshotter interface {
 	Reset()
-	GetLessOrEqual(rv uint64) (orderedLister, bool)
-	Add(rv uint64, indexer orderedLister)
+	GetLessOrEqual(rv uint64) (OrderedLister, bool)
+	Add(rv uint64, indexer OrderedLister)
 	RemoveLess(rv uint64)
 	Len() int
 }
@@ -452,7 +452,7 @@ type storeSnapshotter struct {
 
 type rvSnapshot struct {
 	resourceVersion uint64
-	snapshot        orderedLister
+	snapshot        OrderedLister
 }
 
 func (s *storeSnapshotter) Reset() {
@@ -461,7 +461,7 @@ func (s *storeSnapshotter) Reset() {
 	s.snapshots.Clear(false)
 }
 
-func (s *storeSnapshotter) GetLessOrEqual(rv uint64) (orderedLister, bool) {
+func (s *storeSnapshotter) GetLessOrEqual(rv uint64) (OrderedLister, bool) {
 	s.mux.RLock()
 	defer s.mux.RUnlock()
 
@@ -476,7 +476,7 @@ func (s *storeSnapshotter) GetLessOrEqual(rv uint64) (orderedLister, bool) {
 	return result.snapshot, true
 }
 
-func (s *storeSnapshotter) Add(rv uint64, indexer orderedLister) {
+func (s *storeSnapshotter) Add(rv uint64, indexer OrderedLister) {
 	s.mux.Lock()
 	defer s.mux.Unlock()
 	s.snapshots.ReplaceOrInsert(rvSnapshot{resourceVersion: rv, snapshot: indexer.Clone()})
