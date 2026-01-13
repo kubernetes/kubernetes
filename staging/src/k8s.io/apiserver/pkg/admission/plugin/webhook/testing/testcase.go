@@ -521,7 +521,7 @@ func NewNonMutatingTestCases(url *url.URL) []ValidatingTest {
 				AdmissionReviewVersions: []string{"v1beta1"},
 			}},
 			ExpectStatusCode:       http.StatusInternalServerError,
-			ExpectRejectionMetrics: `apiserver_admission_webhook_rejection_count{error_type="calling_webhook_error",name="invalidClientConfig",operation="UPDATE",rejection_code="500",type="validating"} 1`,
+			ExpectRejectionMetrics: `apiserver_admission_webhook_rejections_total{error_type="calling_webhook_error",name="invalidClientConfig",operation="UPDATE",rejection_code="500",type="validating"} 1`,
 			ErrorContains:          "could not get REST client",
 		},
 		{
@@ -535,7 +535,7 @@ func NewNonMutatingTestCases(url *url.URL) []ValidatingTest {
 				AdmissionReviewVersions: []string{"v1beta1"},
 			}},
 			ExpectStatusCode:       http.StatusInternalServerError,
-			ExpectRejectionMetrics: `apiserver_admission_webhook_rejection_count{error_type="calling_webhook_error",name="nonStatusError",operation="UPDATE",rejection_code="503",type="validating"} 1`,
+			ExpectRejectionMetrics: `apiserver_admission_webhook_rejections_total{error_type="calling_webhook_error",name="nonStatusError",operation="UPDATE",rejection_code="503",type="validating"} 1`,
 			ErrorContains:          "failed to call webhook",
 		},
 		{
@@ -974,7 +974,7 @@ func NewMutatingTestCases(url *url.URL, configurationName string) []MutatingTest
 				AdmissionReviewVersions: []string{"v1beta1"},
 			}},
 			ExpectStatusCode:       http.StatusInternalServerError,
-			ExpectRejectionMetrics: `apiserver_admission_webhook_rejection_count{error_type="calling_webhook_error",name="invalidClientConfig",operation="UPDATE",rejection_code="500",type="admit"} 1`,
+			ExpectRejectionMetrics: `apiserver_admission_webhook_rejections_total{error_type="calling_webhook_error",name="invalidClientConfig",operation="UPDATE",rejection_code="500",type="admit"} 1`,
 			ErrorContains:          "could not get REST client",
 			ExpectAnnotations: map[string]string{
 				"mutation.webhook.admission.k8s.io/round_0_index_0": mutationAnnotationValue(configurationName, "invalidClientConfig", false),
@@ -991,7 +991,7 @@ func NewMutatingTestCases(url *url.URL, configurationName string) []MutatingTest
 				AdmissionReviewVersions: []string{"v1beta1"},
 			}},
 			ExpectStatusCode:       http.StatusInternalServerError,
-			ExpectRejectionMetrics: `apiserver_admission_webhook_rejection_count{error_type="calling_webhook_error",name="nonStatusError",operation="UPDATE",rejection_code="503",type="admit"} 1`,
+			ExpectRejectionMetrics: `apiserver_admission_webhook_rejections_total{error_type="calling_webhook_error",name="nonStatusError",operation="UPDATE",rejection_code="503",type="admit"} 1`,
 			ErrorContains:          "failed to call webhook",
 			ExpectAnnotations: map[string]string{
 				"mutation.webhook.admission.k8s.io/round_0_index_0": mutationAnnotationValue(configurationName, "nonStatusError", false),

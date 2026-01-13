@@ -39,6 +39,7 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/legacyregistry"
 )
 
 const (
@@ -1277,4 +1278,42 @@ func TestCertificateIdentifier(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestClientCertificateExpirationMetric(t *testing.T) {
+	before := certExpirationSampleCount(t)
+
+	a := New(getDefaultVerifyOptions(t), CommonNameUserConversion)
+
+	req, _ := http.NewRequest(http.MethodGet, "/", nil)
+	req.TLS = &tls.ConnectionState{PeerCertificates: getCerts(t, clientCNCert)}
+
+	_, ok, err := a.AuthenticateRequest(req)
+	if err != nil || !ok {
+		t.Fatalf("Expected successful authentication, got ok=%v err=%v", ok, err)
+	}
+
+	after := certExpirationSampleCount(t)
+	if after-before != 1 {
+		t.Errorf("Expected histogram sample count to increase by 1, got before=%d after=%d", before, after)
+	}
+}
+
+// certExpirationSampleCount returns the total sample count across all label
+// combinations for apiserver_client_certificate_expiration_seconds.
+func certExpirationSampleCount(t *testing.T) uint64 {
+	t.Helper()
+	gathered, err := legacyregistry.DefaultGatherer.Gather()
+	if err != nil {
+		t.Fatalf("Failed to gather metrics: %v", err)
+	}
+	var count uint64
+	for _, mf := range gathered {
+		if mf.GetName() == "apiserver_client_certificate_expiration_seconds" {
+			for _, m := range mf.GetMetric() {
+				count += m.GetHistogram().GetSampleCount()
+			}
+		}
+	}
+	return count
 }
