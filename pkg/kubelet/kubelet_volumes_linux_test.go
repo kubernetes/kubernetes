@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog/v2/ktesting"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/mount-utils"
 )
@@ -170,6 +171,7 @@ func TestCleanupOrphanedPodDirs(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 			defer testKubelet.Cleanup()
 			kubelet := testKubelet.kubelet
@@ -180,7 +182,7 @@ func TestCleanupOrphanedPodDirs(t *testing.T) {
 				}
 			}
 
-			err := kubelet.cleanupOrphanedPodDirs(tc.pods, nil)
+			err := kubelet.cleanupOrphanedPodDirs(ctx, tc.pods, nil)
 			if tc.expectErr && err == nil {
 				t.Errorf("%s failed: expected error, got success", name)
 			}
@@ -292,6 +294,7 @@ func TestPodVolumesExistWithMount(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 			defer testKubelet.Cleanup()
 			kubelet := testKubelet.kubelet
@@ -302,7 +305,7 @@ func TestPodVolumesExistWithMount(t *testing.T) {
 				}
 			}
 
-			exist := kubelet.podVolumesExist(poduid)
+			exist := kubelet.podVolumesExist(ctx, poduid)
 			if tc.expected != exist {
 				t.Errorf("%s failed: expected %t, got %t", name, tc.expected, exist)
 			}

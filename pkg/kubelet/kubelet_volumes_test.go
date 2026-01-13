@@ -209,7 +209,7 @@ func TestPodVolumesExist(t *testing.T) {
 	}
 
 	for _, pod := range pods {
-		podVolumesExist := kubelet.podVolumesExist(pod.UID)
+		podVolumesExist := kubelet.podVolumesExist(context.Background(), pod.UID)
 		assert.True(t, podVolumesExist, "pod %q", pod.UID)
 	}
 }

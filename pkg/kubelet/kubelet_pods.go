@@ -1293,7 +1293,7 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 	// in the future (volumes, mount dirs, logs, and containers could all be
 	// better separated)
 	klog.V(3).InfoS("Clean up orphaned pod directories")
-	err = kl.cleanupOrphanedPodDirs(allPods, runningRuntimePods)
+	err = kl.cleanupOrphanedPodDirs(ctx, allPods, runningRuntimePods)
 	if err != nil {
 		// We want all cleanup tasks to be run even if one of them failed. So
 		// we just log an error here and continue other cleanup tasks.
@@ -1446,7 +1446,7 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 	if kl.cgroupsPerQOS {
 		pcm := kl.containerManager.NewPodContainerManager()
 		klog.V(3).InfoS("Clean up orphaned pod cgroups")
-		kl.cleanupOrphanedPodCgroups(pcm, cgroupPods, possiblyRunningPods)
+		kl.cleanupOrphanedPodCgroups(ctx, pcm, cgroupPods, possiblyRunningPods)
 	}
 
 	// Cleanup any backoff entries.
@@ -2805,7 +2805,7 @@ func (kl *Kubelet) GetPortForward(ctx context.Context, podName, podNamespace str
 
 // cleanupOrphanedPodCgroups removes cgroups that should no longer exist.
 // it reconciles the cached state of cgroupPods with the specified list of runningPods
-func (kl *Kubelet) cleanupOrphanedPodCgroups(pcm cm.PodContainerManager, cgroupPods map[types.UID]cm.CgroupName, possiblyRunningPods map[types.UID]sets.Empty) {
+func (kl *Kubelet) cleanupOrphanedPodCgroups(ctx context.Context, pcm cm.PodContainerManager, cgroupPods map[types.UID]cm.CgroupName, possiblyRunningPods map[types.UID]sets.Empty) {
 	// Iterate over all the found pods to verify if they should be running
 	for uid, val := range cgroupPods {
 		// if the pod is in the running set, its not a candidate for cleanup
@@ -2817,7 +2817,7 @@ func (kl *Kubelet) cleanupOrphanedPodCgroups(pcm cm.PodContainerManager, cgroupP
 		// so any memory backed volumes don't have their charges propagated to the
 		// parent croup.  If the volumes still exist, reduce the cpu shares for any
 		// process in the cgroup to the minimum value while we wait.
-		if podVolumesExist := kl.podVolumesExist(uid); podVolumesExist {
+		if podVolumesExist := kl.podVolumesExist(ctx, uid); podVolumesExist {
 			klog.V(3).InfoS("Orphaned pod found, but volumes not yet removed.  Reducing cpu to minimum", "podUID", uid)
 			// TODO: Pass logger from context once contextual logging migration is complete
 			if err := pcm.ReduceCPULimits(klog.TODO(), val); err != nil {
