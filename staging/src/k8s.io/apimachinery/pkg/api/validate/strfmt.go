@@ -23,7 +23,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/api/validate/content"
-	"k8s.io/apimachinery/pkg/api/validation/path"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
@@ -145,7 +144,7 @@ func PathSegmentName[T ~string](_ context.Context, op operation.Operation, fldPa
 		return nil
 	}
 	var allErrs field.ErrorList
-	for _, msg := range path.IsValidPathSegmentName((string)(*value)) {
+	for _, msg := range content.IsPathSegmentName((string)(*value)) {
 		allErrs = append(allErrs, field.Invalid(fldPath, *value, msg).WithOrigin("format=k8s-path-segment-name"))
 	}
 	return allErrs

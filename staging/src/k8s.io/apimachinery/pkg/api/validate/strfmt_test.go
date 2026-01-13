@@ -416,6 +416,9 @@ func TestPathSegmentName(t *testing.T) {
 	ctx := context.Background()
 	fldPath := field.NewPath("test")
 
+	// This format validator does not check for empty strings or max length,
+	// only checks path-segment-unsafe characters. Those constraints are
+	// handled by separate validators (Required, maxLength) in the schema.
 	testCases := []struct {
 		name     string
 		input    string
