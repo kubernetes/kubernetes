@@ -30,6 +30,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
+	ndftesting "k8s.io/component-helpers/nodedeclaredfeatures/testing"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
@@ -362,6 +363,8 @@ func TestNewNodeInfo(t *testing.T) {
 
 func TestNodeInfoClone(t *testing.T) {
 	nodeName := "test-node"
+	declaredFeatureSet := ndf.NewFeatureMapper([]string{"A", "B", "C"}).MustMapSorted([]string{"A", "C"})
+
 	tests := []struct {
 		nodeInfo *NodeInfo
 		expected *NodeInfo
@@ -557,7 +560,7 @@ func TestNodeInfoClone(t *testing.T) {
 				UsedPorts:        fwk.HostPortInfo{},
 				ImageStates:      map[string]*fwk.ImageStateSummary{},
 				PVCRefCounts:     map[string]int{},
-				DeclaredFeatures: ndf.NewFeatureSet("FeatureA", "FeatureB"),
+				DeclaredFeatures: declaredFeatureSet.Clone(),
 			},
 			expected: &NodeInfo{
 				Requested:        &Resource{},
@@ -567,7 +570,7 @@ func TestNodeInfoClone(t *testing.T) {
 				UsedPorts:        fwk.HostPortInfo{},
 				ImageStates:      map[string]*fwk.ImageStateSummary{},
 				PVCRefCounts:     map[string]int{},
-				DeclaredFeatures: ndf.NewFeatureSet("FeatureA", "FeatureB"),
+				DeclaredFeatures: declaredFeatureSet.Clone(),
 			},
 		},
 	}
@@ -1240,11 +1243,13 @@ func TestNodeInfoRemovePod(t *testing.T) {
 }
 
 func TestSetNodeDeclaredFeatures(t *testing.T) {
+	ndfFramework, _ := ndftesting.NewMockFramework(t, "FeatureA", "FeatureB")
+	ndftesting.SetFrameworkDuringTest(t, ndfFramework)
 	tests := []struct {
 		name               string
 		featureGateEnabled bool
 		nodeStatus         v1.NodeStatus
-		expectedFeatures   ndf.FeatureSet
+		expectedFeatures   []string
 	}{
 		{
 			name:               "Feature gate disabled",
@@ -1252,7 +1257,7 @@ func TestSetNodeDeclaredFeatures(t *testing.T) {
 			nodeStatus: v1.NodeStatus{
 				DeclaredFeatures: []string{"FeatureA", "FeatureB"},
 			},
-			expectedFeatures: ndf.NewFeatureSet(),
+			expectedFeatures: nil,
 		},
 		{
 			name:               "Feature gate enabled, node has features",
@@ -1260,7 +1265,7 @@ func TestSetNodeDeclaredFeatures(t *testing.T) {
 			nodeStatus: v1.NodeStatus{
 				DeclaredFeatures: []string{"FeatureA", "FeatureB"},
 			},
-			expectedFeatures: ndf.NewFeatureSet("FeatureA", "FeatureB"),
+			expectedFeatures: []string{"FeatureA", "FeatureB"},
 		},
 		{
 			name:               "Feature gate enabled, node has no features",
@@ -1268,7 +1273,7 @@ func TestSetNodeDeclaredFeatures(t *testing.T) {
 			nodeStatus: v1.NodeStatus{
 				DeclaredFeatures: []string{},
 			},
-			expectedFeatures: ndf.NewFeatureSet(),
+			expectedFeatures: nil,
 		},
 		{
 			name:               "Feature gate enabled, node status has nil features",
@@ -1276,7 +1281,7 @@ func TestSetNodeDeclaredFeatures(t *testing.T) {
 			nodeStatus: v1.NodeStatus{
 				DeclaredFeatures: nil,
 			},
-			expectedFeatures: ndf.NewFeatureSet(),
+			expectedFeatures: nil,
 		},
 	}
 
@@ -1290,8 +1295,15 @@ func TestSetNodeDeclaredFeatures(t *testing.T) {
 			}
 			ni.SetNode(node)
 			gotFeatures := ni.GetNodeDeclaredFeatures()
-			if !gotFeatures.Equal(tt.expectedFeatures) {
-				t.Errorf("SetNode() or GetNodeDeclaredFeatures() unexpected result, got: %v, want: %v", gotFeatures, tt.expectedFeatures)
+			if !tt.featureGateEnabled {
+				if gotFeatures != nil {
+					t.Errorf("Expected GetNodeDeclaredFeatures() to return nil; got %v", ndfFramework.Unmap(gotFeatures))
+				}
+				return
+			}
+			expected := ndfFramework.MustMapSorted(tt.expectedFeatures)
+			if !gotFeatures.Equal(expected) {
+				t.Errorf("SetNode() or GetNodeDeclaredFeatures() unexpected result, got: %v, want: %v", ndfFramework.Unmap(gotFeatures), tt.expectedFeatures)
 			}
 		})
 	}

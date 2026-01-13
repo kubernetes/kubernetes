@@ -1073,7 +1073,7 @@ func NewMainKubelet(ctx context.Context,
 		klet.version = v
 		klet.nodeDeclaredFeaturesFramework = framework
 		klet.nodeDeclaredFeatures = klet.discoverNodeDeclaredFeatures()
-		klet.nodeDeclaredFeaturesSet = ndf.NewFeatureSet(klet.nodeDeclaredFeatures...)
+		klet.nodeDeclaredFeaturesSet = framework.MustMapSorted(klet.nodeDeclaredFeatures)
 	}
 
 	// Safe, allowed sysctls can always be used as unsafe sysctls in the spec.
@@ -2877,8 +2877,8 @@ func (kl *Kubelet) HandlePodUpdates(ctx context.Context, pods []*v1.Pod) {
 			if err != nil {
 				logger.Error(err, "Failed to infer required features for pod update", "pod", klog.KObj(pod))
 			}
-			if reqs.Len() != 0 {
-				matchResult, err := ndf.MatchNodeFeatureSet(reqs, kl.nodeDeclaredFeaturesSet)
+			if !reqs.IsEmpty() {
+				matchResult, err := kl.nodeDeclaredFeaturesFramework.MatchNodeFeatureSet(reqs, kl.nodeDeclaredFeaturesSet)
 				if err != nil {
 					logger.Error(err, "Failed to match pod features with the node", "pod", klog.KObj(pod))
 

@@ -478,7 +478,10 @@ func (n *NodeInfo) SetNode(node *v1.Node) {
 	n.node = node
 	n.Allocatable = NewResource(node.Status.Allocatable)
 	if utilfeature.DefaultFeatureGate.Enabled(features.NodeDeclaredFeatures) {
-		n.DeclaredFeatures = ndf.NewFeatureSet(node.Status.DeclaredFeatures...)
+		// Use TryMap rather than Map here in case the node has unknown features. Since we're only
+		// concerned with matching known features to the node, there is no risk to discarding
+		// unknown features.
+		n.DeclaredFeatures = ndf.DefaultFramework.TryMap(node.Status.DeclaredFeatures)
 	}
 	n.Generation = nextGeneration()
 }

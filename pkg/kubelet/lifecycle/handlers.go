@@ -267,11 +267,11 @@ func (c *declaredFeaturesAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmit
 		}
 	}
 
-	if reqs.Len() == 0 {
+	if reqs.IsEmpty() {
 		return PodAdmitResult{Admit: true}
 	}
 
-	matchResult, err := ndf.MatchNodeFeatureSet(reqs, c.ndfSet)
+	matchResult, err := c.ndfFramework.MatchNodeFeatureSet(reqs, c.ndfSet)
 	if err != nil {
 		return PodAdmitResult{
 			Admit:   false,
