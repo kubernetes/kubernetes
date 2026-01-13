@@ -334,8 +334,7 @@ func (kl *Kubelet) GetExtraSupplementalGroupsForPod(pod *v1.Pod) []int64 {
 
 // getPodVolumePathListFromDisk returns a list of the volume paths by reading the
 // volume directories for the given pod from the disk.
-func (kl *Kubelet) getPodVolumePathListFromDisk(ctx context.Context, podUID types.UID) ([]string, error) {
-	logger := klog.FromContext(ctx)
+func (kl *Kubelet) getPodVolumePathListFromDisk(logger klog.Logger, podUID types.UID) ([]string, error) {
 	volumes := []string{}
 	podVolDir := kl.getPodVolumesDir(podUID)
 
@@ -379,9 +378,9 @@ func (kl *Kubelet) getPodVolumePathListFromDisk(ctx context.Context, podUID type
 	return volumes, nil
 }
 
-func (kl *Kubelet) getMountedVolumePathListFromDisk(ctx context.Context, podUID types.UID) ([]string, error) {
+func (kl *Kubelet) getMountedVolumePathListFromDisk(logger klog.Logger, podUID types.UID) ([]string, error) {
 	mountedVolumes := []string{}
-	volumePaths, err := kl.getPodVolumePathListFromDisk(ctx, podUID)
+	volumePaths, err := kl.getPodVolumePathListFromDisk(logger, podUID)
 	if err != nil {
 		return mountedVolumes, err
 	}
@@ -404,8 +403,7 @@ func (kl *Kubelet) getMountedVolumePathListFromDisk(ctx context.Context, podUID 
 
 // getPodVolumeSubpathListFromDisk returns a list of the volume-subpath paths by reading the
 // subpath directories for the given pod from the disk.
-func (kl *Kubelet) getPodVolumeSubpathListFromDisk(ctx context.Context, podUID types.UID) ([]string, error) {
-	logger := klog.FromContext(ctx)
+func (kl *Kubelet) getPodVolumeSubpathListFromDisk(logger klog.Logger, podUID types.UID) ([]string, error) {
 	volumes := []string{}
 	podSubpathsDir := kl.getPodVolumeSubpathsDir(podUID)
 
@@ -469,8 +467,7 @@ func (kl *Kubelet) setCachedMachineInfo(info *cadvisorapiv1.MachineInfo) {
 }
 
 // getLastStableNodeAddresses returns the last observed node addresses.
-func (kl *Kubelet) getLastObservedNodeAddresses(ctx context.Context) []v1.NodeAddress {
-	logger := klog.FromContext(ctx)
+func (kl *Kubelet) getLastObservedNodeAddresses(logger klog.Logger) []v1.NodeAddress {
 	node, err := kl.GetNode()
 	if err != nil || node == nil {
 		logger.V(4).Info("fail to obtain node from local cache", "node", kl.nodeName, "error", err)

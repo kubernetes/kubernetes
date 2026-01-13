@@ -286,7 +286,7 @@ func Test_getLastObservedNodeAddresses(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
+			logger, _ := ktesting.NewTestContext(t)
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 			defer testKubelet.Cleanup()
 			kl := testKubelet.kubelet
@@ -297,7 +297,7 @@ func Test_getLastObservedNodeAddresses(t *testing.T) {
 				nodeLister.nodes = append(nodeLister.nodes, tc.node)
 			}
 			kl.nodeLister = nodeLister
-			addrs := kl.getLastObservedNodeAddresses(ctx)
+			addrs := kl.getLastObservedNodeAddresses(logger)
 
 			if len(addrs) != len(tc.expectedAddrs) {
 				t.Errorf("expected %d addresses, got %d", len(tc.expectedAddrs), len(addrs))

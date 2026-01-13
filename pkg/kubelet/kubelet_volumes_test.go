@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	core "k8s.io/client-go/testing"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -209,7 +210,7 @@ func TestPodVolumesExist(t *testing.T) {
 	}
 
 	for _, pod := range pods {
-		podVolumesExist := kubelet.podVolumesExist(context.Background(), pod.UID)
+		podVolumesExist := kubelet.podVolumesExist(klog.FromContext(tCtx), pod.UID)
 		assert.True(t, podVolumesExist, "pod %q", pod.UID)
 	}
 }

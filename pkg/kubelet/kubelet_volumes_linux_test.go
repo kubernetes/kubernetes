@@ -171,7 +171,7 @@ func TestCleanupOrphanedPodDirs(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
+			logger, _ := ktesting.NewTestContext(t)
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 			defer testKubelet.Cleanup()
 			kubelet := testKubelet.kubelet
@@ -182,7 +182,7 @@ func TestCleanupOrphanedPodDirs(t *testing.T) {
 				}
 			}
 
-			err := kubelet.cleanupOrphanedPodDirs(ctx, tc.pods, nil)
+			err := kubelet.cleanupOrphanedPodDirs(logger, tc.pods, nil)
 			if tc.expectErr && err == nil {
 				t.Errorf("%s failed: expected error, got success", name)
 			}
@@ -294,7 +294,7 @@ func TestPodVolumesExistWithMount(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
+			logger, _ := ktesting.NewTestContext(t)
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 			defer testKubelet.Cleanup()
 			kubelet := testKubelet.kubelet
@@ -305,7 +305,7 @@ func TestPodVolumesExistWithMount(t *testing.T) {
 				}
 			}
 
-			exist := kubelet.podVolumesExist(ctx, poduid)
+			exist := kubelet.podVolumesExist(logger, poduid)
 			if tc.expected != exist {
 				t.Errorf("%s failed: expected %t, got %t", name, tc.expected, exist)
 			}
