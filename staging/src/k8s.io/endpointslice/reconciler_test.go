@@ -2016,10 +2016,9 @@ func TestReconcile_TrafficDistribution(t *testing.T) {
 		name string
 		desc string
 
-		trafficDistributionFeatureGateEnabled bool
-		preferSameFeatureGateEnabled          bool
-		trafficDistribution                   *string
-		topologyAnnotation                    string
+		preferSameFeatureGateEnabled bool
+		trafficDistribution          *string
+		topologyAnnotation           string
 
 		// Defines how many hints belong to a particular zone/node
 		wantHintsDistributionByZone map[string]int
@@ -2030,11 +2029,10 @@ func TestReconcile_TrafficDistribution(t *testing.T) {
 		wantMetrics                     expectedMetrics
 	}{
 		{
-			name:                                  "trafficDistribution=PreferClose, topologyAnnotation=Disabled",
-			desc:                                  "When trafficDistribution is enabled and topologyAnnotation is disabled, hints should be distributed as per the trafficDistribution field",
-			trafficDistributionFeatureGateEnabled: true,
-			trafficDistribution:                   ptr.To(corev1.ServiceTrafficDistributionPreferClose),
-			topologyAnnotation:                    "Disabled",
+			name:                "trafficDistribution=PreferClose, topologyAnnotation=Disabled",
+			desc:                "When trafficDistribution is enabled and topologyAnnotation is disabled, hints should be distributed as per the trafficDistribution field",
+			trafficDistribution: ptr.To(corev1.ServiceTrafficDistributionPreferClose),
+			topologyAnnotation:  "Disabled",
 			wantHintsDistributionByZone: map[string]int{
 				"zone-a": 1, // {pod-0}
 				"zone-b": 3, // {pod-1, pod-2, pod-3}
@@ -2058,32 +2056,10 @@ func TestReconcile_TrafficDistribution(t *testing.T) {
 			},
 		},
 		{
-			name:                                  "feature gate disabled; trafficDistribution=PreferClose, topologyAnnotation=Disabled",
-			desc:                                  "When feature gate is disabled, trafficDistribution should be ignored",
-			trafficDistributionFeatureGateEnabled: false,
-			trafficDistribution:                   ptr.To(corev1.ServiceTrafficDistributionPreferClose),
-			topologyAnnotation:                    "Disabled",
-			wantHintsDistributionByZone:           map[string]int{"": 6}, // Equivalent to no hints.
-			wantMetrics: expectedMetrics{
-				desiredSlices:                   1,
-				actualSlices:                    1,
-				desiredEndpoints:                6,
-				addedPerSync:                    6,
-				removedPerSync:                  0,
-				numCreated:                      1,
-				numUpdated:                      0,
-				numDeleted:                      0,
-				slicesChangedPerSync:            1, // 1 means both topologyAnnotation and trafficDistribution were not used.
-				slicesChangedPerSyncTopology:    0, // 0 means topologyAnnotation was not used.
-				slicesChangedPerSyncTrafficDist: 0, // 0 means trafficDistribution was not used.
-			},
-		},
-		{
-			name:                                  "trafficDistribution=PreferClose, topologyAnnotation=Auto",
-			desc:                                  "When trafficDistribution and topologyAnnotation are both enabled, precedence should be given to topologyAnnotation",
-			trafficDistributionFeatureGateEnabled: true,
-			trafficDistribution:                   ptr.To(corev1.ServiceTrafficDistributionPreferClose),
-			topologyAnnotation:                    "Auto",
+			name:                "trafficDistribution=PreferClose, topologyAnnotation=Auto",
+			desc:                "When trafficDistribution and topologyAnnotation are both enabled, precedence should be given to topologyAnnotation",
+			trafficDistribution: ptr.To(corev1.ServiceTrafficDistributionPreferClose),
+			topologyAnnotation:  "Auto",
 			wantHintsDistributionByZone: map[string]int{
 				"zone-a": 2, // {pod-0, pod-3} (pod-3 is just an example, it could have also been either of the other two)
 				"zone-b": 2, // {pod-1, pod-2}
@@ -2105,12 +2081,11 @@ func TestReconcile_TrafficDistribution(t *testing.T) {
 			},
 		},
 		{
-			name:                                  "trafficDistribution=nil, topologyAnnotation=<empty>",
-			desc:                                  "When trafficDistribution and topologyAnnotation are both disabled, no hints should be added",
-			trafficDistributionFeatureGateEnabled: true,
-			trafficDistribution:                   nil,
-			topologyAnnotation:                    "",
-			wantHintsDistributionByZone:           map[string]int{"": 6}, // Equivalent to no hints.
+			name:                        "trafficDistribution=nil, topologyAnnotation=<empty>",
+			desc:                        "When trafficDistribution and topologyAnnotation are both disabled, no hints should be added",
+			trafficDistribution:         nil,
+			topologyAnnotation:          "",
+			wantHintsDistributionByZone: map[string]int{"": 6}, // Equivalent to no hints.
 			wantMetrics: expectedMetrics{
 				desiredSlices:                   1,
 				actualSlices:                    1,
@@ -2126,12 +2101,11 @@ func TestReconcile_TrafficDistribution(t *testing.T) {
 			},
 		},
 		{
-			name:                                  "trafficDistribution=PreferSameNode, PSTD enabled",
-			desc:                                  "When trafficDistribution is PreferSameNode and PreferSameTrafficDistribution is enabled, both zone and node hints should be filled out",
-			trafficDistributionFeatureGateEnabled: true,
-			preferSameFeatureGateEnabled:          true,
-			trafficDistribution:                   ptr.To(corev1.ServiceTrafficDistributionPreferSameNode),
-			topologyAnnotation:                    "Disabled",
+			name:                         "trafficDistribution=PreferSameNode, PSTD enabled",
+			desc:                         "When trafficDistribution is PreferSameNode and PreferSameTrafficDistribution is enabled, both zone and node hints should be filled out",
+			preferSameFeatureGateEnabled: true,
+			trafficDistribution:          ptr.To(corev1.ServiceTrafficDistributionPreferSameNode),
+			topologyAnnotation:           "Disabled",
 			wantHintsDistributionByZone: map[string]int{
 				"zone-a": 1, // {pod-0}
 				"zone-b": 3, // {pod-1, pod-2, pod-3}
@@ -2160,13 +2134,12 @@ func TestReconcile_TrafficDistribution(t *testing.T) {
 			},
 		},
 		{
-			name:                                  "trafficDistribution=PreferSameZone, PSTD disabled",
-			desc:                                  "When trafficDistribution is PreferSameZone and PreferSameTrafficDistribution is disabled, no hints should be set",
-			trafficDistributionFeatureGateEnabled: true,
-			preferSameFeatureGateEnabled:          false,
-			trafficDistribution:                   ptr.To(corev1.ServiceTrafficDistributionPreferSameZone),
-			topologyAnnotation:                    "Disabled",
-			wantHintsDistributionByZone:           map[string]int{"": 6}, // Equivalent to no hints.
+			name:                         "trafficDistribution=PreferSameZone, PSTD disabled",
+			desc:                         "When trafficDistribution is PreferSameZone and PreferSameTrafficDistribution is disabled, no hints should be set",
+			preferSameFeatureGateEnabled: false,
+			trafficDistribution:          ptr.To(corev1.ServiceTrafficDistributionPreferSameZone),
+			topologyAnnotation:           "Disabled",
+			wantHintsDistributionByZone:  map[string]int{"": 6}, // Equivalent to no hints.
 			wantMetrics: expectedMetrics{
 				desiredSlices:                   1,
 				actualSlices:                    1,
@@ -2192,7 +2165,6 @@ func TestReconcile_TrafficDistribution(t *testing.T) {
 			setupMetrics()
 
 			r := newReconciler(client, nodes, defaultMaxEndpointsPerSlice)
-			r.trafficDistributionEnabled = tc.trafficDistributionFeatureGateEnabled
 			r.preferSameTrafficDistribution = tc.preferSameFeatureGateEnabled
 			r.topologyCache = topologycache.NewTopologyCache()
 			r.topologyCache.SetNodes(logger, nodes)
