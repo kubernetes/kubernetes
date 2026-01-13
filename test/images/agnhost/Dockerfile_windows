@@ -17,7 +17,7 @@ ARG REGISTRY
 ARG OS_VERSION
 ARG GOLANG_VERSION
 
-FROM --platform=linux/amd64 golang:$GOLANG_VERSION AS prepregistry
+FROM --platform=linux/$BUILDARCH golang:$GOLANG_VERSION AS prepregistry
 
 RUN go install github.com/google/go-containerregistry/cmd/crane@latest && \
     apt-get update && apt-get install -y jq
@@ -38,7 +38,7 @@ RUN find /registry -type f -name '*:*' | while read -r file; do \
     done
 
 # We're using a Linux image to unpack the archives, then we're copying them over to Windows.
-FROM --platform=linux/amd64 alpine:3.21 as prep
+FROM --platform=linux/$BUILDARCH alpine:3.21 as prep
 
 ADD https://github.com/coredns/coredns/releases/download/v1.5.0/coredns_1.5.0_windows_amd64.tgz /coredns.tgz
 ADD https://iperf.fr/download/windows/iperf-2.0.9-win64.zip /iperf.zip
@@ -53,6 +53,8 @@ RUN tar -xzvf /coredns.tgz &&\
     mv coreutils-8.31-28-windows-64bit wincoreutils &&\
     mkdir /uploads
 
+# TODO: Change to linux/$BUILDARCH when windows-servercore-cache has arm64 variant
+# Keep linux/amd64 hardcoded: windows-servercore-cache only has amd64 variant (no arm64 available)
 FROM --platform=linux/amd64 $REGISTRY/windows-servercore-cache:1.0-linux-amd64-$OS_VERSION as servercore-helper
 FROM $BASEIMAGE
 
