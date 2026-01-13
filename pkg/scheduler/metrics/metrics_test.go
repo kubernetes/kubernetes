@@ -125,52 +125,9 @@ func TestSchedulerMetricsRegistrationAndEmission(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.update()
 
-			// NOTE: We use a structured assertion for this histogram to avoid fragile text-format comparisons for bucket exposition.
-			if tt.metricName == "scheduler_permit_wait_duration_seconds" {
-				histogramVec, err := testutil.GetHistogramVecFromGatherer(GetGather(), "scheduler_permit_wait_duration_seconds", map[string]string{"result": "success"})
-				if err != nil {
-					t.Fatalf("Failed to get histogram: %v", err)
-				}
-				if len(histogramVec) == 0 {
-					t.Fatal("HistogramVec is empty")
-				}
-				if len(histogramVec) > 1 {
-					t.Fatalf("Expected 1 histogram, got %d", len(histogramVec))
-				}
-				hist := histogramVec[0]
-
-				// Assert sample count is 1
-				if hist.GetSampleCount() != 1 {
-					t.Errorf("Expected sample count 1, got %d", hist.GetSampleCount())
-				}
-
-				// Assert sample sum is 0.1
-				if hist.GetSampleSum() != 0.1 {
-					t.Errorf("Expected sample sum 0.1, got %f", hist.GetSampleSum())
-				}
-
-				// Assert cumulative bucket counts match expected pattern
-				// For a value of 0.1, it should fall into the 0.128 bucket (first bucket >= 0.1)
-				// So buckets < 0.128 should have count 0, buckets >= 0.128 should have count 1
-				for _, bucket := range hist.Bucket {
-					ub := bucket.GetUpperBound()
-					cumulativeCount := bucket.GetCumulativeCount()
-					if ub < 0.128 {
-						if cumulativeCount != 0 {
-							t.Errorf("Bucket with upper bound %f should have cumulative count 0, got %d", ub, cumulativeCount)
-						}
-					} else {
-						if cumulativeCount != 1 {
-							t.Errorf("Bucket with upper bound %f should have cumulative count 1, got %d", ub, cumulativeCount)
-						}
-					}
-				}
-			} else {
-				// Use text comparison for other metrics
-				exp := normalizeExpected(tt.want)
-				if err := testutil.GatherAndCompare(GetGather(), strings.NewReader(exp), tt.metricName); err != nil {
-					t.Fatal(err)
-				}
+			exp := normalizeExpected(tt.want)
+			if err := testutil.GatherAndCompare(GetGather(), strings.NewReader(exp), tt.metricName); err != nil {
+				t.Fatal(err)
 			}
 		})
 	}
