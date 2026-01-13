@@ -47,14 +47,6 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 		}
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
-	// type WorkloadList
-	scheme.AddValidationFunc((*schedulingv1alpha1.WorkloadList)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_WorkloadList(ctx, op, nil /* fldPath */, obj.(*schedulingv1alpha1.WorkloadList), safe.Cast[*schedulingv1alpha1.WorkloadList](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
 	return nil
 }
 
@@ -266,27 +258,6 @@ func Validate_Workload(ctx context.Context, op operation.Operation, fldPath *fie
 			errs = append(errs, Validate_WorkloadSpec(ctx, op, fldPath, obj, oldObj)...)
 			return
 		}(fldPath.Child("spec"), &obj.Spec, safe.Field(oldObj, func(oldObj *schedulingv1alpha1.Workload) *schedulingv1alpha1.WorkloadSpec { return &oldObj.Spec }), oldObj != nil)...)
-
-	return errs
-}
-
-// Validate_WorkloadList validates an instance of WorkloadList according
-// to declarative validation rules in the API schema.
-func Validate_WorkloadList(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *schedulingv1alpha1.WorkloadList) (errs field.ErrorList) {
-	// field schedulingv1alpha1.WorkloadList.TypeMeta has no validation
-	// field schedulingv1alpha1.WorkloadList.ListMeta has no validation
-
-	// field schedulingv1alpha1.WorkloadList.Items
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []schedulingv1alpha1.Workload, oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
-			}
-			// iterate the list and call the type's validation function
-			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_Workload)...)
-			return
-		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *schedulingv1alpha1.WorkloadList) []schedulingv1alpha1.Workload { return oldObj.Items }), oldObj != nil)...)
 
 	return errs
 }
