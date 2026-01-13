@@ -137,14 +137,14 @@ func TestPodStatusPatchCall_Merge(t *testing.T) {
 		}
 	})
 
-	t.Run("Doesn't overwrite nominating info and condition of a old call", func(t *testing.T) {
+	t.Run("Overwrite nominating info and condition of a old call", func(t *testing.T) {
 		oldCall := NewPodStatusPatchCall(pod, []*v1.PodCondition{{Type: v1.PodScheduled, Status: v1.ConditionFalse}}, nil)
 		newCall := NewPodStatusPatchCall(pod, []*v1.PodCondition{{Type: v1.PodScheduled, Status: v1.ConditionTrue}, {Type: v1.PodInitialized, Status: v1.ConditionTrue}}, nil)
 
 		if err := newCall.Merge(oldCall); err != nil {
 			t.Fatalf("Unexpected error returned by Merge(): %v", err)
 		}
-		if newCall.newConditions[0].Type != v1.PodScheduled || newCall.newConditions[0].Status != v1.ConditionFalse {
+		if newCall.newConditions[0].Type != v1.PodScheduled || newCall.newConditions[0].Status != v1.ConditionTrue {
 			t.Errorf("Expected PodScheduled condition, but got: %v", newCall.newConditions)
 		}
 		if newCall.newConditions[1].Type != v1.PodInitialized || newCall.newConditions[1].Status != v1.ConditionTrue {
