@@ -28,6 +28,7 @@ import (
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/pkg/features"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	e2ecommonnode "k8s.io/kubernetes/test/e2e/common/node"
@@ -44,6 +45,11 @@ var _ = SIGDescribe("Ensure Credential Pulled Images", func() {
 		var testImage string
 		var testSecret *v1.Secret
 		var testNode string
+
+		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
+			initialConfig.ImagePullCredentialsVerificationPolicy = string(kubeletconfig.AlwaysVerify)
+		})
+
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			var err error
 			_, is, err = getCRIClient()
