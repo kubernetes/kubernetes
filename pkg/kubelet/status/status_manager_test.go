@@ -180,8 +180,8 @@ func TestNewStatusPreservesPodStartTime(t *testing.T) {
 	syncer.SetPodStatus(logger, pod, getRandomPodStatus())
 
 	status := expectPodStatus(t, syncer, pod)
-	if !status.StartTime.Time.Equal(startTime.Time) {
-		t.Errorf("Unexpected start time, expected %v, actual %v", startTime, status.StartTime)
+	if !status.StartTime.Time.Equal(startTime.Rfc3339Copy().Time) {
+		t.Errorf("Unexpected start time, expected %v, actual %v", startTime.Rfc3339Copy(), status.StartTime)
 	}
 }
 
