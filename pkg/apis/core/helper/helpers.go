@@ -200,11 +200,18 @@ func IsNativeResource(name core.ResourceName) bool {
 		strings.Contains(string(name), core.ResourceDefaultNamespacePrefix)
 }
 
+const KoordinatorDomainPrefix = "koordinator.sh"
+
+func IsKoordinatorResource(name core.ResourceName) bool {
+	return !strings.Contains(string(name), "/") ||
+		strings.Contains(string(name), KoordinatorDomainPrefix)
+}
+
 // IsOvercommitAllowed returns true if the resource is in the default
 // namespace and is not hugepages.
 func IsOvercommitAllowed(name core.ResourceName) bool {
-	return IsNativeResource(name) &&
-		!IsHugePageResourceName(name)
+	return (IsNativeResource(name) &&
+		!IsHugePageResourceName(name)) || IsKoordinatorResource(name)
 }
 
 var standardLimitRangeTypes = sets.New(
