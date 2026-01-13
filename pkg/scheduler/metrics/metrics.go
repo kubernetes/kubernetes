@@ -222,7 +222,7 @@ func InitMetrics() {
 			Name:           "scheduling_algorithm_duration_seconds",
 			Help:           "Scheduling algorithm latency in seconds",
 			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
-			StabilityLevel: metrics.BETA,
+			StabilityLevel: metrics.ALPHA,
 		},
 	)
 	PreemptionVictims = metrics.NewHistogram(
@@ -324,7 +324,7 @@ func InitMetrics() {
 			// Start with 0.01ms with the last bucket being [~22ms, Inf). We use a small factor (1.5)
 			// so that we have better granularity since plugin latency is very sensitive.
 			Buckets:        metrics.ExponentialBuckets(0.00001, 1.5, 20),
-			StabilityLevel: metrics.BETA,
+			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"plugin", "extension_point", "status"})
 

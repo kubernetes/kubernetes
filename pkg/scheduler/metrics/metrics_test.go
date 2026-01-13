@@ -20,7 +20,6 @@ import (
 	"strings"
 	"testing"
 
-	dto "github.com/prometheus/client_model/go"
 	"k8s.io/component-base/metrics/testutil"
 )
 
@@ -108,41 +107,6 @@ func TestSchedulerMetricsRegistrationAndEmission(t *testing.T) {
 			`,
 		},
 		{
-			name:       "scheduler_plugin_execution_duration_seconds",
-			metricName: "scheduler_plugin_execution_duration_seconds",
-			update: func() {
-				PluginExecutionDuration.Reset()
-				PluginExecutionDuration.WithLabelValues("testPlugin", Filter, "Success").Observe(0.00001)
-			},
-			want: `
-				# HELP scheduler_plugin_execution_duration_seconds [BETA] Duration for running a plugin at a specific extension point.
-				# TYPE scheduler_plugin_execution_duration_seconds histogram
-				scheduler_plugin_execution_duration_seconds_bucket{extension_point="Filter",plugin="testPlugin",status="Success",le="1e-05"} 1
-				scheduler_plugin_execution_duration_seconds_bucket{extension_point="Filter",plugin="testPlugin",status="Success",le="1.5000000000000002e-05"} 1
-				scheduler_plugin_execution_duration_seconds_bucket{extension_point="Filter",plugin="testPlugin",status="Success",le="2.2500000000000005e-05"} 1
-				scheduler_plugin_execution_duration_seconds_bucket{extension_point="Filter",plugin="testPlugin",status="Success",le="3.375000000000001e-05"} 1
-				scheduler_plugin_execution_duration_seconds_bucket{extension_point="Filter",plugin="testPlugin",status="Success",le="5.062500000000001e-05"} 1
-				scheduler_plugin_execution_duration_seconds_bucket{extension_point="Filter",plugin="testPlugin",status="Success",le="7.593750000000002e-05"} 1
-				scheduler_plugin_execution_duration_seconds_bucket{extension_point="Filter",plugin="testPlugin",status="Success",le="0.00011390625000000003"} 1
-				scheduler_plugin_execution_duration_seconds_bucket{extension_point="Filter",plugin="testPlugin",status="Success",le="0.00017085937500000006"} 1
-				scheduler_plugin_execution_duration_seconds_bucket{extension_point="Filter",plugin="testPlugin",status="Success",le="0.0002562890625000001"} 1
-				scheduler_plugin_execution_duration_seconds_bucket{extension_point="Filter",plugin="testPlugin",status="Success",le="0.00038443359375000017"} 1
-				scheduler_plugin_execution_duration_seconds_bucket{extension_point="Filter",plugin="testPlugin",status="Success",le="0.0005766503906250003"} 1
-				scheduler_plugin_execution_duration_seconds_bucket{extension_point="Filter",plugin="testPlugin",status="Success",le="0.0008649755859375004"} 1
-				scheduler_plugin_execution_duration_seconds_bucket{extension_point="Filter",plugin="testPlugin",status="Success",le="0.0012974633789062506"} 1
-				scheduler_plugin_execution_duration_seconds_bucket{extension_point="Filter",plugin="testPlugin",status="Success",le="0.0019461950683593758"} 1
-				scheduler_plugin_execution_duration_seconds_bucket{extension_point="Filter",plugin="testPlugin",status="Success",le="0.0029192926025390638"} 1
-				scheduler_plugin_execution_duration_seconds_bucket{extension_point="Filter",plugin="testPlugin",status="Success",le="0.004378938903808595"} 1
-				scheduler_plugin_execution_duration_seconds_bucket{extension_point="Filter",plugin="testPlugin",status="Success",le="0.006568408355712893"} 1
-				scheduler_plugin_execution_duration_seconds_bucket{extension_point="Filter",plugin="testPlugin",status="Success",le="0.009852612533569338"} 1
-				scheduler_plugin_execution_duration_seconds_bucket{extension_point="Filter",plugin="testPlugin",status="Success",le="0.014778918800354007"} 1
-				scheduler_plugin_execution_duration_seconds_bucket{extension_point="Filter",plugin="testPlugin",status="Success",le="0.02216837820053101"} 1
-				scheduler_plugin_execution_duration_seconds_bucket{extension_point="Filter",plugin="testPlugin",status="Success",le="+Inf"} 1
-				scheduler_plugin_execution_duration_seconds_sum{extension_point="Filter",plugin="testPlugin",status="Success"} 1e-05
-				scheduler_plugin_execution_duration_seconds_count{extension_point="Filter",plugin="testPlugin",status="Success"} 1
-			`,
-		},
-		{
 			name:       "scheduler_unschedulable_pods",
 			metricName: "scheduler_unschedulable_pods",
 			update: func() {
@@ -163,46 +127,17 @@ func TestSchedulerMetricsRegistrationAndEmission(t *testing.T) {
 
 			// NOTE: We use a structured assertion for this histogram to avoid fragile text-format comparisons for bucket exposition.
 			if tt.metricName == "scheduler_permit_wait_duration_seconds" {
-				mfs, err := GetGather().Gather()
+				histogramVec, err := testutil.GetHistogramVecFromGatherer(GetGather(), "scheduler_permit_wait_duration_seconds", map[string]string{"result": "success"})
 				if err != nil {
-					t.Fatalf("Failed to gather metrics: %v", err)
+					t.Fatalf("Failed to get histogram: %v", err)
 				}
-
-				var mf *dto.MetricFamily
-				for _, family := range mfs {
-					if family.GetName() == "scheduler_permit_wait_duration_seconds" {
-						mf = family
-						break
-					}
+				if len(histogramVec) == 0 {
+					t.Fatal("HistogramVec is empty")
 				}
-				if mf == nil {
-					t.Fatal("MetricFamily scheduler_permit_wait_duration_seconds not found")
+				if len(histogramVec) > 1 {
+					t.Fatalf("Expected 1 histogram, got %d", len(histogramVec))
 				}
-
-				// Find the metric with label result="success"
-				var metric *dto.Metric
-				for _, m := range mf.GetMetric() {
-					labels := m.GetLabel()
-					hasResultSuccess := false
-					for _, label := range labels {
-						if label.GetName() == "result" && label.GetValue() == "success" {
-							hasResultSuccess = true
-							break
-						}
-					}
-					if hasResultSuccess {
-						metric = m
-						break
-					}
-				}
-				if metric == nil {
-					t.Fatal("Metric with result=\"success\" not found")
-				}
-
-				hist := metric.GetHistogram()
-				if hist == nil {
-					t.Fatal("Metric is not a histogram")
-				}
+				hist := histogramVec[0]
 
 				// Assert sample count is 1
 				if hist.GetSampleCount() != 1 {
@@ -217,8 +152,7 @@ func TestSchedulerMetricsRegistrationAndEmission(t *testing.T) {
 				// Assert cumulative bucket counts match expected pattern
 				// For a value of 0.1, it should fall into the 0.128 bucket (first bucket >= 0.1)
 				// So buckets < 0.128 should have count 0, buckets >= 0.128 should have count 1
-				buckets := hist.GetBucket()
-				for _, bucket := range buckets {
+				for _, bucket := range hist.Bucket {
 					ub := bucket.GetUpperBound()
 					cumulativeCount := bucket.GetCumulativeCount()
 					if ub < 0.128 {
@@ -239,39 +173,5 @@ func TestSchedulerMetricsRegistrationAndEmission(t *testing.T) {
 				}
 			}
 		})
-	}
-}
-
-func TestSchedulingAlgorithmLatency(t *testing.T) {
-	// Register metrics
-	Register()
-
-	// SchedulingAlgorithmLatency is a Histogram (not HistogramVec), so it doesn't have Reset()
-	// We observe a value to ensure the metric is registered and can be emitted
-	SchedulingAlgorithmLatency.Observe(0.1)
-
-	// Verify the metric is registered and has the correct stability level by checking help text
-	mfs, err := GetGather().Gather()
-	if err != nil {
-		t.Fatalf("Failed to gather metrics: %v", err)
-	}
-
-	var found bool
-	for _, mf := range mfs {
-		if mf.GetName() == "scheduler_scheduling_algorithm_duration_seconds" {
-			found = true
-			help := mf.GetHelp()
-			if !strings.Contains(help, "[BETA]") {
-				t.Errorf("Expected help text to contain [BETA], got: %s", help)
-			}
-			if !strings.Contains(help, "Scheduling algorithm latency in seconds") {
-				t.Errorf("Expected help text to contain description, got: %s", help)
-			}
-			break
-		}
-	}
-
-	if !found {
-		t.Error("scheduler_scheduling_algorithm_duration_seconds metric not found")
 	}
 }
