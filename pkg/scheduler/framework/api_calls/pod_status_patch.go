@@ -130,7 +130,7 @@ func (psuc *PodStatusPatchCall) Sync(obj metav1.Object) (metav1.Object, error) {
 		return obj, fmt.Errorf("unexpected error: object of type %T is not of type *v1.Pod", obj)
 	}
 
-	newConditions := []*v1.PodCondition{}
+	var newConditions []*v1.PodCondition
 	psuc.lock.Lock()
 	if !psuc.executed {
 		// Set podStatus only if the call execution haven't started yet,
