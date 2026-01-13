@@ -18,10 +18,10 @@ require (
 	github.com/blang/semver/v4 v4.0.0
 	github.com/container-storage-interface/spec v1.9.0
 	github.com/coredns/corefile-migration v1.0.29
-	github.com/coreos/go-oidc v2.3.0+incompatible
+	github.com/coreos/go-oidc v2.5.0+incompatible
 	github.com/coreos/go-systemd/v22 v22.6.0
 	github.com/cpuguy83/go-md2man/v2 v2.0.6
-	github.com/cyphar/filepath-securejoin v0.6.0
+	github.com/cyphar/filepath-securejoin v0.6.1
 	github.com/distribution/reference v0.6.0
 	github.com/docker/go-units v0.5.0
 	github.com/emicklei/go-restful/v3 v3.12.2
@@ -79,7 +79,7 @@ require (
 	golang.org/x/tools v0.40.0
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250825161204-c5933d9347a5
 	google.golang.org/grpc v1.75.0
-	google.golang.org/protobuf v1.36.8
+	google.golang.org/protobuf v1.36.11
 	gopkg.in/evanphx/json-patch.v4 v4.13.0
 	gopkg.in/go-jose/go-jose.v2 v2.6.3
 	k8s.io/api v0.0.0
@@ -124,7 +124,7 @@ require (
 
 require (
 	cel.dev/expr v0.24.0 // indirect
-	cyphar.com/go-pathrs v0.2.1 // indirect
+	cyphar.com/go-pathrs v0.2.2 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20230124172434-306776ec8161 // indirect
 	github.com/MakeNowJust/heredoc v1.0.0 // indirect
 	github.com/Masterminds/semver/v3 v3.4.0 // indirect

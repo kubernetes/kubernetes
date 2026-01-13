@@ -54,8 +54,6 @@ func OpenRoot(path string) (*Root, error) {
 // still be closed by the caller.
 //
 // This is effectively the inverse operation of [Root.IntoFile].
-//
-// [os.File]: https://pkg.go.dev/os#File
 func RootFromFile(file *os.File) (*Root, error) {
 	newFile, err := fdutils.DupFile(file)
 	if err != nil {
@@ -109,8 +107,6 @@ func (r *Root) ResolveNoFollow(path string) (*Handle, error) {
 // ergonomic to use.
 //
 // This is effectively equivalent to [os.Open].
-//
-// [os.Open]: https://pkg.go.dev/os#Open
 func (r *Root) Open(path string) (*os.File, error) {
 	return r.OpenFile(path, os.O_RDONLY)
 }
@@ -127,8 +123,6 @@ func (r *Root) Open(path string) (*os.File, error) {
 //
 // This is effectively equivalent to [os.OpenFile], except that os.O_CREAT is
 // not supported.
-//
-// [os.OpenFile]: https://pkg.go.dev/os#OpenFile
 func (r *Root) OpenFile(path string, flags int) (*os.File, error) {
 	return fdutils.WithFileFd(r.inner, func(rootFd uintptr) (*os.File, error) {
 		fd, err := libpathrs.InRootOpen(rootFd, path, flags)
@@ -145,8 +139,6 @@ func (r *Root) OpenFile(path string, flags int) (*os.File, error) {
 //
 // Unlike [os.Create], if the file already exists an error is created rather
 // than the file being opened and truncated.
-//
-// [os.Create]: https://pkg.go.dev/os#Create
 func (r *Root) Create(path string, flags int, mode os.FileMode) (*os.File, error) {
 	unixMode, err := toUnixMode(mode, false)
 	if err != nil {
@@ -194,8 +186,6 @@ func (r *Root) RemoveFile(path string) error {
 // directory tree.
 //
 // This is effectively equivalent to [os.Remove].
-//
-// [os.Remove]: https://pkg.go.dev/os#Remove
 func (r *Root) Remove(path string) error {
 	// In order to match os.Remove's implementation we need to also do both
 	// syscalls unconditionally and adjust the error based on whether
@@ -219,8 +209,6 @@ func (r *Root) Remove(path string) error {
 // RemoveAll recursively deletes a path and all of its children.
 //
 // This is effectively equivalent to [os.RemoveAll].
-//
-// [os.RemoveAll]: https://pkg.go.dev/os#RemoveAll
 func (r *Root) RemoveAll(path string) error {
 	_, err := fdutils.WithFileFd(r.inner, func(rootFd uintptr) (struct{}, error) {
 		err := libpathrs.InRootRemoveAll(rootFd, path)
@@ -233,8 +221,6 @@ func (r *Root) RemoveAll(path string) error {
 // mode is used for the new directory (the process's umask applies).
 //
 // This is effectively equivalent to [os.Mkdir].
-//
-// [os.Mkdir]: https://pkg.go.dev/os#Mkdir
 func (r *Root) Mkdir(path string, mode os.FileMode) error {
 	unixMode, err := toUnixMode(mode, false)
 	if err != nil {
@@ -253,8 +239,6 @@ func (r *Root) Mkdir(path string, mode os.FileMode) error {
 // directories created by this function (the process's umask applies).
 //
 // This is effectively equivalent to [os.MkdirAll].
-//
-// [os.MkdirAll]: https://pkg.go.dev/os#MkdirAll
 func (r *Root) MkdirAll(path string, mode os.FileMode) (*Handle, error) {
 	unixMode, err := toUnixMode(mode, false)
 	if err != nil {
@@ -278,9 +262,7 @@ func (r *Root) MkdirAll(path string, mode os.FileMode) (*Handle, error) {
 // directory tree. The provided mode is used for the new directory (the
 // process's umask applies).
 //
-// This is effectively equivalent to [unix.Mknod].
-//
-// [unix.Mknod]: https://pkg.go.dev/golang.org/x/sys/unix#Mknod
+// This is effectively equivalent to [golang.org/x/sys/unix.Mknod].
 func (r *Root) Mknod(path string, mode os.FileMode, dev uint64) error {
 	unixMode, err := toUnixMode(mode, true)
 	if err != nil {
@@ -298,8 +280,6 @@ func (r *Root) Mknod(path string, mode os.FileMode, dev uint64) error {
 // created at path and is a link to target.
 //
 // This is effectively equivalent to [os.Symlink].
-//
-// [os.Symlink]: https://pkg.go.dev/os#Symlink
 func (r *Root) Symlink(path, target string) error {
 	_, err := fdutils.WithFileFd(r.inner, func(rootFd uintptr) (struct{}, error) {
 		err := libpathrs.InRootSymlink(rootFd, path, target)
@@ -314,8 +294,6 @@ func (r *Root) Symlink(path, target string) error {
 // host).
 //
 // This is effectively equivalent to [os.Link].
-//
-// [os.Link]: https://pkg.go.dev/os#Link
 func (r *Root) Hardlink(path, target string) error {
 	_, err := fdutils.WithFileFd(r.inner, func(rootFd uintptr) (struct{}, error) {
 		err := libpathrs.InRootHardlink(rootFd, path, target)
@@ -327,8 +305,6 @@ func (r *Root) Hardlink(path, target string) error {
 // Readlink returns the target of a symlink with a [Root]'s directory tree.
 //
 // This is effectively equivalent to [os.Readlink].
-//
-// [os.Readlink]: https://pkg.go.dev/os#Readlink
 func (r *Root) Readlink(path string) (string, error) {
 	return fdutils.WithFileFd(r.inner, func(rootFd uintptr) (string, error) {
 		return libpathrs.InRootReadlink(rootFd, path)
@@ -345,8 +321,6 @@ func (r *Root) Readlink(path string) (string, error) {
 // calling [Root.Close] will also close any copies of the returned [os.File].
 // If you want to get an independent copy, use [Root.Clone] followed by
 // [Root.IntoFile] on the cloned [Root].
-//
-// [os.File]: https://pkg.go.dev/os#File
 func (r *Root) IntoFile() *os.File {
 	// TODO: Figure out if we really don't want to make a copy.
 	// TODO: We almost certainly want to clear r.inner here, but we can't do
