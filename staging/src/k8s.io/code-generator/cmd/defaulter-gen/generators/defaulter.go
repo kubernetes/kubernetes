@@ -77,7 +77,6 @@ func extractTag(comments []string) ([]string, bool) {
 	tags, err := genutil.ExtractCommentTagsWithoutArguments("+", []string{tagName}, comments)
 	if err != nil {
 		klog.Fatalf("Error extracting %s tag: %v", tagName, err)
-		return nil, false
 	}
 
 	values, found := tags[tagName]
