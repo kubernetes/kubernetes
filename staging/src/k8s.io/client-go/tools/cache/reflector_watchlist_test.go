@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	clientfeatures "k8s.io/client-go/features"
 	clientfeaturestesting "k8s.io/client-go/features/testing"
@@ -627,6 +628,90 @@ func TestWatchList(t *testing.T) {
 			verifyListCounter(t, listWatcher, scenario.expectedListRequests)
 			verifyRequestOptions(t, listWatcher, scenario.expectedRequestOptions)
 			verifyStore(t, store, scenario.expectedStoreContent)
+		})
+	}
+}
+
+func TestWatchListMemoryOptimizationFeatureGate(t *testing.T) {
+	scenarios := []struct {
+		name                string
+		enableWatchListGate bool
+		expectReuse         bool
+	}{
+		{
+			name:                "watchlist enabled reuses existing object",
+			enableWatchListGate: true,
+			expectReuse:         true,
+		},
+		{
+			name:                "watchlist disabled does not reuse existing object",
+			enableWatchListGate: false,
+			expectReuse:         false,
+		},
+	}
+
+	for _, scenario := range scenarios {
+		t.Run(scenario.name, func(t *testing.T) {
+			clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListClient, scenario.enableWatchListGate)
+
+			existingObject := makePod("p1", "10")
+			incomingObject := makePod("p1", "10")
+			listObject := makePod("p1", "10")
+
+			clientStore := NewStore(DeletionHandlingMetaNamespaceKeyFunc)
+			require.NoError(t, clientStore.Add(existingObject))
+
+			targetStore := NewStore(DeletionHandlingMetaNamespaceKeyFunc)
+			lw := &lwSupportsWatchListSemantics{fakeListWatcher{
+				fakeWatcher:        watch.NewFake(),
+				customListResponse: &v1.PodList{Items: []v1.Pod{*listObject}},
+			}}
+
+			reflector := NewReflectorWithOptions(lw, &v1.Pod{}, targetStore, ReflectorOptions{})
+			reflector.clientStore = clientStore
+
+			ctx, cancel := context.WithCancel(context.Background())
+			errCh := make(chan error, 1)
+			go func() {
+				errCh <- reflector.ListAndWatchWithContext(ctx)
+			}()
+
+			if scenario.enableWatchListGate {
+				require.NoError(t, wait.PollImmediate(10*time.Millisecond, 1*time.Second, func() (bool, error) {
+					return lw.watchCounter > 0, nil
+				}))
+				lw.fakeWatcher.Add(incomingObject)
+				bookmark := &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						ResourceVersion: "10",
+						Annotations: map[string]string{
+							metav1.InitialEventsAnnotationKey: "true",
+						},
+					},
+				}
+				lw.fakeWatcher.Action(watch.Bookmark, bookmark)
+			}
+
+			key, err := DeletionHandlingMetaNamespaceKeyFunc(incomingObject)
+			require.NoError(t, err)
+
+			require.NoError(t, wait.PollImmediate(10*time.Millisecond, 1*time.Second, func() (bool, error) {
+				_, exists, err := targetStore.GetByKey(key)
+				return exists, err
+			}))
+			cancel()
+
+			require.NoError(t, <-errCh)
+
+			got, exists, err := targetStore.GetByKey(key)
+			require.NoError(t, err)
+			require.True(t, exists)
+
+			if scenario.expectReuse {
+				require.Same(t, existingObject, got)
+			} else {
+				require.NotSame(t, existingObject, got)
+			}
 		})
 	}
 }
