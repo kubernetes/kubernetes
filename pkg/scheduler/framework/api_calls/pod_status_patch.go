@@ -68,7 +68,7 @@ func (psuc *PodStatusPatchCall) UID() types.UID {
 	return psuc.podUID
 }
 
-// syncStatus syncs the given status with condition and nominatingInfo. It returns true if anything was actually updated.
+// syncStatus syncs the given status with conditions and nominatingInfo. It returns true if anything was actually updated.
 func syncStatus(status *v1.PodStatus, condition []*v1.PodCondition, nominatingInfo *fwk.NominatingInfo) bool {
 	nnnNeedsUpdate := nominatingInfo.Mode() == fwk.ModeOverride && status.NominatedNodeName != nominatingInfo.NominatedNodeName
 	if len(condition) > 0 {
