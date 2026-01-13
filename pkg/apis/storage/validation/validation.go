@@ -228,17 +228,7 @@ func validateVolumeError(e *storage.VolumeError, fldPath *field.Path) field.Erro
 // ValidateVolumeAttachmentUpdate validates a VolumeAttachment.
 func ValidateVolumeAttachmentUpdate(new, old *storage.VolumeAttachment) field.ErrorList {
 	allErrs := ValidateVolumeAttachment(new)
-	// Spec is read-only
-	// If this ever relaxes in the future, make sure to increment the Generation number in PrepareForUpdate
-	if !apiequality.Semantic.DeepEqual(old.Spec, new.Spec) {
-		err := field.Invalid(
-			field.NewPath("spec"),
-			new.Spec,
-			"field is immutable",
-		).MarkCoveredByDeclarative().WithOrigin("immutable")
-		allErrs = append(allErrs, err)
-	}
-
+	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(new.Spec, old.Spec, field.NewPath("spec")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
 	return allErrs
 }
 
