@@ -17,6 +17,7 @@ limitations under the License.
 package nodedeclaredfeatures
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -37,13 +38,24 @@ type mockFeature struct {
 	maxVersion         *version.Version
 }
 
-func (f *mockFeature) Name() string                               { return f.name }
-func (f *mockFeature) Discover(cfg *types.NodeConfiguration) bool { return f.discover(cfg) }
+func (f *mockFeature) Name() string { return f.name }
+func (f *mockFeature) Discover(cfg *types.NodeConfiguration) bool {
+	if f.discover != nil {
+		return f.discover(cfg)
+	}
+	return true
+}
 func (f *mockFeature) InferForScheduling(podInfo *types.PodInfo) bool {
-	return f.inferForScheduling(podInfo)
+	if f.inferForScheduling != nil {
+		return f.inferForScheduling(podInfo)
+	}
+	return false
 }
 func (f *mockFeature) InferForUpdate(oldPodInfo, newPodInfo *types.PodInfo) bool {
-	return f.inferForUpdate(oldPodInfo, newPodInfo)
+	if f.inferForUpdate != nil {
+		return f.inferForUpdate(oldPodInfo, newPodInfo)
+	}
+	return false
 }
 func (f *mockFeature) MaxVersion() *version.Version { return f.maxVersion }
 
@@ -60,6 +72,17 @@ func (m *mockFeatureGate) Enabled(key string) bool {
 
 func newMockFeatureGate(features map[string]bool) *mockFeatureGate {
 	return &mockFeatureGate{features: features}
+}
+
+func newTestFramework(features ...string) *Framework {
+	slices.Sort(features)
+
+	allFeatures := make([]Feature, len(features))
+	for i, name := range features {
+		allFeatures[i] = &mockFeature{name: name}
+	}
+
+	return New(allFeatures)
 }
 
 func TestDiscoverNodeFeatures(t *testing.T) {
@@ -174,7 +197,7 @@ func TestInferForPodScheduling(t *testing.T) {
 		registry      []types.Feature
 		newPod        *v1.Pod
 		targetVersion *version.Version
-		expectedReqs  FeatureSet
+		expectedReqs  []string
 		expectErr     bool
 		errContains   string
 	}{
@@ -188,7 +211,7 @@ func TestInferForPodScheduling(t *testing.T) {
 			},
 			newPod:        podWithPodLevelResources,
 			targetVersion: version.MustParse("1.30.0"),
-			expectedReqs:  NewFeatureSet("PodLevelResources"),
+			expectedReqs:  []string{"PodLevelResources"},
 			expectErr:     false,
 		},
 		{
@@ -201,7 +224,7 @@ func TestInferForPodScheduling(t *testing.T) {
 			},
 			newPod:        podWithoutPodLevelResources,
 			targetVersion: version.MustParse("1.30.0"),
-			expectedReqs:  NewFeatureSet(),
+			expectedReqs:  nil,
 			expectErr:     false,
 		},
 		{
@@ -215,7 +238,7 @@ func TestInferForPodScheduling(t *testing.T) {
 			},
 			newPod:        podWithPodLevelResources,
 			targetVersion: version.MustParse("1.31.0"),
-			expectedReqs:  NewFeatureSet(),
+			expectedReqs:  nil,
 			expectErr:     false,
 		},
 		{
@@ -229,7 +252,21 @@ func TestInferForPodScheduling(t *testing.T) {
 			},
 			newPod:        podWithPodLevelResources,
 			targetVersion: version.MustParse("0.0.0-alpha.2.39+049eafd34dfbd2"),
-			expectedReqs:  NewFeatureSet("PodLevelResources"),
+			expectedReqs:  []string{"PodLevelResources"},
+			expectErr:     false,
+		},
+		{
+			name: "exceeds max version",
+			registry: []types.Feature{
+				&mockFeature{
+					name:               "PodLevelResources",
+					inferForScheduling: inferPodlevelResources,
+					maxVersion:         version.MustParse("1.30.0"),
+				},
+			},
+			newPod:        podWithPodLevelResources,
+			targetVersion: version.MustParse("1.40.0"),
+			expectedReqs:  nil,
 			expectErr:     false,
 		},
 		{
@@ -242,7 +279,7 @@ func TestInferForPodScheduling(t *testing.T) {
 			},
 			newPod:        podWithPodLevelResources,
 			targetVersion: nil,
-			expectedReqs:  NewFeatureSet(),
+			expectedReqs:  nil,
 			expectErr:     true,
 			errContains:   "target version cannot be nil",
 		},
@@ -258,7 +295,8 @@ func TestInferForPodScheduling(t *testing.T) {
 				assert.Contains(t, err.Error(), tc.errContains)
 			} else {
 				require.NoError(t, err)
-				assert.Equal(t, tc.expectedReqs, reqs)
+				unmappedReqs := framework.Unmap(reqs)
+				assert.Equal(t, tc.expectedReqs, unmappedReqs)
 			}
 		})
 	}
@@ -299,7 +337,7 @@ func TestInferForPodUpdate(t *testing.T) {
 		oldPod        *v1.Pod
 		newPod        *v1.Pod
 		targetVersion *version.Version
-		expectedReqs  FeatureSet
+		expectedReqs  []string
 		expectErr     bool
 		errContains   string
 	}{
@@ -314,7 +352,7 @@ func TestInferForPodUpdate(t *testing.T) {
 			oldPod:        podWith1CPU,
 			newPod:        podWith2CPU,
 			targetVersion: version.MustParse("1.30.0"),
-			expectedReqs:  NewFeatureSet("InPlacePodResize"),
+			expectedReqs:  []string{"InPlacePodResize"},
 			expectErr:     false,
 		},
 		{
@@ -328,7 +366,7 @@ func TestInferForPodUpdate(t *testing.T) {
 			oldPod:        podWith1CPU,
 			newPod:        podWith2CPU,
 			targetVersion: version.MustParse("1.35.0-alpha.2.39+049eafd34dfbd2"),
-			expectedReqs:  NewFeatureSet("InPlacePodResize"),
+			expectedReqs:  []string{"InPlacePodResize"},
 			expectErr:     false,
 		},
 		{
@@ -342,7 +380,7 @@ func TestInferForPodUpdate(t *testing.T) {
 			oldPod:        podWith1CPU,
 			newPod:        podWith1CPU,
 			targetVersion: version.MustParse("1.30.0"),
-			expectedReqs:  NewFeatureSet(),
+			expectedReqs:  nil,
 			expectErr:     false,
 		},
 		{
@@ -357,7 +395,7 @@ func TestInferForPodUpdate(t *testing.T) {
 			oldPod:        podWith1CPU,
 			newPod:        podWith2CPU,
 			targetVersion: version.MustParse("1.31.0"),
-			expectedReqs:  NewFeatureSet(),
+			expectedReqs:  nil,
 			expectErr:     false,
 		},
 		{
@@ -371,7 +409,7 @@ func TestInferForPodUpdate(t *testing.T) {
 			oldPod:        podWith1CPU,
 			newPod:        podWith2CPU,
 			targetVersion: nil,
-			expectedReqs:  NewFeatureSet(),
+			expectedReqs:  nil,
 			expectErr:     true,
 			errContains:   "target version cannot be nil",
 		},
@@ -387,51 +425,52 @@ func TestInferForPodUpdate(t *testing.T) {
 				assert.Contains(t, err.Error(), tc.errContains)
 			} else {
 				require.NoError(t, err)
-				assert.Equal(t, tc.expectedReqs, reqs)
+				assert.Equal(t, tc.expectedReqs, framework.Unmap(reqs))
 			}
 		})
 	}
 }
 
 func TestMatchNode(t *testing.T) {
+	framework := newTestFramework("feature-a", "feature-b", "feature-c")
 	testCases := []struct {
 		name                   string
-		podFeatureRequirements FeatureSet
+		podFeatureRequirements []string
 		nodeFeatures           []string
 		expectedMatch          bool
 		expectedUnsatisfied    []string
 	}{
 		{
 			name:                   "all features match",
-			podFeatureRequirements: NewFeatureSet("feature-a", "feature-b"),
+			podFeatureRequirements: []string{"feature-a", "feature-b"},
 			nodeFeatures:           []string{"feature-a", "feature-b", "feature-c"},
 			expectedMatch:          true,
 			expectedUnsatisfied:    nil,
 		},
 		{
 			name:                   "some features missing",
-			podFeatureRequirements: NewFeatureSet("feature-a", "feature-b"),
+			podFeatureRequirements: []string{"feature-a", "feature-b"},
 			nodeFeatures:           []string{"feature-a", "feature-c"},
 			expectedMatch:          false,
 			expectedUnsatisfied:    []string{"feature-b"},
 		},
 		{
 			name:                   "all features missing",
-			podFeatureRequirements: NewFeatureSet("feature-a", "feature-b"),
+			podFeatureRequirements: []string{"feature-a", "feature-b"},
 			nodeFeatures:           []string{"feature-c"},
 			expectedMatch:          false,
 			expectedUnsatisfied:    []string{"feature-a", "feature-b"},
 		},
 		{
 			name:                   "no node features",
-			podFeatureRequirements: NewFeatureSet("feature-a", "feature-b"),
+			podFeatureRequirements: []string{"feature-a", "feature-b"},
 			nodeFeatures:           []string{},
 			expectedMatch:          false,
 			expectedUnsatisfied:    []string{"feature-a", "feature-b"},
 		},
 		{
 			name:                   "no requirements",
-			podFeatureRequirements: NewFeatureSet(),
+			podFeatureRequirements: []string{},
 			nodeFeatures:           []string{"feature-a", "feature-b", "feature-c"},
 			expectedMatch:          true,
 			expectedUnsatisfied:    nil,
@@ -449,9 +488,9 @@ func TestMatchNode(t *testing.T) {
 					switch variationName {
 					case "MatchNode":
 						node := &v1.Node{Status: v1.NodeStatus{DeclaredFeatures: tc.nodeFeatures}}
-						result, err = MatchNode(tc.podFeatureRequirements, node)
+						result, err = framework.MatchNode(framework.MustMapSorted(tc.podFeatureRequirements), node)
 					case "MatchNodeFeatureSet":
-						result, err = MatchNodeFeatureSet(tc.podFeatureRequirements, NewFeatureSet(tc.nodeFeatures...))
+						result, err = framework.MatchNodeFeatureSet(framework.MustMapSorted(tc.podFeatureRequirements), framework.MustMapSorted(tc.nodeFeatures))
 					default:
 						t.Fatalf("unknown match variation: %s", variationName)
 					}
@@ -467,6 +506,6 @@ func TestMatchNode(t *testing.T) {
 	}
 
 	// Test nil node
-	_, err := MatchNode(NewFeatureSet("feature-a"), nil)
+	_, err := framework.MatchNode(framework.MustMapSorted([]string{"feature-a"}), nil)
 	require.Error(t, err, "MatchNode should return an error for a nil node")
 }

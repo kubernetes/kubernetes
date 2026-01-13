@@ -163,7 +163,7 @@ func (p *Plugin) validatePodUpdate(pod, oldPod *core.Pod, a admission.Attributes
 		return admission.NewForbidden(a, fmt.Errorf("failed to infer pod capability requirements: %w", err))
 	}
 	// If there are no specific feature requirements for this update, we're done.
-	if reqs.Len() == 0 {
+	if reqs.IsEmpty() {
 		return nil
 	}
 	node, err := p.nodeLister.Get(pod.Spec.NodeName)
@@ -173,7 +173,7 @@ func (p *Plugin) validatePodUpdate(pod, oldPod *core.Pod, a admission.Attributes
 		}
 		return admission.NewForbidden(a, fmt.Errorf("failed to get node %q: %w", pod.Spec.NodeName, err))
 	}
-	result, err := ndf.MatchNode(reqs, node)
+	result, err := p.nodeDeclaredFeatureFramework.MatchNode(reqs, node)
 	if err != nil {
 		return admission.NewForbidden(a, fmt.Errorf("failed to match pod requirements against node %q: %w", node.Name, err))
 	}

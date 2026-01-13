@@ -478,7 +478,7 @@ func (n *NodeInfo) SetNode(node *v1.Node) {
 	n.node = node
 	n.Allocatable = NewResource(node.Status.Allocatable)
 	if utilfeature.DefaultFeatureGate.Enabled(features.NodeDeclaredFeatures) {
-		n.DeclaredFeatures = ndf.NewFeatureSet(node.Status.DeclaredFeatures...)
+		n.DeclaredFeatures = ndf.DefaultFramework.TryMap(node.Status.DeclaredFeatures)
 	}
 	n.Generation = nextGeneration()
 }

@@ -19,9 +19,9 @@ package nodedeclaredfeatures
 import (
 	"fmt"
 	"slices"
+	"strings"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features"
 	"k8s.io/component-helpers/nodedeclaredfeatures/types"
@@ -30,38 +30,25 @@ import (
 // Framework provides functions for discovering node features and inferring pod feature requirements.
 // It is stateful and holds the feature registry.
 type Framework struct {
+	*FeatureMapper
 	registry []types.Feature
-}
-
-// FeatureSet is a set of node features.
-type FeatureSet struct {
-	sets.Set[string]
-}
-
-// NewFeatureSet creates a FeatureSet from a list of feature names.
-func NewFeatureSet(features ...string) FeatureSet {
-	return FeatureSet{Set: sets.New(features...)}
-}
-
-// Equal returns true if both the sets have the same features.
-func (s *FeatureSet) Equal(other FeatureSet) bool {
-	return s.Set.Equal(other.Set)
-}
-
-// Clone returns a copy of the FeatureSet.
-func (s *FeatureSet) Clone() FeatureSet {
-	if s.Set == nil {
-		return FeatureSet{Set: nil}
-	}
-	return FeatureSet{Set: s.Set.Clone()}
 }
 
 var DefaultFramework = New(features.AllFeatures)
 
 // New creates a new instance of the Framework.
 func New(registry []types.Feature) *Framework {
+	// Ensure the features are sorted.
+	slices.SortFunc(registry, func(a, b types.Feature) int {
+		return strings.Compare(a.Name(), b.Name())
+	})
+	featureNames := make([]string, len(registry))
+	for i, f := range registry {
+		featureNames[i] = f.Name()
+	}
 	return &Framework{
-		registry: registry,
+		registry:      registry,
+		FeatureMapper: NewFeatureMapper(featureNames),
 	}
 }
 
@@ -86,14 +73,14 @@ func (f *Framework) InferForPodScheduling(podInfo *types.PodInfo, targetVersion 
 	if targetVersion == nil {
 		return FeatureSet{}, fmt.Errorf("target version cannot be nil")
 	}
-	reqs := NewFeatureSet()
-	for _, f := range f.registry {
+	reqs := f.NewFeatureSet()
+	for i, f := range f.registry {
 		if f.MaxVersion() != nil && targetVersion.GreaterThan(f.MaxVersion()) {
 			// If target version is greater than the feature's max version, no need to require the feature
 			continue
 		}
 		if f.InferForScheduling(podInfo) {
-			reqs.Insert(f.Name())
+			reqs.Set(i)
 		}
 	}
 	return reqs, nil
@@ -104,14 +91,14 @@ func (f *Framework) InferForPodUpdate(oldPodInfo, newPodInfo *types.PodInfo, tar
 	if targetVersion == nil {
 		return FeatureSet{}, fmt.Errorf("target version cannot be nil")
 	}
-	reqs := NewFeatureSet()
-	for _, f := range f.registry {
+	reqs := f.NewFeatureSet()
+	for i, f := range f.registry {
 		if f.MaxVersion() != nil && targetVersion.GreaterThan(f.MaxVersion()) {
 			// If target version is greater than the feature's max version, no need to require the feature
 			continue
 		}
 		if f.InferForUpdate(oldPodInfo, newPodInfo) {
-			reqs.Insert(f.Name())
+			reqs.Set(i)
 		}
 	}
 	return reqs, nil
@@ -130,30 +117,32 @@ type MatchResult struct {
 // It returns a MatchResult:
 // - IsMatch is true if all requiredFeatures are present in node.status.declaredFeatures.
 // - UnsatisfiedRequirements lists features in requiredFeatures but not in node.status.declaredFeatures.
-func MatchNode(requiredFeatures FeatureSet, node *v1.Node) (*MatchResult, error) {
+func (f *Framework) MatchNode(requiredFeatures FeatureSet, node *v1.Node) (*MatchResult, error) {
 	if node == nil {
 		return nil, fmt.Errorf("node cannot be nil")
 	}
-	return MatchNodeFeatureSet(requiredFeatures, NewFeatureSet(node.Status.DeclaredFeatures...))
+	fs, err := f.MapSorted(node.Status.DeclaredFeatures)
+	if err != nil {
+		return nil, err
+	}
+	return f.MatchNodeFeatureSet(requiredFeatures, fs)
 }
 
 // MatchNodeFeatureSet compares a set of required features against a set of features present on a node.
 // It returns a MatchResult:
 // - IsMatch is true if all requiredFeatures are present in nodeFeatures.
 // - UnsatisfiedRequirements lists features in requiredFeatures but not in nodeFeatures.
-func MatchNodeFeatureSet(requiredFeatures FeatureSet, nodeFeatures FeatureSet) (*MatchResult, error) {
-	if requiredFeatures.Len() == 0 {
+func (f *Framework) MatchNodeFeatureSet(requiredFeatures FeatureSet, nodeFeatures FeatureSet) (*MatchResult, error) {
+	if requiredFeatures.IsEmpty() {
 		return &MatchResult{IsMatch: true}, nil // No requirements to match.
 	}
-	var mismatched []string
-	for req := range requiredFeatures.Set {
-		if !nodeFeatures.Has(req) {
-			mismatched = append(mismatched, req)
-			continue
-		}
+	diff, err := requiredFeatures.Difference(nodeFeatures)
+	if err != nil {
+		return nil, err
 	}
-	if len(mismatched) > 0 {
-		return &MatchResult{IsMatch: false, UnsatisfiedRequirements: mismatched}, nil
+	if diff.IsEmpty() {
+		return &MatchResult{IsMatch: true}, nil
 	}
-	return &MatchResult{IsMatch: true}, nil
+	unsatisfiedRequirements := f.Unmap(diff)
+	return &MatchResult{IsMatch: false, UnsatisfiedRequirements: unsatisfiedRequirements}, nil
 }
