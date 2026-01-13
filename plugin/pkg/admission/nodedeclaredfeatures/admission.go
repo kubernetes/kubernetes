@@ -173,12 +173,15 @@ func (p *Plugin) validatePodUpdate(pod, oldPod *core.Pod, a admission.Attributes
 		}
 		return admission.NewForbidden(a, fmt.Errorf("failed to get node %q: %w", pod.Spec.NodeName, err))
 	}
-	result, err := p.nodeDeclaredFeatureFramework.MatchNode(reqs, node)
+	nodeFeatures := p.nodeDeclaredFeatureFramework.TryMap(node.Status.DeclaredFeatures)
+	isMatch, err := reqs.IsSubset(nodeFeatures)
 	if err != nil {
 		return admission.NewForbidden(a, fmt.Errorf("failed to match pod requirements against node %q: %w", node.Name, err))
 	}
-	if !result.IsMatch {
-		return admission.NewForbidden(a, fmt.Errorf("pod update requires features %s which are not available on node %q", strings.Join(result.UnsatisfiedRequirements, ", "), node.Name))
+	if !isMatch {
+		missing, _ := reqs.Difference(nodeFeatures) // Difference will error IFF IsSubset also does, so we can ignore the error here.
+		unsatisfiedRequirements := p.nodeDeclaredFeatureFramework.Unmap(missing)
+		return admission.NewForbidden(a, fmt.Errorf("pod update requires features %s which are not available on node %q", strings.Join(unsatisfiedRequirements, ", "), node.Name))
 	}
 
 	return nil

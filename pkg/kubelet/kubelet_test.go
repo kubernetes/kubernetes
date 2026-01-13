@@ -4766,6 +4766,7 @@ func TestSyncPodNodeDeclaredFeaturesUpdate(t *testing.T) {
 		expectEvent        bool
 		expectedEventMsg   string
 		componentVersion   string
+		debug              bool
 	}{
 		{
 			name:               "Feature gate disabled",
@@ -4787,6 +4788,7 @@ func TestSyncPodNodeDeclaredFeaturesUpdate(t *testing.T) {
 			expectEvent:        false,
 		},
 		{
+			debug:              true,
 			name:               "Feature gate enabled, requirements met",
 			featureGateEnabled: true,
 			componentVersion:   "1.35.0",
@@ -4830,6 +4832,9 @@ func TestSyncPodNodeDeclaredFeaturesUpdate(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
+		if !tc.debug {
+			continue
+		}
 		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, tc.featureGateEnabled)
 

@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"slices"
-	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -39,6 +38,9 @@ const (
 	Name = names.NodeDeclaredFeatures
 	// preFilterStateKey is the key in CycleState used to store the pod's feature requirements.
 	preFilterStateKey fwk.StateKey = "PreFilter" + Name
+	// errReasonUnsatisfiedRequirements is the status reason given when a node's declared features
+	// doesn't meet the pod's required features.
+	errReasonUnsatisfiedRequirements = "node(s) didn't match Pod's required features"
 )
 
 // preFilterState computed at PreFilter and used at Filter.
@@ -114,12 +116,12 @@ func (pl *NodeDeclaredFeatures) Filter(ctx context.Context, cycleState fwk.Cycle
 	if err != nil {
 		return fwk.AsStatus(err)
 	}
-	result, err := ndf.DefaultFramework.MatchNodeFeatureSet(s.reqs, nodeInfo.GetNodeDeclaredFeatures())
+	isMatch, err := s.reqs.IsSubset(nodeInfo.GetNodeDeclaredFeatures())
 	if err != nil {
 		return fwk.AsStatus(err)
 	}
-	if !result.IsMatch {
-		return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("node declared features check failed - unsatisfied requirements: %s", strings.Join(result.UnsatisfiedRequirements, ", ")))
+	if !isMatch {
+		return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, errReasonUnsatisfiedRequirements)
 	}
 	return nil
 }

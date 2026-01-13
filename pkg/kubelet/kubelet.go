@@ -2827,13 +2827,15 @@ func (kl *Kubelet) HandlePodUpdates(pods []*v1.Pod) {
 				klog.ErrorS(err, "Failed to infer required features for pod update", "pod", klog.KObj(pod))
 			}
 			if !reqs.IsEmpty() {
-				matchResult, err := kl.nodeDeclaredFeaturesFramework.MatchNodeFeatureSet(reqs, kl.nodeDeclaredFeaturesSet)
+				isMatch, err := reqs.IsSubset(kl.nodeDeclaredFeaturesSet)
 				if err != nil {
 					klog.ErrorS(err, "Failed to match pod features with the node", "pod", klog.KObj(pod))
 
 				}
-				if !matchResult.IsMatch {
-					missingNodeDeclaredFeatures := strings.Join(matchResult.UnsatisfiedRequirements, ", ")
+				if !isMatch {
+					missing, _ := reqs.Difference(kl.nodeDeclaredFeaturesSet) // Difference will error IFF IsSubset also does, so we can ignore the error here.
+					unsatisfiedRequirements := kl.nodeDeclaredFeaturesFramework.Unmap(missing)
+					missingNodeDeclaredFeatures := strings.Join(unsatisfiedRequirements, ", ")
 					klog.ErrorS(nil, "Pod requires node features that are not available", "missingFeatures", missingNodeDeclaredFeatures)
 					kl.recorder.Eventf(pod, v1.EventTypeWarning, events.FailedNodeDeclaredFeaturesCheck, "Pod requires node features that are not available: %s", missingNodeDeclaredFeatures)
 				}

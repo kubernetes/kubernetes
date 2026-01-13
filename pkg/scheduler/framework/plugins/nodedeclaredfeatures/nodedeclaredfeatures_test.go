@@ -209,7 +209,7 @@ func TestFilter(t *testing.T) {
 			pod:            st.MakePod().Name("test-pod").Obj(),
 			node:           st.MakeNode().Name("node-1").DeclaredFeatures([]string{featureB}).Obj(),
 			preFilterReqs:  []string{featureA},
-			expectedStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "node declared features check failed - unsatisfied requirements: FeatureA"),
+			expectedStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, errReasonUnsatisfiedRequirements),
 		},
 		{
 			name:           "Node with multiple features, pod requires subset",
@@ -224,7 +224,7 @@ func TestFilter(t *testing.T) {
 			pod:            st.MakePod().Name("test-pod").Obj(),
 			node:           st.MakeNode().Name("node-1").Obj(),
 			preFilterReqs:  []string{featureA},
-			expectedStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "node declared features check failed - unsatisfied requirements: FeatureA"),
+			expectedStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, errReasonUnsatisfiedRequirements),
 		},
 		{
 			name:           "Node with some but not all required features",
@@ -232,7 +232,7 @@ func TestFilter(t *testing.T) {
 			pod:            st.MakePod().Name("test-pod").Obj(),
 			node:           st.MakeNode().Name("node-1").DeclaredFeatures([]string{featureA}).Obj(),
 			preFilterReqs:  []string{featureA, featureB},
-			expectedStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "node declared features check failed - unsatisfied requirements: FeatureB"),
+			expectedStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, errReasonUnsatisfiedRequirements),
 		},
 		{
 			name:           "Error getting pre-filter state",

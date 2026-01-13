@@ -17,7 +17,6 @@ limitations under the License.
 package nodedeclaredfeatures
 
 import (
-	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -72,17 +71,6 @@ func (m *mockFeatureGate) Enabled(key string) bool {
 
 func newMockFeatureGate(features map[string]bool) *mockFeatureGate {
 	return &mockFeatureGate{features: features}
-}
-
-func newTestFramework(features ...string) *Framework {
-	slices.Sort(features)
-
-	allFeatures := make([]Feature, len(features))
-	for i, name := range features {
-		allFeatures[i] = &mockFeature{name: name}
-	}
-
-	return New(allFeatures)
 }
 
 func TestDiscoverNodeFeatures(t *testing.T) {
@@ -429,83 +417,4 @@ func TestInferForPodUpdate(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestMatchNode(t *testing.T) {
-	framework := newTestFramework("feature-a", "feature-b", "feature-c")
-	testCases := []struct {
-		name                   string
-		podFeatureRequirements []string
-		nodeFeatures           []string
-		expectedMatch          bool
-		expectedUnsatisfied    []string
-	}{
-		{
-			name:                   "all features match",
-			podFeatureRequirements: []string{"feature-a", "feature-b"},
-			nodeFeatures:           []string{"feature-a", "feature-b", "feature-c"},
-			expectedMatch:          true,
-			expectedUnsatisfied:    nil,
-		},
-		{
-			name:                   "some features missing",
-			podFeatureRequirements: []string{"feature-a", "feature-b"},
-			nodeFeatures:           []string{"feature-a", "feature-c"},
-			expectedMatch:          false,
-			expectedUnsatisfied:    []string{"feature-b"},
-		},
-		{
-			name:                   "all features missing",
-			podFeatureRequirements: []string{"feature-a", "feature-b"},
-			nodeFeatures:           []string{"feature-c"},
-			expectedMatch:          false,
-			expectedUnsatisfied:    []string{"feature-a", "feature-b"},
-		},
-		{
-			name:                   "no node features",
-			podFeatureRequirements: []string{"feature-a", "feature-b"},
-			nodeFeatures:           []string{},
-			expectedMatch:          false,
-			expectedUnsatisfied:    []string{"feature-a", "feature-b"},
-		},
-		{
-			name:                   "no requirements",
-			podFeatureRequirements: []string{},
-			nodeFeatures:           []string{"feature-a", "feature-b", "feature-c"},
-			expectedMatch:          true,
-			expectedUnsatisfied:    nil,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			matchVariations := []string{"MatchNode", "MatchNodeFeatureSet"}
-			for _, variationName := range matchVariations {
-				t.Run(variationName, func(t *testing.T) {
-					var result *MatchResult
-					var err error
-
-					switch variationName {
-					case "MatchNode":
-						node := &v1.Node{Status: v1.NodeStatus{DeclaredFeatures: tc.nodeFeatures}}
-						result, err = framework.MatchNode(framework.MustMapSorted(tc.podFeatureRequirements), node)
-					case "MatchNodeFeatureSet":
-						result, err = framework.MatchNodeFeatureSet(framework.MustMapSorted(tc.podFeatureRequirements), framework.MustMapSorted(tc.nodeFeatures))
-					default:
-						t.Fatalf("unknown match variation: %s", variationName)
-					}
-
-					require.NoError(t, err)
-					assert.Equal(t, tc.expectedMatch, result.IsMatch)
-					if !tc.expectedMatch {
-						assert.ElementsMatch(t, tc.expectedUnsatisfied, result.UnsatisfiedRequirements)
-					}
-				})
-			}
-		})
-	}
-
-	// Test nil node
-	_, err := framework.MatchNode(framework.MustMapSorted([]string{"feature-a"}), nil)
-	require.Error(t, err, "MatchNode should return an error for a nil node")
 }

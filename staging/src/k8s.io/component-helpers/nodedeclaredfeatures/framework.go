@@ -21,7 +21,6 @@ import (
 	"slices"
 	"strings"
 
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features"
 	"k8s.io/component-helpers/nodedeclaredfeatures/types"
@@ -102,47 +101,4 @@ func (f *Framework) InferForPodUpdate(oldPodInfo, newPodInfo *types.PodInfo, tar
 		}
 	}
 	return reqs, nil
-}
-
-// MatchResult encapsulates the result of a feature match check.
-type MatchResult struct {
-	// IsMatch is true if the node satisfies all feature requirements.
-	IsMatch bool
-	// UnsatisfiedRequirements lists the specific features that were not met.
-	// This field is only populated if IsMatch is false.
-	UnsatisfiedRequirements []string
-}
-
-// MatchNode checks if a node's declared features satisfy the pod's pre-computed requirements.
-// It returns a MatchResult:
-// - IsMatch is true if all requiredFeatures are present in node.status.declaredFeatures.
-// - UnsatisfiedRequirements lists features in requiredFeatures but not in node.status.declaredFeatures.
-func (f *Framework) MatchNode(requiredFeatures FeatureSet, node *v1.Node) (*MatchResult, error) {
-	if node == nil {
-		return nil, fmt.Errorf("node cannot be nil")
-	}
-	fs, err := f.MapSorted(node.Status.DeclaredFeatures)
-	if err != nil {
-		return nil, err
-	}
-	return f.MatchNodeFeatureSet(requiredFeatures, fs)
-}
-
-// MatchNodeFeatureSet compares a set of required features against a set of features present on a node.
-// It returns a MatchResult:
-// - IsMatch is true if all requiredFeatures are present in nodeFeatures.
-// - UnsatisfiedRequirements lists features in requiredFeatures but not in nodeFeatures.
-func (f *Framework) MatchNodeFeatureSet(requiredFeatures FeatureSet, nodeFeatures FeatureSet) (*MatchResult, error) {
-	if requiredFeatures.IsEmpty() {
-		return &MatchResult{IsMatch: true}, nil // No requirements to match.
-	}
-	diff, err := requiredFeatures.Difference(nodeFeatures)
-	if err != nil {
-		return nil, err
-	}
-	if diff.IsEmpty() {
-		return &MatchResult{IsMatch: true}, nil
-	}
-	unsatisfiedRequirements := f.Unmap(diff)
-	return &MatchResult{IsMatch: false, UnsatisfiedRequirements: unsatisfiedRequirements}, nil
 }
