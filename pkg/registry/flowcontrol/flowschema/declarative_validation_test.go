@@ -1,5 +1,5 @@
 /*
-Copyright 2026 The Kubernetes Authors.
+Copyright 2025 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -52,9 +52,9 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			input: mkValidFlowSchema(),
 		},
 		"invalid empty priorityLevelConfiguration name": {
-			input: mkValidFlowSchema(func(obj *flowcontrol.FlowSchema) {
-				obj.Spec.PriorityLevelConfiguration.Name = ""
-			}),
+			input: mkValidFlowSchema(
+				tweakPriorityLevelName(""),
+			),
 			expectedErrs: field.ErrorList{
 				field.Required(field.NewPath("spec", "priorityLevelConfiguration", "name"), ""),
 			},
@@ -86,11 +86,17 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			oldObj:    mkValidFlowSchema(),
 			updateObj: mkValidFlowSchema(),
 		},
+		"valid update priorityLevelConfiguration name changed": {
+			oldObj: mkValidFlowSchema(),
+			updateObj: mkValidFlowSchema(
+				tweakPriorityLevelName("custom-priority-level"),
+			),
+		},
 		"invalid update empty priorityLevelConfiguration name": {
 			oldObj: mkValidFlowSchema(),
-			updateObj: mkValidFlowSchema(func(obj *flowcontrol.FlowSchema) {
-				obj.Spec.PriorityLevelConfiguration.Name = ""
-			}),
+			updateObj: mkValidFlowSchema(
+				tweakPriorityLevelName(""),
+			),
 			expectedErrs: field.ErrorList{
 				field.Required(field.NewPath("spec", "priorityLevelConfiguration", "name"), ""),
 			},
@@ -151,4 +157,10 @@ func mkValidFlowSchema(tweaks ...func(obj *flowcontrol.FlowSchema)) flowcontrol.
 		tweak(&obj)
 	}
 	return obj
+}
+
+func tweakPriorityLevelName(name string) func(*flowcontrol.FlowSchema) {
+	return func(fs *flowcontrol.FlowSchema) {
+		fs.Spec.PriorityLevelConfiguration.Name = name
+	}
 }
