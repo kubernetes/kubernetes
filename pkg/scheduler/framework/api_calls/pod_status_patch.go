@@ -71,18 +71,14 @@ func (psuc *PodStatusPatchCall) UID() types.UID {
 // syncStatus syncs the given status with conditions and nominatingInfo. It returns true if anything was actually updated.
 func syncStatus(status *v1.PodStatus, condition []*v1.PodCondition, nominatingInfo *fwk.NominatingInfo) bool {
 	nnnNeedsUpdate := nominatingInfo.Mode() == fwk.ModeOverride && status.NominatedNodeName != nominatingInfo.NominatedNodeName
-	if len(condition) > 0 {
-		anyUpdated := false
-		for _, cond := range condition {
-			updated := podutil.UpdatePodCondition(status, cond)
-			if updated {
-				anyUpdated = true
-			}
+	anyUpdated := false
+	for _, cond := range condition {
+		updated := podutil.UpdatePodCondition(status, cond)
+		if updated {
+			anyUpdated = true
 		}
-		if !anyUpdated && !nnnNeedsUpdate {
-			return false
-		}
-	} else if !nnnNeedsUpdate {
+	}
+	if !anyUpdated && !nnnNeedsUpdate {
 		return false
 	}
 	if nnnNeedsUpdate {
@@ -162,10 +158,9 @@ func (psuc *PodStatusPatchCall) Merge(oldCall fwk.APICall) error {
 	}
 	for _, cond := range oldPsuc.newConditions {
 		found := false
-		for i, newCond := range psuc.newConditions {
+		for _, newCond := range psuc.newConditions {
 			if newCond.Type == cond.Type {
 				found = true
-				psuc.newConditions[i] = cond
 				break
 			}
 		}
