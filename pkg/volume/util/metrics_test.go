@@ -95,11 +95,11 @@ func TestGetFullQualifiedPluginNameForVolume(t *testing.T) {
 
 func TestStorageOperationMetric(t *testing.T) {
 	tests := []struct {
-		name            string
-		plugin          string
-		operationName   string
-		status          string
-		migrated        bool
+		name              string
+		plugin            string
+		operationName     string
+		status            string
+		migrated          bool
 		operationComplete func()
 	}{
 		{
