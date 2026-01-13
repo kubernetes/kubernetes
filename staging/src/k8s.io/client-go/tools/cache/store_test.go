@@ -18,10 +18,12 @@ package cache
 
 import (
 	"errors"
+	"runtime/debug"
 	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -139,6 +141,8 @@ func testStoreIndexers() Indexers {
 type testStoreObject struct {
 	id  string
 	val string
+
+	transformCount int
 }
 
 func TestCache(t *testing.T) {
@@ -153,6 +157,11 @@ func TestCacheWithTransformer(t *testing.T) {
 		if !ok {
 			return nil, errors.New("wrong object type")
 		}
+		if obj.transformCount > 0 {
+			t.Error("already transformed")
+			t.Log(string(debug.Stack()))
+		}
+		obj.transformCount++
 		return obj, nil
 	})))
 	if !transformerCalled.Load() {
