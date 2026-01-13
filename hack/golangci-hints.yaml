@@ -272,6 +272,7 @@ linters:
             contextual k8s.io/client-go/tools/cache/.*
             contextual k8s.io/client-go/tools/events/.*
             contextual k8s.io/client-go/tools/record/.*
+            contextual k8s.io/component-base/featuregate/*
             contextual k8s.io/component-helpers/.*
             contextual k8s.io/cri-api/.*
             contextual k8s.io/cri-client/.*
