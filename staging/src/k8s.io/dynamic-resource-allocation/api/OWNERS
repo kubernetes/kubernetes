@@ -9,6 +9,7 @@ reviewers:
   - bart0sh
   - klueska
   - pohly
+  - sig-node-reviewers
 labels:
   - sig/node
   - wg/device-management
