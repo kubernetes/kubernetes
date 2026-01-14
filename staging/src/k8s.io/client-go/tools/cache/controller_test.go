@@ -906,7 +906,7 @@ func TestReplaceEvents(t *testing.T) {
 	defer cancel()
 	// Test that both atomic and non-atomic replace have the same behavior
 	// in regards to events and store state.
-	for _, atomic := range []bool{false} {
+	for _, atomic := range []bool{false, true} {
 		source := fcache.NewFakeControllerSource()
 		t.Cleanup(func() {
 			source.Shutdown()
@@ -914,6 +914,7 @@ func TestReplaceEvents(t *testing.T) {
 		store := NewStore(DeletionHandlingMetaNamespaceKeyFunc)
 		fifo := NewRealFIFOWithOptions(RealFIFOOptions{
 			KnownObjects: store,
+			AtomicEvents: atomic,
 		})
 		recorder := newEventRecorder(store)
 
@@ -1027,7 +1028,7 @@ func testReplaceEvents(t *testing.T, ctx context.Context, fifo Queue, m *eventRe
 }
 
 func TestResetWatch(t *testing.T) {
-	for _, atomic := range []bool{false} {
+	for _, atomic := range []bool{false, true} {
 		t.Run("atomic "+strconv.FormatBool(atomic), func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
@@ -1046,6 +1047,7 @@ func TestResetWatch(t *testing.T) {
 			store := NewStore(DeletionHandlingMetaNamespaceKeyFunc)
 			fifo := NewRealFIFOWithOptions(RealFIFOOptions{
 				KnownObjects: store,
+				AtomicEvents: atomic,
 			})
 			recorder := newEventRecorder(store)
 

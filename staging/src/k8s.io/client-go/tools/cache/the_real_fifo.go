@@ -43,6 +43,11 @@ type RealFIFOOptions struct {
 	// If set, will be called for objects before enqueueing them. Please
 	// see the comment on TransformFunc for details.
 	Transformer TransformFunc
+
+	// AtomicEvents is used to specify whether the RealFIFO will emit events
+	// atomically or not. If it is set, a single event will be emitted
+	// atomically for Replace operations.
+	AtomicEvents bool
 }
 
 const (
@@ -86,6 +91,11 @@ type RealFIFO struct {
 
 	// batchSize determines the maximum number of objects we can combine into a batch.
 	batchSize int
+
+	// emitAtomicEvents defines whether a replace should only send out one
+	// batch of objects on a replace event call rather than a number of delete
+	// and replace events.
+	emitAtomicEvents bool
 }
 
 var (
@@ -561,11 +571,12 @@ func NewRealFIFOWithOptions(opts RealFIFOOptions) *RealFIFO {
 	}
 
 	f := &RealFIFO{
-		items:        make([]Delta, 0, 10),
-		keyFunc:      opts.KeyFunction,
-		knownObjects: opts.KnownObjects,
-		transformer:  opts.Transformer,
-		batchSize:    defaultBatchSize,
+		items:            make([]Delta, 0, 10),
+		keyFunc:          opts.KeyFunction,
+		knownObjects:     opts.KnownObjects,
+		transformer:      opts.Transformer,
+		batchSize:        defaultBatchSize,
+		emitAtomicEvents: opts.AtomicEvents,
 	}
 
 	f.cond.L = &f.lock

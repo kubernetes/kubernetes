@@ -740,6 +740,7 @@ func newQueueFIFO(clientState Store, transform TransformFunc) Queue {
 			KeyFunction:  MetaNamespaceKeyFunc,
 			KnownObjects: clientState,
 			Transformer:  transform,
+			AtomicEvents: clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.AtomicFIFO),
 		})
 	} else {
 		return NewDeltaFIFOWithOptions(DeltaFIFOOptions{
