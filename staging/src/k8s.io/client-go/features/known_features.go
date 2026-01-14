@@ -31,6 +31,13 @@ import (
 // of code conflicts because changes are more likely to be scattered
 // across the file.
 const (
+	// owner: @michaelasp
+	// beta: v1.36
+	//
+	// Allow the client to process events atomically rather than a stream of
+	// events for items popped off the FIFO.
+	AtomicFIFO Feature = "AtomicFIFO"
+
 	// owner: @benluddy
 	// kep: https://kep.k8s.io/4222
 	// alpha: 1.32
@@ -82,6 +89,9 @@ const (
 // After registering with the binary, the features are, by default, controllable using environment variables.
 // For more details, please see envVarFeatureGates implementation.
 var defaultVersionedKubernetesFeatureGates = map[Feature]VersionedSpecs{
+	AtomicFIFO: {
+		{Version: version.MustParse("1.36"), Default: true, PreRelease: Beta},
+	},
 	ClientsAllowCBOR: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: Alpha},
 	},
