@@ -154,6 +154,7 @@ func TestDRA(t *testing.T) {
 				// Number of devices per slice is chosen so that Filter takes a few seconds:
 				// without a timeout, the test doesn't run too long, but long enough that a short timeout triggers.
 				tCtx.Run("FilterTimeout", func(tCtx ktesting.TContext) { testFilterTimeout(tCtx, 9) })
+				tCtx.Run("UsesAllResources", testUsesAllResources)
 			},
 		},
 		"GA": {
@@ -176,6 +177,7 @@ func TestDRA(t *testing.T) {
 					tCtx = tCtx.WithNamespace(namespace)
 					TestCreateResourceSlices(tCtx, 100)
 				})
+				tCtx.Run("UsesAllResources", testUsesAllResources)
 			},
 		},
 		"v1beta1": {
@@ -249,6 +251,7 @@ func TestDRA(t *testing.T) {
 				// in the experimental channel has an improvement that requires a higher number here than
 				// in the incubating and stable channels.
 				tCtx.Run("FilterTimeout", func(tCtx ktesting.TContext) { testFilterTimeout(tCtx, 20) })
+				tCtx.Run("UsesAllResources", testUsesAllResources)
 			},
 		},
 	} {
