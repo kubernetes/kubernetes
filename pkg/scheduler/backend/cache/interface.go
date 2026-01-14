@@ -32,10 +32,10 @@ import (
 //
 // State Machine of a pod's events in scheduler's cache:
 //
-//	+-------------------------------------------+  +-----+
-//	|                            Add            |  |     |
-//	|                                           |  |     | Update
-//	+      Assume                Add            v  v     |
+//	+-------------------------------------------+  +----+
+//	|                            Add            |  |    |
+//	|                                           |  |    | Update
+//	+      Assume                Add            v  v    |
 //
 // Initial +--------> Assumed +----------- ---> Added <--+
 //
@@ -43,7 +43,7 @@ import (
 //	|                    |                        |
 //	|                    |                        | Remove
 //	|                    |                        |
-//	|                    |                        |
+//	|                    |                        v
 //	+--------------------+                     Deleted
 //	      Forget
 //
@@ -69,7 +69,7 @@ type Cache interface {
 	// ForgetPod removes an assumed pod from cache.
 	ForgetPod(logger klog.Logger, pod *v1.Pod) error
 
-	// AddPod either confirms a pod if it's assumed, or adds it.
+	// AddPod confirms an assumed pod, or adds a newly assigned pod to the cache.
 	AddPod(logger klog.Logger, pod *v1.Pod) error
 
 	// UpdatePod removes oldPod's information and adds newPod's information.
