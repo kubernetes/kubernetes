@@ -679,6 +679,8 @@ func processDeltasInBatch(
 			callbacks = append(callbacks, func() {
 				handler.OnDelete(obj)
 			})
+		default:
+			return fmt.Errorf("Delta type %s is not supported in batch processing", d.Type)
 		}
 	}
 
