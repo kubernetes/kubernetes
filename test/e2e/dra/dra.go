@@ -950,21 +950,17 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		driver.WithKubelet = true
 		b := drautils.NewBuilder(f, driver)
 
-		// https://github.com/kubernetes/kubernetes/issues/135901 was fixed in master for Kubernetes 1.35 and not backported
-		// so this test only passes for kubelet >= 1.35.
-		f.It("requests an already allocated and a new claim for a pod", f.WithLabel("KubeletMinVersion:1.35"), func(ctx context.Context) {
+		ginkgo.It("requests an already allocated and a new claim for a pod", func(ctx context.Context) {
 			// This test covers a situation when a pod references a mix of already-prepared and new claims.
-			tCtx := f.TContext(ctx)
-
 			firstClaim := b.ExternalClaim()
 			secondClaim := b.ExternalClaim()
 
-			b.Create(tCtx, firstClaim, secondClaim)
+			b.Create(ctx, firstClaim, secondClaim)
 
 			// First pod uses only firstClaim
 			firstPod := b.PodExternal()
-			b.Create(tCtx, firstPod)
-			b.TestPod(tCtx, firstPod)
+			b.Create(ctx, firstPod)
+			b.TestPod(ctx, f, firstPod)
 
 			// Second pod uses firstClaim (already prepared) + secondClaim (new)
 			secondPod := b.PodExternal()
@@ -985,8 +981,8 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 				{Name: "second"},
 			}
 
-			b.Create(tCtx, secondPod)
-			b.TestPod(tCtx, secondPod)
+			b.Create(ctx, secondPod)
+			b.TestPod(ctx, f, secondPod)
 		})
 	}
 
