@@ -1952,6 +1952,5 @@ type fakeAuthorizer struct {
 func (f *fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
 	if !f.verdict {
 		return authorizer.DecisionDeny, "denied", nil
-	}
 	return authorizer.DecisionAllow, "default accept", nil
 }

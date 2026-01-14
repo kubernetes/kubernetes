@@ -91,6 +91,9 @@ func TestDeclarativeValidate(t *testing.T) {
 							resource.DeviceTaintEffect("Invalid"), []string{}).MarkAlpha(),
 					},
 				},
+				"valid: at limit taints": {
+					input: mkResourceSliceWithDevices(tweakDeviceTaints(16)),
+				},
 				"invalid: max taints exceeded": {
 					input: mkResourceSliceWithDevices(tweakDeviceTaints(17)),
 					expectedErrs: field.ErrorList{
