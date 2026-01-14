@@ -5155,7 +5155,6 @@ func TestDescribeEvents(t *testing.T) {
 		m := map[string]ResourceDescriber{
 			"DaemonSetDescriber":             &DaemonSetDescriber{clientset},
 			"DeploymentDescriber":            &DeploymentDescriber{clientset},
-			"EndpointsDescriber":             &EndpointsDescriber{clientset},
 			"EndpointSliceDescriber":         &EndpointSliceDescriber{clientset},
 			"JobDescriber":                   &JobDescriber{clientset},
 			"IngressDescriber":               &IngressDescriber{clientset},
@@ -5187,12 +5186,6 @@ func TestDescribeEvents(t *testing.T) {
 			Spec: appsv1.DeploymentSpec{
 				Replicas: ptr.To[int32](1),
 				Selector: &metav1.LabelSelector{},
-			},
-		},
-		"EndpointsDescriber": &corev1.Endpoints{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "bar",
-				Namespace: "foo",
 			},
 		},
 		"EndpointSliceDescriber": &discoveryv1.EndpointSlice{

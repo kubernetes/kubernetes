@@ -203,7 +203,6 @@ func describerMap(clientConfig *rest.Config) (map[schema.GroupKind]ResourceDescr
 		{Group: corev1.GroupName, Kind: "PersistentVolume"}:                  &PersistentVolumeDescriber{c},
 		{Group: corev1.GroupName, Kind: "PersistentVolumeClaim"}:             &PersistentVolumeClaimDescriber{c},
 		{Group: corev1.GroupName, Kind: "Namespace"}:                         &NamespaceDescriber{c},
-		{Group: corev1.GroupName, Kind: "Endpoints"}:                         &EndpointsDescriber{c},
 		{Group: corev1.GroupName, Kind: "ConfigMap"}:                         &ConfigMapDescriber{c},
 		{Group: corev1.GroupName, Kind: "PriorityClass"}:                     &PriorityClassDescriber{c},
 		{Group: discoveryv1.GroupName, Kind: "EndpointSlice"}:                &EndpointSliceDescriber{c},
@@ -406,7 +405,6 @@ func init() {
 		describeCSINode,
 		describeDaemonSet,
 		describeDeployment,
-		describeEndpoints,
 		describeEndpointSliceV1,
 		describeHorizontalPodAutoscalerV1,
 		describeHorizontalPodAutoscalerV2,
@@ -3021,79 +3019,6 @@ func describeService(service *corev1.Service, endpointSlices []discoveryv1.Endpo
 		if service.Spec.TrafficDistribution != nil {
 			w.Write(LEVEL_0, "Traffic Distribution:\t%s\n", *service.Spec.TrafficDistribution)
 		}
-		if events != nil {
-			DescribeEvents(events, w)
-		}
-		return nil
-	})
-}
-
-// EndpointsDescriber generates information about an Endpoint.
-type EndpointsDescriber struct {
-	clientset.Interface
-}
-
-func (d *EndpointsDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	ep, err := d.CoreV1().Endpoints(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-	if err != nil {
-		return "", err
-	}
-
-	var events *corev1.EventList
-	if describerSettings.ShowEvents {
-		events, _ = searchEvents(d.CoreV1(), ep, describerSettings.ChunkSize)
-	}
-
-	return describeEndpoints(ep, events)
-}
-
-func describeEndpoints(ep *corev1.Endpoints, events *corev1.EventList) (string, error) {
-	return tabbedString(func(out io.Writer) error {
-		w := NewPrefixWriter(out)
-		w.Write(LEVEL_0, "Name:\t%s\n", ep.Name)
-		w.Write(LEVEL_0, "Namespace:\t%s\n", ep.Namespace)
-		printLabelsMultiline(w, "Labels", ep.Labels)
-		printAnnotationsMultiline(w, "Annotations", ep.Annotations)
-
-		w.Write(LEVEL_0, "Subsets:\n")
-		for i := range ep.Subsets {
-			subset := &ep.Subsets[i]
-
-			addresses := make([]string, 0, len(subset.Addresses))
-			for _, addr := range subset.Addresses {
-				addresses = append(addresses, addr.IP)
-			}
-			addressesString := strings.Join(addresses, ",")
-			if len(addressesString) == 0 {
-				addressesString = "<none>"
-			}
-			w.Write(LEVEL_1, "Addresses:\t%s\n", addressesString)
-
-			notReadyAddresses := make([]string, 0, len(subset.NotReadyAddresses))
-			for _, addr := range subset.NotReadyAddresses {
-				notReadyAddresses = append(notReadyAddresses, addr.IP)
-			}
-			notReadyAddressesString := strings.Join(notReadyAddresses, ",")
-			if len(notReadyAddressesString) == 0 {
-				notReadyAddressesString = "<none>"
-			}
-			w.Write(LEVEL_1, "NotReadyAddresses:\t%s\n", notReadyAddressesString)
-
-			if len(subset.Ports) > 0 {
-				w.Write(LEVEL_1, "Ports:\n")
-				w.Write(LEVEL_2, "Name\tPort\tProtocol\n")
-				w.Write(LEVEL_2, "----\t----\t--------\n")
-				for _, port := range subset.Ports {
-					name := port.Name
-					if len(name) == 0 {
-						name = "<unset>"
-					}
-					w.Write(LEVEL_2, "%s\t%d\t%s\n", name, port.Port, port.Protocol)
-				}
-			}
-			w.Write(LEVEL_0, "\n")
-		}
-
 		if events != nil {
 			DescribeEvents(events, w)
 		}
