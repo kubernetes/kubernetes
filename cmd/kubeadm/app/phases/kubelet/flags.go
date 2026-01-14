@@ -154,7 +154,7 @@ func ReadKubeletDynamicEnvFile(kubeletEnvFilePath string) ([]string, error) {
 	// Split the flags string by whitespace to get individual arguments.
 	trimmedFlags := strings.Fields(flags)
 	if len(trimmedFlags) == 0 {
-		return nil, errors.Errorf("no flags found in file %q", kubeletEnvFilePath)
+		return nil, nil
 	}
 
 	var updatedFlags []string
