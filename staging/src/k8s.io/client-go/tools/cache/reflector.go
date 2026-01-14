@@ -246,6 +246,9 @@ type ReflectorOptions struct {
 	// However, values lower than 5m will not be honored to avoid negative performance impact on controlplane.
 	MinWatchTimeout time.Duration
 
+	// InitBackoff, the backoff initial duration. Default is 800 * time.Millisecond
+	InitBackoff time.Duration
+
 	// Clock allows tests to control time. If unset defaults to clock.RealClock{}
 	Clock clock.Clock
 }
@@ -269,6 +272,10 @@ func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store R
 	if options.MinWatchTimeout > defaultMinWatchTimeout {
 		minWatchTimeout = options.MinWatchTimeout
 	}
+	defaultInitBackoff := 800 * time.Millisecond
+	if options.InitBackoff != 0 {
+		defaultInitBackoff = options.InitBackoff
+	}
 	r := &Reflector{
 		name:            options.Name,
 		resyncPeriod:    options.ResyncPeriod,
@@ -279,7 +286,7 @@ func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store R
 		// We used to make the call every 1sec (1 QPS), the goal here is to achieve ~98% traffic reduction when
 		// API server is not healthy. With these parameters, backoff will stop at [30,60) sec interval which is
 		// 0.22 QPS. If we don't backoff for 2min, assume API server is healthy and we reset the backoff.
-		backoffManager:    wait.NewExponentialBackoffManager(800*time.Millisecond, 30*time.Second, 2*time.Minute, 2.0, 1.0, reflectorClock),
+		backoffManager:    wait.NewExponentialBackoffManager(defaultInitBackoff, 30*time.Second, 2*time.Minute, 2.0, 1.0, reflectorClock),
 		clock:             reflectorClock,
 		watchErrorHandler: WatchErrorHandlerWithContext(DefaultWatchErrorHandler),
 		expectedType:      reflect.TypeOf(expectedType),
