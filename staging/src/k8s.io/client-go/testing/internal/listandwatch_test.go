@@ -84,6 +84,17 @@ func testListAndWatch(t *testing.T) {
 		}, client), &v1.ConfigMap{}, defaultEventHandlerResyncPeriod, nil)
 	})
 
+	var adds, updates, deletes int
+	handle, err := configMapInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    func(_ any) { adds++ },
+		UpdateFunc: func(_, _ any) { updates++ },
+		DeleteFunc: func(_ any) { deletes++ },
+	})
+	if err != nil {
+		t.Fatalf("Unexpected error adding event handler: %v", err)
+	}
+	defer configMapInformer.RemoveEventHandler(handle)
+
 	configMapStore := configMapInformer.GetStore()
 	f.Start(stopCh)
 	f.WaitForCacheSync(stopCh)
@@ -100,7 +111,7 @@ func testListAndWatch(t *testing.T) {
 			Namespace: "default",
 		},
 	}
-	_, err := client.CoreV1().ConfigMaps(cm.Namespace).Create(ctx, cm, metav1.CreateOptions{})
+	_, err = client.CoreV1().ConfigMaps(cm.Namespace).Create(ctx, cm, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Unexpected error creating ConfigMap: %v", err)
 	}
@@ -112,6 +123,13 @@ func testListAndWatch(t *testing.T) {
 
 	objs = configMapStore.List()
 	if len(objs) != 2 {
-		t.Fatalf("Unexpected item(s) in informer cache, want 2, got %d = %v", len(objs), objs)
+		t.Errorf("Unexpected item(s) in informer cache, want 2, got %d = %v", len(objs), objs)
+	}
+
+	if !handle.HasSynced() {
+		t.Error("Expected event handler to have synced, it didn't")
+	}
+	if adds != 2 || updates != 0 || deletes != 0 {
+		t.Errorf("Expected two new objects, got adds/updates/deletes %d/%d/%d", adds, updates, deletes)
 	}
 }
