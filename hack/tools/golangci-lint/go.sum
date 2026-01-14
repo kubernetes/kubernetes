@@ -1006,8 +1006,8 @@ mvdan.cc/unparam v0.0.0-20251027182757-5beb8c8f8f15/go.mod h1:4M5MMXl2kW6fivUT6y
 rsc.io/binaryregexp v0.2.0/go.mod h1:qTv7/COck+e2FymRvadv62gMdZztPaShugOCi3I+8D8=
 rsc.io/quote/v3 v3.1.0/go.mod h1:yEA65RcK8LyAZtP9Kv3t0HmxON59tX3rD+tICJqUlj0=
 rsc.io/sampler v1.3.0/go.mod h1:T1hPZKmBbMNahiBKFy5HrXp6adAjACjK9JXDnKaTXpA=
-sigs.k8s.io/kube-api-linter v0.0.0-20251208100930-d3015c953951 h1:pjOeiLsYwEPaSRYTiMtVfdn7gSoRilw7Peyjw6kyUu4=
-sigs.k8s.io/kube-api-linter v0.0.0-20251208100930-d3015c953951/go.mod h1:5mP60UakkCye+eOcZ5p98VnV2O49qreW1gq9TdsUf7Q=
+sigs.k8s.io/kube-api-linter v0.0.0-20260114104534-18147eee9c49 h1:Dlr79S/bnHg+g86cBxul/lbctdVfMTLN1c5XeN6/0JM=
+sigs.k8s.io/kube-api-linter v0.0.0-20260114104534-18147eee9c49/go.mod h1:5mP60UakkCye+eOcZ5p98VnV2O49qreW1gq9TdsUf7Q=
 sigs.k8s.io/logtools v0.9.0 h1:IMP/HTDkfM6rg6os/tcEjmQeIHyOyu/enduM/cOPGNQ=
 sigs.k8s.io/logtools v0.9.0/go.mod h1:74Z5BP7ehrMHi/Q31W1gSf8YgwT/4GPjVH5xPSPeZA0=
 sigs.k8s.io/yaml v1.4.0 h1:Mk1wCc2gy/F0THH0TAp1QYyJNzRm2KCLy3o5ASXVI5E=
