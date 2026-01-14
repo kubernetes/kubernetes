@@ -799,7 +799,7 @@ func validateIPAddressParentReference(params *networking.ParentReference, fldPat
 
 	// resource is required
 	if params.Resource == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("resource"), ""))
+		allErrs = append(allErrs, field.Required(fldPath.Child("resource"), "")).MarkCoveredByDeclarative()
 	} else {
 		for _, msg := range pathvalidation.IsValidPathSegmentName(params.Resource) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("resource"), params.Resource, msg))
@@ -808,7 +808,7 @@ func validateIPAddressParentReference(params *networking.ParentReference, fldPat
 
 	// name is required
 	if params.Name == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "")).MarkCoveredByDeclarative()
 	} else {
 		for _, msg := range pathvalidation.IsValidPathSegmentName(params.Name) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), params.Name, msg))
@@ -828,7 +828,7 @@ func validateIPAddressParentReference(params *networking.ParentReference, fldPat
 func ValidateIPAddressUpdate(update, old *networking.IPAddress) field.ErrorList {
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))...)
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.Spec.ParentRef, old.Spec.ParentRef, field.NewPath("spec").Child("parentRef"))...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.Spec.ParentRef, old.Spec.ParentRef, field.NewPath("spec").Child("parentRef"))...).MarkCoveredByDeclarative()
 	return allErrs
 }
 
