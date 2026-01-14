@@ -1790,7 +1790,6 @@ func testDeclarativeValidateStatus(t *testing.T, apiVersion string) {
 					Driver: "test", Pool: "test", Device: "test",
 					Conditions: validConditions,
 				}))
-				claim.ObjectMeta.ResourceVersion = "1"
 				claim.Status.Allocation = validAllocation
 				return claim
 			}(),
@@ -1803,9 +1802,54 @@ func testDeclarativeValidateStatus(t *testing.T, apiVersion string) {
 				field.TooMany(field.NewPath("status", "devices").Index(0).Child("conditions"), 9, 8).WithOrigin("maxItems").MarkCoveredByDeclarative(),
 			},
 		},
+		"valid: at limit conditions": {
+			update: func() resource.ResourceClaim {
+				conditions := make([]v1.Condition, 8)
+				for i := 0; i < 8; i++ {
+					conditions[i] = v1.Condition{
+						Type: fmt.Sprintf("Condition%d", i), Status: v1.ConditionTrue,
+						Reason: "Reason", Message: "Msg", LastTransitionTime: v1.Now(),
+					}
+				}
+				claim := mkResourceClaimWithStatus(tweakStatusDevices(resource.AllocatedDeviceStatus{
+					Driver: "test", Pool: "test", Device: "test", Conditions: conditions,
+				}))
+				claim.Status.Allocation = validAllocation
+				return claim
+			}(),
+			old: func() resource.ResourceClaim {
+				claim := mkValidResourceClaim()
+				claim.Status.Allocation = validAllocation
+				return claim
+			}(),
+		},
+		"invalid: duplicate condition type": {
+			update: func() resource.ResourceClaim {
+				conditions := []v1.Condition{
+					{Type: "Ready", Status: v1.ConditionTrue, Reason: "R", Message: "M", LastTransitionTime: v1.Now()},
+					{Type: "Ready", Status: v1.ConditionFalse, Reason: "R2", Message: "M2", LastTransitionTime: v1.Now()},
+				}
+				claim := mkResourceClaimWithStatus(tweakStatusDevices(resource.AllocatedDeviceStatus{
+					Driver: "test", Pool: "test", Device: "test", Conditions: conditions,
+				}))
+				claim.Status.Allocation = validAllocation
+				return claim
+			}(),
+			old: func() resource.ResourceClaim {
+				claim := mkValidResourceClaim()
+				claim.Status.Allocation = validAllocation
+				return claim
+			}(),
+			expectedErrs: field.ErrorList{
+				// Normalization: declarative conditions[1] → handwritten conditions[1].type
+				field.Duplicate(field.NewPath("status", "devices").Index(0).Child("conditions").Index(1).Child("type"), "Ready").MarkCoveredByDeclarative(),
+			},
+		},
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
+			tc.old.ObjectMeta.ResourceVersion = "1"
+			tc.update.ObjectMeta.ResourceVersion = "1"
 			apitesting.VerifyValidationEquivalence(t, ctx, &tc.update, func(ctx context.Context, obj runtime.Object) field.ErrorList {
 				return StatusStrategy.ValidateUpdate(ctx, obj, &tc.old)
 			}, tc.expectedErrs, apitesting.WithNormalizationRules(validation.ResourceNormalizationRules...))

@@ -64,6 +64,13 @@ var ResourceNormalizationRules = []field.NormalizationRule{
 		Regexp:      regexp.MustCompile(`spec.devices\[(\d+)\]\.basic\.`),
 		Replacement: "spec.devices[$1].",
 	},
+	{
+		// Normalize declarative listMapKey duplicate errors (conditions[N]) to match
+		// handwritten ValidateConditions errors (conditions[N].type)
+		// This is applied to declarative errors (got) to match handwritten format (want)
+		Regexp:      regexp.MustCompile(`\.conditions\[(\d+)\]$`),
+		Replacement: ".conditions[$1].type",
+	},
 }
 
 var (
@@ -1292,8 +1299,14 @@ func validateDeviceStatus(device resource.AllocatedDeviceStatus, fldPath *field.
 	if len(device.Conditions) > resource.AllocatedDeviceStatusMaxConditions {
 		allErrs = append(allErrs, field.TooMany(fldPath.Child("conditions"), len(device.Conditions), resource.AllocatedDeviceStatusMaxConditions).WithOrigin("maxItems").MarkCoveredByDeclarative())
 	}
-	// Allow declarative validation to handle duplicates (via +listType=map)
-	allErrs = append(allErrs, metav1validation.ValidateConditions(device.Conditions, fldPath.Child("conditions"))...)
+	// Allow declarative validation to handle duplicates (via +listType=map, +listMapKey=type)
+	for _, err := range metav1validation.ValidateConditions(device.Conditions, fldPath.Child("conditions")) {
+		if err.Type == field.ErrorTypeDuplicate {
+			allErrs = append(allErrs, err.MarkCoveredByDeclarative())
+		} else {
+			allErrs = append(allErrs, err)
+		}
+	}
 	if device.Data != nil && len(device.Data.Raw) > 0 { // Data is an optional field.
 		allErrs = append(allErrs, validateRawExtension(*device.Data, fldPath.Child("data"), false, resource.AllocatedDeviceStatusDataMaxLength)...)
 	}
