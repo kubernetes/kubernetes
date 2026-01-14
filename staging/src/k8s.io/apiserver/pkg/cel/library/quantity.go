@@ -139,6 +139,8 @@ func Quantity() cel.EnvOption {
 
 var quantityLib = &quantity{}
 
+const zeroDivErrMsg = "division by zero error"
+
 type quantity struct{}
 
 func (*quantity) LibraryName() string {
@@ -387,6 +389,10 @@ func quantityDivideIntDefaultRounding(arg ref.Val, div ref.Val) ref.Val {
 		return types.MaybeNoSuchOverloadErr(div)
 	}
 
+	if denominator == 0 {
+		panic(zeroDivErrMsg)
+	}
+
 	copy := *q
 	copy.QuoRound(denominator, 4)
 	return &apiservercel.Quantity{
@@ -403,6 +409,10 @@ func quantityIntegerDivision(arg ref.Val, div ref.Val) ref.Val {
 	denominator, ok := div.Value().(int64)
 	if !ok {
 		return types.MaybeNoSuchOverloadErr(div)
+	}
+
+	if denominator == 0 {
+		panic(zeroDivErrMsg)
 	}
 
 	copy := *q
@@ -428,8 +438,12 @@ func quantityDivideIntRound(args ...ref.Val) ref.Val {
 		return types.MaybeNoSuchOverloadErr(args[2])
 	}
 
-	if roundVal > 10 {
-		return types.WrapErr(fmt.Errorf("the maximum value for rounding float division is 10 but %d was passed", roundVal))
+	if denominator == 0 {
+		panic(zeroDivErrMsg)
+	}
+
+	if roundVal > 10 || roundVal < 0 {
+		return types.WrapErr(fmt.Errorf("the valid range for roundVal is 0 to 10 but %d was passed", roundVal))
 	}
 
 	copy := *q
