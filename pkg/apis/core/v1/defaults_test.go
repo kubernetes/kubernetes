@@ -3422,8 +3422,8 @@ func TestDefaultPodLimits(t *testing.T) {
 							v1.ResourceMemory: resource.MustParse("256Mi"),
 						},
 						Limits: v1.ResourceList{
-							v1.ResourceCPU:    resource.MustParse("500m"),  // sum of containers
-							v1.ResourceMemory: resource.MustParse("256Mi"), // sum of containers
+							v1.ResourceCPU:    resource.MustParse("500m"),
+							v1.ResourceMemory: resource.MustParse("256Mi"),
 						},
 					},
 					Containers: []v1.Container{
@@ -3458,7 +3458,7 @@ func TestDefaultPodLimits(t *testing.T) {
 							v1.ResourceCPU: resource.MustParse("500m"),
 						},
 						Limits: v1.ResourceList{
-							v1.ResourceCPU: resource.MustParse("1000m"), // already set
+							v1.ResourceCPU: resource.MustParse("1000m"),
 						},
 					},
 					Containers: []v1.Container{
@@ -3480,7 +3480,7 @@ func TestDefaultPodLimits(t *testing.T) {
 							v1.ResourceCPU: resource.MustParse("500m"),
 						},
 						Limits: v1.ResourceList{
-							v1.ResourceCPU: resource.MustParse("1000m"), // unchanged
+							v1.ResourceCPU: resource.MustParse("1000m"),
 						},
 					},
 					Containers: []v1.Container{
@@ -3553,7 +3553,6 @@ func TestDefaultPodLimits(t *testing.T) {
 							Resources: v1.ResourceRequirements{
 								Limits: v1.ResourceList{
 									v1.ResourceCPU: resource.MustParse("300m"),
-									// memory missing
 								},
 							},
 						},
@@ -3567,8 +3566,7 @@ func TestDefaultPodLimits(t *testing.T) {
 							v1.ResourceCPU: resource.MustParse("500m"),
 						},
 						Limits: v1.ResourceList{
-							v1.ResourceCPU: resource.MustParse("500m"), // defaulted
-							// memory not defaulted because not all containers have it
+							v1.ResourceCPU: resource.MustParse("500m"),
 						},
 					},
 					Containers: []v1.Container{
@@ -3640,7 +3638,7 @@ func TestDefaultPodLimits(t *testing.T) {
 							v1.ResourceCPU: resource.MustParse("500m"),
 						},
 						Limits: v1.ResourceList{
-							v1.ResourceCPU: resource.MustParse("500m"), // max(300+200, 100+200)
+							v1.ResourceCPU: resource.MustParse("500m"),
 						},
 					},
 					Containers: []v1.Container{
@@ -3695,9 +3693,7 @@ func TestDefaultPodLimits(t *testing.T) {
 						},
 						{
 							Name:      "container2",
-							Resources: v1.ResourceRequirements{
-								// no limits
-							},
+							Resources: v1.ResourceRequirements{},
 						},
 					},
 				},
@@ -3708,7 +3704,6 @@ func TestDefaultPodLimits(t *testing.T) {
 						Requests: v1.ResourceList{
 							v1.ResourceCPU: resource.MustParse("500m"),
 						},
-						// no limits defaulted
 					},
 					Containers: []v1.Container{
 						{
@@ -3778,8 +3773,8 @@ func TestDefaultPodLimits(t *testing.T) {
 							v1.ResourceMemory: resource.MustParse("512Mi"),
 						},
 						Limits: v1.ResourceList{
-							v1.ResourceCPU:    resource.MustParse("500m"),  // max(sum(containers), max(init))
-							v1.ResourceMemory: resource.MustParse("512Mi"), // max(sum(containers), max(init))
+							v1.ResourceCPU:    resource.MustParse("500m"),
+							v1.ResourceMemory: resource.MustParse("512Mi"),
 						},
 					},
 					Containers: []v1.Container{
@@ -3826,8 +3821,8 @@ func TestDefaultPodLimits(t *testing.T) {
 							v1.ResourceMemory: resource.MustParse("512Mi"),
 						},
 						Limits: v1.ResourceList{
-							v1.ResourceCPU:    resource.MustParse("1000m"),  // already set
-							v1.ResourceMemory: resource.MustParse("1024Mi"), // already set
+							v1.ResourceCPU:    resource.MustParse("1000m"),
+							v1.ResourceMemory: resource.MustParse("1024Mi"),
 						},
 					},
 					Containers: []v1.Container{
@@ -3860,8 +3855,8 @@ func TestDefaultPodLimits(t *testing.T) {
 							v1.ResourceMemory: resource.MustParse("512Mi"),
 						},
 						Limits: v1.ResourceList{
-							v1.ResourceCPU:    resource.MustParse("1000m"),  // unchanged
-							v1.ResourceMemory: resource.MustParse("1024Mi"), // unchanged
+							v1.ResourceCPU:    resource.MustParse("1000m"),
+							v1.ResourceMemory: resource.MustParse("1024Mi"),
 						},
 					},
 					Containers: []v1.Container{
@@ -3921,7 +3916,6 @@ func TestDefaultPodLimits(t *testing.T) {
 							Resources: v1.ResourceRequirements{
 								Limits: v1.ResourceList{
 									v1.ResourceCPU: resource.MustParse("100m"),
-									// memory limit missing
 								},
 							},
 						},
@@ -3936,8 +3930,7 @@ func TestDefaultPodLimits(t *testing.T) {
 							v1.ResourceMemory: resource.MustParse("512Mi"),
 						},
 						Limits: v1.ResourceList{
-							v1.ResourceCPU: resource.MustParse("600m"), // CPU defaulted (all containers have CPU limits)
-							// memory NOT defaulted (per-resource: containerC is missing memory limit)
+							v1.ResourceCPU: resource.MustParse("600m"),
 						},
 					},
 					Containers: []v1.Container{
@@ -3976,11 +3969,9 @@ func TestDefaultPodLimits(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
-			// Apply defaulting
 			obj := roundTrip(t, runtime.Object(tc.pod))
 			pod := obj.(*v1.Pod)
 
-			// Compare results
 			if !equality.Semantic.DeepEqual(pod.Spec.Resources, tc.expected.Spec.Resources) {
 				t.Errorf("Pod resources mismatch:\n%s", cmp.Diff(tc.expected.Spec.Resources, pod.Spec.Resources))
 			}

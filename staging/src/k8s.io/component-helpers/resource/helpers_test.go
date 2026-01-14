@@ -2319,9 +2319,9 @@ func getPod(cname string, resources podResources) *v1.Pod {
 					Resources: r,
 				},
 			},
-		Overhead: overhead,
-	},
-}
+			Overhead: overhead,
+		},
+	}
 }
 
 func TestAllContainersHaveLimitForResource(t *testing.T) {
