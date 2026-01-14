@@ -244,6 +244,10 @@ var (
 	// When set, the function will be called before the stream enters
 	// the blocking state.
 	NewStreamWaitingForResolver = func() {}
+
+	// AddressToTelemetryLabels is an xDS-provided function to extract telemetry
+	// labels from a resolver.Address. Callers must assert its type before calling.
+	AddressToTelemetryLabels any // func(addr resolver.Address) map[string]string
 )
 
 // HealthChecker defines the signature of the client-side LB channel health

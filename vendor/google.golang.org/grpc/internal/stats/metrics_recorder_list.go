@@ -64,6 +64,16 @@ func (l *MetricsRecorderList) RecordInt64Count(handle *estats.Int64CountHandle, 
 	}
 }
 
+// RecordInt64UpDownCount records the measurement alongside labels on the int
+// count associated with the provided handle.
+func (l *MetricsRecorderList) RecordInt64UpDownCount(handle *estats.Int64UpDownCountHandle, incr int64, labels ...string) {
+	verifyLabels(handle.Descriptor(), labels...)
+
+	for _, metricRecorder := range l.metricsRecorders {
+		metricRecorder.RecordInt64UpDownCount(handle, incr, labels...)
+	}
+}
+
 // RecordFloat64Count records the measurement alongside labels on the float
 // count associated with the provided handle.
 func (l *MetricsRecorderList) RecordFloat64Count(handle *estats.Float64CountHandle, incr float64, labels ...string) {
