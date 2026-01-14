@@ -329,6 +329,15 @@ var (
 		SnapshotDeletionPolicy: DeleteSnapshot,
 		VolType:                DynamicPV,
 	}
+
+	// VolumeGroupSnapshotRetain is TestPattern for "VolumeGroupSnapshot"
+	VolumeGroupSnapshotRetain = TestPattern{
+		Name:                   " (retain policy)",
+		SnapshotType:           VolumeGroupSnapshot,
+		SnapshotDeletionPolicy: RetainSnapshot,
+		VolType:                DynamicPV,
+	}
+
 	// PreprovisionedSnapshotDelete is TestPattern for "Pre-provisioned snapshot"
 	PreprovisionedSnapshotDelete = TestPattern{
 		Name:                   "Pre-provisioned Snapshot (delete policy)",
