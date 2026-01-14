@@ -21,8 +21,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/google/btree"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/utils/third_party/forked/golang/btree"
 )
 
 // newThreadedBtreeStoreIndexer returns a storage for cacher by adding locking over the two 2 data structures:
