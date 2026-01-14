@@ -67,14 +67,14 @@ func testListAndWatch(t *testing.T) {
 				logger.Info("Listed", "configMaps", objs, "err", err)
 				if err != nil {
 					t.Errorf("Unexpected List error: %v", err)
-				} else if objs.ResourceVersion != "1" {
-					t.Errorf("Expected ListMeta ResourceVersion 1, got %q", objs.ResourceVersion)
+				} else if objs.ResourceVersion != "2" {
+					t.Errorf("Expected ListMeta ResourceVersion 2, got %q", objs.ResourceVersion)
 				}
 				return objs, err
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				if options.ResourceVersion != "1" {
-					t.Errorf("Expected ListOptions ResourceVersion 1, got %q", options.ResourceVersion)
+				if options.ResourceVersion != "2" {
+					t.Errorf("Expected ListOptions ResourceVersion 2, got %q", options.ResourceVersion)
 				}
 				logger.Info("Delaying Watch...")
 				<-createDone
