@@ -73,8 +73,12 @@ type QueueWithBatch interface {
 
 	// PopBatch behaves similarly to Queue#Pop, but processes multiple keys
 	// as a batch. The implementation determines the batching strategy,
-	// such as the number of keys to include per batch.
-	PopBatch(ProcessBatchFunc) error
+	// such as the number of keys to include per batch. The ProcessBatchFunc
+	// is called when a batch is ready to be processed. The PopProcessFunc
+	// is called when a singleton item is ready to be processed. The
+	// ProcessBatchFunc and PopProcessFunc must do the same processing to
+	// ensure consistent behavior.
+	PopBatch(processBatch ProcessBatchFunc, processSingle PopProcessFunc) error
 }
 
 // Pop is helper function for popping from Queue.

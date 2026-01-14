@@ -264,7 +264,9 @@ func (f *RealFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 	return Deltas{item}, err
 }
 
-func (f *RealFIFO) PopBatch(process ProcessBatchFunc) error {
+// PopBatch pops as many items as possible to be processed as a batch using processBatch,
+// or pop a single item using processSingle if multiple items cannot be batched.
+func (f *RealFIFO) PopBatch(processBatch ProcessBatchFunc, processSingle PopProcessFunc) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
@@ -304,6 +306,7 @@ func (f *RealFIFO) PopBatch(process ProcessBatchFunc) error {
 			break
 		}
 		if unique.Has(id) {
+			// close the batch if a duplicate item is encountered
 			break
 		}
 		unique.Insert(id)
@@ -329,8 +332,10 @@ func (f *RealFIFO) PopBatch(process ProcessBatchFunc) error {
 		defer trace.LogIfLong(min(100*time.Millisecond*time.Duration(len(deltas)), time.Second))
 	}
 
-	err := process(deltas, isInInitialList)
-	return err
+	if len(deltas) == 1 {
+		return processSingle(Deltas{deltas[0]}, isInInitialList)
+	}
+	return processBatch(deltas, isInInitialList)
 }
 
 // Replace

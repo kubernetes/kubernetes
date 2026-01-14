@@ -1141,7 +1141,13 @@ func TestRealFIFO_PopMultipleDeltaInBatch(t *testing.T) {
 							receivedInitial <- obj
 						}
 						return nil
-					})
+					}, PopProcessFunc(func(obj interface{}, isInInitialList bool) error {
+						received <- []Delta{*obj.(Deltas).Newest()}
+						if isInInitialList {
+							receivedInitial <- []Delta{*obj.(Deltas).Newest()}
+						}
+						return nil
+					}))
 				}()
 				timer := time.NewTimer(time.Millisecond * 50)
 				select {
@@ -1265,7 +1271,10 @@ func TestRealFIFO_PopBrokenItemsInBatch(t *testing.T) {
 					_ = f.PopBatch(func(obj []Delta, isInInitialList bool) error {
 						received <- obj
 						return nil
-					})
+					}, PopProcessFunc(func(obj interface{}, isInInitialList bool) error {
+						received <- []Delta{*obj.(Deltas).Newest()}
+						return nil
+					}))
 				}()
 				timer := time.NewTimer(time.Millisecond * 50)
 				select {
