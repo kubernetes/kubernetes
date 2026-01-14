@@ -20,7 +20,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sync"
+
+	"github.com/go-logr/logr"
 
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -183,6 +186,8 @@ func (c *claimTracker) ClaimHasPendingAllocation(claimUID types.UID) bool {
 
 func (c *claimTracker) SignalClaimPendingAllocation(claimUID types.UID, allocatedClaim *resourceapi.ResourceClaim) error {
 	c.inFlightAllocations.Store(claimUID, allocatedClaim)
+	// This is the same verbosity as the corresponding log in the assume cache.
+	c.logger.V(5).Info("Added in-flight claim", "claim", klog.KObj(allocatedClaim), "uid", claimUID, "version", allocatedClaim.ResourceVersion)
 	// There's no reason to return an error in this implementation, but the error is helpful for other implementations.
 	// For example, implementations that have to deal with fake claims might want to return an error if the allocation
 	// is for an invalid claim.
@@ -190,7 +195,14 @@ func (c *claimTracker) SignalClaimPendingAllocation(claimUID types.UID, allocate
 }
 
 func (c *claimTracker) RemoveClaimPendingAllocation(claimUID types.UID) (deleted bool) {
-	_, found := c.inFlightAllocations.LoadAndDelete(claimUID)
+	claim, found := c.inFlightAllocations.LoadAndDelete(claimUID)
+	// The assume cache doesn't log this, but maybe it should.
+	if found {
+		claim := claim.(*resourceapi.ResourceClaim)
+		c.logger.V(5).Info("Removed in-flight claim", "claim", klog.KObj(claim), "uid", claimUID, "version", claim.ResourceVersion)
+	} else {
+		c.logger.V(5).Info("Redundant remove of in-flight claim, not found", "uid", claimUID)
+	}
 	return found
 }
 
@@ -238,7 +250,12 @@ func (c *claimTracker) List() ([]*resourceapi.ResourceClaim, error) {
 // so we don't need to re-check the in-flight claims.
 var errClaimTrackerConcurrentModification = errors.New("conflicting concurrent modification")
 
-func (c *claimTracker) ListAllAllocatedDevices() (sets.Set[structured.DeviceID], error) {
+func (c *claimTracker) ListAllAllocatedDevices() (a sets.Set[structured.DeviceID], err error) {
+	c.logger.V(6).Info("Starting ListAllAllocatedDevices")
+	defer func() {
+		c.logger.V(6).Info("Finished ListAllAllocatedDevices", "allocatedDevices", logAllocatedDevices(c.logger, a))
+	}()
+
 	// Start with a fresh set that matches the current known state of the
 	// world according to the informers.
 	allocated, revision := c.allocatedDevices.Get()
@@ -261,7 +278,12 @@ func (c *claimTracker) ListAllAllocatedDevices() (sets.Set[structured.DeviceID],
 	return nil, errClaimTrackerConcurrentModification
 }
 
-func (c *claimTracker) GatherAllocatedState() (*structured.AllocatedState, error) {
+func (c *claimTracker) GatherAllocatedState() (s *structured.AllocatedState, err error) {
+	c.logger.V(6).Info("Starting GatherAllocatedState")
+	defer func() {
+		c.logger.V(6).Info("Finished GatherAllocatedState", "allocatedDevices", logAllocatedDevices(c.logger, s.AllocatedDevices))
+	}()
+
 	// Start with a fresh set that matches the current known state of the
 	// world according to the informers.
 	allocated, revision1 := c.allocatedDevices.Get()
@@ -311,4 +333,55 @@ func (c *claimTracker) AssumeClaimAfterAPICall(claim *resourceapi.ResourceClaim)
 
 func (c *claimTracker) AssumedClaimRestore(namespace, claimName string) {
 	c.cache.Restore(namespace + "/" + claimName)
+}
+
+// At V(6), log only a limited number of devices to avoid blowing up logs. For
+// many E2E tests, 10 devices is enough for all devices without having to
+// truncate, at least when running the tests sequentially.
+const maxDevicesLevel6 = 10
+
+// logAllocatedDevices returns a handle for the value in a structured log call which
+// includes varying amounts of information about the allocated devices, depending on
+// the verbosity of the logger.
+func logAllocatedDevices(logger klog.Logger, allocatedDevices sets.Set[structured.DeviceID]) any {
+	// We need to check verbosity here because our caller's source code
+	// location may be relevant (-vmodule !).
+	helper, logger := logger.WithCallStackHelper()
+	helper()
+
+	// We always produce the same output at V <= 5. 6 adds all IDs.
+	verbosity := 5
+	for i := 7; i > verbosity; i-- {
+		if loggerV := logger.V(i); loggerV.Enabled() {
+			verbosity = i
+			break
+		}
+	}
+
+	return &allocatedDevicesLogger{verbosity, allocatedDevices}
+}
+
+type allocatedDevicesLogger struct {
+	verbosity int
+	devices   sets.Set[structured.DeviceID]
+}
+
+var _ logr.Marshaler = &allocatedDevicesLogger{}
+
+func (a *allocatedDevicesLogger) MarshalLog() any {
+	info := map[string]any{"count": len(a.devices)}
+	if a.verbosity >= 6 {
+		ids := make([]string, 0, len(a.devices))
+		for id := range a.devices {
+			if a.verbosity == 6 && len(ids) >= maxDevicesLevel6 {
+				ids = append(ids, "...")
+				break
+			}
+			ids = append(ids, id.String())
+		}
+		slices.Sort(ids)
+		info["devices"] = ids
+
+	}
+	return info
 }
