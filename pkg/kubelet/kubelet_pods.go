@@ -2151,7 +2151,7 @@ func (kl *Kubelet) convertStatusToAPIStatus(pod *v1.Pod, podStatus *kubecontaine
 }
 
 func getEffectiveAllocatedResources(allocatedPod *v1.Pod) *v1.ResourceRequirements {
-	allocatedResources := allocatedPod.Spec.Resources
+	allocatedResources := allocatedPod.Spec.Resources.DeepCopy()
 	if allocatedResources == nil {
 		allocatedResources = &v1.ResourceRequirements{}
 	}
