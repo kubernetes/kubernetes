@@ -206,7 +206,7 @@ type VolumeError struct {
 
 	// errorCode is a numeric gRPC code representing the error encountered during Attach or Detach operations.
 	//
-	// This is an optional, beta field that requires the MutableCSINodeAllocatableCount feature gate being enabled to be set.
+	// This is an optional field that requires the MutableCSINodeAllocatableCount feature gate being enabled to be set.
 	//
 	// +featureGate=MutableCSINodeAllocatableCount
 	// +optional
@@ -426,7 +426,7 @@ type CSIDriverSpec struct {
 	// occur (neither periodic nor upon detecting capacity-related failures), and the
 	// allocatable.count remains static. The minimum allowed value for this field is 10 seconds.
 	//
-	// This is a beta feature and requires the MutableCSINodeAllocatableCount feature gate to be enabled.
+	// This feature requires the MutableCSINodeAllocatableCount feature gate to be enabled.
 	//
 	// This field is mutable.
 	//
