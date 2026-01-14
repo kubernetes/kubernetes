@@ -152,6 +152,7 @@ func TestDRA(t *testing.T) {
 			f: func(tCtx ktesting.TContext) {
 				tCtx.Run("Pod", func(tCtx ktesting.TContext) { testPod(tCtx, true) })
 				tCtx.Run("FilterTimeout", testFilterTimeout)
+				tCtx.Run("UsesAllResources", testUsesAllResources)
 			},
 		},
 		"GA": {
@@ -169,6 +170,7 @@ func TestDRA(t *testing.T) {
 				tCtx.Run("ExtendedResource", func(tCtx ktesting.TContext) { testExtendedResource(tCtx, false) })
 				tCtx.Run("ResourceClaimDeviceStatus", func(tCtx ktesting.TContext) { testResourceClaimDeviceStatus(tCtx, false) })
 				tCtx.Run("DeviceBindingConditions", func(tCtx ktesting.TContext) { testDeviceBindingConditions(tCtx, false) })
+				tCtx.Run("UsesAllResources", testUsesAllResources)
 			},
 		},
 		"v1beta1": {
@@ -238,6 +240,7 @@ func TestDRA(t *testing.T) {
 				tCtx.Run("EvictClusterWithRule", func(tCtx ktesting.TContext) { testEvictCluster(tCtx, true) })
 				tCtx.Run("EvictClusterWithSlices", func(tCtx ktesting.TContext) { testEvictCluster(tCtx, false) })
 				tCtx.Run("InvalidResourceSlices", testInvalidResourceSlices)
+				tCtx.Run("UsesAllResources", testUsesAllResources)
 			},
 		},
 	} {
