@@ -172,7 +172,8 @@ const (
 	Updated DeltaType = "Updated"
 	Deleted DeltaType = "Deleted"
 	// Replaced is emitted when we encountered watch errors and had to do a
-	// relist. We don't know if the replaced object has changed.
+	// relist, or on initial listing of objects. We don't know if the replaced
+	// object has changed.
 	//
 	// NOTE: Previous versions of DeltaFIFO would use Sync for Replace events
 	// as well. Hence, Replaced is only emitted when the option
