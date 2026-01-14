@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+
 	clientfeatures "k8s.io/client-go/features"
 	clientfeaturestesting "k8s.io/client-go/features/testing"
 )
@@ -39,6 +40,7 @@ func (f *RealFIFO) getItems() []Delta {
 }
 
 const closedFIFOName = "FIFO WAS CLOSED"
+const isAtomic = "ATOMIC REPLACED OBJ"
 
 func popN(queue Queue, count int) []interface{} {
 	result := []interface{}{}
@@ -56,6 +58,13 @@ func testRealFIFOPop(f *RealFIFO) testFifoObject {
 	val := Pop(f)
 	if val == nil {
 		return testFifoObject{name: closedFIFOName}
+	}
+	if val.(Deltas).Newest().Type == ReplacedAll {
+		var objs []testFifoObject
+		for _, obj := range val.(Deltas).Newest().Object.(ReplacedAllInfo).Objects {
+			objs = append(objs, obj.(testFifoObject))
+		}
+		return testFifoObject{name: isAtomic, val: objs}
 	}
 	return val.(Deltas).Newest().Object.(testFifoObject)
 }
@@ -1296,5 +1305,149 @@ func TestRealFIFO_PopBrokenItemsInBatch(t *testing.T) {
 				idx++
 			}
 		})
+	}
+}
+
+func TestRealFIFO_ReplaceAtomic(t *testing.T) {
+	obj := mkFifoObj("foo", 2)
+	table := []struct {
+		name           string
+		operations     func(f *RealFIFO)
+		expectedDeltas Deltas
+	}{
+		{
+			name: "Base replace",
+			operations: func(f *RealFIFO) {
+				f.replaceTest(t, []interface{}{}, "123")
+			},
+			expectedDeltas: Deltas{
+				{Type: ReplacedAll, Object: ReplacedAllInfo{
+					ResourceVersion: "123",
+					Objects:         []interface{}{},
+				}},
+			},
+		},
+		{
+			name: "Added object exists in deltas on Atomic Replace",
+			operations: func(f *RealFIFO) {
+				f.addTest(t, obj)
+				f.replaceTest(t, []interface{}{}, "123")
+			},
+			expectedDeltas: Deltas{
+				{Type: Added, Object: obj},
+				{Type: ReplacedAll, Object: ReplacedAllInfo{
+					ResourceVersion: "123",
+					Objects:         []interface{}{},
+				}},
+			},
+		},
+		{
+			name: "Multiple replaces run in order",
+			operations: func(f *RealFIFO) {
+				f.addTest(t, obj)
+				f.replaceTest(t, []interface{}{obj}, "10")
+				f.replaceTest(t, []interface{}{obj}, "20")
+				f.replaceTest(t, []interface{}{}, "56")
+			},
+			expectedDeltas: Deltas{
+				{Type: Added, Object: obj},
+				{Type: ReplacedAll, Object: ReplacedAllInfo{
+					ResourceVersion: "10",
+					Objects:         []interface{}{obj},
+				}},
+				{Type: ReplacedAll, Object: ReplacedAllInfo{
+					ResourceVersion: "20",
+					Objects:         []interface{}{obj},
+				}},
+				{Type: ReplacedAll, Object: ReplacedAllInfo{
+					ResourceVersion: "56",
+					Objects:         []interface{}{},
+				}},
+			},
+		},
+	}
+	for _, tt := range table {
+		tt := tt
+
+		t.Run(tt.name, func(t *testing.T) {
+			// Test with a RealFIFO with a backing KnownObjects
+			f := NewRealFIFO(
+				testFifoObjectKeyFunc,
+				literalListerGetter(func() []testFifoObject {
+					return []testFifoObject{}
+				}),
+				nil,
+			)
+			f.emitAtomicEvents = true
+			tt.operations(f)
+			actualDeltasWithKnownObjects := popN(f, len(f.getItems()))
+			actualAsDeltas := collapseDeltas(actualDeltasWithKnownObjects)
+			if !reflect.DeepEqual(tt.expectedDeltas, actualAsDeltas) {
+				t.Errorf("expected %#v, got %#v", tt.expectedDeltas, actualAsDeltas)
+			}
+			if len(f.items) != 0 {
+				t.Errorf("expected no extra deltas (empty map), got %#v", f.items)
+			}
+
+		})
+	}
+}
+
+func TestRealFIFO_ReplaceAtomicPop(t *testing.T) {
+	f := NewRealFIFO(
+		testFifoObjectKeyFunc,
+		emptyKnownObjects(),
+		nil,
+	)
+	f.emitAtomicEvents = true
+	f.addTest(t, mkFifoObj("foo", 10))
+	f.replaceTest(t, []interface{}{mkFifoObj("foo", 15)}, "20")
+	got := make(chan testFifoObject, 3)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for {
+			obj := testRealFIFOPop(f)
+			if obj.name == closedFIFOName {
+				break
+			}
+			got <- obj
+		}
+	}()
+
+	added := <-got
+	if e, a, v := "foo", added.name, added.val.(int); e != a || v != 10 {
+		t.Errorf("Didn't get expected name (%v vs %v) or value (%v vs %v)", e, a, v, 10)
+	}
+
+	curr := <-got
+	if e, a, v := isAtomic, curr.name, curr.val.([]testFifoObject)[0]; e != a && v.val == 15 {
+		t.Errorf("Didn't get updated value (%v), got %v", e, a)
+	}
+
+	select {
+	case unexpected := <-got:
+		t.Errorf("Got second value %v", unexpected.val)
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	if items := f.getItems(); len(items) > 0 {
+		t.Errorf("item did not get removed")
+	}
+	f.Close()
+	<-done
+}
+
+func (f *RealFIFO) addTest(t *testing.T, obj interface{}) {
+	err := f.Add(obj)
+	if err != nil {
+		t.Fatalf("Test error on RealFIFO add: %s", err)
+	}
+}
+
+func (f *RealFIFO) replaceTest(t *testing.T, objs []interface{}, rv string) {
+	err := f.Replace(objs, rv)
+	if err != nil {
+		t.Fatalf("Test error on RealFIFO replace: %s", err)
 	}
 }

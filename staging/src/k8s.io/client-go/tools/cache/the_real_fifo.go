@@ -98,6 +98,15 @@ type RealFIFO struct {
 	emitAtomicEvents bool
 }
 
+// ReplacedAllInfo is the object associated with a Delta of type=ReplacedAll
+type ReplacedAllInfo struct {
+	// ResourceVersion is the resource version passed to the Replace() call that created this Delta
+	ResourceVersion string
+	// Objects are the list of objects passed to the Replace() call that created this Delta,
+	// with any configured transformation already applied.
+	Objects []interface{}
+}
+
 var (
 	_ = Queue(&RealFIFO{})             // RealFIFO is a Queue
 	_ = TransformingStore(&RealFIFO{}) // RealFIFO implements TransformingStore to allow memory optimizations
@@ -177,6 +186,35 @@ func (f *RealFIFO) addToItems_locked(deltaActionType DeltaType, skipTransform bo
 	f.items = append(f.items, Delta{
 		Type:   deltaActionType,
 		Object: obj,
+	})
+	f.cond.Broadcast()
+
+	return nil
+}
+
+// addReplaceToItemsLocked appends to the delta list.
+func (f *RealFIFO) addReplaceToItemsLocked(objs []interface{}, resourceVersion string) error {
+	// Replaced items must be transformed before being added to the queue. These objects must
+	// all be objects that have not been transformed yet.
+	if f.transformer != nil {
+		transformedObjs := make([]interface{}, len(objs))
+		for i, obj := range objs {
+			transformedObj, err := f.transformer(obj)
+			if err != nil {
+				return err
+			}
+			transformedObjs[i] = transformedObj
+		}
+		objs = transformedObjs
+	}
+
+	info := ReplacedAllInfo{
+		ResourceVersion: resourceVersion,
+		Objects:         objs,
+	}
+	f.items = append(f.items, Delta{
+		Type:   ReplacedAll,
+		Object: info,
 	})
 	f.cond.Broadcast()
 
@@ -374,13 +412,17 @@ func (f *RealFIFO) Replace(newItems []interface{}, resourceVersion string) error
 	defer f.lock.Unlock()
 
 	var err error
-	err = reconcileReplacement(f.items, f.knownObjects, newItems, f.keyOf,
-		func(obj DeletedFinalStateUnknown) error {
-			return f.addToItems_locked(Deleted, true, obj)
-		},
-		func(obj interface{}) error {
-			return f.addToItems_locked(Replaced, false, obj)
-		})
+	if f.emitAtomicEvents {
+		err = f.addReplaceToItemsLocked(newItems, resourceVersion)
+	} else {
+		err = reconcileReplacement(f.items, f.knownObjects, newItems, f.keyOf,
+			func(obj DeletedFinalStateUnknown) error {
+				return f.addToItems_locked(Deleted, true, obj)
+			},
+			func(obj interface{}) error {
+				return f.addToItems_locked(Replaced, false, obj)
+			})
+	}
 	if err != nil {
 		return err
 	}

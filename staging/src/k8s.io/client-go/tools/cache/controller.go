@@ -591,6 +591,14 @@ func processDeltas(
 		obj := d.Object
 
 		switch d.Type {
+		case ReplacedAll:
+			info, ok := obj.(ReplacedAllInfo)
+			if !ok {
+				return fmt.Errorf("ReplacedAll did not contain ReplacedAllInfo: %T", obj)
+			}
+			if err := processReplacedAllInfo(handler, info, clientState, isInInitialList, keyFunc); err != nil {
+				return err
+			}
 		case Sync, Replaced, Added, Updated:
 			if old, exists, err := clientState.Get(obj); err == nil && exists {
 				if err := clientState.Update(obj); err != nil {
@@ -697,6 +705,52 @@ func processDeltasInBatch(
 	}
 	for _, callback := range callbacks {
 		callback()
+	}
+	return nil
+}
+
+func processReplacedAllInfo(handler ResourceEventHandler, info ReplacedAllInfo, clientState Store, isInInitialList bool, keyFunc KeyFunc) error {
+	var deletions []DeletedFinalStateUnknown
+	type replacement struct {
+		oldObj interface{}
+		newObj interface{}
+	}
+	replacements := make([]replacement, 0, len(info.Objects))
+
+	err := reconcileReplacement(nil, clientState, info.Objects, keyFunc,
+		func(obj DeletedFinalStateUnknown) error {
+			deletions = append(deletions, obj)
+			return nil
+		},
+		func(obj interface{}) error {
+			// This behavior matches processDeltas handling of Replace deltas
+			if old, exists, err := clientState.Get(obj); err == nil && exists {
+				replacements = append(replacements, replacement{newObj: obj, oldObj: old})
+			} else {
+				replacements = append(replacements, replacement{newObj: obj})
+			}
+			return nil
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	// Replace the client state first so the store reflects the events handlers are given
+	if err := clientState.Replace(info.Objects, info.ResourceVersion); err != nil {
+		return err
+	}
+	// Processing all deletions first matches behavior of RealFIFO#Replace
+	for _, objToDelete := range deletions {
+		handler.OnDelete(objToDelete)
+	}
+	// Processing adds/updates in order observed by reconcileReplacement matches behavior of RealFIFO#Replace
+	for _, r := range replacements {
+		if r.oldObj != nil {
+			handler.OnUpdate(r.oldObj, r.newObj)
+		} else {
+			handler.OnAdd(r.newObj, isInInitialList)
+		}
 	}
 	return nil
 }
