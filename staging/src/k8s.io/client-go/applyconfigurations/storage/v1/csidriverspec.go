@@ -154,7 +154,7 @@ type CSIDriverSpecApplyConfiguration struct {
 	// occur (neither periodic nor upon detecting capacity-related failures), and the
 	// allocatable.count remains static. The minimum allowed value for this field is 10 seconds.
 	//
-	// This is a beta feature and requires the MutableCSINodeAllocatableCount feature gate to be enabled.
+	// This feature requires the MutableCSINodeAllocatableCount feature gate to be enabled.
 	//
 	// This field is mutable.
 	NodeAllocatableUpdatePeriodSeconds *int64 `json:"nodeAllocatableUpdatePeriodSeconds,omitempty"`
