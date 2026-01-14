@@ -39,6 +39,14 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *runtime.Scheme) error {
+	// type IPAddress
+	scheme.AddValidationFunc((*networkingv1beta1.IPAddress)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_IPAddress(ctx, op, nil /* fldPath */, obj.(*networkingv1beta1.IPAddress), safe.Cast[*networkingv1beta1.IPAddress](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
 	// type IngressClass
 	scheme.AddValidationFunc((*networkingv1beta1.IngressClass)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
 		switch op.Request.SubresourcePath() {
@@ -48,6 +56,56 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
 	return nil
+}
+
+// Validate_IPAddress validates an instance of IPAddress according
+// to declarative validation rules in the API schema.
+func Validate_IPAddress(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *networkingv1beta1.IPAddress) (errs field.ErrorList) {
+	// field networkingv1beta1.IPAddress.TypeMeta has no validation
+	// field networkingv1beta1.IPAddress.ObjectMeta has no validation
+
+	// field networkingv1beta1.IPAddress.Spec
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *networkingv1beta1.IPAddressSpec, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_IPAddressSpec(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("spec"), &obj.Spec, safe.Field(oldObj, func(oldObj *networkingv1beta1.IPAddress) *networkingv1beta1.IPAddressSpec { return &oldObj.Spec }), oldObj != nil)...)
+
+	return errs
+}
+
+// Validate_IPAddressSpec validates an instance of IPAddressSpec according
+// to declarative validation rules in the API schema.
+func Validate_IPAddressSpec(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *networkingv1beta1.IPAddressSpec) (errs field.ErrorList) {
+	// field networkingv1beta1.IPAddressSpec.ParentRef
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *networkingv1beta1.ParentReference, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_ParentReference(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("parentRef"), obj.ParentRef, safe.Field(oldObj, func(oldObj *networkingv1beta1.IPAddressSpec) *networkingv1beta1.ParentReference {
+			return oldObj.ParentRef
+		}), oldObj != nil)...)
+
+	return errs
 }
 
 // Validate_IngressClass validates an instance of IngressClass according
@@ -145,6 +203,54 @@ func Validate_IngressClassSpec(ctx context.Context, op operation.Operation, fldP
 		}(fldPath.Child("parameters"), obj.Parameters, safe.Field(oldObj, func(oldObj *networkingv1beta1.IngressClassSpec) *networkingv1beta1.IngressClassParametersReference {
 			return oldObj.Parameters
 		}), oldObj != nil)...)
+
+	return errs
+}
+
+// Validate_ParentReference validates an instance of ParentReference according
+// to declarative validation rules in the API schema.
+func Validate_ParentReference(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *networkingv1beta1.ParentReference) (errs field.ErrorList) {
+	// field networkingv1beta1.ParentReference.Group has no validation
+
+	// field networkingv1beta1.ParentReference.Resource
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("resource"), &obj.Resource, safe.Field(oldObj, func(oldObj *networkingv1beta1.ParentReference) *string { return &oldObj.Resource }), oldObj != nil)...)
+
+	// field networkingv1beta1.ParentReference.Namespace has no validation
+
+	// field networkingv1beta1.ParentReference.Name
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("name"), &obj.Name, safe.Field(oldObj, func(oldObj *networkingv1beta1.ParentReference) *string { return &oldObj.Name }), oldObj != nil)...)
 
 	return errs
 }
