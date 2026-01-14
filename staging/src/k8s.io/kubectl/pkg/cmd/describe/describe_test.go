@@ -105,6 +105,7 @@ func TestDescribeObject(t *testing.T) {
 	}()
 	describe.DescriberFn = d.describerFor
 
+	var apiCalled = false
 	_, _, rc := cmdtesting.TestData()
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
@@ -115,6 +116,7 @@ func TestDescribeObject(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "GET":
+				apiCalled = true
 				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &rc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
@@ -128,6 +130,10 @@ func TestDescribeObject(t *testing.T) {
 	cmd := NewCmdDescribe("kubectl", tf, streams)
 	cmd.Flags().Set("filename", "../../../testdata/redis-master-controller.yaml")
 	cmd.Run(cmd, []string{})
+
+	if !apiCalled {
+		t.Errorf("API not called to retrieve the latest object")
+	}
 
 	if d.Name != "redis-master" || d.Namespace != "test" {
 		t.Errorf("unexpected describer: %#v", d)

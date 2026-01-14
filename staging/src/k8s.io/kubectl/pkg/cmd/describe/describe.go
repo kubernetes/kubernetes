@@ -178,6 +178,7 @@ func (o *DescribeOptions) Run() error {
 		ResourceTypeOrNameArgs(true, o.BuilderArgs...).
 		RequestChunksOf(o.DescriberSettings.ChunkSize).
 		Flatten().
+		Latest().
 		Do()
 	err := r.Err()
 	if err != nil {
