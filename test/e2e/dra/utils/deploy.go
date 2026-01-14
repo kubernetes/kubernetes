@@ -664,7 +664,7 @@ func (d *Driver) SetUp(tCtx ktesting.TContext, kubeletRootDir string, nodes *Nod
 
 	// Wait for registration.
 	tCtx.Log("wait for plugin registration")
-	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) map[string][]app.GRPCCall {
+	tCtx.Eventually(func(tCtx ktesting.TContext) map[string][]app.GRPCCall {
 		notRegistered := make(map[string][]app.GRPCCall)
 		for nodename, plugin := range d.Nodes {
 			calls := plugin.GetGRPCCalls()
@@ -995,7 +995,7 @@ func (d *Driver) TearDown(tCtx ktesting.TContext) {
 // Only use this in tests where kubelet support for DRA is guaranteed.
 func (d *Driver) IsGone(tCtx ktesting.TContext) {
 	tCtx.Logf("Waiting for ResourceSlices of driver %s to be removed...", d.Name)
-	ktesting.Eventually(tCtx, d.NewGetSlices()).WithTimeout(2 * time.Minute).Should(gomega.HaveField("Items", gomega.BeEmpty()))
+	tCtx.Eventually(d.NewGetSlices()).WithTimeout(2 * time.Minute).Should(gomega.HaveField("Items", gomega.BeEmpty()))
 }
 
 func (d *Driver) interceptor(nodename string, ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {

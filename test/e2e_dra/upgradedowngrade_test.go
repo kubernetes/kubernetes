@@ -255,7 +255,7 @@ func testUpgradeDowngrade(tCtx ktesting.TContext) {
 
 	// The kubelet wipes all ResourceSlices on a restart because it doesn't know which drivers were running.
 	// Wait for the ResourceSlice controller in the driver to notice and recreate the ResourceSlices.
-	ktesting.Eventually(tCtx.WithStep("wait for ResourceSlices"), driver.NewGetSlices()).WithTimeout(5 * time.Minute).Should(gomega.HaveField("Items", gomega.HaveLen(len(nodes.NodeNames))))
+	tCtx.WithStep("wait for ResourceSlices").Eventually(driver.NewGetSlices()).WithTimeout(5 * time.Minute).Should(gomega.HaveField("Items", gomega.HaveLen(len(nodes.NodeNames))))
 
 	downgradedTestFuncs := make(map[string]downgradedTestFunc, len(subTests))
 	tCtx.Run("after-cluster-upgrade", func(tCtx ktesting.TContext) {

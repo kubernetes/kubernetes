@@ -522,10 +522,8 @@ func (b *Builder) tearDown(tCtx ktesting.TContext) {
 			tCtx.ExpectNoError(err, "delete pod")
 		}
 	}
-	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) []v1.Pod {
-		pods, err := b.listTestPods(tCtx)
-		tCtx.ExpectNoError(err)
-		return pods
+	tCtx.Eventually(func(tCtx ktesting.TContext) ([]v1.Pod, error) {
+		return b.listTestPods(tCtx)
 	}).WithTimeout(time.Minute).Should(gomega.BeEmpty(), "remaining pods despite deletion")
 
 	claims, err := b.ClientV1(tCtx).ResourceClaims(b.namespace).List(tCtx, metav1.ListOptions{})
@@ -543,15 +541,13 @@ func (b *Builder) tearDown(tCtx ktesting.TContext) {
 
 	for host, plugin := range b.driver.Nodes {
 		tCtx.Logf("Waiting for resources on %s to be unprepared", host)
-		ktesting.Eventually(tCtx, func(ktesting.TContext) []app.ClaimID { return plugin.GetPreparedResources() }).WithTimeout(time.Minute).Should(gomega.BeEmpty(), "prepared claims on host %s", host)
+		tCtx.Eventually(func(ktesting.TContext) []app.ClaimID { return plugin.GetPreparedResources() }).WithTimeout(time.Minute).Should(gomega.BeEmpty(), "prepared claims on host %s", host)
 	}
 
 	tCtx.Log("waiting for claims to be deallocated and deleted")
-	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) []resourceapi.ResourceClaim {
-		claims, err := client.ResourceClaims(tCtx.Namespace()).List(tCtx, metav1.ListOptions{})
-		tCtx.ExpectNoError(err)
-		return claims.Items
-	}).WithTimeout(time.Minute).Should(gomega.BeEmpty(), "claims in the namespaces")
+	tCtx.Eventually(func(tCtx ktesting.TContext) (*resourceapi.ResourceClaimList, error) {
+		return client.ResourceClaims(tCtx.Namespace()).List(tCtx, metav1.ListOptions{})
+	}).WithTimeout(time.Minute).Should(gomega.HaveField("Items", gomega.BeEmpty()), "claims in the namespaces")
 }
 
 func (b *Builder) listTestPods(tCtx ktesting.TContext) ([]v1.Pod, error) {
