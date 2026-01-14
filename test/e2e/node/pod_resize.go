@@ -746,7 +746,10 @@ func doPodResizeRetryDeferredTests(f *framework.Framework) {
 			node.Name, nodeAllocatableMilliCPU2, nodeAvailableMilliCPU2)
 
 		testPod3CPUQuantity := resource.NewMilliQuantity(nodeAvailableMilliCPU2/4, resource.DecimalSI)
-		testPod3CPUQuantityResized := resource.NewMilliQuantity(nodeAvailableMilliCPU2+testPod1CPUQuantity.MilliValue()/4, resource.DecimalSI)
+		// Use a larger margin (half of testPod1's CPU instead of quarter) to ensure resize request
+		// clearly exceeds available resources even with minor fluctuations in CI environments.
+		testPod3CPUQuantityResized := resource.NewMilliQuantity(nodeAvailableMilliCPU2+testPod1CPUQuantity.MilliValue()/2, resource.DecimalSI)
+		framework.Logf("testPod3 initial CPU request is '%dm'", testPod3CPUQuantity.MilliValue())
 		framework.Logf("testPod3 MilliCPUs after resize '%dm'", testPod3CPUQuantityResized.MilliValue())
 
 		testPod1CPUQuantityResizedCPU := resource.NewMilliQuantity(testPod1CPUQuantity.MilliValue()/3, resource.DecimalSI)
@@ -790,6 +793,8 @@ func doPodResizeRetryDeferredTests(f *framework.Framework) {
 		gomega.Expect(testPod3.Generation).To(gomega.BeEquivalentTo(1))
 
 		ginkgo.By(fmt.Sprintf("Resize pod '%s' that cannot fit node due to insufficient CPU", testPod3.Name))
+		// Verify resize request exceeds available resources before patching
+		verifyResizeExceedsAvailable(ctx, f, &node, testPod3CPUQuantityResized.MilliValue())
 		testPod3, p3Err := f.ClientSet.CoreV1().Pods(testPod3.Namespace).Patch(ctx,
 			testPod3.Name, types.StrategicMergePatchType, []byte(patchTestpod3ToDeferred), metav1.PatchOptions{}, "resize")
 		framework.ExpectNoError(p3Err, "failed to patch pod for resize")
@@ -934,6 +939,9 @@ func doPodResizeRetryDeferredTests(f *framework.Framework) {
 
 		// Resize requests are done in an arbitrary order, to verify that the priority based on priority class
 		// or qos class takes precedent over the order of the requests.
+
+		// Verify resize request exceeds available resources before starting resize operations
+		verifyResizeExceedsAvailable(ctx, f, &node, majorityCPUQuantity.MilliValue())
 
 		// Attempt pod4 resize request to 2/3 of the node allocatable CPU, verify deferred.
 		ginkgo.By(fmt.Sprintf("Resize pod '%s'", testPod4.Name))
@@ -1146,11 +1154,14 @@ func doPodResizeRetryDeferredTests(f *framework.Framework) {
 		patchTestPod4ToDeferred := podresize.MakeResizePatch(c, expectedTestPod4Resized, nil, nil)
 
 		patches := []string{string(patchTestPod2ToDeferred), string(patchTestPod3ToDeferred), string(patchTestPod4ToDeferred)}
+		resizeRequests := []int64{testPod2CPUQuantityResized.MilliValue(), testPod3CPUQuantityResized.MilliValue(), testPod4CPUQuantityResized.MilliValue()}
 
 		for i := range patches {
 			testPod := testPods[i+1]
 			patch := patches[i]
 			ginkgo.By(fmt.Sprintf("Resize pod '%s' that cannot fit node due to insufficient CPU or memory", testPod.Name))
+			// Verify resize request exceeds available resources before patching
+			verifyResizeExceedsAvailable(ctx, f, &node, resizeRequests[i])
 			testPod, err = f.ClientSet.CoreV1().Pods(testPod.Namespace).Patch(ctx,
 				testPod.Name, types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{}, "resize")
 			framework.ExpectNoError(err, "failed to patch pod for resize")
@@ -1275,6 +1286,23 @@ func getNodeAllocatableAndAvailableValues(ctx context.Context, f *framework.Fram
 
 func waitForPodDeferred(ctx context.Context, f *framework.Framework, testPod *v1.Pod) {
 	framework.ExpectNoError(e2epod.WaitForPodCondition(ctx, f.ClientSet, testPod.Namespace, testPod.Name, "display pod resize status as deferred", f.Timeouts.PodStart, func(pod *v1.Pod) (bool, error) {
+		// Log current resize status for debugging flaky failures
+		for _, c := range pod.Status.Conditions {
+			if c.Type == v1.PodResizePending || c.Type == v1.PodResizeInProgress {
+				framework.Logf("Pod %s resize condition: Type=%s, Reason=%s, Message=%s",
+					pod.Name, c.Type, c.Reason, c.Message)
+			}
+		}
 		return helpers.IsPodResizeDeferred(pod), nil
 	}))
+}
+
+// verifyResizeExceedsAvailable validates that the resize request exceeds available node resources.
+// This helps catch test setup issues early rather than waiting for timeout.
+func verifyResizeExceedsAvailable(ctx context.Context, f *framework.Framework, node *v1.Node, resizeRequestMilliCPU int64) {
+	_, currentAvailable := getNodeAllocatableAndAvailableValues(ctx, f, node, v1.ResourceCPU)
+	framework.Logf("Verifying resize request (%dm) exceeds current available resources (%dm)",
+		resizeRequestMilliCPU, currentAvailable)
+	gomega.Expect(resizeRequestMilliCPU).To(gomega.BeNumerically(">", currentAvailable),
+		"Test precondition failed: resize request should exceed available resources to trigger deferred state")
 }
