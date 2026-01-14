@@ -853,7 +853,8 @@ func TestProcessDeltasInBatch(t *testing.T) {
 				dummyListener,
 				mockStore,
 				tc.deltaList,
-				true)
+				true,
+				DeletionHandlingMetaNamespaceKeyFunc)
 			if tc.assertErr != nil {
 				assert.True(t, tc.assertErr(err))
 			}
@@ -923,12 +924,12 @@ func TestReplaceEvents(t *testing.T) {
 
 		Process: func(obj interface{}, isInInitialList bool) error {
 			if deltas, ok := obj.(Deltas); ok {
-				return processDeltas(recorder, store, deltas, isInInitialList)
+				return processDeltas(recorder, store, deltas, isInInitialList, DeletionHandlingMetaNamespaceKeyFunc)
 			}
 			return errors.New("object given as Process argument is not Deltas")
 		},
 		ProcessBatch: func(deltaList []Delta, isInInitialList bool) error {
-			return processDeltasInBatch(recorder, store, deltaList, isInInitialList)
+			return processDeltasInBatch(recorder, store, deltaList, isInInitialList, DeletionHandlingMetaNamespaceKeyFunc)
 		},
 	}
 

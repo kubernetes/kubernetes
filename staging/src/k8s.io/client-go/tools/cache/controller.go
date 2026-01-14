@@ -442,7 +442,7 @@ func NewInformerWithOptions(options InformerOptions) (Store, Controller) {
 	} else {
 		clientState = NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, options.Indexers)
 	}
-	return clientState, newInformer(clientState, options)
+	return clientState, newInformer(clientState, options, DeletionHandlingMetaNamespaceKeyFunc)
 }
 
 // NewInformer returns a Store and a controller for populating the store
@@ -476,7 +476,7 @@ func NewInformer(
 		Handler:       h,
 		ResyncPeriod:  resyncPeriod,
 	}
-	return clientState, newInformer(clientState, options)
+	return clientState, newInformer(clientState, options, DeletionHandlingMetaNamespaceKeyFunc)
 }
 
 // NewIndexerInformer returns an Indexer and a Controller for populating the index
@@ -513,7 +513,7 @@ func NewIndexerInformer(
 		ResyncPeriod:  resyncPeriod,
 		Indexers:      indexers,
 	}
-	return clientState, newInformer(clientState, options)
+	return clientState, newInformer(clientState, options, DeletionHandlingMetaNamespaceKeyFunc)
 }
 
 // NewTransformingInformer returns a Store and a controller for populating
@@ -542,7 +542,7 @@ func NewTransformingInformer(
 		ResyncPeriod:  resyncPeriod,
 		Transform:     transformer,
 	}
-	return clientState, newInformer(clientState, options)
+	return clientState, newInformer(clientState, options, DeletionHandlingMetaNamespaceKeyFunc)
 }
 
 // NewTransformingIndexerInformer returns an Indexer and a controller for
@@ -573,7 +573,7 @@ func NewTransformingIndexerInformer(
 		Indexers:      indexers,
 		Transform:     transformer,
 	}
-	return clientState, newInformer(clientState, options)
+	return clientState, newInformer(clientState, options, DeletionHandlingMetaNamespaceKeyFunc)
 }
 
 // Multiplexes updates in the form of a list of Deltas into a Store, and informs
@@ -584,6 +584,7 @@ func processDeltas(
 	clientState Store,
 	deltas Deltas,
 	isInInitialList bool,
+	keyFunc KeyFunc,
 ) error {
 	// from oldest to newest
 	for _, d := range deltas {
@@ -626,6 +627,7 @@ func processDeltasInBatch(
 	clientState Store,
 	deltas []Delta,
 	isInInitialList bool,
+	keyFunc KeyFunc,
 ) error {
 	// from oldest to newest
 	txns := make([]Transaction, 0)
@@ -634,7 +636,7 @@ func processDeltasInBatch(
 	if !txnSupported {
 		var errs []error
 		for _, delta := range deltas {
-			if err := processDeltas(handler, clientState, Deltas{delta}, isInInitialList); err != nil {
+			if err := processDeltas(handler, clientState, Deltas{delta}, isInInitialList, keyFunc); err != nil {
 				errs = append(errs, err)
 			}
 		}
@@ -703,7 +705,7 @@ func processDeltasInBatch(
 // Parameters
 //   - clientState is the store you want to populate
 //   - options contain the options to configure the controller
-func newInformer(clientState Store, options InformerOptions) Controller {
+func newInformer(clientState Store, options InformerOptions, keyFunc KeyFunc) Controller {
 	// This will hold incoming changes. Note how we pass clientState in as a
 	// KeyLister, that way resync operations will result in the correct set
 	// of update/delete deltas.
@@ -719,12 +721,12 @@ func newInformer(clientState Store, options InformerOptions) Controller {
 
 		Process: func(obj interface{}, isInInitialList bool) error {
 			if deltas, ok := obj.(Deltas); ok {
-				return processDeltas(options.Handler, clientState, deltas, isInInitialList)
+				return processDeltas(options.Handler, clientState, deltas, isInInitialList, keyFunc)
 			}
 			return errors.New("object given as Process argument is not Deltas")
 		},
 		ProcessBatch: func(deltaList []Delta, isInInitialList bool) error {
-			return processDeltasInBatch(options.Handler, clientState, deltaList, isInInitialList)
+			return processDeltasInBatch(options.Handler, clientState, deltaList, isInInitialList, keyFunc)
 		},
 	}
 	return New(cfg)
