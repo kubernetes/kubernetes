@@ -116,6 +116,14 @@ const (
 	// Enables the Portworx in-tree driver to Portworx migration feature.
 	CSIMigrationPortworx featuregate.Feature = "CSIMigrationPortworx"
 
+	// owner: @joey
+	// kep:  https://kep.k8s.io/XXXX
+	//
+	// Enables kubelet to use cgroup v2 cpu.idle for best-effort pods.
+	// When enabled, best-effort pods will use SCHED_IDLE scheduling policy
+	// instead of minimal cpu.weight.
+	CPUIDLE featuregate.Feature = "CPUIDLE"
+
 	// owner: @aramase
 	// kep:  http://kep.k8s.io/5538
 	//
@@ -1172,6 +1180,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.36
 	},
 
+	CPUIDLE: {
+		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	CSIServiceAccountTokenSecrets: {
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
 	},
@@ -2167,6 +2179,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	CPUManagerPolicyOptions: {},
 
 	CSIMigrationPortworx: {},
+
+	CPUIDLE: {},
 
 	CSIServiceAccountTokenSecrets: {},
 

@@ -102,8 +102,18 @@ func (m *qosContainerManagerImpl) Start(ctx context.Context, getNodeAllocatable 
 		resourceParameters := &ResourceConfig{}
 		// the BestEffort QoS class has a statically configured minShares value
 		if qosClass == v1.PodQOSBestEffort {
-			minShares := uint64(MinShares)
-			resourceParameters.CPUShares = &minShares
+			// If CPUIDLE feature gate is enabled and we're running in cgroup v2 mode,
+			// set cpu.idle=1 instead of cpu.weight=2
+			if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUIDLE) &&
+				libcontainercgroups.IsCgroup2UnifiedMode() {
+				if resourceParameters.Unified == nil {
+					resourceParameters.Unified = make(map[string]string)
+				}
+				resourceParameters.Unified[Cgroup2CPUIdle] = "1"
+			} else {
+				minShares := uint64(MinShares)
+				resourceParameters.CPUShares = &minShares
+			}
 		}
 
 		// containerConfig object stores the cgroup specifications
@@ -192,9 +202,18 @@ func (m *qosContainerManagerImpl) setCPUCgroupConfig(configs map[v1.PodQOSClass]
 		}
 	}
 
-	// make sure best effort is always 2 shares
-	bestEffortCPUShares := uint64(MinShares)
-	configs[v1.PodQOSBestEffort].ResourceParameters.CPUShares = &bestEffortCPUShares
+	// make sure best effort is always 2 shares, unless CPUIDLE feature gate is enabled
+	// in cgroup v2 mode, in which case we set cpu.idle=1 instead
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUIDLE) &&
+		libcontainercgroups.IsCgroup2UnifiedMode() {
+		if configs[v1.PodQOSBestEffort].ResourceParameters.Unified == nil {
+			configs[v1.PodQOSBestEffort].ResourceParameters.Unified = make(map[string]string)
+		}
+		configs[v1.PodQOSBestEffort].ResourceParameters.Unified[Cgroup2CPUIdle] = "1"
+	} else {
+		bestEffortCPUShares := uint64(MinShares)
+		configs[v1.PodQOSBestEffort].ResourceParameters.CPUShares = &bestEffortCPUShares
+	}
 
 	// set burstable shares based on current observe state
 	burstableCPUShares := MilliCPUToShares(burstablePodCPURequest)

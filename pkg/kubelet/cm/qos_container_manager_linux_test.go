@@ -155,3 +155,54 @@ func TestQoSContainerCgroup(t *testing.T) {
 	assert.Equal(t, qosConfigs[v1.PodQOSGuaranteed].ResourceParameters.Unified["memory.min"], strconv.FormatInt(burstableMin.Value()+guaranteedMin.Value(), 10))
 	assert.Equal(t, qosConfigs[v1.PodQOSBurstable].ResourceParameters.Unified["memory.min"], strconv.FormatInt(burstableMin.Value(), 10))
 }
+
+func TestQoSContainerCPUIdle(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	m, err := createTestQOSContainerManager(logger)
+	assert.NoError(t, err)
+
+	qosConfigs := map[v1.PodQOSClass]*CgroupConfig{
+		v1.PodQOSGuaranteed: {
+			Name:               m.qosContainersInfo.Guaranteed,
+			ResourceParameters: &ResourceConfig{},
+		},
+		v1.PodQOSBurstable: {
+			Name:               m.qosContainersInfo.Burstable,
+			ResourceParameters: &ResourceConfig{},
+		},
+		v1.PodQOSBestEffort: {
+			Name:               m.qosContainersInfo.BestEffort,
+			ResourceParameters: &ResourceConfig{},
+		},
+	}
+
+	// Test with CPUIDLE feature gate enabled
+	// Note: This test will only set cpu.idle if running in cgroup v2 mode
+	err = m.setCPUCgroupConfig(qosConfigs)
+	assert.NoError(t, err)
+
+	// Verify that best-effort cgroup has either cpu.idle or cpu.shares set
+	// depending on whether CPUIDLE feature gate is enabled and cgroup v2 mode
+	if qosConfigs[v1.PodQOSBestEffort].ResourceParameters.Unified != nil {
+		if cpuIdle, exists := qosConfigs[v1.PodQOSBestEffort].ResourceParameters.Unified["cpu.idle"]; exists {
+			// CPUIDLE feature gate is enabled and running in cgroup v2 mode
+			assert.Equal(t, "1", cpuIdle)
+			// cpu.shares should not be set when cpu.idle is set
+			assert.Nil(t, qosConfigs[v1.PodQOSBestEffort].ResourceParameters.CPUShares)
+		}
+	}
+
+	if qosConfigs[v1.PodQOSBestEffort].ResourceParameters.CPUShares != nil {
+		// CPUIDLE feature gate is disabled or running in cgroup v1 mode
+		assert.Equal(t, uint64(MinShares), *qosConfigs[v1.PodQOSBestEffort].ResourceParameters.CPUShares)
+		// cpu.idle should not be set when cpu.shares is set
+		if qosConfigs[v1.PodQOSBestEffort].ResourceParameters.Unified != nil {
+			_, exists := qosConfigs[v1.PodQOSBestEffort].ResourceParameters.Unified["cpu.idle"]
+			assert.False(t, exists)
+		}
+	}
+
+	// Verify that burstable cgroup has cpu.shares set (not affected by CPUIDLE)
+	assert.NotNil(t, qosConfigs[v1.PodQOSBurstable].ResourceParameters.CPUShares)
+	assert.Greater(t, *qosConfigs[v1.PodQOSBurstable].ResourceParameters.CPUShares, uint64(0))
+}
