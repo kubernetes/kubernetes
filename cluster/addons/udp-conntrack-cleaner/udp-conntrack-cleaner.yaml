@@ -1,0 +1,74 @@
+# Copyright 2026 The Kubernetes Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: udp-conntrack-cleaner
+  namespace: kube-system
+  labels:
+    k8s-app: udp-conntrack-cleaner
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  selector:
+    matchLabels:
+      k8s-app: udp-conntrack-cleaner
+  template:
+    metadata:
+      labels:
+        k8s-app: udp-conntrack-cleaner
+    spec:
+      # HostNetwork is required to access the Node's conntrack table
+      hostNetwork: true
+      # Run on control plane and worker nodes alike
+      tolerations:
+      - operator: Exists
+        effect: NoSchedule
+      containers:
+      - name: cleaner
+        # Alpine is minimal (~5MB). We install conntrack-tools at runtime.
+        image: alpine:3.19
+        securityContext:
+          capabilities:
+            # NET_ADMIN is strictly required to run 'conntrack -D'
+            add: ["NET_ADMIN"]
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            # Install conntrack-tools (suppress output for cleaner logs)
+            apk add --no-cache conntrack-tools > /dev/null 2>&1;
+            
+            echo "INFO: Starting UDP Conntrack Cleaner loop...";
+            
+            while true; do
+              # Delete UDP entries with [UNREPLIED] state.
+              # This clears "blackholed" connections where the backend is gone 
+              # but the client keeps sending.
+              count=$(conntrack -D -p udp --state UNREPLIED 2>/dev/null);
+              
+              if [ -n "$count" ]; then
+                 echo "$(date): Cleaned stale UNREPLIED UDP entries.";
+              fi
+              
+              # Sleep 60s to minimize CPU usage while maintaining responsiveness
+              sleep 60;
+            done
+        resources:
+          # Minimal resource footprint
+          limits:
+            cpu: 10m
+            memory: 20Mi
+          requests:
+            cpu: 5m
+            memory: 10Mi
