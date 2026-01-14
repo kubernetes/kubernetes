@@ -900,7 +900,9 @@ func NewMainKubelet(ctx context.Context,
 
 	if kubeDeps.TLSOptions != nil {
 		if kubeCfg.ServerTLSBootstrap && utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
-			klet.serverCertificateManager, err = kubeletcertificate.NewKubeletServerCertificateManager(klet.kubeClient, kubeCfg, klet.nodeName, klet.getLastObservedNodeAddresses, certDirectory)
+			klet.serverCertificateManager, err = kubeletcertificate.NewKubeletServerCertificateManager(klet.kubeClient, kubeCfg, klet.nodeName, func() []v1.NodeAddress {
+				return klet.getLastObservedNodeAddresses(logger)
+			}, certDirectory)
 			if err != nil {
 				return nil, fmt.Errorf("failed to initialize certificate manager: %w", err)
 			}
@@ -2371,7 +2373,7 @@ func (kl *Kubelet) SyncTerminatedPod(ctx context.Context, pod *v1.Pod, podStatus
 	// This waiting loop relies on the background cleanup which starts after pod workers respond
 	// true for ShouldPodRuntimeBeRemoved, which happens after `SyncTerminatingPod` is completed.
 	if err := wait.PollUntilContextCancel(ctx, 100*time.Millisecond, true, func(ctx context.Context) (bool, error) {
-		volumesExist := kl.podVolumesExist(pod.UID)
+		volumesExist := kl.podVolumesExist(logger, pod.UID)
 		if volumesExist {
 			klog.V(3).InfoS("Pod is terminated, but some volumes have not been cleaned up", "pod", klog.KObj(pod), "podUID", pod.UID)
 		}
