@@ -406,6 +406,7 @@ linters:
               - "ssatags" # Ensure lists have a listType tag.
               # - "uniquemarkers" # Ensure markers are not duplicated across field and type definitions.
               - "duplicatemarkers" #Prevent identical markers from being present on types and fields
+              - "dependenttags" # Ensure markers dependent on other markers are present.
           lintersConfig:
             conditions:
               isFirstField: Ignore
@@ -423,6 +424,12 @@ linters:
                 - ["k8s:required", "required", "kubebuilder:validation:Required"]
                 - ["default"]
                 description: "fields with default values are always optional"
+            dependenttags:
+              rules:
+                - identifier: "k8s:unionMember"
+                  type: "All"
+                  dependsOn:
+                    - "k8s:optional"
             # jsonTags:
             #   jsonTagRegex: "^[a-z][a-z0-9]*(?:[A-Z][a-z0-9]*)*$" # The default regex is appropriate for our use case.
             # nomaps:
