@@ -98,6 +98,18 @@ func StripUnsupportedFormatsPostProcessorForVersion(compatibilityVersion *versio
 
 		normalized := strings.ReplaceAll(s.Format, "-", "") // go-openapi default format name normalization
 		if !supportedFormatsAtVersion(compatibilityVersion).supported.Has(normalized) {
+			if len(s.Type) == 1 {
+				switch s.Type[0] {
+				case "integer":
+					if s.Format == "int32" || s.Format == "int64" {
+						return nil
+					}
+				case "number":
+					if s.Format == "float" || s.Format == "double" {
+						return nil
+					}
+				}
+			}
 			s.Format = ""
 		}
 
