@@ -198,6 +198,14 @@ func Validate_MyObject(ctx context.Context, op operation.Operation, fldPath *fie
 				return nil
 			}
 			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			errs = append(errs, validate.MaxLength(ctx, op, fldPath, obj, oldObj, 60)...)
 			return
 		}(fldPath.Child("fieldForLengthWithoutDV"), &obj.FieldForLengthWithoutDV, safe.Field(oldObj, func(oldObj *MyObject) *string { return &oldObj.FieldForLengthWithoutDV }), oldObj != nil)...)

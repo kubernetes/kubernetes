@@ -95,9 +95,13 @@ func TestMyObjectValidation(t *testing.T) {
 				obj := validObj.DeepCopy()
 				obj.StableTypeField.InnerField = ""
 				obj.StableTypeFieldWithoutDV.InnerField = ""
+				obj.FieldForLength = ""
+				obj.FieldForLengthWithoutDV = ""
 				return *obj
 			}(),
 			errs: field.ErrorList{
+				field.Required(field.NewPath("fieldForLength"), "").MarkDeclarativeNative(),
+				field.Required(field.NewPath("fieldForLengthWithoutDV"), ""),
 				field.Required(field.NewPath("stableTypeField", "innerField"), "").MarkDeclarativeNative(),
 				field.Required(field.NewPath("stableTypeFieldWithoutDV", "innerField"), ""),
 			},
@@ -156,6 +160,19 @@ func TestMyObjectValidation(t *testing.T) {
 			errs: field.ErrorList{
 				field.TooLong(field.NewPath("subfieldTest", "innerField"), "abcdefg", 5).MarkDeclarativeNative(),
 				field.TooLong(field.NewPath("subfieldTestWithoutDV", "innerField"), "abcdefg", 5),
+			},
+		},
+		{
+			name: "fieldForLength",
+			obj: func() MyObject {
+				obj := validObj.DeepCopy()
+				obj.FieldForLength = strings.Repeat("a", 61)
+				obj.FieldForLengthWithoutDV = strings.Repeat("a", 61)
+				return *obj
+			}(),
+			errs: field.ErrorList{
+				field.TooLong(field.NewPath("fieldForLength"), strings.Repeat("a", 61), 60).MarkDeclarativeNative(),
+				field.TooLong(field.NewPath("fieldForLengthWithoutDV"), strings.Repeat("a", 61), 60),
 			},
 		},
 	}
