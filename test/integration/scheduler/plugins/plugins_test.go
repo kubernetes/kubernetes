@@ -494,8 +494,8 @@ func (pp *PreBindPlugin) Name() string {
 }
 
 // PreBindPreFlight is a test function that returns nil for testing.
-func (pp *PreBindPlugin) PreBindPreFlight(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
-	return nil
+func (pp *PreBindPlugin) PreBindPreFlight(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) (*fwk.PreBindPreFlightResult, *fwk.Status) {
+	return &fwk.PreBindPreFlightResult{AllowParallel: false}, nil
 }
 
 // PreBind is a test function that returns (true, nil) or errors for testing.

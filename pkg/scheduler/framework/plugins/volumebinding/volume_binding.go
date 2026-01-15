@@ -552,20 +552,21 @@ var errNoPodVolumeForNode = fmt.Errorf("no pod volume found for node")
 
 // PreBindPreFlight is called before PreBind, and determines whether PreBind is going to do something for this pod, or not.
 // It checks state.podVolumesByNode to determine whether there are any pod volumes for the node and hence the plugin has to handle them at PreBind.
-func (pl *VolumeBinding) PreBindPreFlight(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
+func (pl *VolumeBinding) PreBindPreFlight(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) (*fwk.PreBindPreFlightResult, *fwk.Status) {
+	result := &fwk.PreBindPreFlightResult{AllowParallel: true}
 	s, err := getStateData(state)
 	if err != nil {
-		return fwk.AsStatus(err)
+		return result, fwk.AsStatus(err)
 	}
 	if s.allBound {
 		// no need to bind volumes
-		return fwk.NewStatus(fwk.Skip)
+		return result, fwk.NewStatus(fwk.Skip)
 	}
 
 	if _, ok := s.podVolumesByNode[nodeName]; !ok {
-		return fwk.AsStatus(fmt.Errorf("%w %q", errNoPodVolumeForNode, nodeName))
+		return result, fwk.AsStatus(fmt.Errorf("%w %q", errNoPodVolumeForNode, nodeName))
 	}
-	return nil
+	return result, nil
 }
 
 // PreBind will make the API update with the assumed bindings and wait until
