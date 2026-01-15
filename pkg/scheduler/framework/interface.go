@@ -277,11 +277,22 @@ type Framework interface {
 	Close() error
 }
 
-func NewPostFilterResultWithNominatedNode(name string) *fwk.PostFilterResult {
+// NewPostFilterResult creates PostFilterResult with a provided nominated node
+// and a list of victims that need to be preempted to make the pod schedulable.
+func NewPostFilterResult(nodeName string, victims []*v1.Pod) *fwk.PostFilterResult {
 	return &fwk.PostFilterResult{
 		NominatingInfo: &fwk.NominatingInfo{
-			NominatedNodeName: name,
+			NominatedNodeName: nodeName,
 			NominatingMode:    fwk.ModeOverride,
 		},
+		Victims: victims,
 	}
+}
+
+// NewPostFilterResultWithNominatedNode creates PostFilterResult with a provided
+// nominated node. The list of victims is set to nil.
+// This function is preserved for backward compatibility - PostFilter plugins
+// should use the NewPostFilterResult function instead, however.
+func NewPostFilterResultWithNominatedNode(nodeName string) *fwk.PostFilterResult {
+	return NewPostFilterResult(nodeName, nil)
 }
