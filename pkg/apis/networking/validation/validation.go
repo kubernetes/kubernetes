@@ -777,7 +777,6 @@ func ValidateIPAddress(ipAddress *networking.IPAddress) field.ErrorList {
 	errs := validateIPAddressParentReference(ipAddress.Spec.ParentRef, field.NewPath("spec"))
 	allErrs = append(allErrs, errs...)
 	return allErrs
-
 }
 
 // validateIPAddressParentReference ensures that the IPAddress ParenteReference exists and is valid.
@@ -785,7 +784,7 @@ func validateIPAddressParentReference(params *networking.ParentReference, fldPat
 	allErrs := field.ErrorList{}
 
 	if params == nil {
-		allErrs = append(allErrs, field.Required(fldPath.Child("parentRef"), ""))
+		allErrs = append(allErrs, field.Required(fldPath.Child("parentRef"), "")).MarkCoveredByDeclarative()
 		return allErrs
 	}
 
@@ -828,7 +827,7 @@ func validateIPAddressParentReference(params *networking.ParentReference, fldPat
 func ValidateIPAddressUpdate(update, old *networking.IPAddress) field.ErrorList {
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))...)
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.Spec.ParentRef, old.Spec.ParentRef, field.NewPath("spec").Child("parentRef"))...).MarkCoveredByDeclarative()
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.Spec.ParentRef, old.Spec.ParentRef, field.NewPath("spec").Child("parentRef")).MarkCoveredByDeclarative().WithOrigin("immutable")...)
 	return allErrs
 }
 

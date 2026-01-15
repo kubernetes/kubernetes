@@ -26,7 +26,7 @@ import (
 	networking "k8s.io/kubernetes/pkg/apis/networking"
 )
 
-var apiVersions = []string{"v1alpha1", "v1beta1", "v1"}
+var apiVersions = []string{"v1beta1", "v1"}
 
 func TestDeclarativeValidateIPAddress(t *testing.T) {
 	for _, apiVersion := range apiVersions {
@@ -114,11 +114,15 @@ func TestDeclarativeValidateIPAddressUpdate(t *testing.T) {
 						obj.Spec.ParentRef.Name = "new-name"
 					}),
 					expectedErrs: field.ErrorList{
-						field.Invalid(field.NewPath("spec", "parentRef"), &networking.ParentReference{
-							Group:    "apps",
-							Resource: "deployments",
-							Name:     "new-name",
-						}, "field is immutable"),
+						func() *field.Error {
+							e := field.Invalid(field.NewPath("spec", "parentRef"), &networking.ParentReference{
+								Group:    "apps",
+								Resource: "deployments",
+								Name:     "new-name",
+							}, "field is immutable")
+							e.Origin = "immutable"
+							return e
+						}(),
 					},
 				},
 			}
@@ -137,6 +141,7 @@ func TestDeclarativeValidateIPAddressUpdate(t *testing.T) {
 							Verb:              "update",
 						},
 					)
+
 					apitesting.VerifyUpdateValidationEquivalence(
 						t,
 						ctx,

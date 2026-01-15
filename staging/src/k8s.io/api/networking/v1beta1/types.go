@@ -457,6 +457,7 @@ type IPAddressSpec struct {
 	// An IPAddress must reference a parent object.
 	// +required
 	// +k8s:required
+	// +k8s:immutable
 	ParentRef *ParentReference `json:"parentRef,omitempty" protobuf:"bytes,1,opt,name=parentRef"`
 }
 

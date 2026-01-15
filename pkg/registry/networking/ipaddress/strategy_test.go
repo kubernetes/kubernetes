@@ -42,7 +42,17 @@ func newIPAddress() networking.IPAddress {
 }
 
 func TestIPAddressStrategy(t *testing.T) {
-	ctx := genericapirequest.NewDefaultContext()
+	ctx := genericapirequest.WithRequestInfo(
+		genericapirequest.NewDefaultContext(),
+		&genericapirequest.RequestInfo{
+			APIGroup:          "networking.k8s.io",
+			APIVersion:        "v1",
+			Resource:          "ipaddresses",
+			Name:              "192.168.1.1",
+			IsResourceRequest: true,
+			Verb:              "create",
+		},
+	)
 	if Strategy.NamespaceScoped() {
 		t.Errorf("ipAddress must not be namespace scoped")
 	}
