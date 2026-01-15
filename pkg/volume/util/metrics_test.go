@@ -25,6 +25,7 @@ import (
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/types"
+	"k8s.io/utils/ptr"
 )
 
 func TestGetFullQualifiedPluginNameForVolume(t *testing.T) {
@@ -111,7 +112,7 @@ func TestStorageOperationMetric(t *testing.T) {
 			operationComplete: func() {
 				hook := OperationCompleteHook("kubernetes.io/fake-plugin", "mount_volume")
 				err := error(nil)
-				hook(types.CompleteFuncParam{Err: &err, Migrated: func() *bool { b := false; return &b }()})
+				hook(types.CompleteFuncParam{Err: &err, Migrated: ptr.To(false)})
 			},
 		},
 		{
@@ -123,7 +124,7 @@ func TestStorageOperationMetric(t *testing.T) {
 			operationComplete: func() {
 				hook := OperationCompleteHook("kubernetes.io/fake-plugin", "unmount_volume")
 				err := fmt.Errorf("test error")
-				hook(types.CompleteFuncParam{Err: &err, Migrated: func() *bool { b := true; return &b }()})
+				hook(types.CompleteFuncParam{Err: &err, Migrated: ptr.To(true)})
 			},
 		},
 	}
