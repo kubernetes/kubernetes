@@ -1438,6 +1438,60 @@ func TestRealFIFO_ReplaceAtomicPop(t *testing.T) {
 	<-done
 }
 
+func TestRealFIFO_ResyncAtomic(t *testing.T) {
+	obj := mkFifoObj("foo", 2)
+	table := []struct {
+		name           string
+		operations     func(f *RealFIFO)
+		expectedDeltas Deltas
+	}{
+		{
+			name: "Base resync",
+			operations: func(f *RealFIFO) {
+				f.resyncTest(t)
+			},
+			expectedDeltas: Deltas{
+				{Type: SyncAll, Object: SyncAllInfo{}},
+			},
+		},
+		{
+			name: "Added object exists in deltas on Atomic Resync",
+			operations: func(f *RealFIFO) {
+				f.addTest(t, obj)
+				f.resyncTest(t)
+			},
+			expectedDeltas: Deltas{
+				{Type: Added, Object: obj},
+				{Type: SyncAll, Object: SyncAllInfo{}},
+			},
+		},
+	}
+	for _, tt := range table {
+		t.Run(tt.name, func(t *testing.T) {
+			// Test with a RealFIFO with a backing KnownObjects
+			f := NewRealFIFO(
+				testFifoObjectKeyFunc,
+				literalListerGetter(func() []testFifoObject {
+					return []testFifoObject{}
+				}),
+				nil,
+			)
+			f.emitAtomicEvents = true
+			tt.operations(f)
+			actualDeltasWithKnownObjects := popN(f, len(f.getItems()))
+			actualAsDeltas := collapseDeltas(actualDeltasWithKnownObjects)
+
+			// Resync appends to the list, so we enable checking preserving the order
+			if !reflect.DeepEqual(tt.expectedDeltas, actualAsDeltas) {
+				t.Errorf("expected %#v, got %#v", tt.expectedDeltas, actualAsDeltas)
+			}
+			if len(f.items) != 0 {
+				t.Errorf("expected no extra deltas (empty map), got %#v", f.items)
+			}
+		})
+	}
+}
+
 func (f *RealFIFO) addTest(t *testing.T, obj interface{}) {
 	err := f.Add(obj)
 	if err != nil {
@@ -1449,5 +1503,12 @@ func (f *RealFIFO) replaceTest(t *testing.T, objs []interface{}, rv string) {
 	err := f.Replace(objs, rv)
 	if err != nil {
 		t.Fatalf("Test error on RealFIFO replace: %s", err)
+	}
+}
+
+func (f *RealFIFO) resyncTest(t *testing.T) {
+	err := f.Resync()
+	if err != nil {
+		t.Fatalf("Test error on RealFIFO resync: %s", err)
 	}
 }

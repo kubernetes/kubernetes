@@ -912,10 +912,13 @@ func TestReplaceEvents(t *testing.T) {
 			source.Shutdown()
 		})
 		store := NewStore(DeletionHandlingMetaNamespaceKeyFunc)
-		fifo := NewRealFIFOWithOptions(RealFIFOOptions{
-			KnownObjects: store,
+		fifoOptions := RealFIFOOptions{
 			AtomicEvents: atomic,
-		})
+		}
+		if !atomic {
+			fifoOptions.KnownObjects = store
+		}
+		fifo := NewRealFIFOWithOptions(fifoOptions)
 		recorder := newEventRecorder(store)
 
 		cfg := &Config{
@@ -1044,11 +1047,15 @@ func TestResetWatch(t *testing.T) {
 			t.Cleanup(func() {
 				source.Shutdown()
 			})
+
 			store := NewStore(DeletionHandlingMetaNamespaceKeyFunc)
-			fifo := NewRealFIFOWithOptions(RealFIFOOptions{
-				KnownObjects: store,
+			fifoOptions := RealFIFOOptions{
 				AtomicEvents: atomic,
-			})
+			}
+			if !atomic {
+				fifoOptions.KnownObjects = store
+			}
+			fifo := NewRealFIFOWithOptions(fifoOptions)
 			recorder := newEventRecorder(store)
 
 			cfg := &Config{

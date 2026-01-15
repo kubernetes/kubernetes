@@ -187,6 +187,9 @@ const (
 	ReplacedAll DeltaType = "ReplacedAll"
 	// Sync is for synthetic events during a periodic resync.
 	Sync DeltaType = "Sync"
+	// SyncAll indicates all known objects should be reprocessed.
+	// This event contains an object of type SyncAllInfo.
+	SyncAll DeltaType = "SyncAll"
 )
 
 // Delta is a member of Deltas (a list of Delta objects) which
