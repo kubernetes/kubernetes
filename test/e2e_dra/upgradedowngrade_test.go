@@ -280,15 +280,6 @@ var _ = ginkgo.Describe("DRA upgrade/downgrade", func() {
 		cluster.Modify(tCtx, restoreOptions)
 		tCtx = ktesting.End(tCtx)
 
-		// TODO: ensure that kube-controller-manager is up-and-running.
-		// This works around https://github.com/kubernetes/kubernetes/issues/132334 and can be removed
-		// once a fix for that is backported.
-		tCtx = ktesting.Begin(tCtx, "wait for kube-controller-manager")
-		ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) string {
-			output, _ := cluster.GetSystemLogs(tCtx, localupcluster.KubeControllerManager)
-			return output
-		}).Should(gomega.ContainSubstring(`"Caches are synced" controller="resource_claim"`))
-		tCtx = ktesting.End(tCtx)
 		testResourceClaimDeviceStatusAfterDowngrade()
 
 		// We need to clean up explicitly because the normal
