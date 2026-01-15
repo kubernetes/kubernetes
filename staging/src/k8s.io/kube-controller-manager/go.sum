@@ -86,6 +86,8 @@ github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu
 github.com/stretchr/testify v1.11.1/go.mod h1:wZwfW3scLgRK+23gO65QZefKpKQRnfz6sD981Nm4B6U=
 github.com/x448/float16 v0.8.4 h1:qLwI1I70+NjRFUR3zs1JPUCgaCXSh3SW62uAKT1mSBM=
 github.com/x448/float16 v0.8.4/go.mod h1:14CWIYCyZA/cWjXOioeEpHeN/83MdbZDRQHoFcYsOfg=
+github.com/yongruilin/kube-openapi v0.0.0-20260114235412-1d94e88592b8 h1:ZgOm4vmT18eCJo/48js9I4iCaG0uvc+fF9gWoWWe7ck=
+github.com/yongruilin/kube-openapi v0.0.0-20260114235412-1d94e88592b8/go.mod h1:kdmbQkyfwUagLfXIad1y2TdrjPFWp2Q89B3qkRwf/pQ=
 go.etcd.io/etcd/api/v3 v3.6.7/go.mod h1:xJ81TLj9hxrYYEDmXTeKURMeY3qEDN24hqe+q7KhbnI=
 go.etcd.io/etcd/client/pkg/v3 v3.6.7/go.mod h1:2IVulJ3FZ/czIGl9T4lMF1uxzrhRahLqe+hSgy+Kh7Q=
 go.etcd.io/etcd/client/v3 v3.6.7/go.mod h1:2XfROY56AXnUqGsvl+6k29wrwsSbEh1lAouQB1vHpeE=
@@ -135,8 +137,6 @@ gopkg.in/yaml.v3 v3.0.1/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
 k8s.io/gengo/v2 v2.0.0-20250604051438-85fd79dbfd9f/go.mod h1:EJykeLsmFC60UQbYJezXkEsG2FLrt0GPNkU5iK5GWxU=
 k8s.io/klog/v2 v2.130.1 h1:n9Xl7H1Xvksem4KFG4PYbdQCQxqc/tTUyrgXaOhHSzk=
 k8s.io/klog/v2 v2.130.1/go.mod h1:3Jpz1GvMt720eyJH1ckRHK1EDfpxISzJ7I9OYgaDtPE=
-k8s.io/kube-openapi v0.0.0-20250910181357-589584f1c912 h1:Y3gxNAuB0OBLImH611+UDZcmKS3g6CthxToOb37KgwE=
-k8s.io/kube-openapi v0.0.0-20250910181357-589584f1c912/go.mod h1:kdmbQkyfwUagLfXIad1y2TdrjPFWp2Q89B3qkRwf/pQ=
 k8s.io/utils v0.0.0-20251219084037-98d557b7f1e7 h1:H6xtwB5tC+KFSHoEhA1o7DnOtHDEo+n9OBSHjlajVKc=
 k8s.io/utils v0.0.0-20251219084037-98d557b7f1e7/go.mod h1:xDxuJ0whA3d0I4mf/C4ppKHxXynQ+fxnkmQH0vTHnuk=
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.34.0/go.mod h1:Ve9uj1L+deCXFrPOk1LpFXqTg7LCFzFso6PA48q/XZw=
