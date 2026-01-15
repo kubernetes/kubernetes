@@ -18,6 +18,7 @@ package validation
 
 import (
 	"context"
+	"math"
 	"math/rand"
 	"os"
 	"strconv"
@@ -636,6 +637,37 @@ func TestValidateCustomResource(t *testing.T) {
 				{object: map[string]interface{}{"fieldX": "a-"}, expectErrs: []string{
 					`fieldX: Invalid value: "a-": fieldX in body must be of type k8s-short-name: "a-"`,
 				}},
+			},
+		},
+		{name: "numeric formats valid",
+			schema: apiextensions.JSONSchemaProps{
+				Type: "object",
+				Properties: map[string]apiextensions.JSONSchemaProps{
+					"intThirtyTwo":  {Type: "integer", Format: "int32"},
+					"intSixtyFour":  {Type: "integer", Format: "int64"},
+					"floatThreeTwo": {Type: "number", Format: "float"},
+					"floatSixFour":  {Type: "number", Format: "double"},
+				},
+			},
+			objects: []interface{}{
+				map[string]interface{}{
+					"intThirtyTwo":  int64(math.MinInt32),
+					"intSixtyFour":  int64(math.MinInt64),
+					"floatThreeTwo": float64(-math.MaxFloat32),
+					"floatSixFour":  float64(-math.MaxFloat64),
+				},
+				map[string]interface{}{
+					"intThirtyTwo":  int64(0),
+					"intSixtyFour":  int64(0),
+					"floatThreeTwo": float64(0),
+					"floatSixFour":  float64(0),
+				},
+				map[string]interface{}{
+					"intThirtyTwo":  int64(math.MaxInt32),
+					"intSixtyFour":  int64(math.MaxInt64),
+					"floatThreeTwo": float64(math.MaxFloat32),
+					"floatSixFour":  float64(math.MaxFloat64),
+				},
 			},
 		},
 	}
