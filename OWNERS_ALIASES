@@ -534,8 +534,14 @@ aliases:
     - sttts
     - soltysh
     - liggitt
-  # TODO: for now will roll up to dep-approvers
-  dep-reviewers: []
+  dep-reviewers:
+    - BenTheElder
+    - cblecker
+    - dims
+    - thockin
+    - sttts
+    - soltysh
+    - liggitt
   feature-approvers:
     - adrianmoisey # Autoscaling
     - ardaguclu # CLI
