@@ -599,6 +599,16 @@ func processDeltas(
 			if err := processReplacedAllInfo(handler, info, clientState, isInInitialList, keyFunc); err != nil {
 				return err
 			}
+		case SyncAll:
+			_, ok := obj.(SyncAllInfo)
+			if !ok {
+				return fmt.Errorf("SyncAll did not contain SyncAllInfo: %T", obj)
+			}
+			objs := clientState.List()
+			for _, obj := range objs {
+				handler.OnUpdate(obj, obj)
+			}
+			return nil
 		case Sync, Replaced, Added, Updated:
 			if old, exists, err := clientState.Get(obj); err == nil && exists {
 				if err := clientState.Update(obj); err != nil {
@@ -790,12 +800,18 @@ func newInformer(clientState Store, options InformerOptions, keyFunc KeyFunc) Co
 
 func newQueueFIFO(clientState Store, transform TransformFunc) Queue {
 	if clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.InOrderInformers) {
-		return NewRealFIFOWithOptions(RealFIFOOptions{
-			KeyFunction:  MetaNamespaceKeyFunc,
-			KnownObjects: clientState,
-			Transformer:  transform,
-			AtomicEvents: clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.AtomicFIFO),
-		})
+		options := RealFIFOOptions{
+			KeyFunction: MetaNamespaceKeyFunc,
+			Transformer: transform,
+		}
+		// If atomic events are enabled, unset clientState in the case of atomic events as we cannot pass a
+		// store to an atomic fifo.
+		if clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.AtomicFIFO) {
+			options.AtomicEvents = true
+		} else {
+			options.KnownObjects = clientState
+		}
+		return NewRealFIFOWithOptions(options)
 	} else {
 		return NewDeltaFIFOWithOptions(DeltaFIFOOptions{
 			KnownObjects:          clientState,

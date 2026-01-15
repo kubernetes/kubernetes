@@ -37,7 +37,8 @@ type RealFIFOOptions struct {
 	// KnownObjects is expected to return a list of keys that the consumer of
 	// this queue "knows about". It is used to decide which items are missing
 	// when Replace() is called; 'Deleted' deltas are produced for the missing items.
-	// KnownObjects is required.
+	// KnownObjects is required if AtomicEvents is false since it is used to
+	// query the state of the internal store for Replace and Resync handling.
 	KnownObjects KeyListerGetter
 
 	// If set, will be called for objects before enqueueing them. Please
@@ -46,7 +47,8 @@ type RealFIFOOptions struct {
 
 	// AtomicEvents is used to specify whether the RealFIFO will emit events
 	// atomically or not. If it is set, a single event will be emitted
-	// atomically for Replace operations.
+	// atomically for Replace and Resync operations.
+	// If AtomicEvents is true, KnownObjects must be nil.
 	AtomicEvents bool
 }
 
@@ -78,7 +80,8 @@ type RealFIFO struct {
 	keyFunc KeyFunc
 
 	// knownObjects list keys that are "known" --- affecting Delete(),
-	// Replace(), and Resync()
+	// Replace(), and Resync().
+	// It is nil if emitAtomicEvents is true.
 	knownObjects KeyListerGetter
 
 	// Indication the queue is closed.
@@ -92,9 +95,12 @@ type RealFIFO struct {
 	// batchSize determines the maximum number of objects we can combine into a batch.
 	batchSize int
 
-	// emitAtomicEvents defines whether a replace should only send out one
-	// batch of objects on a replace event call rather than a number of delete
-	// and replace events.
+	// emitAtomicEvents defines whether events like Replace and Resync should be emitted
+	// atomically rather than as a series of events. This means that any call to the FIFO
+	// will emit a single event.
+	// If it is set:
+	// * a single ReplacedAll event will be emitted instead of multiple Replace events
+	// * a single SyncAll event will be emitted instead of multiple Sync events
 	emitAtomicEvents bool
 }
 
@@ -106,6 +112,10 @@ type ReplacedAllInfo struct {
 	// with any configured transformation already applied.
 	Objects []interface{}
 }
+
+// SyncAllInfo is the object associated with a Delta of type=SyncAll
+// It is used to trigger a resync of the entire queue.
+type SyncAllInfo struct{}
 
 var (
 	_ = Queue(&RealFIFO{})             // RealFIFO is a Queue
@@ -215,6 +225,16 @@ func (f *RealFIFO) addReplaceToItemsLocked(objs []interface{}, resourceVersion s
 	f.items = append(f.items, Delta{
 		Type:   ReplacedAll,
 		Object: info,
+	})
+	f.cond.Broadcast()
+
+	return nil
+}
+
+func (f *RealFIFO) addResyncToItemsLocked() error {
+	f.items = append(f.items, Delta{
+		Type:   SyncAll,
+		Object: SyncAllInfo{},
 	})
 	f.cond.Broadcast()
 
@@ -545,6 +565,10 @@ func (f *RealFIFO) Resync() error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
+	if f.emitAtomicEvents {
+		return f.addResyncToItemsLocked()
+	}
+
 	if f.knownObjects == nil {
 		return nil
 	}
@@ -593,6 +617,8 @@ func (f *RealFIFO) Transformer() TransformFunc {
 
 // NewRealFIFO returns a Store which can be used to queue up items to
 // process.
+//
+// Deprecated: Use NewRealFIFOWithOptions instead.
 func NewRealFIFO(keyFunc KeyFunc, knownObjects KeyListerGetter, transformer TransformFunc) *RealFIFO {
 	return NewRealFIFOWithOptions(RealFIFOOptions{
 		KeyFunction:  keyFunc,
@@ -608,8 +634,16 @@ func NewRealFIFOWithOptions(opts RealFIFOOptions) *RealFIFO {
 		opts.KeyFunction = MetaNamespaceKeyFunc
 	}
 
-	if opts.KnownObjects == nil {
-		panic("coding error: knownObjects must be provided")
+	if opts.AtomicEvents {
+		// If we are emitting atomic events, we must not rely on the known objects store
+		// as it is a requirement to be able to release the lock while processing events.
+		if opts.KnownObjects != nil {
+			panic("coding error: knownObjects must not be provided when AtomicEvents is true")
+		}
+	} else {
+		if opts.KnownObjects == nil {
+			panic("coding error: knownObjects must be provided when AtomicEvents is false")
+		}
 	}
 
 	f := &RealFIFO{
