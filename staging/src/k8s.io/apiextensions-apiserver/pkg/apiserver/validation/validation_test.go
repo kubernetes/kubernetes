@@ -308,6 +308,7 @@ func TestValidateCustomResource(t *testing.T) {
 					`<nil>: Invalid value: "": "field" must validate at least one schema (anyOf)`,
 					`field: Invalid value: "number": field in body must be of type integer,string: "number"`,
 					`field: Invalid value: "number": field in body must be of type integer: "number"`,
+					`<nil>: Invalid value: "": Checked value must be of type integer (default format) in field`,
 				}},
 				{object: map[string]interface{}{"field": map[string]interface{}{}}, expectErrs: []string{
 					`<nil>: Invalid value: "": "field" must validate at least one schema (anyOf)`,
@@ -357,6 +358,7 @@ func TestValidateCustomResource(t *testing.T) {
 					`<nil>: Invalid value: "": "field" must validate at least one schema (anyOf)`,
 					`field: Invalid value: "number": field in body must be of type integer,string: "number"`,
 					`field: Invalid value: "number": field in body must be of type integer: "number"`,
+					`<nil>: Invalid value: "": Checked value must be of type integer (default format) in field`,
 				}},
 				{object: map[string]interface{}{"field": map[string]interface{}{}}, expectErrs: []string{
 					`<nil>: Invalid value: "": "field" must validate all the schemas (allOf). None validated`,
