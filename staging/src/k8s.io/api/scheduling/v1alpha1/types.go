@@ -119,6 +119,7 @@ type WorkloadSpec struct {
 	//
 	// +optional
 	// +k8s:optional
+	// +k8s:update=NoModify
 	ControllerRef *TypedLocalObjectReference `json:"controllerRef,omitempty" protobuf:"bytes,1,opt,name=controllerRef"`
 
 	// PodGroups is the list of pod groups that make up the Workload.
@@ -131,6 +132,7 @@ type WorkloadSpec struct {
 	// +k8s:listType=map
 	// +k8s:listMapKey=name
 	// +k8s:maxItems=8
+	// +k8s:immutable
 	PodGroups []PodGroup `json:"podGroups" protobuf:"bytes,2,rep,name=podGroups"`
 }
 

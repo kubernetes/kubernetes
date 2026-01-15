@@ -192,6 +192,7 @@ message WorkloadSpec {
   //
   // +optional
   // +k8s:optional
+  // +k8s:update=NoModify
   optional TypedLocalObjectReference controllerRef = 1;
 
   // PodGroups is the list of pod groups that make up the Workload.
@@ -204,6 +205,7 @@ message WorkloadSpec {
   // +k8s:listType=map
   // +k8s:listMapKey=name
   // +k8s:maxItems=8
+  // +k8s:immutable
   repeated PodGroup podGroups = 2;
 }
 

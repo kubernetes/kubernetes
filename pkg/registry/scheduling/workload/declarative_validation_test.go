@@ -161,12 +161,16 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			oldObj:    mkValidWorkload(setResourceVersion("1"), setControllerRef("apps", "Deployment", "my-deployment")),
 			updateObj: mkValidWorkload(setResourceVersion("1"), setControllerRef("apps", "Deployment", "my-deployment")),
 		},
+		"valid update with setting controllerRef": {
+			oldObj:    mkValidWorkload(setResourceVersion("1")),
+			updateObj: mkValidWorkload(setResourceVersion("1"), setControllerRef("apps", "Deployment", "my-deployment")),
+		},
 		"invalid update empty podGroups": {
 			oldObj:    mkValidWorkload(setResourceVersion("1")),
 			updateObj: mkValidWorkload(setResourceVersion("1"), setEmptyPodGroups()),
 			expectedErrs: field.ErrorList{
 				field.Required(field.NewPath("spec", "podGroups"), "must have at least one item"),
-				field.Invalid(field.NewPath("spec", "podGroups"), []scheduling.PodGroup{}, "field is immutable"),
+				field.Invalid(field.NewPath("spec", "podGroups"), []scheduling.PodGroup{}, "field is immutable").WithOrigin("immutable"),
 			},
 		},
 		"invalid update too many podGroups": {
@@ -174,39 +178,37 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			updateObj: mkValidWorkload(setResourceVersion("1"), setManyPodGroups(scheduling.WorkloadMaxPodGroups+1)),
 			expectedErrs: field.ErrorList{
 				field.TooMany(field.NewPath("spec", "podGroups"), scheduling.WorkloadMaxPodGroups+1, scheduling.WorkloadMaxPodGroups).WithOrigin("maxItems"),
-				field.Invalid(field.NewPath("spec", "podGroups"), nil, "field is immutable"),
+				field.Invalid(field.NewPath("spec", "podGroups"), nil, "field is immutable").WithOrigin("immutable"),
 			},
 		},
 		"invalid update podGroups": {
 			oldObj:       mkValidWorkload(setResourceVersion("1")),
 			updateObj:    mkValidWorkload(setResourceVersion("1"), addPodGroup("worker1")),
-			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "podGroups"), nil, "field is immutable")},
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "podGroups"), nil, "field is immutable").WithOrigin("immutable")},
 		},
 		"invalid update controllerRef": {
 			oldObj:       mkValidWorkload(setResourceVersion("1"), setControllerRef("apps", "Deployment", "my-deployment")),
 			updateObj:    mkValidWorkload(setResourceVersion("1"), setControllerRef("apps", "Deployment", "different-deployment")),
-			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "controllerRef"), nil, "field is immutable")},
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "controllerRef"), nil, "field is immutable").WithOrigin("update")},
 		},
 		"invalid update with neither basic nor gang": {
 			oldObj:    mkValidWorkload(setResourceVersion("1")),
 			updateObj: mkValidWorkload(setResourceVersion("1"), clearPodGroupPolicy(0)),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "podGroups").Index(0).Child("policy"), nil, "").WithOrigin("union"),
-				field.Invalid(field.NewPath("spec", "podGroups"), nil, "field is immutable"),
+				field.Invalid(field.NewPath("spec", "podGroups"), nil, "field is immutable").WithOrigin("immutable"),
 			},
 		},
 		"invalid update with both basic and gang": {
 			oldObj:    mkValidWorkload(setResourceVersion("1")),
 			updateObj: mkValidWorkload(setResourceVersion("1"), setBothPolicies(0)),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "podGroups").Index(0).Child("policy"), nil, "").WithOrigin("union"),
-				field.Invalid(field.NewPath("spec", "podGroups"), nil, "field is immutable"),
+				field.Invalid(field.NewPath("spec", "podGroups"), nil, "field is immutable").WithOrigin("immutable"),
 			},
 		},
 		"valid update from gang to basic policy": {
 			oldObj:       mkValidWorkload(setResourceVersion("1")),
 			updateObj:    mkValidWorkload(setResourceVersion("1"), setBasicPolicy(0)),
-			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "podGroups"), nil, "field is immutable")},
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "podGroups"), nil, "field is immutable").WithOrigin("immutable")},
 		},
 	}
 	for k, tc := range testCases {

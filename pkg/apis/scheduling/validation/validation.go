@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/api/validate/content"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -77,13 +78,20 @@ func validateWorkloadSpec(spec *scheduling.WorkloadSpec, fldPath *field.Path) fi
 	if spec.ControllerRef != nil {
 		allErrs = append(allErrs, validateControllerRef(spec.ControllerRef, fldPath.Child("controllerRef"))...)
 	}
+	allErrs = append(allErrs, validatePodGroups(fldPath, spec, operation.Create)...)
+	return allErrs
+}
+
+func validatePodGroups(fldPath *field.Path, spec *scheduling.WorkloadSpec, op operation.Type) field.ErrorList {
+	var allErrs field.ErrorList
 	existingPodGroups := sets.New[string]()
 	podGroupsPath := fldPath.Child("podGroups")
 	if len(spec.PodGroups) == 0 {
 		allErrs = append(allErrs, field.Required(podGroupsPath, "must have at least one item").MarkCoveredByDeclarative())
 	} else if len(spec.PodGroups) > scheduling.WorkloadMaxPodGroups {
 		allErrs = append(allErrs, field.TooMany(podGroupsPath, len(spec.PodGroups), scheduling.WorkloadMaxPodGroups).WithOrigin("maxItems").MarkCoveredByDeclarative())
-	} else {
+	} else if op != operation.Update {
+		// spec.PodGroups is immutable after create.
 		for i := range spec.PodGroups {
 			allErrs = append(allErrs, validatePodGroup(&spec.PodGroups[i], podGroupsPath.Index(i), existingPodGroups)...)
 		}
@@ -186,7 +194,6 @@ func validateGangSchedulingPolicy(policy *scheduling.GangSchedulingPolicy, fldPa
 // ValidateWorkloadUpdate tests if an update to Workload is valid.
 func ValidateWorkloadUpdate(workload, oldWorkload *scheduling.Workload) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&workload.ObjectMeta, &oldWorkload.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, validateWorkloadSpec(&workload.Spec, field.NewPath("spec"))...)
 	allErrs = append(allErrs, validateWorkloadSpecUpdate(&workload.Spec, &oldWorkload.Spec, field.NewPath("spec"))...)
 	return allErrs
 }
@@ -194,8 +201,11 @@ func ValidateWorkloadUpdate(workload, oldWorkload *scheduling.Workload) field.Er
 func validateWorkloadSpecUpdate(spec, oldSpec *scheduling.WorkloadSpec, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if oldSpec.ControllerRef != nil {
-		allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(spec.ControllerRef, oldSpec.ControllerRef, fldPath.Child("controllerRef"))...)
+		allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(spec.ControllerRef, oldSpec.ControllerRef, fldPath.Child("controllerRef")).WithOrigin("update").MarkCoveredByDeclarative()...)
+	} else if spec.ControllerRef != nil {
+		allErrs = append(allErrs, validateControllerRef(spec.ControllerRef, fldPath.Child("controllerRef"))...)
 	}
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.PodGroups, oldSpec.PodGroups, fldPath.Child("podGroups"))...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.PodGroups, oldSpec.PodGroups, fldPath.Child("podGroups")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
+	allErrs = append(allErrs, validatePodGroups(fldPath, spec, operation.Update)...)
 	return allErrs
 }
