@@ -159,6 +159,201 @@ Since `canAdmitPod` and `canResizePod` both need NodeInfo, consider caching at `
 - Benefit both admission and resize flows
 - Align with where `allocatedPods` is computed
 
+## Alternative Approach: Incremental Update Cache (Explored in Detail)
+
+Instead of hash-based cache invalidation, leverage `NodeInfo`'s built-in incremental update methods. This approach maintains the cache continuously rather than rebuilding on cache miss.
+
+### NodeInfo Already Supports Incremental Updates
+
+The `framework.NodeInfo` type in `pkg/scheduler/framework/types.go` has these methods:
+
+| Method | Complexity | What It Does |
+|--------|-----------|--------------|
+| `AddPod(pod)` | O(1) | Appends pod, updates resource totals |
+| `RemovePod(logger, pod)` | O(n) | Finds and removes pod, decrements resources |
+| `SetNode(node)` | O(1) | Updates node metadata and allocatable |
+
+**Key insight**: NodeInfo is **NOT thread-safe** - requires external synchronization.
+
+### Minimal Cache Implementation (~100-150 lines)
+
+```go
+// pkg/kubelet/nodeinfocache/cache.go
+package nodeinfocache
+
+import (
+    "sync"
+
+    v1 "k8s.io/api/core/v1"
+    "k8s.io/klog/v2"
+    "k8s.io/kubernetes/pkg/scheduler/framework"
+)
+
+// Cache maintains a cached NodeInfo for the kubelet's node.
+type Cache struct {
+    mu       sync.RWMutex
+    nodeInfo *framework.NodeInfo
+}
+
+func New() *Cache {
+    return &Cache{
+        nodeInfo: framework.NewNodeInfo(),
+    }
+}
+
+func (c *Cache) SetNode(node *v1.Node) {
+    c.mu.Lock()
+    defer c.mu.Unlock()
+    c.nodeInfo.SetNode(node)
+}
+
+func (c *Cache) AddPod(pod *v1.Pod) {
+    c.mu.Lock()
+    defer c.mu.Unlock()
+    c.nodeInfo.AddPod(pod)
+}
+
+func (c *Cache) RemovePod(logger klog.Logger, pod *v1.Pod) error {
+    c.mu.Lock()
+    defer c.mu.Unlock()
+    return c.nodeInfo.RemovePod(logger, pod)
+}
+
+func (c *Cache) UpdatePod(logger klog.Logger, oldPod, newPod *v1.Pod) error {
+    c.mu.Lock()
+    defer c.mu.Unlock()
+    if err := c.nodeInfo.RemovePod(logger, oldPod); err != nil {
+        return err
+    }
+    c.nodeInfo.AddPod(newPod)
+    return nil
+}
+
+// Snapshot returns a deep copy for safe concurrent use.
+func (c *Cache) Snapshot() *framework.NodeInfo {
+    c.mu.RLock()
+    defer c.mu.RUnlock()
+    return c.nodeInfo.Snapshot()
+}
+```
+
+### Cache Instantiation Location
+
+**Add to `Kubelet` struct** in `pkg/kubelet/kubelet.go` (~line 1245):
+
+```go
+type Kubelet struct {
+    // ... existing fields ...
+
+    // NodeInfo cache for efficient pod admission
+    nodeInfoCache *nodeinfocache.Cache
+}
+```
+
+**Initialize in `NewMainKubelet()`** after `allocationManager` (~line 702):
+
+```go
+klet.allocationManager = allocation.NewManager(...)
+
+// Initialize NodeInfo cache
+klet.nodeInfoCache = nodeinfocache.New()
+if node, err := klet.GetCachedNode(ctx, true); err == nil {
+    klet.nodeInfoCache.SetNode(node)
+    // Populate with existing pods
+    for _, pod := range klet.GetActivePods() {
+        klet.nodeInfoCache.AddPod(pod)
+    }
+}
+```
+
+### Wiring: Cache Update Injection Points
+
+| Event | File | Line | Code Change |
+|-------|------|------|-------------|
+| **Pod Added** | `kubelet.go` | 2764 | After `allocationManager.AddPod()` succeeds |
+| **Pod Updated** | `kubelet.go` | 2800 | After `podManager.UpdatePod()` |
+| **Pod Removed** | `kubelet.go` | 2948 | After `podManager.RemovePod()` |
+| **Node Updated** | `kubelet_nodecache.go` | ~45 | When `cachedNode` is updated |
+
+**1. HandlePodAdditions** (`kubelet.go:2756-2765`):
+```go
+if ok, reason, message := kl.allocationManager.AddPod(kl.GetActivePods(), pod); !ok {
+    kl.rejectPod(pod, reason, message)
+    continue
+}
+// ADD: Update cache after successful admission
+kl.nodeInfoCache.AddPod(pod)
+```
+
+**2. HandlePodUpdates** (`kubelet.go:2800-2802`):
+```go
+oldPod, _ := kl.podManager.GetPodByUID(pod.UID)
+kl.podManager.UpdatePod(pod)
+// ADD: Update cache with changed pod
+if oldPod != nil {
+    kl.nodeInfoCache.UpdatePod(logger, oldPod, pod)
+}
+```
+
+**3. HandlePodRemoves** (`kubelet.go:2948-2949`):
+```go
+kl.podManager.RemovePod(pod)
+// ADD: Remove from cache
+kl.nodeInfoCache.RemovePod(logger, pod)
+kl.allocationManager.RemovePod(pod.UID)
+```
+
+**4. Node updates** (`kubelet_nodecache.go` in `getCachedNode()`):
+```go
+if isNewer {
+    kl.cachedNode = informerNode
+    // ADD: Update cache with new node info
+    kl.nodeInfoCache.SetNode(informerNode)
+}
+```
+
+### Wiring: Pass Cache to predicateAdmitHandler
+
+**Modify creation** at `kubelet.go:1065`:
+```go
+lifecycle.NewPredicateAdmitHandler(
+    klet.GetCachedNode,
+    criticalPodAdmissionHandler,
+    klet.containerManager.UpdatePluginResources,
+    klet.nodeInfoCache,  // NEW: pass cache
+)
+```
+
+**Modify `predicate.go:162`** to use cache:
+```go
+// OLD: O(n×m) every admission
+// nodeInfo := schedulerframework.NewNodeInfo(pods...)
+
+// NEW: O(1) snapshot from cache
+nodeInfo := w.nodeInfoCache.Snapshot()
+```
+
+### Comparison: Hash-Based vs Incremental Update
+
+| Aspect | Hash-Based (Main Plan) | Incremental Update |
+|--------|----------------------|-------------------|
+| Cache location | `predicateAdmitHandler` | `Kubelet` struct |
+| Invalidation | Hash mismatch → full rebuild | Never rebuilds, only increments |
+| Update trigger | On `Admit()` call | On pod lifecycle events |
+| Complexity | ~200 lines + hashing | ~100 lines, simpler |
+| Cache misses | Every pod set change | None after initialization |
+| Thread safety | RWMutex around cache | RWMutex around NodeInfo |
+| Stale data risk | None (hash guarantees) | Low (events are synchronous) |
+
+### Note on `pkg/kubelet/cache/`
+
+The `pkg/kubelet/cache/` directory contains **interim code** copied from the scheduler cache. It can be:
+- **Adapted**: Strip scheduler-specific logic (assume pods, multi-node, TTL)
+- **Replaced**: Use the simpler implementation above
+- **Discarded**: If the hash-based approach is preferred
+
+The scheduler cache is designed for cluster-wide scheduling with optimistic pod binding. The kubelet only needs single-node, actual-state caching - much simpler requirements.
+
 ## Expected Performance
 
 Based on PR #134462 benchmarks:
