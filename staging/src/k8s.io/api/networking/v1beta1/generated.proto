@@ -108,6 +108,8 @@ message IPAddressSpec {
   // ParentRef references the resource that an IPAddress is attached to.
   // An IPAddress must reference a parent object.
   // +required
+  // +k8s:required
+  // +k8s:immutable
   optional ParentReference parentRef = 1;
 }
 
@@ -402,6 +404,7 @@ message ParentReference {
 
   // Resource is the resource of the object being referenced.
   // +required
+  // +k8s:required
   optional string resource = 2;
 
   // Namespace is the namespace of the object being referenced.
@@ -410,6 +413,7 @@ message ParentReference {
 
   // Name is the name of the object being referenced.
   // +required
+  // +k8s:required
   optional string name = 4;
 }
 
