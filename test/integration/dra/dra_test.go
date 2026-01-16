@@ -171,6 +171,11 @@ func TestDRA(t *testing.T) {
 				tCtx.Run("ExtendedResource", func(tCtx ktesting.TContext) { testExtendedResource(tCtx, false) })
 				tCtx.Run("ResourceClaimDeviceStatus", func(tCtx ktesting.TContext) { testResourceClaimDeviceStatus(tCtx, false) })
 				tCtx.Run("DeviceBindingConditions", func(tCtx ktesting.TContext) { testDeviceBindingConditions(tCtx, false) })
+				tCtx.Run("ResourceSliceController", func(tCtx ktesting.TContext) {
+					namespace := createTestNamespace(tCtx, nil)
+					tCtx = tCtx.WithNamespace(namespace)
+					TestCreateResourceSlices(tCtx, 100)
+				})
 			},
 		},
 		"v1beta1": {
