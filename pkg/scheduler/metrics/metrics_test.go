@@ -87,7 +87,6 @@ func TestSchedulerMetricsRegistrationAndEmission(t *testing.T) {
 				scheduler_permit_wait_duration_seconds_bucket{result="success",le="4.096"} 1
 				scheduler_permit_wait_duration_seconds_bucket{result="success",le="8.192"} 1
 				scheduler_permit_wait_duration_seconds_bucket{result="success",le="16.384"} 1
-				scheduler_permit_wait_duration_seconds_bucket{result="success",le="32.768"} 1
 				scheduler_permit_wait_duration_seconds_bucket{result="success",le="+Inf"} 1
 				scheduler_permit_wait_duration_seconds_sum{result="success"} 0.1
 				scheduler_permit_wait_duration_seconds_count{result="success"} 1
