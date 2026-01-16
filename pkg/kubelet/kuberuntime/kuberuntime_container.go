@@ -974,7 +974,7 @@ func (m *kubeGenericRuntimeManager) pruneInitContainersBeforeStart(ctx context.C
 			}
 			// prune all other init containers that match this container name
 			logger.V(4).Info("Removing init container", "containerName", status.Name, "containerID", status.ID.ID, "count", count)
-			if err := m.removeContainer(ctx, status.ID.ID); err != nil {
+			if err := m.removeContainer(ctx, status.ID.ID, false); err != nil {
 				utilruntime.HandleError(fmt.Errorf("failed to remove pod init container %q: %v; Skipping pod %q", status.Name, err, format.Pod(pod)))
 				continue
 			}
@@ -1000,7 +1000,7 @@ func (m *kubeGenericRuntimeManager) purgeInitContainers(ctx context.Context, pod
 			count++
 			// Purge all init containers that match this container name
 			logger.V(4).Info("Removing init container", "containerName", status.Name, "containerID", status.ID.ID, "count", count)
-			if err := m.removeContainer(ctx, status.ID.ID); err != nil {
+			if err := m.removeContainer(ctx, status.ID.ID, false); err != nil {
 				utilruntime.HandleError(fmt.Errorf("failed to remove pod init container %q: %v; Skipping pod %q", status.Name, err, format.Pod(pod)))
 				continue
 			}
@@ -1347,13 +1347,14 @@ func (m *kubeGenericRuntimeManager) RunInContainer(ctx context.Context, id kubec
 	return append(stdout, stderr...), err
 }
 
-// removeContainer removes the container and the container logs.
+// removeContainer removes the container and optionally the container logs.
 // Notice that we remove the container logs first, so that container will not be removed if
 // container logs are failed to be removed, and kubelet will retry this later. This guarantees
-// that container logs to be removed with the container.
+// that container logs to be removed with the container if specified.
 // Notice that we assume that the container should only be removed in non-running state, and
 // it will not write container logs anymore in that state.
-func (m *kubeGenericRuntimeManager) removeContainer(ctx context.Context, containerID string) error {
+// If the logs are kept, they will be preserved until the pod is removed and kubelet GC is triggered.
+func (m *kubeGenericRuntimeManager) removeContainer(ctx context.Context, containerID string, keepLogs bool) error {
 	logger := klog.FromContext(ctx)
 	logger.V(4).Info("Removing container", "containerID", containerID)
 	// Call internal container post-stop lifecycle hook.
@@ -1363,8 +1364,10 @@ func (m *kubeGenericRuntimeManager) removeContainer(ctx context.Context, contain
 
 	// Remove the container log.
 	// TODO: Separate log and container lifecycle management.
-	if err := m.removeContainerLog(ctx, containerID); err != nil {
-		return err
+	if !keepLogs {
+		if err := m.removeContainerLog(ctx, containerID); err != nil {
+			return err
+		}
 	}
 	// Remove the container.
 	return m.runtimeService.RemoveContainer(ctx, containerID)
@@ -1400,7 +1403,7 @@ func (m *kubeGenericRuntimeManager) removeContainerLog(ctx context.Context, cont
 
 // DeleteContainer removes a container.
 func (m *kubeGenericRuntimeManager) DeleteContainer(ctx context.Context, containerID kubecontainer.ContainerID) error {
-	return m.removeContainer(ctx, containerID.ID)
+	return m.removeContainer(ctx, containerID.ID, false)
 }
 
 // setTerminationGracePeriod determines the grace period to use when killing a container

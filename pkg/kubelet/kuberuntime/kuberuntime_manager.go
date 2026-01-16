@@ -1456,8 +1456,8 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 						return
 					}
 				}
-				// TODO(yuanwang04): Revisit whether container logs should be persisted.
-				if err := m.removeContainer(ctx, containerInfo.containerID.ID); err != nil {
+				// The logs of removed containers will be preserved until the pod is deleted and GC is triggered.
+				if err := m.removeContainer(ctx, containerInfo.containerID.ID, true); err != nil {
 					removeContainerResult.Fail(kubecontainer.ErrRemoveContainer, err.Error())
 					logger.Error(err, "removeContainer for pod failed", "containerName", cName, "containerID", containerInfo.containerID, "pod", klog.KObj(pod))
 					return
