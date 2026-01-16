@@ -1,10 +1,6 @@
 {
   "spec": {
     "pinnedModules": {
-      "github.com/godbus/dbus/v5": {
-        "Version": "v5.2.0",
-        "Reason": "v5.2.1 has unused import on windows causing typecheck failures - https://github.com/kubernetes/kubernetes/issues/135864"
-      },
       "github.com/libopenstorage/openstorage": {
         "Version": "v1.0.0",
         "Reason": "portworx csi driver has been deprecated and will be removed - https://github.com/kubernetes/enhancements/issues/2589"
