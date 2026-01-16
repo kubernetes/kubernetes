@@ -152,6 +152,10 @@ linters:
         
       {{include "hack/kube-api-linter/exceptions.yaml" | indent 6 | trim}}
 
+      - linters:
+        - forbidigo
+        path: test/e2e/e2e_test\.go|test/e2e/framework/internal/.*|test/e2e/framework/[^/]*\.go|test/e2e/invariants/.*
+
   default: {{if .Base -}} none {{- else -}} standard {{- end}}
   enable: # please keep this alphabetized
     - depguard
@@ -231,7 +235,11 @@ linters:
           msg: should not be used because managedFields was removed
         - pattern: \.Add$
           pkg: ^k8s\.io/component-base/featuregate$         
-          msg: should not use Add, use AddVersioned instead 
+          msg: should not use Add, use AddVersioned instead
+        - pattern: \.(ReportBeforeSuite|ReportAfterSuite)
+          pkg: ^github\.com/onsi/ginkgo/v2$
+          msg: usage is restricted to code under control of SIG Testing
+          # Exceptions are listed above under rules.
       {{- if .Hints}}
         - pattern: ^gomega\.BeTrue$
           pkg: ^github.com/onsi/gomega$
