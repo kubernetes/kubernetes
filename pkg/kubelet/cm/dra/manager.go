@@ -717,7 +717,18 @@ func (m *Manager) PodMightNeedToUnprepareResources(uid types.UID) bool {
 func (m *Manager) GetContainerClaimInfos(pod *v1.Pod, container *v1.Container) ([]*ClaimInfo, error) {
 	claimInfos := make([]*ClaimInfo, 0, len(pod.Spec.ResourceClaims))
 
+	// Build a map of container claims for O(1) lookup
+	containerClaimsMap := make(map[string]bool, len(container.Resources.Claims))
+	for _, claim := range container.Resources.Claims {
+		containerClaimsMap[claim.Name] = true
+	}
+
 	for i, podResourceClaim := range pod.Spec.ResourceClaims {
+		// Only process claims that this container actually uses
+		if !containerClaimsMap[podResourceClaim.Name] {
+			continue
+		}
+
 		claimName, _, err := resourceclaim.Name(pod, &pod.Spec.ResourceClaims[i])
 		if err != nil {
 			// No wrapping, the error is already informative.
@@ -731,23 +742,17 @@ func (m *Manager) GetContainerClaimInfos(pod *v1.Pod, container *v1.Container) (
 
 		// Ownership doesn't get checked here, this should have been done before.
 
-		for _, claim := range container.Resources.Claims {
-			if podResourceClaim.Name != claim.Name {
-				continue
+		err = m.cache.withRLock(func() error {
+			claimInfo, exists := m.cache.get(*claimName, pod.Namespace)
+			if !exists {
+				return fmt.Errorf("unable to get information for ResourceClaim %s", *claimName)
 			}
-
-			err := m.cache.withRLock(func() error {
-				claimInfo, exists := m.cache.get(*claimName, pod.Namespace)
-				if !exists {
-					return fmt.Errorf("unable to get information for ResourceClaim %s", *claimName)
-				}
-				claimInfos = append(claimInfos, claimInfo.DeepCopy())
-				return nil
-			})
-			if err != nil {
-				// No wrapping, this is the error above.
-				return nil, err
-			}
+			claimInfos = append(claimInfos, claimInfo.DeepCopy())
+			return nil
+		})
+		if err != nil {
+			// No wrapping, this is the error above.
+			return nil, err
 		}
 	}
 
