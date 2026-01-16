@@ -223,6 +223,10 @@ linters:
       - text: "field (CapacityRequirements.Requests|DeviceRequestAllocationResult.ConsumedCapacity) should not use a map type, use a list type with a unique name/identifier instead"
         path: "staging/src/k8s.io/api/resource/(v1|v1beta1|v1beta2)/types.go"
 
+      - linters:
+        - forbidigo
+        path: test/e2e/e2e_test\.go|test/e2e/framework/internal/.*|test/e2e/framework/[^/]*\.go|test/e2e/invariants/.*
+
   default: none
   enable: # please keep this alphabetized
     - depguard
@@ -496,6 +500,10 @@ linters:
         - pattern: \.Add$
           pkg: ^k8s\.io/component-base/featuregate$         
           msg: should not use Add, use AddVersioned instead
+        - pattern: \.(ReportBeforeSuite|ReportAfterSuite)
+          pkg: ^github\.com/onsi/ginkgo/v2$
+          msg: usage is restricted to code under control of SIG Testing
+          # Exceptions are listed above under rules.
     gocritic:
       enabled-checks: # These are in addition to the default checks - see https://golangci-lint.run/docs/linters/configuration/#gocritic
         - boolExprSimplify
