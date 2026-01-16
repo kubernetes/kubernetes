@@ -2282,6 +2282,11 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 				if oldStatus.RestartCount > status.RestartCount {
 					status.RestartCount = oldStatus.RestartCount
 				}
+				if oldStatus.State.Terminated != nil {
+					status.LastTerminationState.Terminated = oldStatus.State.Terminated
+				} else if oldStatus.LastTerminationState.Terminated != nil {
+					status.LastTerminationState.Terminated = oldStatus.LastTerminationState.Terminated
+				}
 			}
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.ImageVolumeWithDigest) && imageVolumeNames.Len() > 0 {
