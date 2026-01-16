@@ -243,8 +243,10 @@ func (ufv updateFieldValidator) generateValidation(context Context, constraints 
 		}
 	}
 
-	// Use ShortCircuit flag so these run in the same group as +k8s:optional
-	fn := Function(updateTagName, ShortCircuit, validatorFunc, constraintArgs...)
+	// Use ShortCircuit flag and UpdateCohort so update constraints run before
+	// other short-circuit validators (required, maxItems, etc.) and fail fast.
+	// See https://github.com/kubernetes/kubernetes/issues/136262
+	fn := Function(updateTagName, ShortCircuit, validatorFunc, constraintArgs...).WithCohort(UpdateCohort)
 	result.AddFunction(fn)
 
 	return result, nil

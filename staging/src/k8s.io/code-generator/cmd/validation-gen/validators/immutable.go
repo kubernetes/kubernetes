@@ -51,8 +51,10 @@ var (
 func (immutableTagValidator) GetValidations(context Context, _ codetags.Tag) (Validations, error) {
 	var result Validations
 
-	// Use ShortCircuit flag so immutable runs in the same group as +k8s:optional.
-	result.AddFunction(Function(immutableTagName, ShortCircuit, immutableValidator))
+	// Use ShortCircuit flag and UpdateCohort so immutable check runs before
+	// other short-circuit validators (required, maxItems, etc.) and fails fast.
+	// See https://github.com/kubernetes/kubernetes/issues/136262
+	result.AddFunction(Function(immutableTagName, ShortCircuit, immutableValidator).WithCohort(UpdateCohort))
 	return result, nil
 }
 

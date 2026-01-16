@@ -469,6 +469,13 @@ const (
 	DeclarativeNative
 )
 
+const (
+	// UpdateCohort is the cohort for update-related validators (immutable, update).
+	// This cohort runs before the default cohort to fail fast on update violations.
+	// See https://github.com/kubernetes/kubernetes/issues/136262
+	UpdateCohort = "update"
+)
+
 // Conditions defines what conditions must be true for a resource to be validated.
 // If any of the conditions are not true, the resource is not validated.
 type Conditions struct {
@@ -571,6 +578,12 @@ func (fg FunctionGen) WithComment(comment string) FunctionGen {
 // WithStabilityLevel returns a new FunctionGen with the given stability level.
 func (fg FunctionGen) WithStabilityLevel(level ValidationStabilityLevel) FunctionGen {
 	fg.StabilityLevel = level
+	return fg
+}
+
+// WithCohort returns a derived FunctionGen with the specified cohort.
+func (fg FunctionGen) WithCohort(cohort string) FunctionGen {
+	fg.Cohort = cohort
 	return fg
 }
 
