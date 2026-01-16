@@ -438,6 +438,17 @@ func TestErrorMatcher_Test(t *testing.T) {
 		got:            ErrorList{{DeclarativeNative: false}},
 		expectedErrors: []string{"expected an error matching:", "unmatched error:"},
 	}, {
+		name:    "declarative shadow: match",
+		matcher: ErrorMatcher{}.ByShadow(),
+		want:    ErrorList{{Shadow: true}},
+		got:     ErrorList{{Shadow: true}},
+	}, {
+		name:           "declarative shadow: no match",
+		matcher:        ErrorMatcher{}.ByShadow(),
+		want:           ErrorList{{Shadow: true}},
+		got:            ErrorList{{Shadow: false}},
+		expectedErrors: []string{"expected an error matching:", "unmatched error:"},
+	}, {
 		name:    "with origin: single match",
 		matcher: ErrorMatcher{}.ByField().ByOrigin(),
 		want:    ErrorList{Invalid(NewPath("f"), nil, "").WithOrigin("o")},
