@@ -50,25 +50,19 @@ func TestDeclarativeValidateIPAddress(t *testing.T) {
 					input: mkValidIPAddress(),
 				},
 				"missing parentRef": {
-					input: mkValidIPAddress(func(obj *networking.IPAddress) {
-						obj.Spec.ParentRef = nil
-					}),
+					input: mkValidIPAddress(withNilParentRef),
 					expectedErrs: field.ErrorList{
 						field.Required(field.NewPath("spec", "parentRef"), ""),
 					},
 				},
 				"missing parentRef resource": {
-					input: mkValidIPAddress(func(obj *networking.IPAddress) {
-						obj.Spec.ParentRef.Resource = ""
-					}),
+					input: mkValidIPAddress(withEmptyParentRefResource),
 					expectedErrs: field.ErrorList{
 						field.Required(field.NewPath("spec", "parentRef", "resource"), ""),
 					},
 				},
 				"missing parentRef name": {
-					input: mkValidIPAddress(func(obj *networking.IPAddress) {
-						obj.Spec.ParentRef.Name = ""
-					}),
+					input: mkValidIPAddress(withEmptyParentRefName),
 					expectedErrs: field.ErrorList{
 						field.Required(field.NewPath("spec", "parentRef", "name"), ""),
 					},
@@ -98,21 +92,15 @@ func TestDeclarativeValidateIPAddressUpdate(t *testing.T) {
 				expectedErrs field.ErrorList
 			}{
 				"valid update": {
-					oldObj: mkValidIPAddress(func(obj *networking.IPAddress) {
-						obj.ResourceVersion = "1"
-					}),
-					updateObj: mkValidIPAddress(func(obj *networking.IPAddress) {
-						obj.ResourceVersion = "1"
-					}),
+					oldObj:    mkValidIPAddress(withResourceVersion("1")),
+					updateObj: mkValidIPAddress(withResourceVersion("1")),
 				},
 				"immutable parentRef": {
-					oldObj: mkValidIPAddress(func(obj *networking.IPAddress) {
-						obj.ResourceVersion = "1"
-					}),
-					updateObj: mkValidIPAddress(func(obj *networking.IPAddress) {
-						obj.ResourceVersion = "1"
-						obj.Spec.ParentRef.Name = "new-name"
-					}),
+					oldObj: mkValidIPAddress(withResourceVersion("1")),
+					updateObj: mkValidIPAddress(
+						withResourceVersion("1"),
+						withParentRefName("new-name"),
+					),
 					expectedErrs: field.ErrorList{
 						func() *field.Error {
 							e := field.Invalid(field.NewPath("spec", "parentRef"), &networking.ParentReference{
@@ -174,4 +162,28 @@ func mkValidIPAddress(tweaks ...func(obj *networking.IPAddress)) networking.IPAd
 		tweak(&obj)
 	}
 	return obj
+}
+
+func withNilParentRef(obj *networking.IPAddress) {
+	obj.Spec.ParentRef = nil
+}
+
+func withEmptyParentRefResource(obj *networking.IPAddress) {
+	obj.Spec.ParentRef.Resource = ""
+}
+
+func withEmptyParentRefName(obj *networking.IPAddress) {
+	obj.Spec.ParentRef.Name = ""
+}
+
+func withResourceVersion(rv string) func(*networking.IPAddress) {
+	return func(obj *networking.IPAddress) {
+		obj.ResourceVersion = rv
+	}
+}
+
+func withParentRefName(name string) func(*networking.IPAddress) {
+	return func(obj *networking.IPAddress) {
+		obj.Spec.ParentRef.Name = name
+	}
 }
