@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/go-logr/logr"
@@ -163,19 +164,21 @@ func TestQoSContainerCgroup(t *testing.T) {
 	assert.Equal(t, qosConfigs[v1.PodQOSBurstable].ResourceParameters.Unified["memory.min"], strconv.FormatInt(burstableMin.Value(), 10))
 }
 
-
 // fakeCgroupManager is used because Start() requires a functional
 // CgroupManager. All methods are stubbed so that Start() can
-// complete successfully without using real cgroups. 
+// complete successfully without using real cgroups.
 type fakeCgroupManager struct {
-	
+	mutex   sync.Mutex
 	created []*CgroupConfig
 	updates []*CgroupConfig
 }
 
 // Update() is the observation point for this test.
 // Capture the updated cgroup config so it can be validated.
-func (f *fakeCgroupManager) Update(logger klog.Logger, config *CgroupConfig) error{
+func (f *fakeCgroupManager) Update(logger klog.Logger, config *CgroupConfig) error {
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
+
 	copiedConfig := *config
 	f.updates = append(f.updates, &copiedConfig)
 	return nil
@@ -184,25 +187,36 @@ func (f *fakeCgroupManager) Update(logger klog.Logger, config *CgroupConfig) err
 // Create() must succeed for Start() to construct QoS cgroups.
 // We do not assert on Create() behavior in this test.
 func (f *fakeCgroupManager) Create(l klog.Logger, config *CgroupConfig) error {
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
+
 	copiedConfig := *config
 	f.created = append(f.created, &copiedConfig)
 	return nil
 }
 
-func (f *fakeCgroupManager)	Destroy(l klog.Logger,config *CgroupConfig) error {return nil}
-func (f *fakeCgroupManager)	Validate(name CgroupName) error {return nil}
-func (f *fakeCgroupManager)	Exists(name CgroupName) bool {return false}
-func (f *fakeCgroupManager)	Name(name CgroupName) string {return name.ToCgroupfs()}
-func (f *fakeCgroupManager)	CgroupName(name string) CgroupName {return ParseCgroupfsToCgroupName(name)}
-func (f *fakeCgroupManager)	Pids(logger klog.Logger, name CgroupName) []int {return nil}
-func (f *fakeCgroupManager)	ReduceCPULimits(logger klog.Logger, cgroupName CgroupName) error {return nil}
-func (f *fakeCgroupManager)	MemoryUsage(name CgroupName) (int64, error) {return int64(0),nil}
-func (f *fakeCgroupManager)	GetCgroupConfig(name CgroupName, resource v1.ResourceName) (*ResourceConfig, error) {return nil,nil}
-func (f *fakeCgroupManager)	SetCgroupConfig(logger klog.Logger, name CgroupName, resourceConfig *ResourceConfig) error {return nil}
-func (f *fakeCgroupManager)	Version() int {return 1}
+func (f *fakeCgroupManager) Destroy(l klog.Logger, config *CgroupConfig) error { return nil }
+func (f *fakeCgroupManager) Validate(name CgroupName) error                    { return nil }
+func (f *fakeCgroupManager) Exists(name CgroupName) bool                       { return false }
+func (f *fakeCgroupManager) Name(name CgroupName) string                       { return name.ToCgroupfs() }
+func (f *fakeCgroupManager) CgroupName(name string) CgroupName {
+	return ParseCgroupfsToCgroupName(name)
+}
+func (f *fakeCgroupManager) Pids(logger klog.Logger, name CgroupName) []int { return nil }
+func (f *fakeCgroupManager) ReduceCPULimits(logger klog.Logger, cgroupName CgroupName) error {
+	return nil
+}
+func (f *fakeCgroupManager) MemoryUsage(name CgroupName) (int64, error) { return int64(0), nil }
+func (f *fakeCgroupManager) GetCgroupConfig(name CgroupName, resource v1.ResourceName) (*ResourceConfig, error) {
+	return nil, nil
+}
+func (f *fakeCgroupManager) SetCgroupConfig(logger klog.Logger, name CgroupName, resourceConfig *ResourceConfig) error {
+	return nil
+}
+func (f *fakeCgroupManager) Version() int { return 1 }
 
 func expectedCPUShares(activeTestPods ActivePodsFunc) uint64 {
-	var pods []*v1.Pod = activeTestPods()
+	pods := activeTestPods()
 
 	burstablePodCPURequest := int64(0)
 	for i := range pods {
@@ -211,7 +225,7 @@ func expectedCPUShares(activeTestPods ActivePodsFunc) uint64 {
 		if qosClass != v1.PodQOSBurstable {
 			// we only care about the burstable qos tier
 			continue
-		}	
+		}
 		req := cres.PodRequests(pod, cres.PodResourcesOptions{})
 		if request, found := req[v1.ResourceCPU]; found {
 			burstablePodCPURequest += request.MilliValue()
@@ -222,55 +236,26 @@ func expectedCPUShares(activeTestPods ActivePodsFunc) uint64 {
 	return burstableCPUShares
 }
 
-func guaranteedTestPods() []*v1.Pod{
+func guaranteedTestPods() []*v1.Pod {
 	return []*v1.Pod{
-		
+
 		{
 			ObjectMeta: metav1.ObjectMeta{
-				UID: types.UID(uuid.NewUUID()),
-				Name: "guaranteed-pod",
+				UID:       types.UID(uuid.NewUUID()),
+				Name:      "guaranteed-pod",
 				Namespace: "test",
 			},
 			Spec: v1.PodSpec{
 				Containers: []v1.Container{
 					{
-						Name: "foo",
+						Name:  "foo",
 						Image: "busybox",
 						Resources: v1.ResourceRequirements{
 							Requests: v1.ResourceList{
-								v1.ResourceCPU:resource.MustParse("1"),
+								v1.ResourceCPU: resource.MustParse("1"),
 							},
 							Limits: v1.ResourceList{
-								v1.ResourceCPU:resource.MustParse("1"),
-							},
-						},
-					},
-				},
-			},
-		},
-
-	}
-}
-
-func burstableTestPods() []*v1.Pod{
-	return []*v1.Pod{
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				UID: types.UID(uuid.NewUUID()),
-				Name: "burstable-pod",
-				Namespace: "test",
-			},
-			Spec: v1.PodSpec{
-				Containers: []v1.Container{
-					{
-						Name: "foo",
-						Image: "busybox",
-						Resources: v1.ResourceRequirements{
-							Requests: v1.ResourceList{
-								v1.ResourceCPU:resource.MustParse("1"),
-							},
-							Limits: v1.ResourceList{
-								v1.ResourceCPU:resource.MustParse("2"),
+								v1.ResourceCPU: resource.MustParse("1"),
 							},
 						},
 					},
@@ -280,25 +265,53 @@ func burstableTestPods() []*v1.Pod{
 	}
 }
 
-func bestEffortTestPods() []*v1.Pod{
+func burstableTestPods() []*v1.Pod {
 	return []*v1.Pod{
 		{
 			ObjectMeta: metav1.ObjectMeta{
-				UID: types.UID(uuid.NewUUID()),
-				Name: "besteffort-pod",
+				UID:       types.UID(uuid.NewUUID()),
+				Name:      "burstable-pod",
 				Namespace: "test",
 			},
 			Spec: v1.PodSpec{
 				Containers: []v1.Container{
 					{
-						Name: "foo",
+						Name:  "foo",
+						Image: "busybox",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU: resource.MustParse("1"),
+							},
+							Limits: v1.ResourceList{
+								v1.ResourceCPU: resource.MustParse("2"),
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func bestEffortTestPods() []*v1.Pod {
+	return []*v1.Pod{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				UID:       types.UID(uuid.NewUUID()),
+				Name:      "besteffort-pod",
+				Namespace: "test",
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:  "foo",
 						Image: "busybox",
 					},
 				},
 			},
 		},
 	}
-} 
+}
 
 func guaranteedAndBurstableTestPods() []*v1.Pod {
 	pods := []*v1.Pod{}
@@ -316,108 +329,117 @@ func besteffortAndBurstableTestPods() []*v1.Pod {
 // TestQOSCPUConfigUpdate verifies that UpdateCgroups() computes and
 // updates the correct CPU shares for each QoS class based on the
 // currently active pods.
-func TestQOSCPUConfigUpdate(t *testing.T){
+func TestQOSCPUConfigUpdate(t *testing.T) {
 
-	tests := []struct{
-		name string
-		testPods ActivePodsFunc
+	tests := []struct {
+		name              string
+		testPods          ActivePodsFunc
 		expectedCPUShares uint64
 	}{
 		{
-			name: "guaranteed-pods-only",
-			testPods: guaranteedTestPods,
-			expectedCPUShares:expectedCPUShares(guaranteedTestPods),
+			name:              "guaranteed-pods-only",
+			testPods:          guaranteedTestPods,
+			expectedCPUShares: expectedCPUShares(guaranteedTestPods),
 		},
 		{
-			name: "burstable-pods-only",
-			testPods: burstableTestPods,
+			name:              "burstable-pods-only",
+			testPods:          burstableTestPods,
 			expectedCPUShares: expectedCPUShares(burstableTestPods),
 		},
 		{
-			name: "besteffort-pods-only",
-			testPods: bestEffortTestPods,
+			name:              "besteffort-pods-only",
+			testPods:          bestEffortTestPods,
 			expectedCPUShares: expectedCPUShares(bestEffortTestPods),
 		},
 		{
-			name: "guaranteed-and-burstable-pods",
-			testPods: guaranteedAndBurstableTestPods,
+			name:              "guaranteed-and-burstable-pods",
+			testPods:          guaranteedAndBurstableTestPods,
 			expectedCPUShares: expectedCPUShares(guaranteedAndBurstableTestPods),
 		},
 		{
-			name: "besteffort-and-burstable-pods",
-			testPods: besteffortAndBurstableTestPods,
+			name:              "besteffort-and-burstable-pods",
+			testPods:          besteffortAndBurstableTestPods,
 			expectedCPUShares: expectedCPUShares(besteffortAndBurstableTestPods),
 		},
 	}
 
-	for _,testCase := range tests{
+	for _, testCase := range tests {
 
 		t.Run(testCase.name, func(t *testing.T) {
 
-	testContainerManager,err := createTestQOSContainerManager(logr.Logger{})
-	if err!=nil{
-		t.Fatalf("Unable to create Test Qos Container Manager: %s", err)
-		return
-	}
-	
-	var fakecgroupManager = &fakeCgroupManager{}
-	testContainerManager.cgroupManager = fakecgroupManager
-
-	err=testContainerManager.Start(context.Background(), func() v1.ResourceList {return v1.ResourceList{}}, testCase.testPods)
-	if err!=nil{
-		t.Fatalf("Start() failed: %s",err)
-	}
-
-	// UpdateCgroups() is expected to update all QoS cgroups on each call
-	// based on the current active pod set.
-	err = testContainerManager.UpdateCgroups(logr.Logger{})
-	if err!=nil{
-		t.Fatalf("Error in UpdateCgroups(): %s", err)
-	}
-
-	//These flags will be used to check whether UpdateCgroups()
-	//is updating the CPU shares for all QoS classes (cgroups) 
-	foundBurstable := false
-	foundBestEffort := false
-	foundGuaranteed := false
-
-	for _,config := range fakecgroupManager.updates {
-
-		if strings.HasSuffix(config.Name.ToCgroupfs(), "burstable"){
-			foundBurstable = true
-			if *config.ResourceParameters.CPUShares != testCase.expectedCPUShares{
-				t.Fatalf("Expected CPU Shares for Burstable: %d. Got: %d",testCase.expectedCPUShares, *config.ResourceParameters.CPUShares)
+			testContainerManager, err := createTestQOSContainerManager(logr.Logger{})
+			if err != nil {
+				t.Fatalf("Unable to create Test Qos Container Manager: %s", err)
+				return
 			}
-			continue
-		}
 
-		if strings.HasSuffix(config.Name.ToCgroupfs(), "besteffort"){
-			foundBestEffort = true
-			if *config.ResourceParameters.CPUShares != MinShares {
-				t.Fatalf("Expected CPU Shares for BestEffort: %d Got: %d", MinShares, *config.ResourceParameters.CPUShares)
+			fakecgroupManager := &fakeCgroupManager{}
+			testContainerManager.cgroupManager = fakecgroupManager
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			err = testContainerManager.Start(ctx, func() v1.ResourceList { return v1.ResourceList{} }, testCase.testPods)
+
+			if err != nil {
+				t.Fatalf("Start() failed: %s", err)
 			}
-			continue
-		}
 
-		if config.Name.ToCgroupfs() == testContainerManager.cgroupRoot.ToCgroupfs() {
-			foundGuaranteed = true
-			if  config.ResourceParameters != nil && config.ResourceParameters.CPUShares != nil{
-				t.Fatalf("Expected CPU Shares for Guaranteed: <nil>, Got: %d", *config.ResourceParameters.CPUShares)
+			// UpdateCgroups() is expected to update all QoS cgroups on each call
+			// based on the current active pod set.
+			err = testContainerManager.UpdateCgroups(logr.Logger{})
+			if err != nil {
+				t.Fatalf("Error in UpdateCgroups(): %s", err)
 			}
-		}
-	}
+			cancel()
 
-	if !foundBurstable {
-	t.Fatalf("burstable cgroup not found")
-}
-if !foundBestEffort {
-	t.Fatalf("besteffort cgroup not found")
-}
-if !foundGuaranteed {
-	t.Fatalf("guaranteed cgroup not found")
-}
+			// These flags will be used to check whether UpdateCgroups()
+			// is updating the CPU shares for all QoS classes (cgroups)
+			foundBurstable := false
+			foundBestEffort := false
+			foundGuaranteed := false
 
-}) 
+			fakecgroupManager.mutex.Lock()
+			updates := append([]*CgroupConfig(nil), fakecgroupManager.updates...)
+			fakecgroupManager.mutex.Unlock()
+
+			for _, config := range updates {
+
+				if strings.HasSuffix(config.Name.ToCgroupfs(), "burstable") {
+					foundBurstable = true
+					if *config.ResourceParameters.CPUShares != testCase.expectedCPUShares {
+						t.Fatalf("Expected CPU Shares for Burstable: %d. Got: %d", testCase.expectedCPUShares, *config.ResourceParameters.CPUShares)
+					}
+					continue
+				}
+
+				if strings.HasSuffix(config.Name.ToCgroupfs(), "besteffort") {
+					foundBestEffort = true
+					if *config.ResourceParameters.CPUShares != MinShares {
+						t.Fatalf("Expected CPU Shares for BestEffort: %d Got: %d", MinShares, *config.ResourceParameters.CPUShares)
+					}
+					continue
+				}
+
+				if config.Name.ToCgroupfs() == testContainerManager.cgroupRoot.ToCgroupfs() {
+					foundGuaranteed = true
+					if config.ResourceParameters != nil && config.ResourceParameters.CPUShares != nil {
+						t.Fatalf("Expected CPU Shares for Guaranteed: <nil>, Got: %d", *config.ResourceParameters.CPUShares)
+					}
+				}
+			}
+
+			if !foundBurstable {
+				t.Fatalf("burstable cgroup not found")
+			}
+			if !foundBestEffort {
+				t.Fatalf("besteffort cgroup not found")
+			}
+			if !foundGuaranteed {
+				t.Fatalf("guaranteed cgroup not found")
+			}
+
+		})
 
 	}
 }
