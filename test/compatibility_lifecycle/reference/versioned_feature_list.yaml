@@ -305,6 +305,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.30"
+- name: ControllerManagerReleaseLeaderElectionLockOnExit
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.36"
 - name: CoordinatedLeaderElection
   versionedSpecs:
   - default: false
