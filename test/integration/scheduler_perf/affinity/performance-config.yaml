@@ -124,6 +124,7 @@
       initNodes: 5000
       initPods: 1000
       measurePods: 5000
+    threshold: 595
   - name: 5000Nodes_5000Pods_QueueingHintsEnabled
     featureGates:
       SchedulerQueueingHints: true
@@ -132,6 +133,7 @@
       initNodes: 5000
       initPods: 1000
       measurePods: 5000
+    threshold: 543
 
 - name: SchedulingPodAffinity
   defaultPodTemplatePath: ../templates/pod-with-pod-affinity.yaml
