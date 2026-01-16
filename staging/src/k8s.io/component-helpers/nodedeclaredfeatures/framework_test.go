@@ -25,22 +25,36 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/component-helpers/nodedeclaredfeatures/types"
 )
 
 // mockFeature is a mock implementation of the Feature interface for testing.
 type mockFeature struct {
 	name               string
-	discover           func(cfg *NodeConfiguration) bool
-	inferForScheduling func(podInfo *PodInfo) bool
-	inferForUpdate     func(oldPodInfo, newPodInfo *PodInfo) bool
+	discover           func(cfg *types.NodeConfiguration) bool
+	inferForScheduling func(podInfo *types.PodInfo) bool
+	inferForUpdate     func(oldPodInfo, newPodInfo *types.PodInfo) bool
 	maxVersion         *version.Version
 }
 
-func (f *mockFeature) Name() string                             { return f.name }
-func (f *mockFeature) Discover(cfg *NodeConfiguration) bool     { return f.discover(cfg) }
-func (f *mockFeature) InferForScheduling(podInfo *PodInfo) bool { return f.inferForScheduling(podInfo) }
-func (f *mockFeature) InferForUpdate(oldPodInfo, newPodInfo *PodInfo) bool {
-	return f.inferForUpdate(oldPodInfo, newPodInfo)
+func (f *mockFeature) Name() string { return f.name }
+func (f *mockFeature) Discover(cfg *types.NodeConfiguration) bool {
+	if f.discover != nil {
+		return f.discover(cfg)
+	}
+	return true
+}
+func (f *mockFeature) InferForScheduling(podInfo *types.PodInfo) bool {
+	if f.inferForScheduling != nil {
+		return f.inferForScheduling(podInfo)
+	}
+	return false
+}
+func (f *mockFeature) InferForUpdate(oldPodInfo, newPodInfo *types.PodInfo) bool {
+	if f.inferForUpdate != nil {
+		return f.inferForUpdate(oldPodInfo, newPodInfo)
+	}
+	return false
 }
 func (f *mockFeature) MaxVersion() *version.Version { return f.maxVersion }
 
@@ -59,84 +73,76 @@ func newMockFeatureGate(features map[string]bool) *mockFeatureGate {
 	return &mockFeatureGate{features: features}
 }
 
-func TestNewFramework(t *testing.T) {
-	_, err := New(nil)
-	require.Error(t, err, "NewFramework should return an error with a nil registry")
-
-	_, err = New([]Feature{})
-	require.NoError(t, err, "NewFramework should not return an error with an empty registry")
-}
-
 func TestDiscoverNodeFeatures(t *testing.T) {
 	featureMaxVersion := version.MustParse("1.38.0")
-	registry := []Feature{
+	registry := []types.Feature{
 		&mockFeature{
 			name: "FeatureA",
-			discover: func(cfg *NodeConfiguration) bool {
+			discover: func(cfg *types.NodeConfiguration) bool {
 				return cfg.FeatureGates.Enabled("feature-a")
 			},
 			maxVersion: featureMaxVersion,
 		},
 		&mockFeature{
 			name: "FeatureBWithStaticConfig",
-			discover: func(cfg *NodeConfiguration) bool {
+			discover: func(cfg *types.NodeConfiguration) bool {
 				return cfg.FeatureGates.Enabled("feature-b") && cfg.StaticConfig.CPUManagerPolicy == "static"
 			},
 			maxVersion: featureMaxVersion,
 		},
 	}
 
-	framework, _ := New(registry)
+	framework := New(registry)
 
 	testCases := []struct {
 		name     string
-		config   *NodeConfiguration
+		config   *types.NodeConfiguration
 		expected []string
 	}{
 		{
 			name: "Feature Enabled",
-			config: &NodeConfiguration{
+			config: &types.NodeConfiguration{
 				FeatureGates: newMockFeatureGate(map[string]bool{string("feature-a"): true}),
-				StaticConfig: StaticConfiguration{},
+				StaticConfig: types.StaticConfiguration{},
 			},
 			expected: []string{"FeatureA"},
 		},
 		{
 			name: "multiple features enabled",
-			config: &NodeConfiguration{
+			config: &types.NodeConfiguration{
 				FeatureGates: newMockFeatureGate(map[string]bool{
 					string("feature-a"): true,
 					string("feature-b"): true,
 				}),
-				StaticConfig: StaticConfiguration{CPUManagerPolicy: "static"},
+				StaticConfig: types.StaticConfiguration{CPUManagerPolicy: "static"},
 			},
 			expected: []string{"FeatureA", "FeatureBWithStaticConfig"}, // Should be sorted
 		},
 		{
 			name: "no features enabled",
-			config: &NodeConfiguration{
+			config: &types.NodeConfiguration{
 				FeatureGates: newMockFeatureGate(map[string]bool{
 					string("feature-a"): false,
 					string("feature-b"): true,
 				}),
-				StaticConfig: StaticConfiguration{CPUManagerPolicy: "none"},
+				StaticConfig: types.StaticConfiguration{CPUManagerPolicy: "none"},
 			},
 			expected: []string{},
 		},
 		{
 			name: "feature past max version",
-			config: &NodeConfiguration{
+			config: &types.NodeConfiguration{
 				FeatureGates: newMockFeatureGate(map[string]bool{string("feature-a"): true}),
-				StaticConfig: StaticConfiguration{},
+				StaticConfig: types.StaticConfiguration{},
 				Version:      featureMaxVersion.AddMinor(1),
 			},
 			expected: []string{}, // Not published
 		},
 		{
 			name: "feature past max version - pre-release version",
-			config: &NodeConfiguration{
+			config: &types.NodeConfiguration{
 				FeatureGates: newMockFeatureGate(map[string]bool{string("feature-a"): true}),
-				StaticConfig: StaticConfiguration{},
+				StaticConfig: types.StaticConfiguration{},
 				Version:      version.MustParse("1.39.0-alpha.2.39+049eafd34dfbd2"),
 			},
 			expected: []string{}, // Not published
@@ -156,7 +162,7 @@ func TestDiscoverNodeFeatures(t *testing.T) {
 }
 
 func TestInferForPodScheduling(t *testing.T) {
-	inferPodlevelResources := func(p *PodInfo) bool {
+	inferPodlevelResources := func(p *types.PodInfo) bool {
 		return p.Spec.Resources != nil
 	}
 	podWithPodLevelResources := &v1.Pod{
@@ -176,16 +182,16 @@ func TestInferForPodScheduling(t *testing.T) {
 
 	testCases := []struct {
 		name          string
-		registry      []Feature
+		registry      []types.Feature
 		newPod        *v1.Pod
 		targetVersion *version.Version
-		expectedReqs  FeatureSet
+		expectedReqs  []string
 		expectErr     bool
 		errContains   string
 	}{
 		{
 			name: "pod with feature, inferred during scheduling",
-			registry: []Feature{
+			registry: []types.Feature{
 				&mockFeature{
 					name:               "PodLevelResources",
 					inferForScheduling: inferPodlevelResources,
@@ -193,12 +199,12 @@ func TestInferForPodScheduling(t *testing.T) {
 			},
 			newPod:        podWithPodLevelResources,
 			targetVersion: version.MustParse("1.30.0"),
-			expectedReqs:  NewFeatureSet("PodLevelResources"),
+			expectedReqs:  []string{"PodLevelResources"},
 			expectErr:     false,
 		},
 		{
 			name: "pod without feature",
-			registry: []Feature{
+			registry: []types.Feature{
 				&mockFeature{
 					name:               "PodLevelResources",
 					inferForScheduling: inferPodlevelResources,
@@ -206,12 +212,12 @@ func TestInferForPodScheduling(t *testing.T) {
 			},
 			newPod:        podWithoutPodLevelResources,
 			targetVersion: version.MustParse("1.30.0"),
-			expectedReqs:  NewFeatureSet(),
+			expectedReqs:  nil,
 			expectErr:     false,
 		},
 		{
 			name: "feature universally available, not inferred during create",
-			registry: []Feature{
+			registry: []types.Feature{
 				&mockFeature{
 					name:               "PodLevelResources",
 					inferForScheduling: inferPodlevelResources,
@@ -220,12 +226,12 @@ func TestInferForPodScheduling(t *testing.T) {
 			},
 			newPod:        podWithPodLevelResources,
 			targetVersion: version.MustParse("1.31.0"),
-			expectedReqs:  NewFeatureSet(),
+			expectedReqs:  nil,
 			expectErr:     false,
 		},
 		{
 			name: "pre-release target version",
-			registry: []Feature{
+			registry: []types.Feature{
 				&mockFeature{
 					name:               "PodLevelResources",
 					inferForScheduling: inferPodlevelResources,
@@ -234,12 +240,26 @@ func TestInferForPodScheduling(t *testing.T) {
 			},
 			newPod:        podWithPodLevelResources,
 			targetVersion: version.MustParse("0.0.0-alpha.2.39+049eafd34dfbd2"),
-			expectedReqs:  NewFeatureSet("PodLevelResources"),
+			expectedReqs:  []string{"PodLevelResources"},
+			expectErr:     false,
+		},
+		{
+			name: "exceeds max version",
+			registry: []types.Feature{
+				&mockFeature{
+					name:               "PodLevelResources",
+					inferForScheduling: inferPodlevelResources,
+					maxVersion:         version.MustParse("1.30.0"),
+				},
+			},
+			newPod:        podWithPodLevelResources,
+			targetVersion: version.MustParse("1.40.0"),
+			expectedReqs:  nil,
 			expectErr:     false,
 		},
 		{
 			name: "target version nil",
-			registry: []Feature{
+			registry: []types.Feature{
 				&mockFeature{
 					name:               "PodLevelResources",
 					inferForScheduling: inferPodlevelResources,
@@ -247,7 +267,7 @@ func TestInferForPodScheduling(t *testing.T) {
 			},
 			newPod:        podWithPodLevelResources,
 			targetVersion: nil,
-			expectedReqs:  NewFeatureSet(),
+			expectedReqs:  nil,
 			expectErr:     true,
 			errContains:   "target version cannot be nil",
 		},
@@ -255,22 +275,23 @@ func TestInferForPodScheduling(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			framework, _ := New(tc.registry)
-			reqs, err := framework.InferForPodScheduling(&PodInfo{Spec: &tc.newPod.Spec, Status: &tc.newPod.Status}, tc.targetVersion)
+			framework := New(tc.registry)
+			reqs, err := framework.InferForPodScheduling(&types.PodInfo{Spec: &tc.newPod.Spec, Status: &tc.newPod.Status}, tc.targetVersion)
 
 			if tc.expectErr {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tc.errContains)
 			} else {
 				require.NoError(t, err)
-				assert.Equal(t, tc.expectedReqs, reqs)
+				unmappedReqs := framework.Unmap(reqs)
+				assert.Equal(t, tc.expectedReqs, unmappedReqs)
 			}
 		})
 	}
 }
 
 func TestInferForPodUpdate(t *testing.T) {
-	inferResize := func(oldPodInfo, newPodInfo *PodInfo) bool {
+	inferResize := func(oldPodInfo, newPodInfo *types.PodInfo) bool {
 		oldCPU := oldPodInfo.Spec.Containers[0].Resources.Requests.Cpu()
 		newCPU := newPodInfo.Spec.Containers[0].Resources.Requests.Cpu()
 		if oldCPU != nil && newCPU != nil && !oldCPU.Equal(*newCPU) {
@@ -300,17 +321,17 @@ func TestInferForPodUpdate(t *testing.T) {
 
 	testCases := []struct {
 		name          string
-		registry      []Feature
+		registry      []types.Feature
 		oldPod        *v1.Pod
 		newPod        *v1.Pod
 		targetVersion *version.Version
-		expectedReqs  FeatureSet
+		expectedReqs  []string
 		expectErr     bool
 		errContains   string
 	}{
 		{
 			name: "pod update requires feature",
-			registry: []Feature{
+			registry: []types.Feature{
 				&mockFeature{
 					name:           "InPlacePodResize",
 					inferForUpdate: inferResize,
@@ -319,12 +340,12 @@ func TestInferForPodUpdate(t *testing.T) {
 			oldPod:        podWith1CPU,
 			newPod:        podWith2CPU,
 			targetVersion: version.MustParse("1.30.0"),
-			expectedReqs:  NewFeatureSet("InPlacePodResize"),
+			expectedReqs:  []string{"InPlacePodResize"},
 			expectErr:     false,
 		},
 		{
 			name: "pod update requires feature with pre-release version",
-			registry: []Feature{
+			registry: []types.Feature{
 				&mockFeature{
 					name:           "InPlacePodResize",
 					inferForUpdate: inferResize,
@@ -333,12 +354,12 @@ func TestInferForPodUpdate(t *testing.T) {
 			oldPod:        podWith1CPU,
 			newPod:        podWith2CPU,
 			targetVersion: version.MustParse("1.35.0-alpha.2.39+049eafd34dfbd2"),
-			expectedReqs:  NewFeatureSet("InPlacePodResize"),
+			expectedReqs:  []string{"InPlacePodResize"},
 			expectErr:     false,
 		},
 		{
 			name: "pod update does not require feature",
-			registry: []Feature{
+			registry: []types.Feature{
 				&mockFeature{
 					name:           "InPlacePodResize",
 					inferForUpdate: inferResize,
@@ -347,12 +368,12 @@ func TestInferForPodUpdate(t *testing.T) {
 			oldPod:        podWith1CPU,
 			newPod:        podWith1CPU,
 			targetVersion: version.MustParse("1.30.0"),
-			expectedReqs:  NewFeatureSet(),
+			expectedReqs:  nil,
 			expectErr:     false,
 		},
 		{
 			name: "feature universally available, not inferred during update",
-			registry: []Feature{
+			registry: []types.Feature{
 				&mockFeature{
 					name:           "InPlacePodResize",
 					inferForUpdate: inferResize,
@@ -362,12 +383,12 @@ func TestInferForPodUpdate(t *testing.T) {
 			oldPod:        podWith1CPU,
 			newPod:        podWith2CPU,
 			targetVersion: version.MustParse("1.31.0"),
-			expectedReqs:  NewFeatureSet(),
+			expectedReqs:  nil,
 			expectErr:     false,
 		},
 		{
 			name: "target version nil",
-			registry: []Feature{
+			registry: []types.Feature{
 				&mockFeature{
 					name:           "InPlacePodResize",
 					inferForUpdate: inferResize,
@@ -376,7 +397,7 @@ func TestInferForPodUpdate(t *testing.T) {
 			oldPod:        podWith1CPU,
 			newPod:        podWith2CPU,
 			targetVersion: nil,
-			expectedReqs:  NewFeatureSet(),
+			expectedReqs:  nil,
 			expectErr:     true,
 			errContains:   "target version cannot be nil",
 		},
@@ -384,94 +405,16 @@ func TestInferForPodUpdate(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			framework, _ := New(tc.registry)
-			reqs, err := framework.InferForPodUpdate(&PodInfo{Spec: &tc.oldPod.Spec, Status: &tc.oldPod.Status}, &PodInfo{Spec: &tc.newPod.Spec, Status: &tc.newPod.Status}, tc.targetVersion)
+			framework := New(tc.registry)
+			reqs, err := framework.InferForPodUpdate(&types.PodInfo{Spec: &tc.oldPod.Spec, Status: &tc.oldPod.Status}, &types.PodInfo{Spec: &tc.newPod.Spec, Status: &tc.newPod.Status}, tc.targetVersion)
 
 			if tc.expectErr {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tc.errContains)
 			} else {
 				require.NoError(t, err)
-				assert.Equal(t, tc.expectedReqs, reqs)
+				assert.Equal(t, tc.expectedReqs, framework.Unmap(reqs))
 			}
 		})
 	}
-}
-
-func TestMatchNode(t *testing.T) {
-	testCases := []struct {
-		name                   string
-		podFeatureRequirements FeatureSet
-		nodeFeatures           []string
-		expectedMatch          bool
-		expectedUnsatisfied    []string
-	}{
-		{
-			name:                   "all features match",
-			podFeatureRequirements: NewFeatureSet("feature-a", "feature-b"),
-			nodeFeatures:           []string{"feature-a", "feature-b", "feature-c"},
-			expectedMatch:          true,
-			expectedUnsatisfied:    nil,
-		},
-		{
-			name:                   "some features missing",
-			podFeatureRequirements: NewFeatureSet("feature-a", "feature-b"),
-			nodeFeatures:           []string{"feature-a", "feature-c"},
-			expectedMatch:          false,
-			expectedUnsatisfied:    []string{"feature-b"},
-		},
-		{
-			name:                   "all features missing",
-			podFeatureRequirements: NewFeatureSet("feature-a", "feature-b"),
-			nodeFeatures:           []string{"feature-c"},
-			expectedMatch:          false,
-			expectedUnsatisfied:    []string{"feature-a", "feature-b"},
-		},
-		{
-			name:                   "no node features",
-			podFeatureRequirements: NewFeatureSet("feature-a", "feature-b"),
-			nodeFeatures:           []string{},
-			expectedMatch:          false,
-			expectedUnsatisfied:    []string{"feature-a", "feature-b"},
-		},
-		{
-			name:                   "no requirements",
-			podFeatureRequirements: NewFeatureSet(),
-			nodeFeatures:           []string{"feature-a", "feature-b", "feature-c"},
-			expectedMatch:          true,
-			expectedUnsatisfied:    nil,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			matchVariations := []string{"MatchNode", "MatchNodeFeatureSet"}
-			for _, variationName := range matchVariations {
-				t.Run(variationName, func(t *testing.T) {
-					var result *MatchResult
-					var err error
-
-					switch variationName {
-					case "MatchNode":
-						node := &v1.Node{Status: v1.NodeStatus{DeclaredFeatures: tc.nodeFeatures}}
-						result, err = MatchNode(tc.podFeatureRequirements, node)
-					case "MatchNodeFeatureSet":
-						result, err = MatchNodeFeatureSet(tc.podFeatureRequirements, NewFeatureSet(tc.nodeFeatures...))
-					default:
-						t.Fatalf("unknown match variation: %s", variationName)
-					}
-
-					require.NoError(t, err)
-					assert.Equal(t, tc.expectedMatch, result.IsMatch)
-					if !tc.expectedMatch {
-						assert.ElementsMatch(t, tc.expectedUnsatisfied, result.UnsatisfiedRequirements)
-					}
-				})
-			}
-		})
-	}
-
-	// Test nil node
-	_, err := MatchNode(NewFeatureSet("feature-a"), nil)
-	require.Error(t, err, "MatchNode should return an error for a nil node")
 }

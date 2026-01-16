@@ -20,15 +20,12 @@ import (
 	"context"
 	"fmt"
 	"slices"
-	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
 	versionutil "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/component-base/version"
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
-	"k8s.io/component-helpers/nodedeclaredfeatures/features"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
@@ -41,6 +38,9 @@ const (
 	Name = names.NodeDeclaredFeatures
 	// preFilterStateKey is the key in CycleState used to store the pod's feature requirements.
 	preFilterStateKey fwk.StateKey = "PreFilter" + Name
+	// errReasonUnsatisfiedRequirements is the status reason given when a node's declared features
+	// doesn't meet the pod's required features.
+	errReasonUnsatisfiedRequirements = "node(s) didn't match Pod's required features"
 )
 
 // preFilterState computed at PreFilter and used at Filter.
@@ -76,10 +76,7 @@ func New(ctx context.Context, plArgs runtime.Object, fh fwk.Handle, fts feature.
 		// Disabled, won't do anything.
 		return &NodeDeclaredFeatures{}, nil
 	}
-	ndfFramework, err := ndf.New(features.AllFeatures)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create node feature framework: %w", err)
-	}
+	ndfFramework := ndf.DefaultFramework
 	ver, err := versionutil.Parse(version.Get().String())
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse version: %w", err)
@@ -98,7 +95,7 @@ func (pl *NodeDeclaredFeatures) PreFilter(ctx context.Context, cycleState fwk.Cy
 	if err != nil {
 		return nil, fwk.AsStatus(err)
 	}
-	if reqs.Len() == 0 {
+	if reqs.IsEmpty() {
 		return nil, fwk.NewStatus(fwk.Skip)
 	}
 	cycleState.Write(preFilterStateKey, &preFilterState{reqs: reqs})
@@ -119,12 +116,12 @@ func (pl *NodeDeclaredFeatures) Filter(ctx context.Context, cycleState fwk.Cycle
 	if err != nil {
 		return fwk.AsStatus(err)
 	}
-	result, err := ndf.MatchNodeFeatureSet(s.reqs, nodeInfo.GetNodeDeclaredFeatures())
+	isMatch, err := s.reqs.IsSubset(nodeInfo.GetNodeDeclaredFeatures())
 	if err != nil {
 		return fwk.AsStatus(err)
 	}
-	if !result.IsMatch {
-		return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("node declared features check failed - unsatisfied requirements: %s", strings.Join(result.UnsatisfiedRequirements, ", ")))
+	if !isMatch {
+		return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, errReasonUnsatisfiedRequirements)
 	}
 	return nil
 }
@@ -135,9 +132,8 @@ func (pl *NodeDeclaredFeatures) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk
 	if err != nil {
 		return nil, fwk.AsStatus(err)
 	}
-	featuresList := sets.List(fs.Set)
 	return []fwk.SignFragment{
-		{Key: fwk.FeaturesSignerName, Value: featuresList},
+		{Key: fwk.FeaturesSignerName, Value: fs.String()},
 	}, nil
 }
 

@@ -21,8 +21,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/component-helpers/nodedeclaredfeatures"
-	test "k8s.io/component-helpers/nodedeclaredfeatures/testing"
+	"k8s.io/component-helpers/nodedeclaredfeatures/types"
 )
 
 func TestDiscover(t *testing.T) {
@@ -46,11 +45,8 @@ func TestDiscover(t *testing.T) {
 	feature := &restartAllContainersFeature{}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			mockFG := test.NewMockFeatureGate(t)
-			mockFG.EXPECT().Enabled(RestartAllContainersOnContainerExits).Return(tc.featureGateEnabled)
-
-			config := &nodedeclaredfeatures.NodeConfiguration{
-				FeatureGates: mockFG,
+			config := &types.NodeConfiguration{
+				FeatureGates: types.FeatureGateMap{RestartAllContainersOnContainerExits: tc.featureGateEnabled},
 			}
 			enabled := feature.Discover(config)
 			assert.Equal(t, tc.expected, enabled)
@@ -107,7 +103,7 @@ func TestInferForScheduling(t *testing.T) {
 	feature := &restartAllContainersFeature{}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			podInfo := &nodedeclaredfeatures.PodInfo{Spec: tc.pod}
+			podInfo := &types.PodInfo{Spec: tc.pod}
 			assert.Equal(t, tc.expected, feature.InferForScheduling(podInfo))
 		})
 	}
@@ -115,7 +111,7 @@ func TestInferForScheduling(t *testing.T) {
 
 func TestInferForUpdate(t *testing.T) {
 	feature := &restartAllContainersFeature{}
-	podInfo := &nodedeclaredfeatures.PodInfo{Spec: &v1.PodSpec{}}
+	podInfo := &types.PodInfo{Spec: &v1.PodSpec{}}
 	assert.False(t, feature.InferForUpdate(nil, podInfo), "expect InferForUpdate to be false")
 }
 

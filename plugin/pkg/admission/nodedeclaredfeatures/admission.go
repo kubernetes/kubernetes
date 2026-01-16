@@ -32,7 +32,6 @@ import (
 	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/version"
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
-	ndffeatures "k8s.io/component-helpers/nodedeclaredfeatures/features"
 	"k8s.io/kubernetes/pkg/apis/core"
 	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/features"
@@ -65,18 +64,13 @@ var _ genericadmissioninitializer.WantsFeatures = &Plugin{}
 
 // New creates a new Plugin admission plugin
 func NewPlugin() (*Plugin, error) {
-	framework, err := ndf.New(ndffeatures.AllFeatures)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create node declared features helper: %w", err)
-	}
-
 	ver, err := versionutil.Parse(version.Get().String())
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse version: %w", err)
 	}
 	return &Plugin{
 		Handler:                      admission.NewHandler(admission.Update),
-		nodeDeclaredFeatureFramework: framework,
+		nodeDeclaredFeatureFramework: ndf.DefaultFramework,
 		version:                      ver,
 	}, nil
 }
@@ -100,11 +94,7 @@ func (p *Plugin) ValidateInitialization() error {
 	}
 
 	if p.nodeDeclaredFeatureFramework == nil {
-		framework, err := ndf.New(ndffeatures.AllFeatures)
-		if err != nil {
-			return fmt.Errorf("failed to create node feature helper for %s: %w", PluginName, err)
-		}
-		p.nodeDeclaredFeatureFramework = framework
+		p.nodeDeclaredFeatureFramework = ndf.DefaultFramework
 	}
 	return nil
 }
@@ -173,7 +163,7 @@ func (p *Plugin) validatePodUpdate(pod, oldPod *core.Pod, a admission.Attributes
 		return admission.NewForbidden(a, fmt.Errorf("failed to infer pod capability requirements: %w", err))
 	}
 	// If there are no specific feature requirements for this update, we're done.
-	if reqs.Len() == 0 {
+	if reqs.IsEmpty() {
 		return nil
 	}
 	node, err := p.nodeLister.Get(pod.Spec.NodeName)
@@ -183,12 +173,15 @@ func (p *Plugin) validatePodUpdate(pod, oldPod *core.Pod, a admission.Attributes
 		}
 		return admission.NewForbidden(a, fmt.Errorf("failed to get node %q: %w", pod.Spec.NodeName, err))
 	}
-	result, err := ndf.MatchNode(reqs, node)
+	nodeFeatures := p.nodeDeclaredFeatureFramework.TryMap(node.Status.DeclaredFeatures)
+	isMatch, err := reqs.IsSubset(nodeFeatures)
 	if err != nil {
 		return admission.NewForbidden(a, fmt.Errorf("failed to match pod requirements against node %q: %w", node.Name, err))
 	}
-	if !result.IsMatch {
-		return admission.NewForbidden(a, fmt.Errorf("pod update requires features %s which are not available on node %q", strings.Join(result.UnsatisfiedRequirements, ", "), node.Name))
+	if !isMatch {
+		missing, _ := reqs.Difference(nodeFeatures) // Difference will error IFF IsSubset also does, so we can ignore the error here.
+		unsatisfiedRequirements := p.nodeDeclaredFeatureFramework.Unmap(missing)
+		return admission.NewForbidden(a, fmt.Errorf("pod update requires features %s which are not available on node %q", strings.Join(unsatisfiedRequirements, ", "), node.Name))
 	}
 
 	return nil

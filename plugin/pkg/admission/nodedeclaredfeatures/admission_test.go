@@ -244,8 +244,7 @@ func TestAdmission(t *testing.T) {
 			require.NoError(t, err)
 
 			if tc.featureGateEnabled {
-				framework, err := ndf.New(tc.registeredFeatures)
-				require.NoError(t, err)
+				framework := ndf.New(tc.registeredFeatures)
 				target.nodeDeclaredFeatureFramework = framework
 				target.version = version.MustParseSemantic(tc.componentVersion)
 			}

@@ -267,11 +267,11 @@ func (c *declaredFeaturesAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmit
 		}
 	}
 
-	if reqs.Len() == 0 {
+	if reqs.IsEmpty() {
 		return PodAdmitResult{Admit: true}
 	}
 
-	matchResult, err := ndf.MatchNodeFeatureSet(reqs, c.ndfSet)
+	isMatch, err := reqs.IsSubset(c.ndfSet)
 	if err != nil {
 		return PodAdmitResult{
 			Admit:   false,
@@ -280,11 +280,13 @@ func (c *declaredFeaturesAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmit
 		}
 	}
 
-	if !matchResult.IsMatch {
+	if !isMatch {
+		missing, _ := reqs.Difference(c.ndfSet) // Difference will error IFF IsSubset also does, so we can ignore the error here.
+		unsatisfiedRequirements := c.ndfFramework.Unmap(missing)
 		return PodAdmitResult{
 			Admit:   false,
 			Reason:  PodFeatureUnsupported,
-			Message: fmt.Sprintf("Pod requires node features that are not available: %s", strings.Join(matchResult.UnsatisfiedRequirements, ", ")),
+			Message: fmt.Sprintf("Pod requires node features that are not available: %s", strings.Join(unsatisfiedRequirements, ", ")),
 		}
 	}
 

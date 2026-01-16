@@ -908,9 +908,9 @@ func TestDeclaredFeaturesAdmitHandler(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			framework, err := ndf.New(tc.registeredFeatures)
-			require.NoError(t, err)
-			handler := NewDeclaredFeaturesAdmitHandler(framework, ndf.NewFeatureSet(tc.nodeDeclaredFeatures...), tc.version)
+			framework := ndf.New(tc.registeredFeatures)
+			fs := framework.MustMapSorted(tc.nodeDeclaredFeatures)
+			handler := NewDeclaredFeaturesAdmitHandler(framework, fs, tc.version)
 			attrs := &PodAdmitAttributes{Pod: pod}
 
 			result := handler.Admit(attrs)

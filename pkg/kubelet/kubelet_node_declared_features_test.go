@@ -20,11 +20,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	ndflib "k8s.io/component-helpers/nodedeclaredfeatures"
-	ndffeatures "k8s.io/component-helpers/nodedeclaredfeatures/features"
+	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 )
@@ -79,9 +77,7 @@ func TestGuaranteedPodExclusiveCPUsFeatureDiscovery(t *testing.T) {
 				CPUManagerPolicy: tc.cpuManagerPolicy,
 			})
 			kubelet.containerManager = fakeCM
-			framework, err := ndflib.New(ndffeatures.AllFeatures)
-			require.NoError(t, err)
-			kubelet.nodeDeclaredFeaturesFramework = framework
+			kubelet.nodeDeclaredFeaturesFramework = ndf.DefaultFramework
 
 			features := kubelet.discoverNodeDeclaredFeatures()
 			if tc.expectFeature {

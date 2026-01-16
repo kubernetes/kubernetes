@@ -23,7 +23,7 @@ package testing
 import (
 	mock "github.com/stretchr/testify/mock"
 	"k8s.io/apimachinery/pkg/util/version"
-	"k8s.io/component-helpers/nodedeclaredfeatures"
+	"k8s.io/component-helpers/nodedeclaredfeatures/types"
 )
 
 // NewMockFeature creates a new instance of MockFeature. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
@@ -54,7 +54,7 @@ func (_m *MockFeature) EXPECT() *MockFeature_Expecter {
 }
 
 // Discover provides a mock function for the type MockFeature
-func (_mock *MockFeature) Discover(cfg *nodedeclaredfeatures.NodeConfiguration) bool {
+func (_mock *MockFeature) Discover(cfg *types.NodeConfiguration) bool {
 	ret := _mock.Called(cfg)
 
 	if len(ret) == 0 {
@@ -62,7 +62,7 @@ func (_mock *MockFeature) Discover(cfg *nodedeclaredfeatures.NodeConfiguration) 
 	}
 
 	var r0 bool
-	if returnFunc, ok := ret.Get(0).(func(*nodedeclaredfeatures.NodeConfiguration) bool); ok {
+	if returnFunc, ok := ret.Get(0).(func(*types.NodeConfiguration) bool); ok {
 		r0 = returnFunc(cfg)
 	} else {
 		r0 = ret.Get(0).(bool)
@@ -76,16 +76,16 @@ type MockFeature_Discover_Call struct {
 }
 
 // Discover is a helper method to define mock.On call
-//   - cfg *nodedeclaredfeatures.NodeConfiguration
+//   - cfg *types.NodeConfiguration
 func (_e *MockFeature_Expecter) Discover(cfg interface{}) *MockFeature_Discover_Call {
 	return &MockFeature_Discover_Call{Call: _e.mock.On("Discover", cfg)}
 }
 
-func (_c *MockFeature_Discover_Call) Run(run func(cfg *nodedeclaredfeatures.NodeConfiguration)) *MockFeature_Discover_Call {
+func (_c *MockFeature_Discover_Call) Run(run func(cfg *types.NodeConfiguration)) *MockFeature_Discover_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *nodedeclaredfeatures.NodeConfiguration
+		var arg0 *types.NodeConfiguration
 		if args[0] != nil {
-			arg0 = args[0].(*nodedeclaredfeatures.NodeConfiguration)
+			arg0 = args[0].(*types.NodeConfiguration)
 		}
 		run(
 			arg0,
@@ -99,13 +99,13 @@ func (_c *MockFeature_Discover_Call) Return(b bool) *MockFeature_Discover_Call {
 	return _c
 }
 
-func (_c *MockFeature_Discover_Call) RunAndReturn(run func(cfg *nodedeclaredfeatures.NodeConfiguration) bool) *MockFeature_Discover_Call {
+func (_c *MockFeature_Discover_Call) RunAndReturn(run func(cfg *types.NodeConfiguration) bool) *MockFeature_Discover_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // InferForScheduling provides a mock function for the type MockFeature
-func (_mock *MockFeature) InferForScheduling(podInfo *nodedeclaredfeatures.PodInfo) bool {
+func (_mock *MockFeature) InferForScheduling(podInfo *types.PodInfo) bool {
 	ret := _mock.Called(podInfo)
 
 	if len(ret) == 0 {
@@ -113,7 +113,7 @@ func (_mock *MockFeature) InferForScheduling(podInfo *nodedeclaredfeatures.PodIn
 	}
 
 	var r0 bool
-	if returnFunc, ok := ret.Get(0).(func(*nodedeclaredfeatures.PodInfo) bool); ok {
+	if returnFunc, ok := ret.Get(0).(func(*types.PodInfo) bool); ok {
 		r0 = returnFunc(podInfo)
 	} else {
 		r0 = ret.Get(0).(bool)
@@ -127,16 +127,16 @@ type MockFeature_InferForScheduling_Call struct {
 }
 
 // InferForScheduling is a helper method to define mock.On call
-//   - podInfo *nodedeclaredfeatures.PodInfo
+//   - podInfo *types.PodInfo
 func (_e *MockFeature_Expecter) InferForScheduling(podInfo interface{}) *MockFeature_InferForScheduling_Call {
 	return &MockFeature_InferForScheduling_Call{Call: _e.mock.On("InferForScheduling", podInfo)}
 }
 
-func (_c *MockFeature_InferForScheduling_Call) Run(run func(podInfo *nodedeclaredfeatures.PodInfo)) *MockFeature_InferForScheduling_Call {
+func (_c *MockFeature_InferForScheduling_Call) Run(run func(podInfo *types.PodInfo)) *MockFeature_InferForScheduling_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *nodedeclaredfeatures.PodInfo
+		var arg0 *types.PodInfo
 		if args[0] != nil {
-			arg0 = args[0].(*nodedeclaredfeatures.PodInfo)
+			arg0 = args[0].(*types.PodInfo)
 		}
 		run(
 			arg0,
@@ -150,13 +150,13 @@ func (_c *MockFeature_InferForScheduling_Call) Return(b bool) *MockFeature_Infer
 	return _c
 }
 
-func (_c *MockFeature_InferForScheduling_Call) RunAndReturn(run func(podInfo *nodedeclaredfeatures.PodInfo) bool) *MockFeature_InferForScheduling_Call {
+func (_c *MockFeature_InferForScheduling_Call) RunAndReturn(run func(podInfo *types.PodInfo) bool) *MockFeature_InferForScheduling_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // InferForUpdate provides a mock function for the type MockFeature
-func (_mock *MockFeature) InferForUpdate(oldPodInfo *nodedeclaredfeatures.PodInfo, newPodInfo *nodedeclaredfeatures.PodInfo) bool {
+func (_mock *MockFeature) InferForUpdate(oldPodInfo *types.PodInfo, newPodInfo *types.PodInfo) bool {
 	ret := _mock.Called(oldPodInfo, newPodInfo)
 
 	if len(ret) == 0 {
@@ -164,7 +164,7 @@ func (_mock *MockFeature) InferForUpdate(oldPodInfo *nodedeclaredfeatures.PodInf
 	}
 
 	var r0 bool
-	if returnFunc, ok := ret.Get(0).(func(*nodedeclaredfeatures.PodInfo, *nodedeclaredfeatures.PodInfo) bool); ok {
+	if returnFunc, ok := ret.Get(0).(func(*types.PodInfo, *types.PodInfo) bool); ok {
 		r0 = returnFunc(oldPodInfo, newPodInfo)
 	} else {
 		r0 = ret.Get(0).(bool)
@@ -178,21 +178,21 @@ type MockFeature_InferForUpdate_Call struct {
 }
 
 // InferForUpdate is a helper method to define mock.On call
-//   - oldPodInfo *nodedeclaredfeatures.PodInfo
-//   - newPodInfo *nodedeclaredfeatures.PodInfo
+//   - oldPodInfo *types.PodInfo
+//   - newPodInfo *types.PodInfo
 func (_e *MockFeature_Expecter) InferForUpdate(oldPodInfo interface{}, newPodInfo interface{}) *MockFeature_InferForUpdate_Call {
 	return &MockFeature_InferForUpdate_Call{Call: _e.mock.On("InferForUpdate", oldPodInfo, newPodInfo)}
 }
 
-func (_c *MockFeature_InferForUpdate_Call) Run(run func(oldPodInfo *nodedeclaredfeatures.PodInfo, newPodInfo *nodedeclaredfeatures.PodInfo)) *MockFeature_InferForUpdate_Call {
+func (_c *MockFeature_InferForUpdate_Call) Run(run func(oldPodInfo *types.PodInfo, newPodInfo *types.PodInfo)) *MockFeature_InferForUpdate_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *nodedeclaredfeatures.PodInfo
+		var arg0 *types.PodInfo
 		if args[0] != nil {
-			arg0 = args[0].(*nodedeclaredfeatures.PodInfo)
+			arg0 = args[0].(*types.PodInfo)
 		}
-		var arg1 *nodedeclaredfeatures.PodInfo
+		var arg1 *types.PodInfo
 		if args[1] != nil {
-			arg1 = args[1].(*nodedeclaredfeatures.PodInfo)
+			arg1 = args[1].(*types.PodInfo)
 		}
 		run(
 			arg0,
@@ -207,7 +207,7 @@ func (_c *MockFeature_InferForUpdate_Call) Return(b bool) *MockFeature_InferForU
 	return _c
 }
 
-func (_c *MockFeature_InferForUpdate_Call) RunAndReturn(run func(oldPodInfo *nodedeclaredfeatures.PodInfo, newPodInfo *nodedeclaredfeatures.PodInfo) bool) *MockFeature_InferForUpdate_Call {
+func (_c *MockFeature_InferForUpdate_Call) RunAndReturn(run func(oldPodInfo *types.PodInfo, newPodInfo *types.PodInfo) bool) *MockFeature_InferForUpdate_Call {
 	_c.Call.Return(run)
 	return _c
 }

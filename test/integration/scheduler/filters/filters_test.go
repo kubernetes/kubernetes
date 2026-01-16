@@ -3198,6 +3198,9 @@ func TestNodeDeclaredFeaturesFilter(t *testing.T) {
 	mockFeature.EXPECT().InferForUpdate(mock.Anything, mock.Anything).Return(false).Maybe()
 	mockFeature.EXPECT().Discover(mock.Anything).Return(false).Maybe()
 
+	framework := ndf.New([]ndf.Feature{mockFeature})
+	ndftesting.SetFrameworkDuringTest(t, *framework)
+
 	tests := []struct {
 		name           string
 		pod            *v1.Pod

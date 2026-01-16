@@ -5,7 +5,7 @@ template: testify
 template-data:
   boilerplate-file: ../../../../../hack/boilerplate/boilerplate.generatego.txt
 packages:
-  k8s.io/component-helpers/nodedeclaredfeatures:
+  k8s.io/component-helpers/nodedeclaredfeatures/types:
     config:
       filename: mocks.go # New file name
     interfaces:
