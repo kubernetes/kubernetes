@@ -477,8 +477,22 @@ func lookupClaimRequest(claims []*drapb.Claim, claimUID string) *drapb.Claim {
 func (m *Manager) GetResources(pod *v1.Pod, container *v1.Container) (*ContainerInfo, error) {
 	cdiDevices := []kubecontainer.CDIDevice{}
 
+	// claimRequests maps claimName -> []requestNames for this container
+	claimRequests := make(map[string][]string)
+
+	// Collect regular ResourceClaims
+	containerClaimsMap := make(map[string]string, len(container.Resources.Claims))
+	for _, claim := range container.Resources.Claims {
+		containerClaimsMap[claim.Name] = claim.Request
+	}
+
 	for i := range pod.Spec.ResourceClaims {
 		podClaim := &pod.Spec.ResourceClaims[i]
+		request, ok := containerClaimsMap[podClaim.Name]
+		if !ok {
+			continue
+		}
+
 		claimName, _, err := resourceclaim.Name(pod, podClaim)
 		if err != nil {
 			// No wrapping, error is already informative.
@@ -490,61 +504,54 @@ func (m *Manager) GetResources(pod *v1.Pod, container *v1.Container) (*Container
 		if claimName == nil {
 			continue
 		}
-		for _, claim := range container.Resources.Claims {
-			if podClaim.Name != claim.Name {
-				continue
-			}
 
-			err := m.cache.withRLock(func() error {
-				claimInfo, exists := m.cache.get(*claimName, pod.Namespace)
-				if !exists {
-					return fmt.Errorf("internal error: unable to get claim info for ResourceClaim %s", *claimName)
-				}
-
-				// As of Kubernetes 1.31, CDI device IDs are not passed via annotations anymore.
-				cdiDevices = append(cdiDevices, claimInfo.cdiDevicesAsList(claim.Request)...)
-
-				return nil
-			})
-			if err != nil {
-				// No wrapping, this is the error above.
-				return nil, err
-			}
-		}
+		claimRequests[*claimName] = append(claimRequests[*claimName], request)
 	}
 
+	// Collect extended resource claims if feature is enabled
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DRAExtendedResource) && pod.Status.ExtendedResourceClaimStatus != nil {
 		claimName := pod.Status.ExtendedResourceClaimStatus.ResourceClaimName
 		// if the container has requests for extended resources backed by DRA,
 		// they must have been allocated via the extendedResourceClaim created
 		// by the kube-scheduler.
+
+		// Build map of this container's extended resource requests
+		extendedResourceRequests := make(map[string]bool)
+		for rName, rValue := range container.Resources.Requests {
+			if !rValue.IsZero() && schedutil.IsDRAExtendedResourceName(rName) {
+				extendedResourceRequests[rName.String()] = true
+			}
+		}
+
+		// Collect request names matching this container's extended resources
+		for _, rm := range pod.Status.ExtendedResourceClaimStatus.RequestMappings {
+			// allow multiple device requests per container per resource.
+			if rm.ContainerName == container.Name && extendedResourceRequests[rm.ResourceName] {
+				claimRequests[claimName] = append(claimRequests[claimName], rm.RequestName)
+			}
+		}
+	}
+
+	// Process all collected claims
+	for claimName, requestNames := range claimRequests {
 		err := m.cache.withRLock(func() error {
 			claimInfo, exists := m.cache.get(claimName, pod.Namespace)
 			if !exists {
-				return fmt.Errorf("unable to get claim info for claim %s in namespace %s", claimName, pod.Namespace)
+				return fmt.Errorf("internal error: unable to get claim info for ResourceClaim %s", claimName)
 			}
 
-			for rName, rValue := range container.Resources.Requests {
-				if rValue.IsZero() {
-					// We only care about the resources requested by the pod
-					continue
-				}
-				if schedutil.IsDRAExtendedResourceName(rName) {
-					for _, rm := range pod.Status.ExtendedResourceClaimStatus.RequestMappings {
-						// allow multiple device requests per container per resource.
-						if rm.ContainerName == container.Name && rm.ResourceName == rName.String() {
-							// As of Kubernetes 1.31, CDI device IDs are not passed via annotations anymore.
-							cdiDevices = append(cdiDevices, claimInfo.cdiDevicesAsList(rm.RequestName)...)
-						}
-					}
-				}
+			for _, requestName := range requestNames {
+				// As of Kubernetes 1.31, CDI device IDs are not passed via annotations anymore.
+				cdiDevices = append(cdiDevices, claimInfo.cdiDevicesAsList(requestName)...)
 			}
 			return nil
 		})
 		if err != nil {
+			// No wrapping, this is the error above.
 			return nil, err
 		}
 	}
+
 	return &ContainerInfo{CDIDevices: cdiDevices}, nil
 }
 
