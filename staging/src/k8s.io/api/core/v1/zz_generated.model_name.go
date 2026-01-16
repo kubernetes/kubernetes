@@ -822,11 +822,6 @@ func (in PodStatus) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
-func (in PodStatusResult) OpenAPIModelName() string {
-	return "io.k8s.api.core.v1.PodStatusResult"
-}
-
-// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in PodTemplate) OpenAPIModelName() string {
 	return "io.k8s.api.core.v1.PodTemplate"
 }

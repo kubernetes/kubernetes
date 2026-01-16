@@ -616,7 +616,6 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		corev1.PodSignature{}.OpenAPIModelName():                                                                        schema_k8sio_api_core_v1_PodSignature(ref),
 		corev1.PodSpec{}.OpenAPIModelName():                                                                             schema_k8sio_api_core_v1_PodSpec(ref),
 		corev1.PodStatus{}.OpenAPIModelName():                                                                           schema_k8sio_api_core_v1_PodStatus(ref),
-		corev1.PodStatusResult{}.OpenAPIModelName():                                                                     schema_k8sio_api_core_v1_PodStatusResult(ref),
 		corev1.PodTemplate{}.OpenAPIModelName():                                                                         schema_k8sio_api_core_v1_PodTemplate(ref),
 		corev1.PodTemplateList{}.OpenAPIModelName():                                                                     schema_k8sio_api_core_v1_PodTemplateList(ref),
 		corev1.PodTemplateSpec{}.OpenAPIModelName():                                                                     schema_k8sio_api_core_v1_PodTemplateSpec(ref),
@@ -28623,49 +28622,6 @@ func schema_k8sio_api_core_v1_PodStatus(ref common.ReferenceCallback) common.Ope
 		},
 		Dependencies: []string{
 			corev1.ContainerStatus{}.OpenAPIModelName(), corev1.HostIP{}.OpenAPIModelName(), corev1.PodCondition{}.OpenAPIModelName(), corev1.PodExtendedResourceClaimStatus{}.OpenAPIModelName(), corev1.PodIP{}.OpenAPIModelName(), corev1.PodResourceClaimStatus{}.OpenAPIModelName(), corev1.ResourceRequirements{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName(), metav1.Time{}.OpenAPIModelName()},
-	}
-}
-
-func schema_k8sio_api_core_v1_PodStatusResult(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "PodStatusResult is a wrapper for PodStatus returned by kubelet that can be encode/decoded",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"kind": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"apiVersion": {
-						SchemaProps: spec.SchemaProps{
-							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
-							Default:     map[string]interface{}{},
-							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
-						},
-					},
-					"status": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Most recently observed status of the pod. This data may not be up to date. Populated by the system. Read-only. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
-							Default:     map[string]interface{}{},
-							Ref:         ref(corev1.PodStatus{}.OpenAPIModelName()),
-						},
-					},
-				},
-			},
-		},
-		Dependencies: []string{
-			corev1.PodStatus{}.OpenAPIModelName(), metav1.ObjectMeta{}.OpenAPIModelName()},
 	}
 }
 

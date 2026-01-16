@@ -4657,19 +4657,6 @@ type PodStatus struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// PodStatusResult is a wrapper for PodStatus returned by kubelet that can be encode/decoded
-type PodStatusResult struct {
-	metav1.TypeMeta
-	// +optional
-	metav1.ObjectMeta
-	// Status represents the current information about a pod. This data may not be up
-	// to date.
-	// +optional
-	Status PodStatus
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
 // Pod is a collection of containers, used as either input (create, update) or as output (list, get).
 type Pod struct {
 	metav1.TypeMeta
