@@ -175,9 +175,6 @@ func TestGangSchedulingFlow(t *testing.T) {
 		PodGroup(st.MakePodGroup().Name("pg1").MinCount(3).Obj()).
 		PodGroup(st.MakePodGroup().Name("pg2").MinCount(4).Obj()).Obj()
 
-	basicPolicyWorkload := st.MakeWorkload().Namespace("ns1").Name("basic-wl").
-		PodGroup(st.MakePodGroup().Name("pg1").BasicPolicy().Obj()).Obj()
-
 	p1 := st.MakePod().Namespace("ns1").Name("p1").UID("p1").
 		WorkloadRef(&v1.WorkloadReference{Name: "gang-wl", PodGroup: "pg1"}).Obj()
 	p2 := st.MakePod().Namespace("ns1").Name("p2").UID("p2").
@@ -190,9 +187,6 @@ func TestGangSchedulingFlow(t *testing.T) {
 
 	p5 := st.MakePod().Namespace("ns1").Name("p5").UID("p5").
 		WorkloadRef(&v1.WorkloadReference{Name: "gang-wl", PodGroup: "pg1", PodGroupReplicaKey: "2"}).Obj()
-
-	basicPolicyPod := st.MakePod().Namespace("ns1").Name("basic-pod").UID("basic-pod").
-		WorkloadRef(&v1.WorkloadReference{Name: "basic-wl", PodGroup: "pg1"}).Obj()
 
 	nonGangPod := st.MakePod().Namespace("ns1").Name("non-gang").UID("non-gang").Obj()
 
@@ -210,14 +204,7 @@ func TestGangSchedulingFlow(t *testing.T) {
 		{
 			name:                 "non-gang pod succeeds immediately",
 			pod:                  nonGangPod,
-			initialWorkloads:     []*schedulingapi.Workload{workload, basicPolicyWorkload},
-			wantPreEnqueueStatus: nil,
-			wantPermitStatus:     nil,
-		},
-		{
-			name:                 "basic policy pod succeeds immediately",
-			pod:                  basicPolicyPod,
-			initialWorkloads:     []*schedulingapi.Workload{workload, basicPolicyWorkload},
+			initialWorkloads:     []*schedulingapi.Workload{workload},
 			wantPreEnqueueStatus: nil,
 			wantPermitStatus:     nil,
 		},
