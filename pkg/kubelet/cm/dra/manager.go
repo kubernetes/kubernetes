@@ -814,18 +814,18 @@ func (m *Manager) UpdateAllocatedResourcesStatus(pod *v1.Pod, status *v1.PodStat
 			}
 		}
 
+		// Build a map of pod claim statuses for O(1) lookup
+		podClaimStatusMap := make(map[string]string, len(pod.Status.ResourceClaimStatuses))
+		for _, podClaimStatus := range pod.Status.ResourceClaimStatuses {
+			if podClaimStatus.ResourceClaimName != nil {
+				podClaimStatusMap[podClaimStatus.Name] = *podClaimStatus.ResourceClaimName
+			}
+		}
+
 		// Iterate through the claims requested by this specific container.
 		for _, claim := range containerSpec.Resources.Claims {
 			// Find the actual name of the ResourceClaim object.
-			var actualClaimName string
-			for _, podClaimStatus := range pod.Status.ResourceClaimStatuses {
-				if podClaimStatus.Name == claim.Name {
-					if podClaimStatus.ResourceClaimName != nil {
-						actualClaimName = *podClaimStatus.ResourceClaimName
-					}
-					break
-				}
-			}
+			actualClaimName := podClaimStatusMap[claim.Name]
 
 			if actualClaimName == "" {
 				logger.V(4).Info("Could not find generated name for resource claim in pod status", "pod", klog.KObj(pod), "container", containerSpec.Name, "claimName", claim.Name)
