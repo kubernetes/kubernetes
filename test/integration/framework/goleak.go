@@ -17,10 +17,12 @@ limitations under the License.
 package framework
 
 import (
+	"runtime"
 	"testing"
 	"time"
 
 	"go.uber.org/goleak"
+
 	"k8s.io/apiserver/pkg/server/healthz"
 )
 
@@ -54,15 +56,16 @@ func GoleakCheck(tb testing.TB, opts ...goleak.Option) {
 
 func goleakFindRetry(opts ...goleak.Option) error {
 	// Several tests don't wait for goroutines to stop. goleak.Find retries
-	// internally, but not long enough. 5 seconds seemed to be enough for
+	// internally, but not long enough. 60 seconds seemed to be enough for
 	// most tests, even when testing in the CI.
-	timeout := 5 * time.Second
+	timeout := 60 * time.Second
 	start := time.Now()
 	for {
 		err := goleak.Find(opts...)
 		if err == nil {
 			return nil
 		}
+		runtime.GC() // let cleanups run, i.e. those associated with tlsTransportCache in client-go
 		if time.Now().Sub(start) >= timeout {
 			return err
 		}
