@@ -181,7 +181,23 @@ const (
 	// - NodeStageVolume in the spec
 	CapMultiPODs Capability = "multipods"
 
-	CapRWX                 Capability = "RWX"                 // support ReadWriteMany access modes
+	// CapRWX indicates the driver supports ReadWriteMany access mode.
+	// When set alone without CapRWXFilesystemOnly or CapRWXBlockOnly, it means the driver supports
+	// RWX for all volume modes it supports (backward compatible with existing drivers like NFS, Azure File).
+	// For drivers that support RWX only on specific volume modes, use CapRWXFilesystemOnly or CapRWXBlockOnly.
+	CapRWX Capability = "RWX"
+
+	// CapRWXFilesystemOnly indicates the driver supports ReadWriteMany only on filesystem volumes.
+	// Use this for drivers that support both filesystem and block volumes (e.g., vSphere CSI) where only
+	// filesystem volumes support RWX. Block volume RWX tests will be skipped.
+	// Note: RWX filesystem volumes don't support specifying fsType - tests with non-empty fsType will be skipped.
+	CapRWXFilesystemOnly Capability = "RWXFilesystemOnly"
+
+	// CapRWXBlockOnly indicates the driver supports ReadWriteMany only on block volumes.
+	// Use this for drivers that support both filesystem and block volumes where only block volumes support RWX.
+	// Filesystem volume RWX tests will be skipped.
+	CapRWXBlockOnly Capability = "RWXBlockOnly"
+
 	CapControllerExpansion Capability = "controllerExpansion" // support volume expansion for controller
 	CapNodeExpansion       Capability = "nodeExpansion"       // support volume expansion for node
 
