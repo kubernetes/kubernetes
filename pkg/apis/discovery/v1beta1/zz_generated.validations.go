@@ -110,11 +110,22 @@ func Validate_EndpointSlice(ctx context.Context, op operation.Operation, fldPath
 				return nil
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
+			crossCohortEarlyReturn := false
+			func() { // cohort update
+				earlyReturn := false
+				if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				crossCohortEarlyReturn = earlyReturn
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
+			if crossCohortEarlyReturn {
+				return // short-circuit from previous cohort
 			}
+			earlyReturn := false
 			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
