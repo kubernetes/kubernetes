@@ -986,6 +986,8 @@ func TestUpdatePod_WakeUpPodsOnExternalScheduling(t *testing.T) {
 	assumedPodOnNodeA.Spec.NodeName = "node-a"
 	boundPodOnNodeB := pod.DeepCopy()
 	boundPodOnNodeB.Spec.NodeName = "node-b"
+	boundPodOnNodeA := pod.DeepCopy()
+	boundPodOnNodeA.Spec.NodeName = "node-a"
 
 	medPriorityNominatedPodOnNodeA := pod.DeepCopy()
 	medPriorityNominatedPodOnNodeA.Status.NominatedNodeName = "node-a"
@@ -1023,10 +1025,23 @@ func TestUpdatePod_WakeUpPodsOnExternalScheduling(t *testing.T) {
 			wantInActiveOrBackoff: sets.New(lowPriorityPod.Name, medPriorityPod.Name, highPriorityPod.Name),
 		},
 		{
-			name:                  "nominated pod externally bound to a different node should wake up other pods with lower or equaL priority",
+			name:                  "nominated pod externally bound to a different node should wake up other pods with lower or equal priority",
 			oldPod:                medPriorityNominatedPodOnNodeA,
 			newPod:                boundPodOnNodeB,
 			wantInActiveOrBackoff: sets.New(lowPriorityPod.Name, medPriorityPod.Name),
+		},
+		{
+			name:                  "assumed pod externally bound to the same node should not wake up other pods",
+			oldPod:                pod,
+			newPod:                boundPodOnNodeA,
+			assumedPod:            assumedPodOnNodeA,
+			wantInActiveOrBackoff: sets.New[string](),
+		},
+		{
+			name:                  "nominated pod externally bound to a the same node should not wake up other pods",
+			oldPod:                medPriorityNominatedPodOnNodeA,
+			newPod:                boundPodOnNodeA,
+			wantInActiveOrBackoff: sets.New[string](),
 		},
 	}
 
