@@ -147,7 +147,7 @@ func (cgc *containerGC) removeOldestN(ctx context.Context, containers []containe
 				continue
 			}
 		}
-		if err := cgc.manager.removeContainer(ctx, containers[i].id); err != nil {
+		if err := cgc.manager.removeContainer(ctx, containers[i].id, false); err != nil {
 			logger.Error(err, "Failed to remove container", "containerID", containers[i].id)
 		}
 	}
