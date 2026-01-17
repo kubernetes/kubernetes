@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The Kubernetes Authors.
+Copyright 2026 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,94 +18,105 @@ package e2enode
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os/exec"
+	"strings"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/kubernetes/test/e2e/framework"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
-var _ = SIGDescribe("OOMWatcher", func() {
+const (
+	// systemOOMEventReason mirrors the reason used by pkg/kubelet/oom.
+	systemOOMEventReason = "SystemOOM"
+	// The kubelet records node events in the default namespace.
+	nodeEventNamespace = "default"
+)
+
+/*
+The test simulates system OOM kills by writing fake OOM killer lines into
+/dev/kmsg. The kernel assigns the sequence number and timestamp of every
+record written there, so the test cannot control event ordering. It verifies
+that every simulated OOM is reported exactly once, also across a kubelet
+restart, when the whole kernel log is replayed to the OOM watcher.
+*/
+var _ = SIGDescribe("OOMWatcher", framework.WithSerial(), framework.WithDisruptive(), func() {
 	f := framework.NewDefaultFramework("oom")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
-	ginkgo.It("ignores already processed events [LinuxOnly]", func(ctx context.Context) {
-		events, err := f.ClientSet.CoreV1().Events("default").List(ctx, metav1.ListOptions{})
-		framework.ExpectNoError(err)
+	ginkgo.It("reports every system OOM once and does not replay them after a kubelet restart", ginkgo.Label("LinuxOnly"), func(ctx context.Context) {
+		// A unique process name isolates this run from OOM events recorded
+		// earlier on the node.
+		processName := "e2e-oom-" + utilrand.String(8)
+		pids := []int{900001, 900002, 900003}
 
-		OOMEventOnTestStart := getOOMEventOnly(events.Items)
-		framework.Logf("OOM Event count on test start: '%d'", len(OOMEventOnTestStart))
-
-		offsets := []time.Duration{
-			10 * time.Second,
-			1 * time.Second,
-			5 * time.Second,
-			7 * time.Second,
-			15 * time.Second,
+		for _, pid := range pids {
+			framework.ExpectNoError(insertOOMEvent(ctx, processName, pid))
 		}
+		waitForOOMEventCount(ctx, f, processName, len(pids))
 
-		for k, offset := range offsets {
-			framework.Logf("Insert oom event with offset: '%d'", offset)
-			err := insertOOMEvent(k, offset.Microseconds())
-			framework.ExpectNoError(err)
-		}
-
-		events, err = f.ClientSet.CoreV1().Events("default").List(ctx, metav1.ListOptions{})
-		framework.ExpectNoError(err)
-		OOMEventsAfterInsert := getOOMEventOnly(events.Items)
-		framework.Logf("OOM Event count after insert: '%d'", len(OOMEventsAfterInsert))
-
-		if len(OOMEventsAfterInsert) != (2 + len(OOMEventOnTestStart)) {
-			framework.Failf("Expected %d OOM events, got %d", 2+len(OOMEventOnTestStart), len(OOMEventsAfterInsert))
-		}
+		ginkgo.By("restarting the kubelet so it replays the kernel log")
 		restartKubelet(ctx, true)
+		waitForKubeletToStart(ctx, f)
 
-		eventsAfterRestart, err := f.ClientSet.CoreV1().Events("default").List(ctx, metav1.ListOptions{})
-		framework.ExpectNoError(err)
-		OOMEventsAfterKubeletRestart := getOOMEventOnly(eventsAfterRestart.Items)
+		// The watcher reads /dev/kmsg from the beginning right after start,
+		// so any duplicate would show up within this window.
+		gomega.Consistently(ctx, func(ctx context.Context) (int, error) {
+			return countOOMEvents(ctx, f, processName)
+		}, 30*time.Second, 2*time.Second).Should(gomega.Equal(len(pids)), "already reported OOM events were reported again after the kubelet restart")
 
-		if len(OOMEventsAfterInsert) != len(OOMEventsAfterKubeletRestart) {
-			framework.Failf("Expected %d OOM events, got %d after kubelet restart", len(OOMEventsAfterInsert), len(OOMEventsAfterKubeletRestart))
-		}
-
+		ginkgo.By("verifying that new OOM kills are still reported after the restart")
+		framework.ExpectNoError(insertOOMEvent(ctx, processName, 900004))
+		waitForOOMEventCount(ctx, f, processName, len(pids)+1)
 	})
 })
 
-func insertOOMEvent(processID int, offset int64) error {
-	cmd := fmt.Sprintf(`cat >> %s << EOF 
-%s 
-EOF`, "/dev/kmsg", buildOOMEvent(processID, offset))
-	_, err := exec.Command("sudo", "sh", "-c", cmd).Output()
-	var exError *exec.ExitError
-	if errors.As(err, &exError) {
-		framework.Logf("error %s", string(exError.Stderr))
+// insertOOMEvent writes the kernel lines the OOM parser needs to recognise a
+// system OOM kill. Each echo is a separate write, and each write to /dev/kmsg
+// becomes exactly one kernel log record. The kernel rate-limits /dev/kmsg
+// writes to 10 records per 5 seconds by default, so keep the total small.
+func insertOOMEvent(ctx context.Context, processName string, pid int) error {
+	lines := []string{
+		fmt.Sprintf("%s invoked oom-killer: gfp_mask=0x140cca(GFP_HIGHUSER_MOVABLE|__GFP_COMP), order=0, oom_score_adj=0", processName),
+		fmt.Sprintf("Out of memory: Killed process %d (%s) total-vm:1658008kB, anon-rss:1647488kB, file-rss:1920kB, shmem-rss:0kB, UID:1000 pgtables:3284kB oom_score_adj:0", pid, processName),
 	}
-
+	script := ""
+	for _, line := range lines {
+		script += fmt.Sprintf("echo '%s' > /dev/kmsg\n", line)
+	}
+	out, err := exec.CommandContext(ctx, "sudo", "sh", "-c", script).CombinedOutput()
 	if err != nil {
-		return err
+		return fmt.Errorf("writing OOM event to /dev/kmsg: %w, output: %s", err, out)
 	}
 	return nil
 }
 
-func buildOOMEvent(processID int, timeOffset int64) string {
-	return fmt.Sprintf(`
-4,1034,%d,-;sshd invoked oom-killer: gfp_mask=0x140cca(GFP_HIGHUSER_MOVABLE|__GFP_COMP), order=0, oom_score_adj=0
-6,1143,%d,-;oom-kill:constraint=CONSTRAINT_NONE,nodemask=(null),cpuset=user.slice,mems_allowed=0,global_oom,task_memcg=/user.slice/user-1000.slice/session-4.scope,task=perl,pid=6118,uid=1000
-3,1144,%d,-;Out of memory: Killed process %d (perl) total-vm:1658008kB, anon-rss:1647488kB, file-rss:1920kB, shmem-rss:0kB, UID:1000 pgtables:3284kB oom_score_adj:0`, timeOffset, timeOffset, timeOffset, processID)
+// countOOMEvents returns how many times a SystemOOM event for processName was
+// recorded. The event recorder folds repeated identical events into one object
+// and bumps its count, so the counts are summed.
+func countOOMEvents(ctx context.Context, f *framework.Framework, processName string) (int, error) {
+	events, err := f.ClientSet.CoreV1().Events(nodeEventNamespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return 0, err
+	}
+	total := 0
+	for _, event := range events.Items {
+		if event.Reason != systemOOMEventReason || !strings.Contains(event.Message, processName) {
+			continue
+		}
+		total += max(int(event.Count), 1)
+	}
+	return total, nil
 }
 
-func getOOMEventOnly(events []v1.Event) []v1.Event {
-	result := []v1.Event{}
-	for _, event := range events {
-		if event.Reason == "SystemOOM" {
-			result = append(result, event)
-		}
-	}
-	return result
+func waitForOOMEventCount(ctx context.Context, f *framework.Framework, processName string, expected int) {
+	gomega.Eventually(ctx, func(ctx context.Context) (int, error) {
+		return countOOMEvents(ctx, f, processName)
+	}, time.Minute, 2*time.Second).Should(gomega.Equal(expected))
 }
