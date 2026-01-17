@@ -35,7 +35,7 @@ var _ = SIGDescribe("OOMWatcher", func() {
 	f := framework.NewDefaultFramework("oom")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
-	ginkgo.It("ignores already processed events [LinuxOnly]", func(ctx context.Context) {
+	ginkgo.It("ignores already processed eventsma", ginkgo.Label("LinuxOnly"), func(ctx context.Context) {
 		events, err := f.ClientSet.CoreV1().Events("default").List(ctx, metav1.ListOptions{})
 		framework.ExpectNoError(err)
 

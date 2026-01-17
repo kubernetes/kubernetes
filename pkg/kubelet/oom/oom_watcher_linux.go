@@ -20,14 +20,15 @@ package oom
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	"path"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 
 	"github.com/google/cadvisor/utils/oomparser"
 )
@@ -38,10 +39,36 @@ type streamer interface {
 
 var _ streamer = &oomparser.OomParser{}
 
+type Checkpoint struct {
+	LastProcessedTimestamp time.Time
+}
+
+func (s *Checkpoint) MarshalCheckpoint() ([]byte, error) {
+	return json.Marshal(s)
+}
+
+func (s *Checkpoint) UnmarshalCheckpoint(blob []byte) error {
+	return json.Unmarshal(blob, s)
+}
+
+func (s *Checkpoint) VerifyChecksum() error {
+	if s.LastProcessedTimestamp.IsZero() {
+		return fmt.Errorf("LastProcessedTimestamp is zero")
+	}
+	return nil
+}
+
+func (s *Checkpoint) isNewEvent(newTime time.Time) bool {
+	return newTime.After(s.LastProcessedTimestamp)
+}
+
+var _ checkpointmanager.Checkpoint = &Checkpoint{}
+
 type realWatcher struct {
-	recorder    record.EventRecorder
-	oomStreamer streamer
-	state       *state
+	recorder          record.EventRecorder
+	oomStreamer       streamer
+	checkPoint        *Checkpoint
+	checkPointManager checkpointmanager.CheckpointManager
 }
 
 var _ Watcher = &realWatcher{}
@@ -55,18 +82,20 @@ func NewWatcher(recorder record.EventRecorder, rootDir string) (Watcher, error) 
 		return nil, nil
 	}
 
+	manager, err := checkpointmanager.NewCheckpointManager(rootDir)
+	if err != nil {
+		return nil, err
+	}
+
 	oomStreamer, err := oomparser.New()
 	if err != nil {
 		return nil, err
 	}
 	watcher := &realWatcher{
-		recorder:    recorder,
-		oomStreamer: oomStreamer,
-		state: &state{
-			storer: &FileStorer{
-				filePath: path.Join(rootDir, "oom_watcher_state"),
-			},
-		},
+		recorder:          recorder,
+		oomStreamer:       oomStreamer,
+		checkPoint:        &Checkpoint{},
+		checkPointManager: manager,
 	}
 
 	return watcher, nil
@@ -75,14 +104,16 @@ func NewWatcher(recorder record.EventRecorder, rootDir string) (Watcher, error) 
 const (
 	systemOOMEvent           = "SystemOOM"
 	recordEventContainerName = "/"
+	checkpointKey            = "oom_watcher"
 )
 
 // Start watches for system oom's and records an event for every system oom encountered.
 func (ow *realWatcher) Start(ctx context.Context, ref *v1.ObjectReference) error {
 	logger := klog.FromContext(ctx)
-	if err := ow.state.load(); err != nil {
-		ow.state.LastProcessedTimestamp = time.Now()
-		logger.Info("unable to restore state from file, continue with state", "state", ow.state.LastProcessedTimestamp, "error", err)
+
+	if err := ow.checkPointManager.GetCheckpoint(checkpointKey, ow.checkPoint); err != nil {
+		ow.checkPoint.LastProcessedTimestamp = time.Now()
+		logger.Info("unable to restore OOMCheckpoint from file", "OOMCheckpoint", ow.checkPoint.LastProcessedTimestamp, "error", err)
 	}
 
 	outStream := make(chan *oomparser.OomInstance, 10)
@@ -94,8 +125,8 @@ func (ow *realWatcher) Start(ctx context.Context, ref *v1.ObjectReference) error
 		for event := range outStream {
 			if event.VictimContainerName == recordEventContainerName {
 				logger.V(1).Info("Got sys oom event", "event", event)
-				if !ow.state.isNewEvent(event.TimeOfDeath) {
-					logger.V(1).Info("ignore out of the order event", "event", event, "LastProcessedTimestamp", ow.state.LastProcessedTimestamp)
+				if !ow.checkPoint.isNewEvent(event.TimeOfDeath) {
+					logger.V(1).Info("ignore out of the order event", "event", event, "LastProcessedTimestamp", ow.checkPoint.LastProcessedTimestamp)
 					continue
 				}
 
@@ -104,9 +135,9 @@ func (ow *realWatcher) Start(ctx context.Context, ref *v1.ObjectReference) error
 					eventMsg = fmt.Sprintf("%s, victim process: %s, pid: %d", eventMsg, event.ProcessName, event.Pid)
 				}
 				ow.recorder.Eventf(ref, v1.EventTypeWarning, systemOOMEvent, eventMsg)
-				ow.state.LastProcessedTimestamp = event.TimeOfDeath
-				if err := ow.state.store(); err != nil {
-					logger.Error(err, "Unable to store watcher state")
+				ow.checkPoint.LastProcessedTimestamp = event.TimeOfDeath
+				if err := ow.checkPointManager.CreateCheckpoint(checkpointKey, ow.checkPoint); err != nil {
+					logger.Error(err, "Unable to store watcher OOMCheckpoint")
 				}
 			}
 		}
