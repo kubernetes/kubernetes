@@ -293,6 +293,475 @@ func collectNamespacedNamesFromPodResources(prs []*podresourcesapi.PodResources)
 	return ret
 }
 
+// ptr returns a pointer to the given string value.
+func ptr(s string) *string {
+	return &s
+}
+
+func TestListPodResourcesWithCompleteClaimResources(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.KubeletPodResourcesDynamicResources, true)
+
+	tCtx := ktesting.Init(t)
+	podName := "pod-name"
+	podNamespace := "pod-namespace"
+	podUID := types.UID("pod-uid")
+	containerName := "container-name"
+
+	containers := []v1.Container{
+		{
+			Name: containerName,
+		},
+	}
+	pods := []*v1.Pod{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      podName,
+				Namespace: podNamespace,
+				UID:       podUID,
+			},
+			Spec: v1.PodSpec{
+				Containers: containers,
+			},
+		},
+	}
+
+	for _, tc := range []struct {
+		desc             string
+		dynamicResources []*podresourcesapi.DynamicResource
+		expectedResponse *podresourcesapi.ListPodResourcesResponse
+	}{
+		{
+			desc: "claim resource with all fields including ShareId",
+			dynamicResources: []*podresourcesapi.DynamicResource{
+				{
+					ClaimName:      "gpu-claim",
+					ClaimNamespace: "default",
+					ClaimResources: []*podresourcesapi.ClaimResource{
+						{
+							CdiDevices: []*podresourcesapi.CDIDevice{
+								{Name: "nvidia.com/gpu=0"},
+								{Name: "nvidia.com/gpu=1"},
+							},
+							DriverName: "gpu.nvidia.com",
+							PoolName:   "worker-1-gpu-pool",
+							DeviceName: "gpu-device-0",
+							ShareId:    ptr("shared-gpu-123"),
+						},
+					},
+				},
+			},
+			expectedResponse: &podresourcesapi.ListPodResourcesResponse{
+				PodResources: []*podresourcesapi.PodResources{
+					{
+						Name:      podName,
+						Namespace: podNamespace,
+						Containers: []*podresourcesapi.ContainerResources{
+							{
+								Name:    containerName,
+								Devices: []*podresourcesapi.ContainerDevices{},
+								CpuIds:  []int64{},
+								Memory:  []*podresourcesapi.ContainerMemory{},
+								DynamicResources: []*podresourcesapi.DynamicResource{
+									{
+										ClaimName:      "gpu-claim",
+										ClaimNamespace: "default",
+										ClaimResources: []*podresourcesapi.ClaimResource{
+											{
+												CdiDevices: []*podresourcesapi.CDIDevice{
+													{Name: "nvidia.com/gpu=0"},
+													{Name: "nvidia.com/gpu=1"},
+												},
+												DriverName: "gpu.nvidia.com",
+												PoolName:   "worker-1-gpu-pool",
+												DeviceName: "gpu-device-0",
+												ShareId:    ptr("shared-gpu-123"),
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "claim resource without ShareId (nil)",
+			dynamicResources: []*podresourcesapi.DynamicResource{
+				{
+					ClaimName:      "fpga-claim",
+					ClaimNamespace: "workloads",
+					ClaimResources: []*podresourcesapi.ClaimResource{
+						{
+							CdiDevices: []*podresourcesapi.CDIDevice{
+								{Name: "intel.com/fpga=accel-0"},
+							},
+							DriverName: "fpga.intel.com",
+							PoolName:   "fpga-pool",
+							DeviceName: "fpga-device-1",
+							ShareId:    nil,
+						},
+					},
+				},
+			},
+			expectedResponse: &podresourcesapi.ListPodResourcesResponse{
+				PodResources: []*podresourcesapi.PodResources{
+					{
+						Name:      podName,
+						Namespace: podNamespace,
+						Containers: []*podresourcesapi.ContainerResources{
+							{
+								Name:    containerName,
+								Devices: []*podresourcesapi.ContainerDevices{},
+								CpuIds:  []int64{},
+								Memory:  []*podresourcesapi.ContainerMemory{},
+								DynamicResources: []*podresourcesapi.DynamicResource{
+									{
+										ClaimName:      "fpga-claim",
+										ClaimNamespace: "workloads",
+										ClaimResources: []*podresourcesapi.ClaimResource{
+											{
+												CdiDevices: []*podresourcesapi.CDIDevice{
+													{Name: "intel.com/fpga=accel-0"},
+												},
+												DriverName: "fpga.intel.com",
+												PoolName:   "fpga-pool",
+												DeviceName: "fpga-device-1",
+												ShareId:    nil,
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "multiple ClaimResources within single DynamicResource",
+			dynamicResources: []*podresourcesapi.DynamicResource{
+				{
+					ClaimName:      "multi-device-claim",
+					ClaimNamespace: "default",
+					ClaimResources: []*podresourcesapi.ClaimResource{
+						{
+							CdiDevices: []*podresourcesapi.CDIDevice{
+								{Name: "vendor.com/device=dev0"},
+							},
+							DriverName: "dra.vendor.com",
+							PoolName:   "pool-a",
+							DeviceName: "device-0",
+							ShareId:    ptr("share-a"),
+						},
+						{
+							CdiDevices: []*podresourcesapi.CDIDevice{
+								{Name: "vendor.com/device=dev1"},
+								{Name: "vendor.com/device=dev2"},
+							},
+							DriverName: "dra.vendor.com",
+							PoolName:   "pool-b",
+							DeviceName: "device-1",
+							ShareId:    nil,
+						},
+						{
+							CdiDevices: []*podresourcesapi.CDIDevice{
+								{Name: "other.com/accel=acc0"},
+							},
+							DriverName: "dra.other.com",
+							PoolName:   "accel-pool",
+							DeviceName: "accel-device-0",
+							ShareId:    ptr("share-other"),
+						},
+					},
+				},
+			},
+			expectedResponse: &podresourcesapi.ListPodResourcesResponse{
+				PodResources: []*podresourcesapi.PodResources{
+					{
+						Name:      podName,
+						Namespace: podNamespace,
+						Containers: []*podresourcesapi.ContainerResources{
+							{
+								Name:    containerName,
+								Devices: []*podresourcesapi.ContainerDevices{},
+								CpuIds:  []int64{},
+								Memory:  []*podresourcesapi.ContainerMemory{},
+								DynamicResources: []*podresourcesapi.DynamicResource{
+									{
+										ClaimName:      "multi-device-claim",
+										ClaimNamespace: "default",
+										ClaimResources: []*podresourcesapi.ClaimResource{
+											{
+												CdiDevices: []*podresourcesapi.CDIDevice{
+													{Name: "vendor.com/device=dev0"},
+												},
+												DriverName: "dra.vendor.com",
+												PoolName:   "pool-a",
+												DeviceName: "device-0",
+												ShareId:    ptr("share-a"),
+											},
+											{
+												CdiDevices: []*podresourcesapi.CDIDevice{
+													{Name: "vendor.com/device=dev1"},
+													{Name: "vendor.com/device=dev2"},
+												},
+												DriverName: "dra.vendor.com",
+												PoolName:   "pool-b",
+												DeviceName: "device-1",
+												ShareId:    nil,
+											},
+											{
+												CdiDevices: []*podresourcesapi.CDIDevice{
+													{Name: "other.com/accel=acc0"},
+												},
+												DriverName: "dra.other.com",
+												PoolName:   "accel-pool",
+												DeviceName: "accel-device-0",
+												ShareId:    ptr("share-other"),
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "multiple DynamicResources (multiple claims)",
+			dynamicResources: []*podresourcesapi.DynamicResource{
+				{
+					ClaimName:      "claim-1",
+					ClaimNamespace: "ns-1",
+					ClaimResources: []*podresourcesapi.ClaimResource{
+						{
+							CdiDevices: []*podresourcesapi.CDIDevice{
+								{Name: "vendor1.com/gpu=0"},
+							},
+							DriverName: "dra.vendor1.com",
+							PoolName:   "gpu-pool",
+							DeviceName: "gpu-0",
+							ShareId:    nil,
+						},
+					},
+				},
+				{
+					ClaimName:      "claim-2",
+					ClaimNamespace: "ns-2",
+					ClaimResources: []*podresourcesapi.ClaimResource{
+						{
+							CdiDevices: []*podresourcesapi.CDIDevice{
+								{Name: "vendor2.com/fpga=0"},
+								{Name: "vendor2.com/fpga=1"},
+							},
+							DriverName: "dra.vendor2.com",
+							PoolName:   "fpga-pool",
+							DeviceName: "fpga-0",
+							ShareId:    ptr("shared-fpga"),
+						},
+					},
+				},
+			},
+			expectedResponse: &podresourcesapi.ListPodResourcesResponse{
+				PodResources: []*podresourcesapi.PodResources{
+					{
+						Name:      podName,
+						Namespace: podNamespace,
+						Containers: []*podresourcesapi.ContainerResources{
+							{
+								Name:    containerName,
+								Devices: []*podresourcesapi.ContainerDevices{},
+								CpuIds:  []int64{},
+								Memory:  []*podresourcesapi.ContainerMemory{},
+								DynamicResources: []*podresourcesapi.DynamicResource{
+									{
+										ClaimName:      "claim-1",
+										ClaimNamespace: "ns-1",
+										ClaimResources: []*podresourcesapi.ClaimResource{
+											{
+												CdiDevices: []*podresourcesapi.CDIDevice{
+													{Name: "vendor1.com/gpu=0"},
+												},
+												DriverName: "dra.vendor1.com",
+												PoolName:   "gpu-pool",
+												DeviceName: "gpu-0",
+												ShareId:    nil,
+											},
+										},
+									},
+									{
+										ClaimName:      "claim-2",
+										ClaimNamespace: "ns-2",
+										ClaimResources: []*podresourcesapi.ClaimResource{
+											{
+												CdiDevices: []*podresourcesapi.CDIDevice{
+													{Name: "vendor2.com/fpga=0"},
+													{Name: "vendor2.com/fpga=1"},
+												},
+												DriverName: "dra.vendor2.com",
+												PoolName:   "fpga-pool",
+												DeviceName: "fpga-0",
+												ShareId:    ptr("shared-fpga"),
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "claim resource with empty CdiDevices",
+			dynamicResources: []*podresourcesapi.DynamicResource{
+				{
+					ClaimName:      "no-cdi-claim",
+					ClaimNamespace: "default",
+					ClaimResources: []*podresourcesapi.ClaimResource{
+						{
+							CdiDevices: []*podresourcesapi.CDIDevice{},
+							DriverName: "dra.example.com",
+							PoolName:   "empty-pool",
+							DeviceName: "device-without-cdi",
+							ShareId:    nil,
+						},
+					},
+				},
+			},
+			expectedResponse: &podresourcesapi.ListPodResourcesResponse{
+				PodResources: []*podresourcesapi.PodResources{
+					{
+						Name:      podName,
+						Namespace: podNamespace,
+						Containers: []*podresourcesapi.ContainerResources{
+							{
+								Name:    containerName,
+								Devices: []*podresourcesapi.ContainerDevices{},
+								CpuIds:  []int64{},
+								Memory:  []*podresourcesapi.ContainerMemory{},
+								DynamicResources: []*podresourcesapi.DynamicResource{
+									{
+										ClaimName:      "no-cdi-claim",
+										ClaimNamespace: "default",
+										ClaimResources: []*podresourcesapi.ClaimResource{
+											{
+												CdiDevices: []*podresourcesapi.CDIDevice{},
+												DriverName: "dra.example.com",
+												PoolName:   "empty-pool",
+												DeviceName: "device-without-cdi",
+												ShareId:    nil,
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "claim resource with empty ShareId string",
+			dynamicResources: []*podresourcesapi.DynamicResource{
+				{
+					ClaimName:      "empty-share-claim",
+					ClaimNamespace: "default",
+					ClaimResources: []*podresourcesapi.ClaimResource{
+						{
+							CdiDevices: []*podresourcesapi.CDIDevice{
+								{Name: "vendor.com/device=dev0"},
+							},
+							DriverName: "dra.vendor.com",
+							PoolName:   "pool",
+							DeviceName: "device",
+							ShareId:    ptr(""),
+						},
+					},
+				},
+			},
+			expectedResponse: &podresourcesapi.ListPodResourcesResponse{
+				PodResources: []*podresourcesapi.PodResources{
+					{
+						Name:      podName,
+						Namespace: podNamespace,
+						Containers: []*podresourcesapi.ContainerResources{
+							{
+								Name:    containerName,
+								Devices: []*podresourcesapi.ContainerDevices{},
+								CpuIds:  []int64{},
+								Memory:  []*podresourcesapi.ContainerMemory{},
+								DynamicResources: []*podresourcesapi.DynamicResource{
+									{
+										ClaimName:      "empty-share-claim",
+										ClaimNamespace: "default",
+										ClaimResources: []*podresourcesapi.ClaimResource{
+											{
+												CdiDevices: []*podresourcesapi.CDIDevice{
+													{Name: "vendor.com/device=dev0"},
+												},
+												DriverName: "dra.vendor.com",
+												PoolName:   "pool",
+												DeviceName: "device",
+												ShareId:    ptr(""),
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	} {
+		t.Run(tc.desc, func(t *testing.T) {
+			mockDevicesProvider := podresourcetest.NewMockDevicesProvider(t)
+			mockPodsProvider := podresourcetest.NewMockPodsProvider(t)
+			mockCPUsProvider := podresourcetest.NewMockCPUsProvider(t)
+			mockMemoryProvider := podresourcetest.NewMockMemoryProvider(t)
+			mockDynamicResourcesProvider := podresourcetest.NewMockDynamicResourcesProvider(t)
+
+			mockPodsProvider.EXPECT().GetPods().Return(pods).Maybe()
+			mockPodsProvider.EXPECT().GetActivePods().Return(pods).Maybe()
+			mockDevicesProvider.EXPECT().GetDevices(string(podUID), containerName).Return([]*podresourcesapi.ContainerDevices{}).Maybe()
+			mockCPUsProvider.EXPECT().GetCPUs(string(podUID), containerName).Return([]int64{}).Maybe()
+			mockMemoryProvider.EXPECT().GetMemory(string(podUID), containerName).Return([]*podresourcesapi.ContainerMemory{}).Maybe()
+			mockDynamicResourcesProvider.EXPECT().GetDynamicResources(pods[0], &containers[0]).Return(tc.dynamicResources).Maybe()
+			mockDevicesProvider.EXPECT().UpdateAllocatedDevices().Return().Maybe()
+			mockCPUsProvider.EXPECT().GetAllocatableCPUs().Return([]int64{}).Maybe()
+			mockDevicesProvider.EXPECT().GetAllocatableDevices().Return([]*podresourcesapi.ContainerDevices{}).Maybe()
+			mockMemoryProvider.EXPECT().GetAllocatableMemory().Return([]*podresourcesapi.ContainerMemory{}).Maybe()
+
+			providers := PodResourcesProviders{
+				Pods:             mockPodsProvider,
+				Devices:          mockDevicesProvider,
+				Cpus:             mockCPUsProvider,
+				Memory:           mockMemoryProvider,
+				DynamicResources: mockDynamicResourcesProvider,
+			}
+			server := NewV1PodResourcesServer(tCtx, providers)
+			resp, err := server.List(tCtx, &podresourcesapi.ListPodResourcesRequest{})
+			if err != nil {
+				t.Errorf("want err = %v, got %q", nil, err)
+			}
+			if diff := cmp.Diff(tc.expectedResponse, resp, cmpopts.IgnoreUnexported(
+				podresourcesapi.ListPodResourcesResponse{},
+				podresourcesapi.PodResources{},
+				podresourcesapi.ContainerResources{},
+				podresourcesapi.ContainerDevices{},
+				podresourcesapi.DynamicResource{},
+				podresourcesapi.ClaimResource{},
+				podresourcesapi.CDIDevice{},
+			)); diff != "" {
+				t.Errorf("ListPodResources() mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestListPodResourcesUsesOnlyActivePodsV1(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.KubeletPodResourcesDynamicResources, true)
 
