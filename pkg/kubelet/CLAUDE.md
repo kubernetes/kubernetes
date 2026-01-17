@@ -116,6 +116,33 @@ The kubelet triggers resize retries from multiple points in `kubelet.go`:
 - Line 2974: `TriggerReasonPodsRemoved` - When pods are removed
 - Line 3054: `TriggerReasonPodResized` - When pod resize completes
 
+## Active Pods (kubelet_pods.go)
+
+### GetActivePods() (line 208)
+
+Returns pods that should be considered for admission and resource calculations:
+
+```go
+func (kl *Kubelet) GetActivePods() []*v1.Pod {
+    allPods := kl.podManager.GetPods()
+    return kl.filterOutInactivePods(allPods)
+}
+```
+
+### filterOutInactivePods() (line 1126)
+
+Excludes pods that shouldn't consume node resources:
+
+| Condition | Meaning |
+|-----------|---------|
+| `IsPodKnownTerminated(uid)` | Pod worker completed termination |
+| `isAdmittedPodTerminal(pod)` | Pod in Succeeded/Failed phase |
+| `!IsPodTerminationRequested(uid)` | Not actively terminating |
+
+A pod is **inactive** if: fully terminated OR (terminal phase AND not actively terminating).
+
+**Used by**: `allocationManager.AddPod()`, admission handlers, resource calculations.
+
 ## Design Notes
 
 - The kubelet watches for pods from multiple sources (API server, file, HTTP)

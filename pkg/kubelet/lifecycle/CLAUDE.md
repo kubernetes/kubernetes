@@ -37,6 +37,29 @@ type predicateAdmitHandler struct {
 }
 ```
 
+### Key Line Numbers (predicate.go)
+
+| Location | Line | Description |
+|----------|------|-------------|
+| `predicateAdmitHandler` struct | 102-106 | Handler struct definition |
+| `NewPredicateAdmitHandler()` | 112-118 | Constructor |
+| `Admit()` | 120-251 | Main admission method |
+| **NodeInfo construction** | 162-164 | `NewNodeInfo(pods...)` - **O(n×m) bottleneck** |
+| `pluginResourceUpdateFunc` call | 167 | Modifies NodeInfo.Allocatable |
+| `generalFilter()` call | 188 | Resource fit, taints, affinity checks |
+| Affinity retry with fresh node | 267-273 | Bypasses cache on affinity failure |
+| `generalFilter()` (standalone) | 436-464 | Admission checks implementation |
+
+### NodeInfo Construction (lines 162-164)
+
+```go
+pods := attrs.OtherPods
+nodeInfo := schedulerframework.NewNodeInfo(pods...)
+nodeInfo.SetNode(node)
+```
+
+This is the **performance bottleneck** addressed by issue #132858. The `OtherPods` comes from `PodAdmitAttributes` passed by `allocationManager.canAdmitPod()`.
+
 ### Admit() Flow
 
 1. **Get Node**: Calls `getNodeAnyWayFunc(ctx, true)` to get cached node

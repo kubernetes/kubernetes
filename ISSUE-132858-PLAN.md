@@ -17,151 +17,26 @@ nodeInfo.SetNode(node)
 
 **SergeyKanzhelev's feedback is critical**: Sequential pod admissions will frequently invalidate the cache since each admission changes the pod set. The primary optimization benefit is for **resize retries**, where the same pod set is repeatedly evaluated while waiting for resources to become available.
 
-## Recommended Approach
-
-### 1. Cache Location
-
-Add the cache to `predicateAdmitHandler` in `pkg/kubelet/lifecycle/predicate.go`:
-
-```go
-type predicateAdmitHandler struct {
-    getNodeAnyWayFunc        getNodeAnyWayFuncType
-    pluginResourceUpdateFunc pluginResourceUpdateFuncType
-    admissionFailureHandler  AdmissionFailureHandler
-
-    // NodeInfo cache
-    mu              sync.RWMutex
-    cachedNodeInfo  *schedulerframework.NodeInfo
-    cacheGeneration uint64  // or use a hash of pod UIDs + resource versions
-}
-```
-
-### 2. Cache Key/Invalidation Strategy
-
-The cache should be invalidated when any of these change:
-
-| Trigger | Detection Method |
-|---------|------------------|
-| Pod additions/removals | Hash of pod UIDs in `OtherPods` |
-| Pod resource changes | Hash of pod ResourceVersions |
-| Pod generation changes (resize) | Compare `pod.Generation` |
-| Allocated resource changes | Hash of allocated resources |
-| Node resource version | Compare `node.ResourceVersion` |
-
-**Recommended hash approach**:
-```go
-type cacheKey struct {
-    nodeResourceVersion string
-    podSetHash          uint64  // FNV hash of sorted pod UIDs
-    resourceHash        uint64  // FNV hash of pod resource versions
-}
-```
-
-### 3. Implementation Steps
-
-**Step 1**: Create cache infrastructure in `predicate.go`
-
-```go
-func (w *predicateAdmitHandler) getCachedNodeInfo(node *v1.Node, pods []*v1.Pod) *schedulerframework.NodeInfo {
-    key := w.computeCacheKey(node, pods)
-
-    w.mu.RLock()
-    if w.cacheKey == key && w.cachedNodeInfo != nil {
-        nodeInfoCacheHits.Inc()
-        w.mu.RUnlock()
-        return w.cachedNodeInfo
-    }
-    w.mu.RUnlock()
-
-    // Cache miss - build new NodeInfo
-    nodeInfoCacheMisses.Inc()
-    nodeInfo := schedulerframework.NewNodeInfo(pods...)
-    nodeInfo.SetNode(node)
-
-    w.mu.Lock()
-    w.cachedNodeInfo = nodeInfo
-    w.cacheKey = key
-    w.mu.Unlock()
-
-    return nodeInfo
-}
-```
-
-**Step 2**: Modify `Admit()` to use cache
-
-```go
-func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
-    // ... existing node fetch ...
-
-    pods := attrs.OtherPods
-    // CHANGE: Use cached NodeInfo
-    nodeInfo := w.getCachedNodeInfo(node, pods)
-
-    // ... rest of admission logic ...
-}
-```
-
-**Step 3**: Handle cache invalidation after plugin resource update
-
-The `pluginResourceUpdateFunc` modifies `nodeInfo.Allocatable`, so either:
-- Clone the cached NodeInfo before passing to plugins, OR
-- Invalidate cache after plugin updates
-
-**Step 4**: Add metrics in `pkg/kubelet/metrics/metrics.go`
-
-```go
-var (
-    nodeInfoCacheHits = prometheus.NewCounter(
-        prometheus.CounterOpts{
-            Name: "kubelet_admission_nodeinfo_cache_hits_total",
-            Help: "Total number of NodeInfo cache hits during admission",
-        },
-    )
-    nodeInfoCacheMisses = prometheus.NewCounter(
-        prometheus.CounterOpts{
-            Name: "kubelet_admission_nodeinfo_cache_misses_total",
-            Help: "Total number of NodeInfo cache misses during admission",
-        },
-    )
-)
-```
-
-### 4. Edge Cases to Handle
-
-1. **`pluginResourceUpdateFunc` modifies NodeInfo**: The `sanitizeNodeAllocatable` in device manager modifies `nodeInfo.Allocatable`. Options:
-   - Clone NodeInfo before plugin call (safest)
-   - Track if plugin modified it and invalidate
-
-2. **Synchronous node refetch on affinity failure** (lines 262-272): When admission fails due to node affinity, the code fetches the node synchronously and retries. The cache should handle this by:
-   - Passing the new node to cache lookup
-   - Cache miss due to different `node.ResourceVersion`
-
-3. **Concurrent admission**: Multiple goroutines may call `Admit()` concurrently. Use proper locking (already shown above).
-
-### 5. Testing Strategy
-
-1. **Unit tests**: Mock `OtherPods` with varying pod sets, verify cache hits/misses
-2. **Benchmark tests**: Measure admission latency with 100+ pods
-3. **Integration tests**: Verify resize retries benefit from caching
-
-### 6. Files to Modify
-
-| File | Changes |
-|------|---------|
-| `pkg/kubelet/lifecycle/predicate.go` | Add cache logic, modify `Admit()` |
-| `pkg/kubelet/metrics/metrics.go` | Add cache hit/miss counters |
-| `pkg/kubelet/lifecycle/predicate_test.go` | Add cache tests |
-
-## Alternative Approach: Cache at Allocation Manager Level
-
-Since `canAdmitPod` and `canResizePod` both need NodeInfo, consider caching at `pkg/kubelet/allocation/allocation_manager.go` instead. This would:
-- Centralize cache management
-- Benefit both admission and resize flows
-- Align with where `allocatedPods` is computed
-
-## Alternative Approach: Incremental Update Cache (Explored in Detail)
+## Recommended Approach: Incremental Update Cache
 
 Instead of hash-based cache invalidation, leverage `NodeInfo`'s built-in incremental update methods. This approach maintains the cache continuously rather than rebuilding on cache miss.
+
+### Why This Approach
+
+| Consideration | Hash-Based (predicateAdmitHandler) | Incremental (Kubelet) |
+|---------------|-----------------------------------|----------------------|
+| Cache location | Consumer | Owner of pod lifecycle |
+| Rebuild frequency | Every pod set change | Never |
+| Sequential admission benefit | None (cache miss) | Full (O(1) update) |
+| Resize retry benefit | Yes | Yes |
+| Existing pattern | None | Matches `cachedNode` |
+| Code complexity | Self-contained | Distributed updates |
+
+The incremental approach is preferred because:
+1. **Kubelet owns pod lifecycle events** - natural place for cache updates
+2. **Benefits ALL admissions**, not just resize retries
+3. **Follows existing `cachedNode` pattern** in kubelet
+4. **Never rebuilds NodeInfo from scratch** - always O(1) incremental updates
 
 ### NodeInfo Already Supports Incremental Updates
 
@@ -333,26 +208,643 @@ lifecycle.NewPredicateAdmitHandler(
 nodeInfo := w.nodeInfoCache.Snapshot()
 ```
 
-### Comparison: Hash-Based vs Incremental Update
+### Edge Cases to Handle
 
-| Aspect | Hash-Based (Main Plan) | Incremental Update |
-|--------|----------------------|-------------------|
-| Cache location | `predicateAdmitHandler` | `Kubelet` struct |
-| Invalidation | Hash mismatch → full rebuild | Never rebuilds, only increments |
-| Update trigger | On `Admit()` call | On pod lifecycle events |
-| Complexity | ~200 lines + hashing | ~100 lines, simpler |
-| Cache misses | Every pod set change | None after initialization |
-| Thread safety | RWMutex around cache | RWMutex around NodeInfo |
-| Stale data risk | None (hash guarantees) | Low (events are synchronous) |
+1. **`pluginResourceUpdateFunc` modifies NodeInfo**: The `sanitizeNodeAllocatable` in device manager modifies `nodeInfo.Allocatable`. Since we use `Snapshot()`, the cached NodeInfo is not modified - the snapshot copy is modified instead.
+
+2. **Synchronous node refetch on affinity failure** (lines 262-272): When admission fails due to node affinity, the code fetches the node synchronously and retries. The cache's node will be updated via `getCachedNode()` which calls `SetNode()`.
+
+3. **Concurrent admission**: Multiple goroutines may call `Snapshot()` concurrently. The `RWMutex` ensures safe concurrent reads.
+
+4. **Stale data risk**: Events are processed synchronously in the kubelet's sync loop, so the cache should stay consistent with pod manager. If a pod is added/removed, the cache update happens in the same goroutine before the next admission.
+
+### Implementation Steps
+
+#### Step 1: Create Cache Package
+
+**Create `pkg/kubelet/nodeinfocache/cache.go`**
+
+```go
+package nodeinfocache
+
+import (
+    "sync"
+
+    v1 "k8s.io/api/core/v1"
+    "k8s.io/klog/v2"
+    "k8s.io/kubernetes/pkg/scheduler/framework"
+)
+
+// Cache maintains a cached NodeInfo for the kubelet's node.
+// Thread-safe wrapper around framework.NodeInfo with incremental updates.
+type Cache struct {
+    mu       sync.RWMutex
+    nodeInfo *framework.NodeInfo
+}
+
+// New creates a new empty NodeInfo cache.
+func New() *Cache {
+    return &Cache{
+        nodeInfo: framework.NewNodeInfo(),
+    }
+}
+
+// SetNode updates the cached node metadata.
+func (c *Cache) SetNode(node *v1.Node) {
+    c.mu.Lock()
+    defer c.mu.Unlock()
+    c.nodeInfo.SetNode(node)
+}
+
+// AddPod adds a pod to the cache incrementally.
+func (c *Cache) AddPod(pod *v1.Pod) {
+    c.mu.Lock()
+    defer c.mu.Unlock()
+    c.nodeInfo.AddPod(pod)
+}
+
+// RemovePod removes a pod from the cache.
+func (c *Cache) RemovePod(logger klog.Logger, pod *v1.Pod) error {
+    c.mu.Lock()
+    defer c.mu.Unlock()
+    return c.nodeInfo.RemovePod(logger, pod)
+}
+
+// UpdatePod updates a pod in the cache (remove old, add new).
+func (c *Cache) UpdatePod(logger klog.Logger, oldPod, newPod *v1.Pod) error {
+    c.mu.Lock()
+    defer c.mu.Unlock()
+    if err := c.nodeInfo.RemovePod(logger, oldPod); err != nil {
+        // Pod may not exist if it was rejected during admission
+        logger.V(4).Info("Pod not found in cache during update", "pod", klog.KObj(oldPod), "err", err)
+    }
+    c.nodeInfo.AddPod(newPod)
+    return nil
+}
+
+// Snapshot returns a deep copy of the cached NodeInfo for safe concurrent use.
+func (c *Cache) Snapshot() *framework.NodeInfo {
+    c.mu.RLock()
+    defer c.mu.RUnlock()
+    return c.nodeInfo.Snapshot()
+}
+
+// PodCount returns the number of pods in the cache.
+func (c *Cache) PodCount() int {
+    c.mu.RLock()
+    defer c.mu.RUnlock()
+    return len(c.nodeInfo.Pods)
+}
+```
+
+#### Step 2: Create Cache Unit Tests
+
+**Create `pkg/kubelet/nodeinfocache/cache_test.go`**
+
+```go
+package nodeinfocache
+
+import (
+    "testing"
+
+    v1 "k8s.io/api/core/v1"
+    "k8s.io/apimachinery/pkg/api/resource"
+    metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+    "k8s.io/apimachinery/pkg/types"
+    "k8s.io/klog/v2/ktesting"
+)
+
+func TestCacheAddRemovePod(t *testing.T) {
+    cache := New()
+    logger, _ := ktesting.NewTestContext(t)
+
+    pod := &v1.Pod{
+        ObjectMeta: metav1.ObjectMeta{
+            Name: "test-pod", Namespace: "default", UID: types.UID("test-uid"),
+        },
+        Spec: v1.PodSpec{
+            Containers: []v1.Container{{
+                Resources: v1.ResourceRequirements{
+                    Requests: v1.ResourceList{
+                        v1.ResourceCPU:    resource.MustParse("100m"),
+                        v1.ResourceMemory: resource.MustParse("256Mi"),
+                    },
+                },
+            }},
+        },
+    }
+
+    // Add pod
+    cache.AddPod(pod)
+    if cache.PodCount() != 1 {
+        t.Errorf("expected 1 pod, got %d", cache.PodCount())
+    }
+
+    // Verify resources in snapshot
+    snapshot := cache.Snapshot()
+    if snapshot.Requested.MilliCPU != 100 {
+        t.Errorf("expected 100 milliCPU, got %d", snapshot.Requested.MilliCPU)
+    }
+
+    // Remove pod
+    if err := cache.RemovePod(logger, pod); err != nil {
+        t.Errorf("unexpected error removing pod: %v", err)
+    }
+    if cache.PodCount() != 0 {
+        t.Errorf("expected 0 pods, got %d", cache.PodCount())
+    }
+}
+
+func TestCacheSnapshotIsolation(t *testing.T) {
+    cache := New()
+
+    pod1 := makePod("pod1", "100m", "256Mi")
+    cache.AddPod(pod1)
+
+    // Take snapshot
+    snapshot := cache.Snapshot()
+    originalCPU := snapshot.Requested.MilliCPU
+
+    // Add another pod to cache
+    pod2 := makePod("pod2", "200m", "512Mi")
+    cache.AddPod(pod2)
+
+    // Snapshot should be unchanged (deep copy)
+    if snapshot.Requested.MilliCPU != originalCPU {
+        t.Error("snapshot was mutated after cache modification")
+    }
+}
+
+func TestCacheConcurrentAccess(t *testing.T) {
+    cache := New()
+    logger, _ := ktesting.NewTestContext(t)
+
+    done := make(chan bool)
+
+    // Writer goroutine
+    go func() {
+        for i := 0; i < 100; i++ {
+            pod := makePod(fmt.Sprintf("pod-%d", i), "10m", "10Mi")
+            cache.AddPod(pod)
+            cache.RemovePod(logger, pod)
+        }
+        done <- true
+    }()
+
+    // Reader goroutine
+    go func() {
+        for i := 0; i < 100; i++ {
+            _ = cache.Snapshot()
+            _ = cache.PodCount()
+        }
+        done <- true
+    }()
+
+    <-done
+    <-done
+}
+
+func makePod(name, cpu, memory string) *v1.Pod {
+    return &v1.Pod{
+        ObjectMeta: metav1.ObjectMeta{
+            Name: name, Namespace: "default", UID: types.UID(name),
+        },
+        Spec: v1.PodSpec{
+            Containers: []v1.Container{{
+                Resources: v1.ResourceRequirements{
+                    Requests: v1.ResourceList{
+                        v1.ResourceCPU:    resource.MustParse(cpu),
+                        v1.ResourceMemory: resource.MustParse(memory),
+                    },
+                },
+            }},
+        },
+    }
+}
+```
+
+#### Step 3: Add Cache to Kubelet Struct
+
+**Modify `pkg/kubelet/kubelet.go`** (~line 1245):
+
+```go
+import "k8s.io/kubernetes/pkg/kubelet/nodeinfocache"
+
+type Kubelet struct {
+    // ... existing fields ...
+
+    // nodeInfoCache caches NodeInfo for efficient pod admission.
+    // Updated incrementally when pods are added/removed/updated.
+    nodeInfoCache *nodeinfocache.Cache
+}
+```
+
+#### Step 4: Initialize Cache in NewMainKubelet
+
+**Modify `pkg/kubelet/kubelet.go`** in `NewMainKubelet()` (~line 702, after `allocationManager`):
+
+```go
+// Initialize NodeInfo cache for efficient admission
+klet.nodeInfoCache = nodeinfocache.New()
+```
+
+Then later, after the kubelet is fully initialized and can access pods/node (~line 830, after `klet.setNodeStatusFuncs`):
+
+```go
+// Populate NodeInfo cache with initial state
+if node, err := klet.GetCachedNode(ctx, true); err == nil {
+    klet.nodeInfoCache.SetNode(node)
+}
+// Note: Initial pods will be added via HandlePodAdditions during sync
+```
+
+#### Step 5: Wire Pod Lifecycle Updates
+
+**Modify `pkg/kubelet/kubelet.go`**:
+
+**HandlePodAdditions** (~line 2764, after successful admission):
+```go
+if ok, reason, message := kl.allocationManager.AddPod(kl.GetActivePods(), pod); !ok {
+    kl.rejectPod(pod, reason, message)
+    continue
+}
+// Update NodeInfo cache after successful admission
+kl.nodeInfoCache.AddPod(pod)
+```
+
+**HandlePodUpdates** (~line 2800, after podManager update):
+```go
+oldPod, _ := kl.podManager.GetPodByUID(pod.UID)
+kl.podManager.UpdatePod(pod)
+// Update NodeInfo cache if pod resources may have changed
+if oldPod != nil {
+    kl.nodeInfoCache.UpdatePod(logger, oldPod, pod)
+}
+```
+
+**HandlePodRemoves** (~line 2948, after podManager removal):
+```go
+kl.podManager.RemovePod(pod)
+// Remove from NodeInfo cache
+kl.nodeInfoCache.RemovePod(logger, pod)
+kl.allocationManager.RemovePod(pod.UID)
+```
+
+#### Step 6: Wire Node Updates
+
+**Modify `pkg/kubelet/kubelet_nodecache.go`** in `getCachedNode()` (~line 45):
+
+```go
+if isNewer {
+    kl.cachedNode = informerNode
+    // Update NodeInfo cache with new node metadata
+    if kl.nodeInfoCache != nil {
+        kl.nodeInfoCache.SetNode(informerNode)
+    }
+}
+```
+
+#### Step 7: Modify predicateAdmitHandler
+
+**Modify `pkg/kubelet/lifecycle/predicate.go`**:
+
+Add interface for cache (to allow testing with mocks):
+```go
+// NodeInfoProvider provides NodeInfo snapshots for admission.
+type NodeInfoProvider interface {
+    Snapshot() *schedulerframework.NodeInfo
+}
+```
+
+Update struct:
+```go
+type predicateAdmitHandler struct {
+    getNodeAnyWayFunc        getNodeAnyWayFuncType
+    pluginResourceUpdateFunc pluginResourceUpdateFuncType
+    admissionFailureHandler  AdmissionFailureHandler
+    nodeInfoProvider         NodeInfoProvider  // NEW
+}
+```
+
+Update constructor:
+```go
+func NewPredicateAdmitHandler(
+    getNodeAnyWayFunc getNodeAnyWayFuncType,
+    admissionFailureHandler AdmissionFailureHandler,
+    pluginResourceUpdateFunc pluginResourceUpdateFuncType,
+    nodeInfoProvider NodeInfoProvider,  // NEW parameter
+) PodAdmitHandler {
+    return &predicateAdmitHandler{
+        getNodeAnyWayFunc:        getNodeAnyWayFunc,
+        pluginResourceUpdateFunc: pluginResourceUpdateFunc,
+        admissionFailureHandler:  admissionFailureHandler,
+        nodeInfoProvider:         nodeInfoProvider,
+    }
+}
+```
+
+Update `Admit()` method (lines 162-164):
+```go
+// OLD:
+// pods := attrs.OtherPods
+// nodeInfo := schedulerframework.NewNodeInfo(pods...)
+// nodeInfo.SetNode(node)
+
+// NEW: Use cached NodeInfo snapshot
+nodeInfo := w.nodeInfoProvider.Snapshot()
+// Ensure node is current (cache may have stale node if updated between events)
+nodeInfo.SetNode(node)
+```
+
+#### Step 8: Update predicate_test.go
+
+**Modify `pkg/kubelet/lifecycle/predicate_test.go`**:
+
+Add mock provider:
+```go
+type mockNodeInfoProvider struct {
+    nodeInfo *schedulerframework.NodeInfo
+}
+
+func (m *mockNodeInfoProvider) Snapshot() *schedulerframework.NodeInfo {
+    return m.nodeInfo.Snapshot()
+}
+```
+
+Update test setup:
+```go
+// Before:
+w := &predicateAdmitHandler{getNodeAnyWayFunc: ...}
+
+// After:
+nodeInfo := schedulerframework.NewNodeInfo(existingPods...)
+nodeInfo.SetNode(test.cachedNode)
+w := &predicateAdmitHandler{
+    getNodeAnyWayFunc: ...,
+    nodeInfoProvider:  &mockNodeInfoProvider{nodeInfo: nodeInfo},
+}
+```
+
+#### Step 9: Update kubelet.go Handler Creation
+
+**Modify `pkg/kubelet/kubelet.go`** (~line 1065):
+
+```go
+handlers = append(handlers,
+    lifecycle.NewPredicateAdmitHandler(
+        klet.GetCachedNode,
+        criticalPodAdmissionHandler,
+        klet.containerManager.UpdatePluginResources,
+        klet.nodeInfoCache,  // NEW: pass cache
+    ),
+)
+```
+
+### Testing Strategy
+
+#### Unit Tests (Correctness)
+
+1. **Cache operations** (`pkg/kubelet/nodeinfocache/cache_test.go`):
+   - `TestCacheAddRemovePod`: Verify pod count and resources update correctly
+   - `TestCacheUpdatePod`: Verify update replaces old pod resources
+   - `TestCacheSetNode`: Verify node allocatable is updated
+   - `TestCacheSnapshotIsolation`: Verify snapshots are not affected by subsequent mutations
+   - `TestCacheConcurrentAccess`: Verify thread safety with concurrent readers/writers
+   - `TestCacheRemoveNonexistentPod`: Verify graceful handling of missing pods
+
+2. **Predicate handler** (`pkg/kubelet/lifecycle/predicate_test.go`):
+   - Update existing tests to use mock `NodeInfoProvider`
+   - Add test verifying cache snapshot is used instead of rebuilding
+
+#### Integration Tests (Correctness)
+
+**Create `pkg/kubelet/nodeinfocache/integration_test.go`** (or add to kubelet_test.go):
+
+```go
+func TestNodeInfoCacheStaysInSyncWithPodManager(t *testing.T) {
+    // Setup kubelet with real components
+    // Add pods via HandlePodAdditions
+    // Verify cache.PodCount() matches podManager.GetPods()
+    // Remove pods via HandlePodRemoves
+    // Verify cache stays in sync
+    // Update pods via HandlePodUpdates
+    // Verify resource totals are correct
+}
+
+func TestAdmissionUsesCache(t *testing.T) {
+    // Setup kubelet with cache
+    // Add pods to cache
+    // Verify admission uses cached NodeInfo (not rebuilt)
+    // Can verify by checking that OtherPods parameter is ignored
+}
+```
+
+#### Benchmark Tests (Performance)
+
+**Create `pkg/kubelet/nodeinfocache/benchmark_test.go`**:
+
+```go
+func BenchmarkNewNodeInfo(b *testing.B) {
+    // Baseline: Current approach - rebuild from scratch
+    pods := generatePods(100)
+    b.ResetTimer()
+    for i := 0; i < b.N; i++ {
+        _ = schedulerframework.NewNodeInfo(pods...)
+    }
+}
+
+func BenchmarkCacheSnapshot(b *testing.B) {
+    // New approach: Snapshot from cache
+    cache := New()
+    for _, pod := range generatePods(100) {
+        cache.AddPod(pod)
+    }
+    b.ResetTimer()
+    for i := 0; i < b.N; i++ {
+        _ = cache.Snapshot()
+    }
+}
+
+func BenchmarkCacheAddPod(b *testing.B) {
+    cache := New()
+    pods := generatePods(b.N)
+    b.ResetTimer()
+    for i := 0; i < b.N; i++ {
+        cache.AddPod(pods[i])
+    }
+}
+
+func BenchmarkCacheRemovePod(b *testing.B) {
+    logger, _ := ktesting.NewTestContext(b)
+    cache := New()
+    pods := generatePods(b.N)
+    for _, pod := range pods {
+        cache.AddPod(pod)
+    }
+    b.ResetTimer()
+    for i := 0; i < b.N; i++ {
+        cache.RemovePod(logger, pods[i])
+    }
+}
+
+// Test with varying pod counts
+func BenchmarkSnapshotScaling(b *testing.B) {
+    for _, podCount := range []int{10, 50, 100, 200, 500} {
+        b.Run(fmt.Sprintf("%dPods", podCount), func(b *testing.B) {
+            cache := New()
+            for _, pod := range generatePods(podCount) {
+                cache.AddPod(pod)
+            }
+            b.ResetTimer()
+            for i := 0; i < b.N; i++ {
+                _ = cache.Snapshot()
+            }
+        })
+    }
+}
+
+func generatePods(count int) []*v1.Pod {
+    pods := make([]*v1.Pod, count)
+    for i := 0; i < count; i++ {
+        pods[i] = &v1.Pod{
+            ObjectMeta: metav1.ObjectMeta{
+                Name: fmt.Sprintf("pod-%d", i),
+                UID:  types.UID(fmt.Sprintf("uid-%d", i)),
+            },
+            Spec: v1.PodSpec{
+                Containers: []v1.Container{{
+                    Resources: v1.ResourceRequirements{
+                        Requests: v1.ResourceList{
+                            v1.ResourceCPU:    resource.MustParse("100m"),
+                            v1.ResourceMemory: resource.MustParse("256Mi"),
+                        },
+                    },
+                }},
+            },
+        }
+    }
+    return pods
+}
+```
+
+#### Expected Performance Results
+
+| Operation | Current (NewNodeInfo) | With Cache | Improvement |
+|-----------|----------------------|------------|-------------|
+| 100 pods admission | O(n×m) ~35μs | O(n) snapshot ~15μs | ~2x |
+| Sequential admissions | O(n×m) per admission | O(1) add + O(n) snapshot | Significant |
+| Resize retry (same pods) | O(n×m) per retry | O(n) snapshot only | ~2x |
+
+### Files to Modify Summary
+
+| File | Changes |
+|------|---------|
+| `pkg/kubelet/nodeinfocache/cache.go` | **New file** - Cache implementation |
+| `pkg/kubelet/nodeinfocache/cache_test.go` | **New file** - Unit tests |
+| `pkg/kubelet/nodeinfocache/benchmark_test.go` | **New file** - Benchmarks |
+| `pkg/kubelet/kubelet.go` | Add field, initialize, wire lifecycle updates |
+| `pkg/kubelet/kubelet_nodecache.go` | Update cache on node changes |
+| `pkg/kubelet/lifecycle/predicate.go` | Add interface, accept cache, use Snapshot() |
+| `pkg/kubelet/lifecycle/predicate_test.go` | Update tests for new parameter |
 
 ### Note on `pkg/kubelet/cache/`
 
 The `pkg/kubelet/cache/` directory contains **interim code** copied from the scheduler cache. It can be:
-- **Adapted**: Strip scheduler-specific logic (assume pods, multi-node, TTL)
 - **Replaced**: Use the simpler implementation above
-- **Discarded**: If the hash-based approach is preferred
+- **Discarded**: The scheduler cache is overengineered for kubelet's needs
 
 The scheduler cache is designed for cluster-wide scheduling with optimistic pod binding. The kubelet only needs single-node, actual-state caching - much simpler requirements.
+
+## Alternative Approach: Hash-Based Cache in predicateAdmitHandler
+
+This approach keeps the cache self-contained within `predicateAdmitHandler`, using hash-based invalidation to detect when the cache is stale.
+
+### Cache Location
+
+Add the cache to `predicateAdmitHandler` in `pkg/kubelet/lifecycle/predicate.go`:
+
+```go
+type predicateAdmitHandler struct {
+    getNodeAnyWayFunc        getNodeAnyWayFuncType
+    pluginResourceUpdateFunc pluginResourceUpdateFuncType
+    admissionFailureHandler  AdmissionFailureHandler
+
+    // NodeInfo cache
+    mu              sync.RWMutex
+    cachedNodeInfo  *schedulerframework.NodeInfo
+    cacheGeneration uint64  // or use a hash of pod UIDs + resource versions
+}
+```
+
+### Cache Key/Invalidation Strategy
+
+The cache should be invalidated when any of these change:
+
+| Trigger | Detection Method |
+|---------|------------------|
+| Pod additions/removals | Hash of pod UIDs in `OtherPods` |
+| Pod resource changes | Hash of pod ResourceVersions |
+| Pod generation changes (resize) | Compare `pod.Generation` |
+| Allocated resource changes | Hash of allocated resources |
+| Node resource version | Compare `node.ResourceVersion` |
+
+**Recommended hash approach**:
+```go
+type cacheKey struct {
+    nodeResourceVersion string
+    podSetHash          uint64  // FNV hash of sorted pod UIDs
+    resourceHash        uint64  // FNV hash of pod resource versions
+}
+```
+
+### Implementation
+
+```go
+func (w *predicateAdmitHandler) getCachedNodeInfo(node *v1.Node, pods []*v1.Pod) *schedulerframework.NodeInfo {
+    key := w.computeCacheKey(node, pods)
+
+    w.mu.RLock()
+    if w.cacheKey == key && w.cachedNodeInfo != nil {
+        nodeInfoCacheHits.Inc()
+        w.mu.RUnlock()
+        return w.cachedNodeInfo
+    }
+    w.mu.RUnlock()
+
+    // Cache miss - build new NodeInfo
+    nodeInfoCacheMisses.Inc()
+    nodeInfo := schedulerframework.NewNodeInfo(pods...)
+    nodeInfo.SetNode(node)
+
+    w.mu.Lock()
+    w.cachedNodeInfo = nodeInfo
+    w.cacheKey = key
+    w.mu.Unlock()
+
+    return nodeInfo
+}
+```
+
+### Limitations
+
+- **Cache miss on every pod set change**: Sequential pod admissions will miss cache since each changes the pod set
+- **Primary benefit is resize retries**: Same pod set evaluated repeatedly while waiting for resources
+- **No benefit for normal admission flow**: Each admission adds a pod, changing the hash
+
+### When to Prefer This Approach
+
+- If distributed cache update wiring is undesirable
+- If code locality is prioritized over optimization scope
+- If stale data risk (however small) is unacceptable
+
+## Alternative Approach: Cache at Allocation Manager Level
+
+Since `canAdmitPod` and `canResizePod` both need NodeInfo, consider caching at `pkg/kubelet/allocation/allocation_manager.go` instead. This would:
+- Centralize cache management
+- Benefit both admission and resize flows
+- Align with where `allocatedPods` is computed
+
+However, this still requires wiring updates from pod lifecycle events, similar to the recommended approach.
 
 ## Expected Performance
 
@@ -360,23 +852,26 @@ Based on PR #134462 benchmarks:
 - Cache hit: **O(1)** lookup vs **O(n×m)** iteration
 - ~34.5 microseconds per admission with cache hits on 100-pod nodes
 
+With the incremental approach:
+- **Every admission benefits** (not just resize retries)
+- Pod add/remove: O(1) for add, O(n) for remove
+- Snapshot for admission: O(n) deep copy (but no resource iteration)
+
 ## Compatibility with Existing PR #134462
 
-The existing PR takes a similar approach but has issues:
+The existing PR takes a hash-based approach but has issues:
 1. Contains merge commits (needs rebase)
 2. Missing extended resource support in hash (per reviewer)
 3. May be over-engineering invalidation triggers
 
-Your implementation should:
-- Start simpler with just pod UID + ResourceVersion hashing
-- Add extended resource hashing per `bart0sh`'s feedback
-- Ensure deterministic hashing with sorted keys
+The incremental approach sidesteps these issues entirely by not using hash-based invalidation.
 
 ## Related Files
 
 - `pkg/kubelet/lifecycle/predicate.go` - Main admission handler with NodeInfo construction
 - `pkg/kubelet/allocation/allocation_manager.go` - Calls admission for pods and resizes
 - `pkg/kubelet/kubelet_nodecache.go` - Existing node caching pattern to follow
+- `pkg/scheduler/framework/types.go` - NodeInfo type with incremental update methods
 - `pkg/scheduler/backend/cache/` - Scheduler cache pattern (more complex, for reference)
 
 ## References

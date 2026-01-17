@@ -33,6 +33,23 @@ func (m *manager) canAdmitPod(logger klog.Logger, allocatedPods []*v1.Pod, pod *
 3. Iterates through all registered `admitHandlers`
 4. Returns first rejection reason, or success if all pass
 
+### Admission Call Chain
+
+```
+HandlePodAdditions (kubelet.go:2756)
+  → allocationManager.AddPod(activePods, pod)
+      → getAllocatedPods(activePods)  // Enrich with checkpoint data
+      → canAdmitPod(allocatedPods, pod)
+          → PodAdmitAttributes{Pod: pod, OtherPods: allocatedPods}
+          → for each handler in admitHandlers:
+              → handler.Admit(attrs)
+                  → predicateAdmitHandler.Admit()
+                      → NewNodeInfo(attrs.OtherPods...)  // O(n×m) here
+                      → generalFilter()
+```
+
+**Key insight**: The `OtherPods` passed to handlers contains ALL other pods with their allocated resources. The handler uses this to build NodeInfo and check if the new pod fits.
+
 ### canResizePod() (line 709)
 
 Determines if a requested resize is currently feasible:
