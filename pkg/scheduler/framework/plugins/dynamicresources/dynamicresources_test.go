@@ -918,22 +918,22 @@ func (p perNodeScoreResult) forNode(nodeName string) int64 {
 }
 
 type want struct {
-	preenqueue           result
-	preFilterResult      *fwk.PreFilterResult
-	prefilter            result
-	filter               perNodeResult
-	prescore             result
-	scoreResult          perNodeScoreResult
-	score                perNodeResult
-	normalizeScoreResult fwk.NodeScoreList
-	normalizeScore       result
-	reserve              result
-	unreserve            result
-	prebindPreFlight     *fwk.Status
-	prebind              result
-	postbind             result
-	postFilterResult     *fwk.PostFilterResult
-	postfilter           result
+	preenqueue             result
+	preFilterResult        *fwk.PreFilterResult
+	prefilter              result
+	filter                 perNodeResult
+	prescore               result
+	scoreResult            perNodeScoreResult
+	score                  perNodeResult
+	normalizeScoreResult   fwk.NodeScoreList
+	normalizeScore         result
+	reserve                result
+	unreserve              result
+	preBindPreFlightStatus *fwk.Status
+	prebind                result
+	postbind               result
+	postFilterResult       *fwk.PostFilterResult
+	postfilter             result
 
 	// unreserveAfterBindFailure, if set, triggers a call to Unreserve
 	// after PreBind, as if the actual Bind had failed.
@@ -1014,7 +1014,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				postfilter: result{
 					status: fwk.NewStatus(fwk.Unschedulable),
 				},
-				prebindPreFlight: fwk.NewStatus(fwk.Skip),
+				preBindPreFlightStatus: fwk.NewStatus(fwk.Skip),
 			},
 		},
 		"empty-with-extended-resources-enabled": {
@@ -1027,7 +1027,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				postfilter: result{
 					status: fwk.NewStatus(fwk.Unschedulable),
 				},
-				prebindPreFlight: fwk.NewStatus(fwk.Skip),
+				preBindPreFlightStatus: fwk.NewStatus(fwk.Skip),
 			},
 		},
 		"claim-reference": {
@@ -1570,7 +1570,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				postfilter: result{
 					status: fwk.NewStatus(fwk.Unschedulable, `plugin disabled`),
 				},
-				prebindPreFlight: fwk.NewStatus(fwk.Skip),
+				preBindPreFlightStatus: fwk.NewStatus(fwk.Skip),
 			},
 			disableDRA: true,
 		},
@@ -1701,7 +1701,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				prefilter: result{
 					status: fwk.NewStatus(fwk.Skip),
 				},
-				prebindPreFlight: fwk.NewStatus(fwk.Skip),
+				preBindPreFlightStatus: fwk.NewStatus(fwk.Skip),
 			},
 		},
 		"extended-resource-name-no-resource": {
@@ -2608,9 +2608,12 @@ func testPlugin(tCtx ktesting.TContext) {
 
 					initialObjects = testCtx.listAll(tCtx)
 					initialObjects = testCtx.updateAPIServer(tCtx, initialObjects, tc.prepare.prebind)
-					preBindPreFlightStatus := testCtx.p.PreBindPreFlight(tCtx, testCtx.state, tc.pod, selectedNodeName)
-					tCtx.Run("prebindPreFlight", func(tContext ktesting.TContext) {
-						assert.Equal(tCtx, tc.want.prebindPreFlight, preBindPreFlightStatus)
+					preBindPreFlightResult, preBindPreFlightStatus := testCtx.p.PreBindPreFlight(tCtx, testCtx.state, tc.pod, selectedNodeName)
+					tCtx.Run("preBindPreFlightStatus", func(tContext ktesting.TContext) {
+						assert.Equal(tCtx, tc.want.preBindPreFlightStatus, preBindPreFlightStatus)
+					})
+					tCtx.Run("preBindPreFlightResult", func(tContext ktesting.TContext) {
+						assert.Equal(tCtx, &fwk.PreBindPreFlightResult{AllowParallel: true}, preBindPreFlightResult)
 					})
 					preBindStatus := testCtx.p.PreBind(tCtx, testCtx.state, tc.pod, selectedNodeName)
 					tCtx.Run("prebind", func(tCtx ktesting.TContext) {

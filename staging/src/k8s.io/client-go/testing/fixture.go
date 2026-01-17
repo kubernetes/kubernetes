@@ -297,8 +297,11 @@ type tracker struct {
 	// see apimachinery/pkg/watch.DefaultChanSize) will cause a panic.
 	watchers map[schema.GroupVersionResource]map[string][]*watch.RaceFreeFakeWatcher
 	// resourceVersions is the highest resource version of any tracked object with
-	// a certain gvr. The resource version for that set of objects gets bumped before
-	// storing a new or modified object, so all entries are larger than 0.
+	// a certain gvr. Conceptually it starts at 1 when no objects are stored (0 is
+	// special in queries) but the map contains no entries in that case.
+	// The resource version for that set of objects gets bumped before
+	// storing a new or modified object.
+	//
 	// Object content does not get changed to preserve the traditional behavior
 	// (hence also the versionedObject type instead of storing a runtime.Object
 	// with modified ResourceVersion).
@@ -322,6 +325,8 @@ type tracker struct {
 // but this is not how fake client-go has traditionally worked and starting to do
 // that now might break tests.
 type versionedObject struct {
+	// resourceVersion is always > 1 for a stored object because 1
+	// is the initial value for an empty set of objects.
 	resourceVersion int64
 	runtime.Object
 }
@@ -368,6 +373,14 @@ func (t *tracker) List(gvr schema.GroupVersionResource, gvk schema.GroupVersionK
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
+	if listMeta, err := meta.ListAccessor(list); err == nil {
+		resourceVersion, ok := t.resourceVersions[gvr]
+		if !ok {
+			resourceVersion = 1
+		}
+		listMeta.SetResourceVersion(fmt.Sprintf("%d", resourceVersion))
+	}
+
 	objs, ok := t.objects[gvr]
 	if !ok {
 		return list, nil
@@ -384,9 +397,6 @@ func (t *tracker) List(gvr schema.GroupVersionResource, gvk schema.GroupVersionK
 	if err := meta.SetList(list, matchingObjs); err != nil {
 		return nil, err
 	}
-	if listMeta, err := meta.ListAccessor(list); err == nil {
-		listMeta.SetResourceVersion(fmt.Sprintf("%d", t.resourceVersions[gvr]))
-	}
 	return list.DeepCopyObject(), nil
 }
 
@@ -395,16 +405,26 @@ func (t *tracker) Watch(gvr schema.GroupVersionResource, ns string, opts ...meta
 	if err != nil {
 		return nil, err
 	}
+
 	// By default, emulate the traditional behavior of the tracker and don't deliver
-	// *any* existing objects. This ensures compatibility which users
-	// which don't pass options and then also don't expect the additional objects.
-	resourceVersion := int64(-1)
-	if len(opts) > 0 && opts[0].ResourceVersion != "" {
-		rv, err := strconv.ParseInt(opts[0].ResourceVersion, 10, 64)
-		if err != nil {
-			return nil, fmt.Errorf("invalid ResourceVersion %q in ListOptions, must be int64: %w", opts[0].ResourceVersion, err)
+	// *any* existing objects unless list options are provided.
+	addExisting := false
+	addFromRV := int64(0)
+	if len(opts) > 0 {
+		// Providing options, as the generated client-go fake does, enables support
+		// for existing objects depending on the resource version.
+		//
+		// The default if ResourceVersion is empty is "start at most recent",
+		// which includes delivering all existing objects. addFromRV == 0
+		// matches all objects below because all stored objects have addFromRV > 0.
+		addExisting = true
+		if opts[0].ResourceVersion != "" {
+			rv, err := strconv.ParseInt(opts[0].ResourceVersion, 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("invalid ResourceVersion %q in ListOptions, must be int64: %w", opts[0].ResourceVersion, err)
+			}
+			addFromRV = rv
 		}
-		resourceVersion = rv
 	}
 
 	t.lock.Lock()
@@ -419,14 +439,14 @@ func (t *tracker) Watch(gvr schema.GroupVersionResource, ns string, opts ...meta
 
 	// Deliver all objects that match the list options, for example
 	// between the initial List and the following Watch.
-	if resourceVersion != -1 {
+	if addExisting {
 		objs := t.objects[gvr]
 		matchingObjs, err := filterByNamespace(objs, ns)
 		if err != nil {
 			return nil, err
 		}
 		for _, obj := range matchingObjs {
-			if resourceVersion == 0 || resourceVersion < obj.resourceVersion {
+			if addFromRV < obj.resourceVersion {
 				fakewatcher.Add(obj.Object)
 			}
 		}
@@ -632,16 +652,23 @@ func (t *tracker) add(gvr schema.GroupVersionResource, obj runtime.Object, ns st
 		t.objects[gvr] = make(map[types.NamespacedName]versionedObject)
 	}
 
+	// Determine resource version for the new or updated object.
+	resourceVersion, ok := t.resourceVersions[gvr]
+	if !ok {
+		resourceVersion = 1
+	}
+	resourceVersion++
+
 	namespacedName := types.NamespacedName{Namespace: newMeta.GetNamespace(), Name: newMeta.GetName()}
 	if _, ok = t.objects[gvr][namespacedName]; ok {
 		if replaceExisting {
-			resourceVersion := t.resourceVersions[gvr] + 1
 			t.resourceVersions[gvr] = resourceVersion
+			t.objects[gvr][namespacedName] = versionedObject{resourceVersion, obj}
+
 			for _, w := range t.getWatches(gvr, ns) {
 				// To avoid the object from being accidentally modified by watcher
 				w.Modify(obj.DeepCopyObject())
 			}
-			t.objects[gvr][namespacedName] = versionedObject{resourceVersion, obj}
 			return nil
 		}
 		return apierrors.NewAlreadyExists(gr, newMeta.GetName())
@@ -652,7 +679,6 @@ func (t *tracker) add(gvr schema.GroupVersionResource, obj runtime.Object, ns st
 		return apierrors.NewNotFound(gr, newMeta.GetName())
 	}
 
-	resourceVersion := t.resourceVersions[gvr] + 1
 	t.resourceVersions[gvr] = resourceVersion
 	t.objects[gvr][namespacedName] = versionedObject{resourceVersion, obj}
 

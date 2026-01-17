@@ -44,6 +44,7 @@ import (
 	"time"
 
 	"github.com/onsi/gomega"
+	"github.com/onsi/gomega/format"
 	"github.com/onsi/gomega/gstruct"
 
 	corev1 "k8s.io/api/core/v1"
@@ -299,12 +300,39 @@ func (c *Cluster) LoadConfig(tCtx ktesting.TContext) *restclient.Config {
 }
 
 // GetSystemLogs returns the output of the given component, the empty string and false if not started.
-func (c *Cluster) GetSystemLogs(tCtx ktesting.TContext, component KubeComponentName) (string, bool) {
+func (c *Cluster) GetSystemLogs(tCtx ktesting.TContext, component KubeComponentName) (GString, bool) {
 	cmd, ok := c.running[component]
 	if !ok {
 		return "", false
 	}
-	return cmd.Output(tCtx), true
+	return GString(cmd.Output(tCtx)), true
+}
+
+// GString is useful for log output because in contrast to the default behavior for
+// strings it truncates in the middle.
+type GString string
+
+var (
+	_ format.GomegaStringer = GString("")
+	_ fmt.Stringer          = GString("")
+)
+
+func (gs GString) GomegaString() string {
+	s := string(gs)
+	if len(s) < format.MaxLength {
+		return s
+	}
+	elipsis := "\n...\n"
+	keepLen := format.MaxLength - len(elipsis)
+	if keepLen < 0 {
+		// Cannot truncate in the middle, result would be too long. Leave it to Gomega.
+		return s
+	}
+	return s[:keepLen/2] + elipsis + s[len(gs)-keepLen/2:]
+}
+
+func (gs GString) String() string {
+	return string(gs)
 }
 
 type ModifyOptions struct {
@@ -354,8 +382,7 @@ func (c *Cluster) Modify(tCtx ktesting.TContext, options ModifyOptions) ModifyOp
 
 func (c *Cluster) modifyComponent(tCtx ktesting.TContext, options ModifyOptions, component KubeComponentName, restore *ModifyOptions) {
 	tCtx.Helper()
-	tCtx = ktesting.Begin(tCtx, fmt.Sprintf("modify %s", component))
-	defer ktesting.End(tCtx)
+	tCtx = tCtx.WithStep(fmt.Sprintf("modify %s", component))
 
 	// We could also do things like turning feature gates on or off.
 	// For now we only support replacing the file.
@@ -430,8 +457,7 @@ func (c *Cluster) runComponentWithRetry(tCtx ktesting.TContext, cmd *Cmd) {
 func (c *Cluster) checkReadiness(tCtx ktesting.TContext, cmd *Cmd) {
 	restConfig := c.LoadConfig(tCtx)
 	tCtx = ktesting.WithRESTConfig(tCtx, restConfig)
-	tCtx = ktesting.Begin(tCtx, fmt.Sprintf("wait for %s readiness", cmd.Name))
-	defer ktesting.End(tCtx)
+	tCtx = tCtx.WithStep(fmt.Sprintf("wait for %s readiness", cmd.Name))
 
 	switch KubeComponentName(cmd.Name) {
 	case KubeAPIServer:
@@ -446,9 +472,7 @@ func (c *Cluster) checkReadiness(tCtx ktesting.TContext, cmd *Cmd) {
 		c.checkHealthz(tCtx, cmd, "https", c.settings["KUBELET_HOST"], c.settings["KUBELET_PORT"])
 
 		// Also wait for the node to be ready.
-		tCtx = ktesting.Begin(tCtx, "wait for node ready")
-		defer ktesting.End(tCtx)
-		ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) []corev1.Node {
+		ktesting.Eventually(tCtx.WithStep("wait for node ready"), func(tCtx ktesting.TContext) []corev1.Node {
 			nodes, err := tCtx.Client().CoreV1().Nodes().List(tCtx, metav1.ListOptions{})
 			tCtx.ExpectNoError(err, "list nodes")
 			return nodes.Items

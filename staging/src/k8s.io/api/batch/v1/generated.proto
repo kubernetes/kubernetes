@@ -61,6 +61,8 @@ message CronJobList {
 // CronJobSpec describes how the job execution will look like and when it will actually run.
 message CronJobSpec {
   // The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
+  // +required
+  // +k8s:required
   optional string schedule = 1;
 
   // The time zone name for the given schedule, see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones.

@@ -5,9 +5,9 @@ import (
 	"fmt"
 )
 
-// MapClaims is a claims type that uses the map[string]interface{} for JSON
+// MapClaims is a claims type that uses the map[string]any for JSON
 // decoding. This is the default claims type if you don't supply one
-type MapClaims map[string]interface{}
+type MapClaims map[string]any
 
 // GetExpirationTime implements the Claims interface.
 func (m MapClaims) GetExpirationTime() (*NumericDate, error) {
@@ -73,7 +73,7 @@ func (m MapClaims) parseClaimsString(key string) (ClaimStrings, error) {
 		cs = append(cs, v)
 	case []string:
 		cs = v
-	case []interface{}:
+	case []any:
 		for _, a := range v {
 			vs, ok := a.(string)
 			if !ok {
@@ -92,7 +92,7 @@ func (m MapClaims) parseClaimsString(key string) (ClaimStrings, error) {
 func (m MapClaims) parseString(key string) (string, error) {
 	var (
 		ok  bool
-		raw interface{}
+		raw any
 		iss string
 	)
 	raw, ok = m[key]

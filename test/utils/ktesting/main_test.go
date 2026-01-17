@@ -29,6 +29,10 @@ func TestMain(m *testing.M) {
 	// Bail out early when -help was given as parameter.
 	flag.Parse()
 
+	// The unit tests assume that they run as a unit test, with progress reporting enabled.
+	// This leaks a goroutine, so we have to do it before IgnoreCurrent.
+	initSignals()
+
 	// Must be called *before* creating new goroutines.
 	goleakOpts := []goleak.Option{
 		goleak.IgnoreCurrent(),

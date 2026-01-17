@@ -30,11 +30,9 @@ import (
 // you can try to use [Root.Open] or [Root.OpenFile].
 //
 // It is critical that perform all relevant operations through this [Handle]
-// (rather than fetching the file descriptor yourself with [Handle.IntoRaw]),
+// (rather than fetching the underlying [os.File] yourself with [Handle.IntoFile]),
 // because the security properties of libpathrs depend on users doing all
 // relevant filesystem operations through libpathrs.
-//
-// [os.File]: https://pkg.go.dev/os#File
 type Handle struct {
 	inner *os.File
 }
@@ -43,7 +41,7 @@ type Handle struct {
 // handle will be copied by this method, so the original handle should still be
 // freed by the caller.
 //
-// This is effectively the inverse operation of [Handle.IntoRaw], and is used
+// This is effectively the inverse operation of [Handle.IntoFile], and is used
 // for "deserialising" pathrs root handles.
 func HandleFromFile(file *os.File) (*Handle, error) {
 	newFile, err := fdutils.DupFile(file)
@@ -92,8 +90,6 @@ func (h *Handle) OpenFile(flags int) (*os.File, error) {
 // calling [Handle.Close] will also close any copies of the returned [os.File].
 // If you want to get an independent copy, use [Handle.Clone] followed by
 // [Handle.IntoFile] on the cloned [Handle].
-//
-// [os.File]: https://pkg.go.dev/os#File
 func (h *Handle) IntoFile() *os.File {
 	// TODO: Figure out if we really don't want to make a copy.
 	// TODO: We almost certainly want to clear r.inner here, but we can't do

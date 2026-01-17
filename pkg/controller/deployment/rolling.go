@@ -72,14 +72,14 @@ func (dc *DeploymentController) reconcileNewReplicaSet(ctx context.Context, allR
 	}
 	if *(newRS.Spec.Replicas) > *(deployment.Spec.Replicas) {
 		// Scale down.
-		scaled, _, err := dc.scaleReplicaSetWithLazyAnnotationUpdate(ctx, newRS, *(deployment.Spec.Replicas), deployment)
+		scaled, _, err := dc.scaleReplicaSet(ctx, newRS, *(deployment.Spec.Replicas), deployment, false)
 		return scaled, err
 	}
 	newReplicasCount, err := deploymentutil.NewRSNewReplicas(deployment, allRSs, newRS)
 	if err != nil {
 		return false, err
 	}
-	scaled, _, err := dc.scaleReplicaSetWithLazyAnnotationUpdate(ctx, newRS, newReplicasCount, deployment)
+	scaled, _, err := dc.scaleReplicaSet(ctx, newRS, newReplicasCount, deployment, false)
 	return scaled, err
 }
 
@@ -178,7 +178,7 @@ func (dc *DeploymentController) cleanupUnhealthyReplicas(ctx context.Context, ol
 		if newReplicasCount > *(targetRS.Spec.Replicas) {
 			return nil, 0, fmt.Errorf("when cleaning up unhealthy replicas, got invalid request to scale down %s/%s %d -> %d", targetRS.Namespace, targetRS.Name, *(targetRS.Spec.Replicas), newReplicasCount)
 		}
-		_, updatedOldRS, err := dc.scaleReplicaSetWithLazyAnnotationUpdate(ctx, targetRS, newReplicasCount, deployment)
+		_, updatedOldRS, err := dc.scaleReplicaSet(ctx, targetRS, newReplicasCount, deployment, false)
 		if err != nil {
 			return nil, totalScaledDown, err
 		}
@@ -223,7 +223,7 @@ func (dc *DeploymentController) scaleDownOldReplicaSetsForRollingUpdate(ctx cont
 		if newReplicasCount > *(targetRS.Spec.Replicas) {
 			return 0, fmt.Errorf("when scaling down old RS, got invalid request to scale down %s/%s %d -> %d", targetRS.Namespace, targetRS.Name, *(targetRS.Spec.Replicas), newReplicasCount)
 		}
-		_, _, err := dc.scaleReplicaSetWithLazyAnnotationUpdate(ctx, targetRS, newReplicasCount, deployment)
+		_, _, err := dc.scaleReplicaSet(ctx, targetRS, newReplicasCount, deployment, false)
 		if err != nil {
 			return totalScaledDown, err
 		}

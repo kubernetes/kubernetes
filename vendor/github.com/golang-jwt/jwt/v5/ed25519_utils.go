@@ -24,7 +24,7 @@ func ParseEdPrivateKeyFromPEM(key []byte) (crypto.PrivateKey, error) {
 	}
 
 	// Parse the key
-	var parsedKey interface{}
+	var parsedKey any
 	if parsedKey, err = x509.ParsePKCS8PrivateKey(block.Bytes); err != nil {
 		return nil, err
 	}
@@ -49,7 +49,7 @@ func ParseEdPublicKeyFromPEM(key []byte) (crypto.PublicKey, error) {
 	}
 
 	// Parse the key
-	var parsedKey interface{}
+	var parsedKey any
 	if parsedKey, err = x509.ParsePKIXPublicKey(block.Bytes); err != nil {
 		return nil, err
 	}

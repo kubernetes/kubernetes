@@ -35,6 +35,8 @@ func TestVersionedValidationByFuzzing(t *testing.T) {
 	typesWithDeclarativeValidation := []schema.GroupVersion{
 		// Registered group versions for versioned validation fuzz testing:
 		{Group: "", Version: "v1"},
+		{Group: "batch", Version: "v1"},
+		{Group: "batch", Version: "v1beta1"},
 		{Group: "certificates.k8s.io", Version: "v1"},
 		{Group: "certificates.k8s.io", Version: "v1alpha1"},
 		{Group: "certificates.k8s.io", Version: "v1beta1"},

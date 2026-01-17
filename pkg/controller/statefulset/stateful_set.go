@@ -101,6 +101,9 @@ func NewStatefulSetController(
 
 	// Register metrics
 	metrics.Register()
+	if err := history.AddControllerRevisionControllerIndexer(revInformer.Informer()); err != nil {
+		utilruntime.HandleError(fmt.Errorf("unable to add controller revision controller indexer: %w", err))
+	}
 	ssc := &StatefulSetController{
 		kubeClient: kubeClient,
 		control: NewDefaultStatefulSetControl(
@@ -110,7 +113,7 @@ func NewStatefulSetController(
 				pvcInformer.Lister(),
 				recorder),
 			NewRealStatefulSetStatusUpdater(kubeClient, setInformer.Lister()),
-			history.NewHistory(kubeClient, revInformer.Lister()),
+			history.NewHistory(kubeClient, revInformer.Lister(), revInformer.Informer().GetIndexer()),
 		),
 		pvcListerSynced: pvcInformer.Informer().HasSynced,
 		revListerSynced: revInformer.Informer().HasSynced,

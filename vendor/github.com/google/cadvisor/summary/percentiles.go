@@ -105,6 +105,7 @@ func (r *resource) AddSample(val uint64) {
 	sample := info.Percentiles{
 		Present:    true,
 		Mean:       val,
+		Std:        0,
 		Max:        val,
 		Fifty:      val,
 		Ninety:     val,
@@ -118,6 +119,7 @@ func (r *resource) AddSample(val uint64) {
 func (r *resource) GetAllPercentiles() info.Percentiles {
 	p := info.Percentiles{}
 	p.Mean = uint64(r.mean.Mean)
+	p.Std = uint64(r.samples.getStandardDeviation(r.mean.Mean))
 	p.Max = r.max
 	p.Fifty = r.samples.GetPercentile(0.5)
 	p.Ninety = r.samples.GetPercentile(0.9)
@@ -161,6 +163,21 @@ func getPercentComplete(stats []*secondSample) (percent int32) {
 		}
 	}
 	return
+}
+
+func (s Uint64Slice) getStandardDeviation(mean float64) float64 {
+	n := len(s)
+	if n <= 1 {
+		return 0
+	}
+	var ss float64
+	for _, v := range s {
+		d := float64(v) - mean
+		ss += d * d
+	}
+	// Use Bessel's correction (n-1) to calculate sample standard deviation.
+	// This provides an unbiased estimate of population variance from sample data.
+	return math.Sqrt(ss / float64(n-1))
 }
 
 // Calculate cpurate from two consecutive total cpu usage samples.

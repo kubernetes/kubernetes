@@ -231,7 +231,7 @@ func (c *controller) processLoop(ctx context.Context) {
 		default:
 			var err error
 			if useBatchProcess {
-				err = batchQueue.PopBatch(c.config.ProcessBatch)
+				err = batchQueue.PopBatch(c.config.ProcessBatch, PopProcessFunc(c.config.Process))
 			} else {
 				// otherwise fallback to non-batch process behavior
 				_, err = c.config.Pop(PopProcessFunc(c.config.Process))
@@ -442,7 +442,7 @@ func NewInformerWithOptions(options InformerOptions) (Store, Controller) {
 	} else {
 		clientState = NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, options.Indexers)
 	}
-	return clientState, newInformer(clientState, options)
+	return clientState, newInformer(clientState, options, DeletionHandlingMetaNamespaceKeyFunc)
 }
 
 // NewInformer returns a Store and a controller for populating the store
@@ -476,7 +476,7 @@ func NewInformer(
 		Handler:       h,
 		ResyncPeriod:  resyncPeriod,
 	}
-	return clientState, newInformer(clientState, options)
+	return clientState, newInformer(clientState, options, DeletionHandlingMetaNamespaceKeyFunc)
 }
 
 // NewIndexerInformer returns an Indexer and a Controller for populating the index
@@ -513,7 +513,7 @@ func NewIndexerInformer(
 		ResyncPeriod:  resyncPeriod,
 		Indexers:      indexers,
 	}
-	return clientState, newInformer(clientState, options)
+	return clientState, newInformer(clientState, options, DeletionHandlingMetaNamespaceKeyFunc)
 }
 
 // NewTransformingInformer returns a Store and a controller for populating
@@ -542,7 +542,7 @@ func NewTransformingInformer(
 		ResyncPeriod:  resyncPeriod,
 		Transform:     transformer,
 	}
-	return clientState, newInformer(clientState, options)
+	return clientState, newInformer(clientState, options, DeletionHandlingMetaNamespaceKeyFunc)
 }
 
 // NewTransformingIndexerInformer returns an Indexer and a controller for
@@ -573,7 +573,7 @@ func NewTransformingIndexerInformer(
 		Indexers:      indexers,
 		Transform:     transformer,
 	}
-	return clientState, newInformer(clientState, options)
+	return clientState, newInformer(clientState, options, DeletionHandlingMetaNamespaceKeyFunc)
 }
 
 // Multiplexes updates in the form of a list of Deltas into a Store, and informs
@@ -584,12 +584,31 @@ func processDeltas(
 	clientState Store,
 	deltas Deltas,
 	isInInitialList bool,
+	keyFunc KeyFunc,
 ) error {
 	// from oldest to newest
 	for _, d := range deltas {
 		obj := d.Object
 
 		switch d.Type {
+		case ReplacedAll:
+			info, ok := obj.(ReplacedAllInfo)
+			if !ok {
+				return fmt.Errorf("ReplacedAll did not contain ReplacedAllInfo: %T", obj)
+			}
+			if err := processReplacedAllInfo(handler, info, clientState, isInInitialList, keyFunc); err != nil {
+				return err
+			}
+		case SyncAll:
+			_, ok := obj.(SyncAllInfo)
+			if !ok {
+				return fmt.Errorf("SyncAll did not contain SyncAllInfo: %T", obj)
+			}
+			objs := clientState.List()
+			for _, obj := range objs {
+				handler.OnUpdate(obj, obj)
+			}
+			return nil
 		case Sync, Replaced, Added, Updated:
 			if old, exists, err := clientState.Get(obj); err == nil && exists {
 				if err := clientState.Update(obj); err != nil {
@@ -626,6 +645,7 @@ func processDeltasInBatch(
 	clientState Store,
 	deltas []Delta,
 	isInInitialList bool,
+	keyFunc KeyFunc,
 ) error {
 	// from oldest to newest
 	txns := make([]Transaction, 0)
@@ -634,7 +654,7 @@ func processDeltasInBatch(
 	if !txnSupported {
 		var errs []error
 		for _, delta := range deltas {
-			if err := processDeltas(handler, clientState, Deltas{delta}, isInInitialList); err != nil {
+			if err := processDeltas(handler, clientState, Deltas{delta}, isInInitialList, keyFunc); err != nil {
 				errs = append(errs, err)
 			}
 		}
@@ -677,6 +697,8 @@ func processDeltasInBatch(
 			callbacks = append(callbacks, func() {
 				handler.OnDelete(obj)
 			})
+		default:
+			return fmt.Errorf("Delta type %s is not supported in batch processing", d.Type)
 		}
 	}
 
@@ -697,13 +719,59 @@ func processDeltasInBatch(
 	return nil
 }
 
+func processReplacedAllInfo(handler ResourceEventHandler, info ReplacedAllInfo, clientState Store, isInInitialList bool, keyFunc KeyFunc) error {
+	var deletions []DeletedFinalStateUnknown
+	type replacement struct {
+		oldObj interface{}
+		newObj interface{}
+	}
+	replacements := make([]replacement, 0, len(info.Objects))
+
+	err := reconcileReplacement(nil, clientState, info.Objects, keyFunc,
+		func(obj DeletedFinalStateUnknown) error {
+			deletions = append(deletions, obj)
+			return nil
+		},
+		func(obj interface{}) error {
+			// This behavior matches processDeltas handling of Replace deltas
+			if old, exists, err := clientState.Get(obj); err == nil && exists {
+				replacements = append(replacements, replacement{newObj: obj, oldObj: old})
+			} else {
+				replacements = append(replacements, replacement{newObj: obj})
+			}
+			return nil
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	// Replace the client state first so the store reflects the events handlers are given
+	if err := clientState.Replace(info.Objects, info.ResourceVersion); err != nil {
+		return err
+	}
+	// Processing all deletions first matches behavior of RealFIFO#Replace
+	for _, objToDelete := range deletions {
+		handler.OnDelete(objToDelete)
+	}
+	// Processing adds/updates in order observed by reconcileReplacement matches behavior of RealFIFO#Replace
+	for _, r := range replacements {
+		if r.oldObj != nil {
+			handler.OnUpdate(r.oldObj, r.newObj)
+		} else {
+			handler.OnAdd(r.newObj, isInInitialList)
+		}
+	}
+	return nil
+}
+
 // newInformer returns a controller for populating the store while also
 // providing event notifications.
 //
 // Parameters
 //   - clientState is the store you want to populate
 //   - options contain the options to configure the controller
-func newInformer(clientState Store, options InformerOptions) Controller {
+func newInformer(clientState Store, options InformerOptions, keyFunc KeyFunc) Controller {
 	// This will hold incoming changes. Note how we pass clientState in as a
 	// KeyLister, that way resync operations will result in the correct set
 	// of update/delete deltas.
@@ -719,12 +787,12 @@ func newInformer(clientState Store, options InformerOptions) Controller {
 
 		Process: func(obj interface{}, isInInitialList bool) error {
 			if deltas, ok := obj.(Deltas); ok {
-				return processDeltas(options.Handler, clientState, deltas, isInInitialList)
+				return processDeltas(options.Handler, clientState, deltas, isInInitialList, keyFunc)
 			}
 			return errors.New("object given as Process argument is not Deltas")
 		},
 		ProcessBatch: func(deltaList []Delta, isInInitialList bool) error {
-			return processDeltasInBatch(options.Handler, clientState, deltaList, isInInitialList)
+			return processDeltasInBatch(options.Handler, clientState, deltaList, isInInitialList, keyFunc)
 		},
 	}
 	return New(cfg)
@@ -732,11 +800,18 @@ func newInformer(clientState Store, options InformerOptions) Controller {
 
 func newQueueFIFO(clientState Store, transform TransformFunc) Queue {
 	if clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.InOrderInformers) {
-		return NewRealFIFOWithOptions(RealFIFOOptions{
-			KeyFunction:  MetaNamespaceKeyFunc,
-			KnownObjects: clientState,
-			Transformer:  transform,
-		})
+		options := RealFIFOOptions{
+			KeyFunction: MetaNamespaceKeyFunc,
+			Transformer: transform,
+		}
+		// If atomic events are enabled, unset clientState in the case of atomic events as we cannot pass a
+		// store to an atomic fifo.
+		if clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.AtomicFIFO) {
+			options.AtomicEvents = true
+		} else {
+			options.KnownObjects = clientState
+		}
+		return NewRealFIFOWithOptions(options)
 	} else {
 		return NewDeltaFIFOWithOptions(DeltaFIFOOptions{
 			KnownObjects:          clientState,

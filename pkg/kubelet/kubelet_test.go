@@ -1827,6 +1827,7 @@ func TestCheckpointContainer(t *testing.T) {
 }
 
 func TestSyncPodsSetStatusToFailedForPodsThatRunTooLong(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	fakeRuntime := testKubelet.fakeRuntime
@@ -1867,7 +1868,7 @@ func TestSyncPodsSetStatusToFailedForPodsThatRunTooLong(t *testing.T) {
 	}
 
 	// Let the pod worker sets the status to fail after this sync.
-	kubelet.HandlePodUpdates(pods)
+	kubelet.HandlePodUpdates(logger, pods)
 	status, found := kubelet.statusManager.GetPodStatus(pods[0].UID)
 	assert.True(t, found, "expected to found status for pod %q", pods[0].UID)
 	assert.Equal(t, v1.PodFailed, status.Phase)
@@ -1876,6 +1877,7 @@ func TestSyncPodsSetStatusToFailedForPodsThatRunTooLong(t *testing.T) {
 }
 
 func TestSyncPodsDoesNotSetPodsThatDidNotRunTooLongToFailed(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	fakeRuntime := testKubelet.fakeRuntime
@@ -1917,7 +1919,7 @@ func TestSyncPodsDoesNotSetPodsThatDidNotRunTooLongToFailed(t *testing.T) {
 	}
 
 	kubelet.podManager.SetPods(pods)
-	kubelet.HandlePodUpdates(pods)
+	kubelet.HandlePodUpdates(logger, pods)
 	status, found := kubelet.statusManager.GetPodStatus(pods[0].UID)
 	assert.True(t, found, "expected to found status for pod %q", pods[0].UID)
 	assert.NotEqual(t, v1.PodFailed, status.Phase)
@@ -2058,6 +2060,7 @@ func TestGetPodsToSync(t *testing.T) {
 }
 
 func TestGenerateAPIPodStatusWithSortedContainers(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -2093,7 +2096,7 @@ func TestGenerateAPIPodStatusWithSortedContainers(t *testing.T) {
 		ContainerStatuses: cStatuses,
 	}
 	for i := 0; i < 5; i++ {
-		apiStatus := kubelet.generateAPIPodStatus(pod, status, false)
+		apiStatus := kubelet.generateAPIPodStatus(tCtx, pod, status, false)
 		for i, c := range apiStatus.ContainerStatuses {
 			if expectedOrder[i] != c.Name {
 				t.Fatalf("Container status not sorted, expected %v at index %d, but found %v", expectedOrder[i], i, c.Name)
@@ -2111,6 +2114,7 @@ func verifyContainerStatuses(t *testing.T, statuses []v1.ContainerStatus, expect
 
 // Test generateAPIPodStatus with different reason cache and old api pod status.
 func TestGenerateAPIPodStatusWithReasonCache(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	// The following waiting reason and message  are generated in convertStatusToAPIStatus()
 	testTimestamp := time.Unix(123456789, 987654321)
 	testErrorReason := fmt.Errorf("test-error")
@@ -2307,7 +2311,7 @@ func TestGenerateAPIPodStatusWithReasonCache(t *testing.T) {
 		pod.Spec.Containers = test.containers
 		pod.Status.ContainerStatuses = test.oldStatuses
 		podStatus.ContainerStatuses = test.statuses
-		apiStatus := kubelet.generateAPIPodStatus(pod, podStatus, false)
+		apiStatus := kubelet.generateAPIPodStatus(tCtx, pod, podStatus, false)
 		verifyContainerStatuses(t, apiStatus.ContainerStatuses, test.expectedState, test.expectedLastTerminationState, fmt.Sprintf("case %d", i))
 	}
 
@@ -2320,7 +2324,7 @@ func TestGenerateAPIPodStatusWithReasonCache(t *testing.T) {
 		pod.Spec.InitContainers = test.containers
 		pod.Status.InitContainerStatuses = test.oldStatuses
 		podStatus.ContainerStatuses = test.statuses
-		apiStatus := kubelet.generateAPIPodStatus(pod, podStatus, false)
+		apiStatus := kubelet.generateAPIPodStatus(tCtx, pod, podStatus, false)
 		expectedState := test.expectedState
 		if test.expectedInitState != nil {
 			expectedState = test.expectedInitState
@@ -2331,6 +2335,7 @@ func TestGenerateAPIPodStatusWithReasonCache(t *testing.T) {
 
 // Test generateAPIPodStatus with different restart policies.
 func TestGenerateAPIPodStatusWithDifferentRestartPolicies(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	testErrorReason := fmt.Errorf("test-error")
 	emptyContainerID := (&kubecontainer.ContainerID{}).String()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
@@ -2459,14 +2464,14 @@ func TestGenerateAPIPodStatusWithDifferentRestartPolicies(t *testing.T) {
 		pod.Spec.RestartPolicy = test.restartPolicy
 		// Test normal containers
 		pod.Spec.Containers = containers
-		apiStatus := kubelet.generateAPIPodStatus(pod, podStatus, false)
+		apiStatus := kubelet.generateAPIPodStatus(tCtx, pod, podStatus, false)
 		expectedState, expectedLastTerminationState := test.expectedState, test.expectedLastTerminationState
 		verifyContainerStatuses(t, apiStatus.ContainerStatuses, expectedState, expectedLastTerminationState, fmt.Sprintf("case %d", c))
 		pod.Spec.Containers = nil
 
 		// Test init containers
 		pod.Spec.InitContainers = containers
-		apiStatus = kubelet.generateAPIPodStatus(pod, podStatus, false)
+		apiStatus = kubelet.generateAPIPodStatus(tCtx, pod, podStatus, false)
 		if test.expectedInitState != nil {
 			expectedState = test.expectedInitState
 		}
@@ -2480,6 +2485,7 @@ func TestGenerateAPIPodStatusWithDifferentRestartPolicies(t *testing.T) {
 
 // Test generateAPIPodStatus with different container-level restart policies.
 func TestGenerateAPIPodStatusWithContainerRestartPolicies(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	var (
 		containerRestartPolicyAlways    = v1.ContainerRestartPolicyAlways
 		containerRestartPolicyOnFailure = v1.ContainerRestartPolicyOnFailure
@@ -2675,7 +2681,7 @@ func TestGenerateAPIPodStatusWithContainerRestartPolicies(t *testing.T) {
 		pod.Spec.RestartPolicy = v1.RestartPolicyAlways
 		// Test normal containers
 		pod.Spec.Containers = test.containers
-		apiStatus := kubelet.generateAPIPodStatus(pod, podStatus, false)
+		apiStatus := kubelet.generateAPIPodStatus(tCtx, pod, podStatus, false)
 		expectedState, expectedLastTerminationState := test.expectedState, test.expectedLastTerminationState
 		verifyContainerStatuses(t, apiStatus.ContainerStatuses, expectedState, expectedLastTerminationState, test.desc)
 		pod.Spec.Containers = nil
@@ -3011,6 +3017,7 @@ func (a *testPodSyncHandler) ShouldEvict(pod *v1.Pod) lifecycle.ShouldEvictRespo
 
 // TestGenerateAPIPodStatusInvokesPodSyncHandlers invokes the handlers and reports the proper status
 func TestGenerateAPIPodStatusInvokesPodSyncHandlers(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -3022,7 +3029,7 @@ func TestGenerateAPIPodStatusInvokesPodSyncHandlers(t *testing.T) {
 		Name:      pod.Name,
 		Namespace: pod.Namespace,
 	}
-	apiStatus := kubelet.generateAPIPodStatus(pod, status, false)
+	apiStatus := kubelet.generateAPIPodStatus(tCtx, pod, status, false)
 	require.Equal(t, v1.PodFailed, apiStatus.Phase)
 	require.Equal(t, "Evicted", apiStatus.Reason)
 	require.Equal(t, "because", apiStatus.Message)
@@ -3932,6 +3939,7 @@ func TestSyncPodWithErrorsDuringInPlacePodResize(t *testing.T) {
 }
 
 func TestHandlePodUpdates_RecordContainerRequestedResizes(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	metrics.Register()
 	metrics.ContainerRequestedResizes.Reset()
 
@@ -4513,7 +4521,7 @@ func TestHandlePodUpdates_RecordContainerRequestedResizes(t *testing.T) {
 
 			kubelet.podManager.AddPod(initialPod)
 			require.NoError(t, kubelet.allocationManager.SetAllocatedResources(initialPod))
-			kubelet.HandlePodUpdates([]*v1.Pod{updatedPod})
+			kubelet.HandlePodUpdates(logger, []*v1.Pod{updatedPod})
 
 			tc.updateExpectedFunc(&expectedMetrics)
 
@@ -4710,6 +4718,7 @@ func TestHandlePodReconcile_RetryPendingResizes(t *testing.T) {
 }
 
 func TestSyncPodNodeDeclaredFeaturesUpdate(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	cpu1000m := resource.MustParse("1")
 	mem1000M := resource.MustParse("1Gi")
 	cpu2000m := resource.MustParse("2")
@@ -4853,7 +4862,7 @@ func TestSyncPodNodeDeclaredFeaturesUpdate(t *testing.T) {
 			}
 
 			kubelet.statusManager.SetPodStatus(klog.TODO(), tc.newPod, v1.PodStatus{Phase: v1.PodRunning})
-			kubelet.HandlePodUpdates([]*v1.Pod{tc.newPod})
+			kubelet.HandlePodUpdates(logger, []*v1.Pod{tc.newPod})
 			if tc.expectEvent {
 				select {
 				case event := <-recorder.Events:

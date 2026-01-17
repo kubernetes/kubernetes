@@ -133,6 +133,23 @@ func LabelValue[T ~string](_ context.Context, op operation.Operation, fldPath *f
 	return allErrs
 }
 
+// PathSegmentName verifies that the specified value is a valid path segment name.
+// A path segment name can be safely encoded as a path segment in URLs and file paths.
+//   - must not be exactly "." or ".."
+//   - must not contain "/" (forward slash)
+//   - must not contain "%" (percent sign)
+//   - can contain any other characters including mixed case, numbers, dots, hyphens, underscores, and non-ASCII characters
+func PathSegmentName[T ~string](_ context.Context, op operation.Operation, fldPath *field.Path, value, _ *T) field.ErrorList {
+	if value == nil {
+		return nil
+	}
+	var allErrs field.ErrorList
+	for _, msg := range content.IsPathSegmentName((string)(*value)) {
+		allErrs = append(allErrs, field.Invalid(fldPath, *value, msg).WithOrigin("format=k8s-path-segment-name"))
+	}
+	return allErrs
+}
+
 // UUID verifies that the specified value is a valid UUID (RFC 4122).
 //   - must be 36 characters long
 //   - must be in the normalized form `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`

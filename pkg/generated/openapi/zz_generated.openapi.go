@@ -11849,28 +11849,28 @@ func schema_k8sio_api_authentication_v1_BoundObjectReference(ref common.Referenc
 				Properties: map[string]spec.Schema{
 					"kind": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Kind of the referent. Valid kinds are 'Pod' and 'Secret'.",
+							Description: "kind of the referent. Valid kinds are 'Pod' and 'Secret'.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"apiVersion": {
 						SchemaProps: spec.SchemaProps{
-							Description: "API version of the referent.",
+							Description: "apiVersion is API version of the referent.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Name of the referent.",
+							Description: "name of the referent.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"uid": {
 						SchemaProps: spec.SchemaProps{
-							Description: "UID of the referent.",
+							Description: "uid of the referent.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -11904,14 +11904,14 @@ func schema_k8sio_api_authentication_v1_SelfSubjectReview(ref common.ReferenceCa
 					},
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Description: "metadata is standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 							Default:     map[string]interface{}{},
 							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Status is filled in by the server with the user attributes.",
+							Description: "status is filled in by the server with the user attributes.",
 							Default:     map[string]interface{}{},
 							Ref:         ref(authenticationv1.SelfSubjectReviewStatus{}.OpenAPIModelName()),
 						},
@@ -11933,7 +11933,7 @@ func schema_k8sio_api_authentication_v1_SelfSubjectReviewStatus(ref common.Refer
 				Properties: map[string]spec.Schema{
 					"userInfo": {
 						SchemaProps: spec.SchemaProps{
-							Description: "User attributes of the user making this request.",
+							Description: "userInfo is a set of attributes belonging to the user making this request.",
 							Default:     map[string]interface{}{},
 							Ref:         ref(authenticationv1.UserInfo{}.OpenAPIModelName()),
 						},
@@ -11969,21 +11969,21 @@ func schema_k8sio_api_authentication_v1_TokenRequest(ref common.ReferenceCallbac
 					},
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Description: "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 							Default:     map[string]interface{}{},
 							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
 						},
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Spec holds information about the request being evaluated",
+							Description: "spec holds information about the request being evaluated",
 							Default:     map[string]interface{}{},
 							Ref:         ref(authenticationv1.TokenRequestSpec{}.OpenAPIModelName()),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Status is filled in by the server and indicates whether the token can be authenticated.",
+							Description: "status is filled in by the server and indicates whether the token can be authenticated.",
 							Default:     map[string]interface{}{},
 							Ref:         ref(authenticationv1.TokenRequestStatus{}.OpenAPIModelName()),
 						},
@@ -12011,7 +12011,7 @@ func schema_k8sio_api_authentication_v1_TokenRequestSpec(ref common.ReferenceCal
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Audiences are the intendend audiences of the token. A recipient of a token must identify themself with an identifier in the list of audiences of the token, and otherwise should reject the token. A token issued for multiple audiences may be used to authenticate against any of the audiences listed but implies a high degree of trust between the target audiences.",
+							Description: "audiences are the intendend audiences of the token. A recipient of a token must identify themself with an identifier in the list of audiences of the token, and otherwise should reject the token. A token issued for multiple audiences may be used to authenticate against any of the audiences listed but implies a high degree of trust between the target audiences.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -12026,14 +12026,14 @@ func schema_k8sio_api_authentication_v1_TokenRequestSpec(ref common.ReferenceCal
 					},
 					"expirationSeconds": {
 						SchemaProps: spec.SchemaProps{
-							Description: "ExpirationSeconds is the requested duration of validity of the request. The token issuer may return a token with a different validity duration so a client needs to check the 'expiration' field in a response.",
+							Description: "expirationSeconds is the requested duration of validity of the request. The token issuer may return a token with a different validity duration so a client needs to check the 'expiration' field in a response.",
 							Type:        []string{"integer"},
 							Format:      "int64",
 						},
 					},
 					"boundObjectRef": {
 						SchemaProps: spec.SchemaProps{
-							Description: "BoundObjectRef is a reference to an object that the token will be bound to. The token will only be valid for as long as the bound object exists. NOTE: The API server's TokenReview endpoint will validate the BoundObjectRef, but other audiences may not. Keep ExpirationSeconds small if you want prompt revocation.",
+							Description: "boundObjectRef is a reference to an object that the token will be bound to. The token will only be valid for as long as the bound object exists. NOTE: The API server's TokenReview endpoint will validate the BoundObjectRef, but other audiences may not. Keep ExpirationSeconds small if you want prompt revocation.",
 							Ref:         ref(authenticationv1.BoundObjectReference{}.OpenAPIModelName()),
 						},
 					},
@@ -12055,7 +12055,7 @@ func schema_k8sio_api_authentication_v1_TokenRequestStatus(ref common.ReferenceC
 				Properties: map[string]spec.Schema{
 					"token": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Token is the opaque bearer token.",
+							Description: "token is the opaque bearer token.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -12063,7 +12063,7 @@ func schema_k8sio_api_authentication_v1_TokenRequestStatus(ref common.ReferenceC
 					},
 					"expirationTimestamp": {
 						SchemaProps: spec.SchemaProps{
-							Description: "ExpirationTimestamp is the time of expiration of the returned token.",
+							Description: "expirationTimestamp is the time of expiration of the returned token.",
 							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
 						},
 					},
@@ -12099,21 +12099,21 @@ func schema_k8sio_api_authentication_v1_TokenReview(ref common.ReferenceCallback
 					},
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Description: "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 							Default:     map[string]interface{}{},
 							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
 						},
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Spec holds information about the request being evaluated",
+							Description: "spec holds information about the request being evaluated",
 							Default:     map[string]interface{}{},
 							Ref:         ref(authenticationv1.TokenReviewSpec{}.OpenAPIModelName()),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Status is filled in by the server and indicates whether the request can be authenticated.",
+							Description: "status is filled in by the server and indicates whether the request can be authenticated.",
 							Default:     map[string]interface{}{},
 							Ref:         ref(authenticationv1.TokenReviewStatus{}.OpenAPIModelName()),
 						},
@@ -12136,7 +12136,7 @@ func schema_k8sio_api_authentication_v1_TokenReviewSpec(ref common.ReferenceCall
 				Properties: map[string]spec.Schema{
 					"token": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Token is the opaque bearer token.",
+							Description: "token is the opaque bearer token.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -12148,7 +12148,7 @@ func schema_k8sio_api_authentication_v1_TokenReviewSpec(ref common.ReferenceCall
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Audiences is a list of the identifiers that the resource server presented with the token identifies as. Audience-aware token authenticators will verify that the token was intended for at least one of the audiences in this list. If no audiences are provided, the audience will default to the audience of the Kubernetes apiserver.",
+							Description: "audiences is a list of the identifiers that the resource server presented with the token identifies as. Audience-aware token authenticators will verify that the token was intended for at least one of the audiences in this list. If no audiences are provided, the audience will default to the audience of the Kubernetes apiserver.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -12176,14 +12176,14 @@ func schema_k8sio_api_authentication_v1_TokenReviewStatus(ref common.ReferenceCa
 				Properties: map[string]spec.Schema{
 					"authenticated": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Authenticated indicates that the token was associated with a known user.",
+							Description: "authenticated indicates that the token was associated with a known user.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
 					},
 					"user": {
 						SchemaProps: spec.SchemaProps{
-							Description: "User is the UserInfo associated with the provided token.",
+							Description: "user is the UserInfo associated with the provided token.",
 							Default:     map[string]interface{}{},
 							Ref:         ref(authenticationv1.UserInfo{}.OpenAPIModelName()),
 						},
@@ -12195,7 +12195,7 @@ func schema_k8sio_api_authentication_v1_TokenReviewStatus(ref common.ReferenceCa
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Audiences are audience identifiers chosen by the authenticator that are compatible with both the TokenReview and token. An identifier is any identifier in the intersection of the TokenReviewSpec audiences and the token's audiences. A client of the TokenReview API that sets the spec.audiences field should validate that a compatible audience identifier is returned in the status.audiences field to ensure that the TokenReview server is audience aware. If a TokenReview returns an empty status.audience field where status.authenticated is \"true\", the token is valid against the audience of the Kubernetes API server.",
+							Description: "audiences are audience identifiers chosen by the authenticator that are compatible with both the TokenReview and token. An identifier is any identifier in the intersection of the TokenReviewSpec audiences and the token's audiences. A client of the TokenReview API that sets the spec.audiences field should validate that a compatible audience identifier is returned in the status.audiences field to ensure that the TokenReview server is audience aware. If a TokenReview returns an empty status.audience field where status.authenticated is \"true\", the token is valid against the audience of the Kubernetes API server.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -12210,7 +12210,7 @@ func schema_k8sio_api_authentication_v1_TokenReviewStatus(ref common.ReferenceCa
 					},
 					"error": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Error indicates that the token couldn't be checked",
+							Description: "error indicates that the token couldn't be checked",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -12232,14 +12232,14 @@ func schema_k8sio_api_authentication_v1_UserInfo(ref common.ReferenceCallback) c
 				Properties: map[string]spec.Schema{
 					"username": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The name that uniquely identifies this user among all active users.",
+							Description: "username is the name that uniquely identifies this user among all active users.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"uid": {
 						SchemaProps: spec.SchemaProps{
-							Description: "A unique value that identifies this user across time. If this user is deleted and another user by the same name is added, they will have different UIDs.",
+							Description: "uid is a unique value that identifies this user across time. If this user is deleted and another user by the same name is added, they will have different UIDs.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -12251,7 +12251,7 @@ func schema_k8sio_api_authentication_v1_UserInfo(ref common.ReferenceCallback) c
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "The names of groups this user is a part of.",
+							Description: "groups is the names of groups this user is a part of.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -12266,7 +12266,7 @@ func schema_k8sio_api_authentication_v1_UserInfo(ref common.ReferenceCallback) c
 					},
 					"extra": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Any additional information provided by the authenticator.",
+							Description: "extra is any additional information provided by the authenticator.",
 							Type:        []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,
@@ -12316,14 +12316,14 @@ func schema_k8sio_api_authentication_v1alpha1_SelfSubjectReview(ref common.Refer
 					},
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Description: "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 							Default:     map[string]interface{}{},
 							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Status is filled in by the server with the user attributes.",
+							Description: "status is filled in by the server with the user attributes.",
 							Default:     map[string]interface{}{},
 							Ref:         ref(authenticationv1alpha1.SelfSubjectReviewStatus{}.OpenAPIModelName()),
 						},
@@ -12345,7 +12345,7 @@ func schema_k8sio_api_authentication_v1alpha1_SelfSubjectReviewStatus(ref common
 				Properties: map[string]spec.Schema{
 					"userInfo": {
 						SchemaProps: spec.SchemaProps{
-							Description: "User attributes of the user making this request.",
+							Description: "userInfo is a set of attributes belonging to the user making this request.",
 							Default:     map[string]interface{}{},
 							Ref:         ref(authenticationv1.UserInfo{}.OpenAPIModelName()),
 						},
@@ -12381,14 +12381,14 @@ func schema_k8sio_api_authentication_v1beta1_SelfSubjectReview(ref common.Refere
 					},
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Description: "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 							Default:     map[string]interface{}{},
 							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Status is filled in by the server with the user attributes.",
+							Description: "status is filled in by the server with the user attributes.",
 							Default:     map[string]interface{}{},
 							Ref:         ref(authenticationv1beta1.SelfSubjectReviewStatus{}.OpenAPIModelName()),
 						},
@@ -12410,7 +12410,7 @@ func schema_k8sio_api_authentication_v1beta1_SelfSubjectReviewStatus(ref common.
 				Properties: map[string]spec.Schema{
 					"userInfo": {
 						SchemaProps: spec.SchemaProps{
-							Description: "User attributes of the user making this request.",
+							Description: "userInfo is a set of attributes belonging to the user making this request.",
 							Default:     map[string]interface{}{},
 							Ref:         ref(authenticationv1.UserInfo{}.OpenAPIModelName()),
 						},
@@ -12446,21 +12446,21 @@ func schema_k8sio_api_authentication_v1beta1_TokenReview(ref common.ReferenceCal
 					},
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Description: "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 							Default:     map[string]interface{}{},
 							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
 						},
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Spec holds information about the request being evaluated",
+							Description: "spec holds information about the request being evaluated",
 							Default:     map[string]interface{}{},
 							Ref:         ref(authenticationv1beta1.TokenReviewSpec{}.OpenAPIModelName()),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Status is filled in by the server and indicates whether the token can be authenticated.",
+							Description: "status is filled in by the server and indicates whether the token can be authenticated.",
 							Default:     map[string]interface{}{},
 							Ref:         ref(authenticationv1beta1.TokenReviewStatus{}.OpenAPIModelName()),
 						},
@@ -12483,7 +12483,7 @@ func schema_k8sio_api_authentication_v1beta1_TokenReviewSpec(ref common.Referenc
 				Properties: map[string]spec.Schema{
 					"token": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Token is the opaque bearer token.",
+							Description: "token is the opaque bearer token.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -12495,7 +12495,7 @@ func schema_k8sio_api_authentication_v1beta1_TokenReviewSpec(ref common.Referenc
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Audiences is a list of the identifiers that the resource server presented with the token identifies as. Audience-aware token authenticators will verify that the token was intended for at least one of the audiences in this list. If no audiences are provided, the audience will default to the audience of the Kubernetes apiserver.",
+							Description: "audiences is a list of the identifiers that the resource server presented with the token identifies as. Audience-aware token authenticators will verify that the token was intended for at least one of the audiences in this list. If no audiences are provided, the audience will default to the audience of the Kubernetes apiserver.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -12523,14 +12523,14 @@ func schema_k8sio_api_authentication_v1beta1_TokenReviewStatus(ref common.Refere
 				Properties: map[string]spec.Schema{
 					"authenticated": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Authenticated indicates that the token was associated with a known user.",
+							Description: "authenticated indicates that the token was associated with a known user.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
 					},
 					"user": {
 						SchemaProps: spec.SchemaProps{
-							Description: "User is the UserInfo associated with the provided token.",
+							Description: "user is the UserInfo associated with the provided token.",
 							Default:     map[string]interface{}{},
 							Ref:         ref(authenticationv1beta1.UserInfo{}.OpenAPIModelName()),
 						},
@@ -12542,7 +12542,7 @@ func schema_k8sio_api_authentication_v1beta1_TokenReviewStatus(ref common.Refere
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Audiences are audience identifiers chosen by the authenticator that are compatible with both the TokenReview and token. An identifier is any identifier in the intersection of the TokenReviewSpec audiences and the token's audiences. A client of the TokenReview API that sets the spec.audiences field should validate that a compatible audience identifier is returned in the status.audiences field to ensure that the TokenReview server is audience aware. If a TokenReview returns an empty status.audience field where status.authenticated is \"true\", the token is valid against the audience of the Kubernetes API server.",
+							Description: "audiences are audience identifiers chosen by the authenticator that are compatible with both the TokenReview and token. An identifier is any identifier in the intersection of the TokenReviewSpec audiences and the token's audiences. A client of the TokenReview API that sets the spec.audiences field should validate that a compatible audience identifier is returned in the status.audiences field to ensure that the TokenReview server is audience aware. If a TokenReview returns an empty status.audience field where status.authenticated is \"true\", the token is valid against the audience of the Kubernetes API server.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -12557,7 +12557,7 @@ func schema_k8sio_api_authentication_v1beta1_TokenReviewStatus(ref common.Refere
 					},
 					"error": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Error indicates that the token couldn't be checked",
+							Description: "error indicates that the token couldn't be checked",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -12579,14 +12579,14 @@ func schema_k8sio_api_authentication_v1beta1_UserInfo(ref common.ReferenceCallba
 				Properties: map[string]spec.Schema{
 					"username": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The name that uniquely identifies this user among all active users.",
+							Description: "username is the name that uniquely identifies this user among all active users.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"uid": {
 						SchemaProps: spec.SchemaProps{
-							Description: "A unique value that identifies this user across time. If this user is deleted and another user by the same name is added, they will have different UIDs.",
+							Description: "uid is a unique value that identifies this user across time. If this user is deleted and another user by the same name is added, they will have different UIDs.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -12598,7 +12598,7 @@ func schema_k8sio_api_authentication_v1beta1_UserInfo(ref common.ReferenceCallba
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "The names of groups this user is a part of.",
+							Description: "groups is the names of groups this user is a part of.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -12613,7 +12613,7 @@ func schema_k8sio_api_authentication_v1beta1_UserInfo(ref common.ReferenceCallba
 					},
 					"extra": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Any additional information provided by the authenticator.",
+							Description: "extra is any additional information provided by the authenticator.",
 							Type:        []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,

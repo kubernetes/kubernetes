@@ -1188,7 +1188,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 
 			// If there is any regular container, it means all init containers have
 			// been initialized.
-			hasInitialized = hasAnyRegularContainerCreated(pod, podStatus)
+			hasInitialized = HasAnyRegularContainerCreated(pod, podStatus)
 
 			if hasInitialized {
 				changes.CreateSandbox = false

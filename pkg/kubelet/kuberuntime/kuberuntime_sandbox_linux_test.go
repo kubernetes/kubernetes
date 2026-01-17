@@ -256,7 +256,7 @@ func TestGeneratePodSandboxLinuxConfigSupplementalGroupsPolicy(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		config, err := m.generatePodSandboxLinuxConfig(test.pod)
+		config, err := m.generatePodSandboxLinuxConfig(tCtx, test.pod)
 		if test.expectedErr {
 			assert.NotEmptyf(t, err, "TestCase[%d]: %s", i, test.description)
 			assert.Emptyf(t, config, "TestCase[%d]: %s", i, test.description)

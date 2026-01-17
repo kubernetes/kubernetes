@@ -26,6 +26,7 @@ const (
 	Edition_EDITION_PROTO3_enum_value          = 999
 	Edition_EDITION_2023_enum_value            = 1000
 	Edition_EDITION_2024_enum_value            = 1001
+	Edition_EDITION_UNSTABLE_enum_value        = 9999
 	Edition_EDITION_1_TEST_ONLY_enum_value     = 1
 	Edition_EDITION_2_TEST_ONLY_enum_value     = 2
 	Edition_EDITION_99997_TEST_ONLY_enum_value = 99997
