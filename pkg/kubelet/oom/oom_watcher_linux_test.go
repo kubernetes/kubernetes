@@ -17,12 +17,14 @@ limitations under the License.
 package oom
 
 import (
+	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/test/utils/ktesting"
 
 	"github.com/google/cadvisor/utils/oomparser"
@@ -40,11 +42,30 @@ func (fs *fakeStreamer) StreamOoms(outStream chan<- *oomparser.OomInstance) {
 	}
 }
 
-type noopStorer struct{}
+type fakeCheckPointManager struct {
+	timestamp time.Time
+}
 
-func (n noopStorer) store(data state) error { return nil }
+func (c fakeCheckPointManager) CreateCheckpoint(checkpointKey string, checkpoint checkpointmanager.Checkpoint) error {
+	return nil
+}
 
-func (n noopStorer) load(data *state) error { return nil }
+func (c fakeCheckPointManager) GetCheckpoint(checkpointKey string, checkpoint checkpointmanager.Checkpoint) error {
+	s := Checkpoint{LastProcessedTimestamp: c.timestamp}
+	res, err := json.Marshal(s)
+	if err != nil {
+		return err
+	}
+	return checkpoint.UnmarshalCheckpoint(res)
+}
+
+func (c fakeCheckPointManager) RemoveCheckpoint(checkpointKey string) error {
+	return nil
+}
+
+func (c fakeCheckPointManager) ListCheckpoints() ([]string, error) {
+	return []string{}, nil
+}
 
 // TestWatcherRecordsEventsForOomEvents ensures that our OomInstances coming
 // from `StreamOoms` are translated into events in our recorder.
@@ -71,10 +92,10 @@ func TestWatcherRecordsEventsForOomEvents(t *testing.T) {
 	oomWatcher := &realWatcher{
 		recorder:    fakeRecorder,
 		oomStreamer: fakeStreamer,
-		state: &state{
+		checkPoint: &Checkpoint{
 			LastProcessedTimestamp: time.Now().Add(-1 * time.Hour),
-			storer:                 &noopStorer{},
 		},
+		checkPointManager: fakeCheckPointManager{},
 	}
 	require.NoError(t, oomWatcher.Start(tCtx, node))
 
@@ -82,42 +103,32 @@ func TestWatcherRecordsEventsForOomEvents(t *testing.T) {
 	assert.Len(t, eventsRecorded, numExpectedOomEvents)
 }
 
-type MemoryStorer struct {
-	LastProcessedTimestamp time.Time
-	storeCompletedCh       chan bool
-}
-
-func (ms *MemoryStorer) store(data state) error {
-	ms.LastProcessedTimestamp = data.LastProcessedTimestamp
-	ms.storeCompletedCh <- true
-	return nil
-}
-
-func (ms *MemoryStorer) load(data *state) error {
-	data.LastProcessedTimestamp = ms.LastProcessedTimestamp
-	return nil
-}
-
 func TestWatcherIgnoreOutOfOrderEvents(t *testing.T) {
 	tCtx := ktesting.Init(t)
-	expectedStateTime := time.Now().Add(2 * time.Hour)
 	oomInstancesToStream := []*oomparser.OomInstance{
 		{
 			Pid:                 1000,
-			ProcessName:         "fakeProcess",
-			TimeOfDeath:         time.Now(),
+			ProcessName:         "fakeProcess-1",
+			TimeOfDeath:         time.Now().Add(1 * time.Hour),
 			ContainerName:       recordEventContainerName + "some-container",
 			VictimContainerName: recordEventContainerName,
 		},
 		{
 			Pid:                 1001,
-			ProcessName:         "fakeProcess",
-			TimeOfDeath:         expectedStateTime,
+			ProcessName:         "fakeProcess-2",
+			TimeOfDeath:         time.Now().Add(2 * time.Hour),
+			ContainerName:       recordEventContainerName + "some-container",
+			VictimContainerName: recordEventContainerName,
+		},
+		{
+			Pid:                 1002,
+			ProcessName:         "fakeProcess-3",
+			TimeOfDeath:         time.Now().Add(-2 * time.Hour),
 			ContainerName:       recordEventContainerName + "some-container",
 			VictimContainerName: recordEventContainerName,
 		},
 	}
-	numExpectedOomEvents := len(oomInstancesToStream)
+	numExpectedOomEvents := 1 // Since the current time is set +90 min from now, the first and third messages will be discarded
 
 	fakeStreamer := &fakeStreamer{
 		oomInstancesToStream: oomInstancesToStream,
@@ -126,41 +137,35 @@ func TestWatcherIgnoreOutOfOrderEvents(t *testing.T) {
 	fakeRecorder := record.NewFakeRecorder(numExpectedOomEvents)
 	node := &v1.ObjectReference{}
 
-	syncCh := make(chan bool)
-	defer close(syncCh)
 	oomWatcher := &realWatcher{
 		recorder:    fakeRecorder,
 		oomStreamer: fakeStreamer,
-		state: &state{
-			storer: &MemoryStorer{
-				LastProcessedTimestamp: time.Now().Add(1 * time.Hour),
-				storeCompletedCh:       syncCh,
-			},
+		checkPoint:  &Checkpoint{},
+		checkPointManager: fakeCheckPointManager{
+			timestamp: time.Now().Add(90 * time.Minute),
 		},
 	}
+
 	require.NoError(t, oomWatcher.Start(tCtx, node))
-	<-syncCh
 
 	eventsRecorded := getRecordedEvents(fakeRecorder, numExpectedOomEvents)
 	assert.Len(t, eventsRecorded, 1)
-	assert.Equal(t, expectedStateTime, oomWatcher.state.LastProcessedTimestamp)
 }
 
 func getRecordedEvents(fakeRecorder *record.FakeRecorder, numExpectedOomEvents int) []string {
 	eventsRecorded := []string{}
 
-	select {
-	case event := <-fakeRecorder.Events:
-		eventsRecorded = append(eventsRecorded, event)
-
-		if len(eventsRecorded) == numExpectedOomEvents {
-			break
+loop:
+	for {
+		select {
+		case event := <-fakeRecorder.Events:
+			eventsRecorded = append(eventsRecorded, event)
+		case <-time.After(500 * time.Millisecond):
+			break loop
 		}
-	case <-time.After(10 * time.Second):
-		break
 	}
-
 	return eventsRecorded
+
 }
 
 // TestWatcherRecordsEventsForOomEventsCorrectContainerName verifies that we
@@ -199,10 +204,10 @@ func TestWatcherRecordsEventsForOomEventsCorrectContainerName(t *testing.T) {
 	oomWatcher := &realWatcher{
 		recorder:    fakeRecorder,
 		oomStreamer: fakeStreamer,
-		state: &state{
+		checkPoint: &Checkpoint{
 			LastProcessedTimestamp: time.Now().Add(-1 * time.Hour),
-			storer:                 &noopStorer{},
 		},
+		checkPointManager: fakeCheckPointManager{},
 	}
 	require.NoError(t, oomWatcher.Start(tCtx, node))
 
@@ -240,10 +245,10 @@ func TestWatcherRecordsEventsForOomEventsWithAdditionalInfo(t *testing.T) {
 	oomWatcher := &realWatcher{
 		recorder:    fakeRecorder,
 		oomStreamer: fakeStreamer,
-		state: &state{
+		checkPoint: &Checkpoint{
 			LastProcessedTimestamp: time.Now().Add(-1 * time.Hour),
-			storer:                 &noopStorer{},
 		},
+		checkPointManager: fakeCheckPointManager{},
 	}
 	require.NoError(t, oomWatcher.Start(tCtx, node))
 

@@ -31,11 +31,16 @@ import (
 	"github.com/onsi/ginkgo/v2"
 )
 
+/*
+The test simulates OOM events by inserting a fake data directly into /dev/kmsg
+While not the best solution, the approach ensures that the test is as much as
+possible close to production without applying performance penalty.
+*/
 var _ = SIGDescribe("OOMWatcher", func() {
 	f := framework.NewDefaultFramework("oom")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
-	ginkgo.It("ignores already processed events [LinuxOnly]", func(ctx context.Context) {
+	ginkgo.It("ignores already processed events", ginkgo.Label("LinuxOnly"), func(ctx context.Context) {
 		events, err := f.ClientSet.CoreV1().Events("default").List(ctx, metav1.ListOptions{})
 		framework.ExpectNoError(err)
 
