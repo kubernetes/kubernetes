@@ -374,8 +374,15 @@ func podTerminatingByPreemption(p *v1.Pod) bool {
 // receives a sorted list, grouping will preserve the order of the input list.
 func filterPodsWithPDBViolation(podInfos []fwk.PodInfo, pdbs []*policy.PodDisruptionBudget) (violatingPodInfos, nonViolatingPodInfos []fwk.PodInfo) {
 	pdbsAllowed := make([]int32, len(pdbs))
+	selectors := make([]labels.Selector, len(pdbs))
+
 	for i, pdb := range pdbs {
 		pdbsAllowed[i] = pdb.Status.DisruptionsAllowed
+		// Optimization: Parse selectors once here instead of inside the nested loop.
+		// If parsing fails, selectors[i] remains nil.
+		if s, err := metav1.LabelSelectorAsSelector(pdb.Spec.Selector); err == nil {
+			selectors[i] = s
+		}
 	}
 
 	for _, podInfo := range podInfos {
@@ -384,16 +391,18 @@ func filterPodsWithPDBViolation(podInfos []fwk.PodInfo, pdbs []*policy.PodDisrup
 		// A pod with no labels will not match any PDB. So, no need to check.
 		if len(pod.Labels) != 0 {
 			for i, pdb := range pdbs {
+				// Optimization Check: If selector failed to parse (is nil), skip it.
+				// This mimics the original behavior of "if err != nil { continue }".
+				if selectors[i] == nil {
+					continue
+				}
+
 				if pdb.Namespace != pod.Namespace {
 					continue
 				}
-				selector, err := metav1.LabelSelectorAsSelector(pdb.Spec.Selector)
-				if err != nil {
-					// This object has an invalid selector, it does not match the pod
-					continue
-				}
+
 				// A PDB with a nil or empty selector matches nothing.
-				if selector.Empty() || !selector.Matches(labels.Set(pod.Labels)) {
+				if selectors[i].Empty() || !selectors[i].Matches(labels.Set(pod.Labels)) {
 					continue
 				}
 
