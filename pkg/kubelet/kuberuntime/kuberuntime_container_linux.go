@@ -78,7 +78,7 @@ func (m *kubeGenericRuntimeManager) applyPlatformSpecificContainerConfig(ctx con
 
 // generateLinuxContainerConfig generates linux container config for kubelet runtime v1.
 func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(ctx context.Context, container *v1.Container, pod *v1.Pod, uid *int64, username string, nsTarget *kubecontainer.ContainerID, enforceMemoryQoS bool) (*runtimeapi.LinuxContainerConfig, error) {
-	sc, err := m.determineEffectiveSecurityContext(pod, container, uid, username)
+	sc, err := m.determineEffectiveSecurityContext(ctx, pod, container, uid, username)
 	if err != nil {
 		return nil, err
 	}
