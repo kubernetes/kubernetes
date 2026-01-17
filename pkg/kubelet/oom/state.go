@@ -54,7 +54,8 @@ type FileStorer struct {
 }
 
 func (fs *FileStorer) store(data state) error {
-	file, err := os.OpenFile(fs.filePath, os.O_CREATE|os.O_WRONLY, 0644)
+	tmpFile := fs.filePath + ".tmp"
+	file, err := os.OpenFile(tmpFile, os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return fmt.Errorf("unable to create oom watcher state file at %v: %w", fs.filePath, err)
 	}
@@ -65,12 +66,16 @@ func (fs *FileStorer) store(data state) error {
 	if err != nil {
 		return fmt.Errorf("unable to encode oom watcher state file at %v: %w", fs.filePath, err)
 	}
+	os.Rename(tmpFile, fs.filePath)
 	return nil
 }
 
 func (fs *FileStorer) load(data *state) error {
-	file, err := os.OpenFile(fs.filePath, os.O_CREATE|os.O_RDONLY, 0644)
+	file, err := os.OpenFile(fs.filePath, os.O_RDONLY, 0644)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("oom watcher state file at %v does not exist", fs.filePath)
+		}
 		return fmt.Errorf("unable to create oom watcher state file at %v: %w", fs.filePath, err)
 	}
 	defer func() {
