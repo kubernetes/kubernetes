@@ -33,10 +33,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	cres "k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
-	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 )
 
 func activeTestPods() []*v1.Pod {
@@ -215,151 +213,218 @@ func (f *fakeCgroupManager) SetCgroupConfig(logger klog.Logger, name CgroupName,
 }
 func (f *fakeCgroupManager) Version() int { return 1 }
 
-func expectedCPUShares(activeTestPods ActivePodsFunc) uint64 {
-	pods := activeTestPods()
-
-	burstablePodCPURequest := int64(0)
-	for i := range pods {
-		pod := pods[i]
-		qosClass := v1qos.GetPodQOS(pod)
-		if qosClass != v1.PodQOSBurstable {
-			// we only care about the burstable qos tier
-			continue
-		}
-		req := cres.PodRequests(pod, cres.PodResourcesOptions{})
-		if request, found := req[v1.ResourceCPU]; found {
-			burstablePodCPURequest += request.MilliValue()
-		}
-	}
-	// set burstable shares based on current observe state
-	burstableCPUShares := MilliCPUToShares(burstablePodCPURequest)
-	return burstableCPUShares
-}
-
-func guaranteedTestPods() []*v1.Pod {
-	return []*v1.Pod{
-
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				UID:       types.UID(uuid.NewUUID()),
-				Name:      "guaranteed-pod",
-				Namespace: "test",
-			},
-			Spec: v1.PodSpec{
-				Containers: []v1.Container{
-					{
-						Name:  "foo",
-						Image: "busybox",
-						Resources: v1.ResourceRequirements{
-							Requests: v1.ResourceList{
-								v1.ResourceCPU: resource.MustParse("1"),
-							},
-							Limits: v1.ResourceList{
-								v1.ResourceCPU: resource.MustParse("1"),
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-}
-
-func burstableTestPods() []*v1.Pod {
-	return []*v1.Pod{
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				UID:       types.UID(uuid.NewUUID()),
-				Name:      "burstable-pod",
-				Namespace: "test",
-			},
-			Spec: v1.PodSpec{
-				Containers: []v1.Container{
-					{
-						Name:  "foo",
-						Image: "busybox",
-						Resources: v1.ResourceRequirements{
-							Requests: v1.ResourceList{
-								v1.ResourceCPU: resource.MustParse("1"),
-							},
-							Limits: v1.ResourceList{
-								v1.ResourceCPU: resource.MustParse("2"),
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-}
-
-func bestEffortTestPods() []*v1.Pod {
-	return []*v1.Pod{
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				UID:       types.UID(uuid.NewUUID()),
-				Name:      "besteffort-pod",
-				Namespace: "test",
-			},
-			Spec: v1.PodSpec{
-				Containers: []v1.Container{
-					{
-						Name:  "foo",
-						Image: "busybox",
-					},
-				},
-			},
-		},
-	}
-}
-
-func guaranteedAndBurstableTestPods() []*v1.Pod {
-	pods := []*v1.Pod{}
-	pods = append(pods, guaranteedTestPods()...)
-	pods = append(pods, burstableTestPods()...)
-	return pods
-}
-func besteffortAndBurstableTestPods() []*v1.Pod {
-	pods := []*v1.Pod{}
-	pods = append(pods, bestEffortTestPods()...)
-	pods = append(pods, burstableTestPods()...)
-	return pods
-}
-
 // TestQOSCPUConfigUpdate verifies that UpdateCgroups() computes and
 // updates the correct CPU shares for each QoS class based on the
 // currently active pods.
 func TestQOSCPUConfigUpdate(t *testing.T) {
 
+	// Guaranteed QoS uses fixed CPU shares (requests == limits), so they are not
+	// recalculated. BestEffort always uses MinShares, and only Burstable CPU shares
+	// depend on aggregate burstable CPU requests.
+
 	tests := []struct {
-		name              string
-		testPods          ActivePodsFunc
-		expectedCPUShares uint64
+		name                       string
+		testPods                   ActivePodsFunc
+		expectedBurstableCPUShares uint64 // Recalculation will be done only for Burstable QoS class
 	}{
 		{
-			name:              "guaranteed-pods-only",
-			testPods:          guaranteedTestPods,
-			expectedCPUShares: expectedCPUShares(guaranteedTestPods),
+			name: "guaranteed-pods-only",
+			testPods: func() []*v1.Pod {
+				return []*v1.Pod{
+
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							UID:       types.UID(uuid.NewUUID()),
+							Name:      "guaranteed-pod",
+							Namespace: "test",
+						},
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
+								{
+									Name:  "foo",
+									Image: "busybox",
+									Resources: v1.ResourceRequirements{
+										Requests: v1.ResourceList{
+											v1.ResourceCPU:    resource.MustParse("1"),
+											v1.ResourceMemory: resource.MustParse("128Mi"),
+										},
+										Limits: v1.ResourceList{
+											v1.ResourceCPU:    resource.MustParse("1"),
+											v1.ResourceMemory: resource.MustParse("128Mi"),
+										},
+									},
+								},
+							},
+						},
+					},
+				}
+			},
+			// MinShares will be given to the Burstable QoS class since kubelet
+			// creates all QoS cgroups regardless of whether pods of that class exist.
+			expectedBurstableCPUShares: MinShares,
 		},
 		{
-			name:              "burstable-pods-only",
-			testPods:          burstableTestPods,
-			expectedCPUShares: expectedCPUShares(burstableTestPods),
+			name: "burstable-pods-only",
+			testPods: func() []*v1.Pod {
+				return []*v1.Pod{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							UID:       types.UID(uuid.NewUUID()),
+							Name:      "burstable-pod",
+							Namespace: "test",
+						},
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
+								{
+									Name:  "foo",
+									Image: "busybox",
+									Resources: v1.ResourceRequirements{
+										Requests: v1.ResourceList{
+											v1.ResourceCPU:    resource.MustParse("1"),
+											v1.ResourceMemory: resource.MustParse("128Mi"),
+										},
+										Limits: v1.ResourceList{
+											v1.ResourceCPU:    resource.MustParse("2"),
+											v1.ResourceMemory: resource.MustParse("256Mi"),
+										},
+									},
+								},
+							},
+						},
+					},
+				}
+			},
+			// 1 CPU Resource = 1024 CPU Shares
+			expectedBurstableCPUShares: 1024,
 		},
 		{
-			name:              "besteffort-pods-only",
-			testPods:          bestEffortTestPods,
-			expectedCPUShares: expectedCPUShares(bestEffortTestPods),
+			name: "besteffort-pods-only",
+			testPods: func() []*v1.Pod {
+				return []*v1.Pod{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							UID:       types.UID(uuid.NewUUID()),
+							Name:      "besteffort-pod",
+							Namespace: "test",
+						},
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
+								{
+									Name:  "foo",
+									Image: "busybox",
+								},
+							},
+						},
+					},
+				}
+			},
+			expectedBurstableCPUShares: MinShares,
 		},
 		{
-			name:              "guaranteed-and-burstable-pods",
-			testPods:          guaranteedAndBurstableTestPods,
-			expectedCPUShares: expectedCPUShares(guaranteedAndBurstableTestPods),
+			name: "guaranteed-and-burstable-pods",
+			testPods: func() []*v1.Pod {
+				return []*v1.Pod{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							UID:       types.UID(uuid.NewUUID()),
+							Name:      "guaranteed-pod",
+							Namespace: "test",
+						},
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
+								{
+									Name:  "foo",
+									Image: "busybox",
+									Resources: v1.ResourceRequirements{
+										Requests: v1.ResourceList{
+											v1.ResourceCPU:    resource.MustParse("1"),
+											v1.ResourceMemory: resource.MustParse("128Mi"),
+										},
+										Limits: v1.ResourceList{
+											v1.ResourceCPU:    resource.MustParse("1"),
+											v1.ResourceMemory: resource.MustParse("128Mi"),
+										},
+									},
+								},
+							},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							UID:       types.UID(uuid.NewUUID()),
+							Name:      "burstable-pod",
+							Namespace: "test",
+						},
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
+								{
+									Name:  "foo",
+									Image: "busybox",
+									Resources: v1.ResourceRequirements{
+										Requests: v1.ResourceList{
+											v1.ResourceCPU:    resource.MustParse("1"),
+											v1.ResourceMemory: resource.MustParse("128Mi"),
+										},
+										Limits: v1.ResourceList{
+											v1.ResourceCPU:    resource.MustParse("2"),
+											v1.ResourceMemory: resource.MustParse("256Mi"),
+										},
+									},
+								},
+							},
+						},
+					},
+				}
+			},
+			expectedBurstableCPUShares: 1024,
 		},
 		{
-			name:              "besteffort-and-burstable-pods",
-			testPods:          besteffortAndBurstableTestPods,
-			expectedCPUShares: expectedCPUShares(besteffortAndBurstableTestPods),
+			name: "besteffort-and-burstable-pods",
+			testPods: func() []*v1.Pod {
+				return []*v1.Pod{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							UID:       types.UID(uuid.NewUUID()),
+							Name:      "besteffort-pod",
+							Namespace: "test",
+						},
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
+								{
+									Name:  "foo",
+									Image: "busybox",
+								},
+							},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							UID:       types.UID(uuid.NewUUID()),
+							Name:      "burstable-pod",
+							Namespace: "test",
+						},
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
+								{
+									Name:  "foo",
+									Image: "busybox",
+									Resources: v1.ResourceRequirements{
+										Requests: v1.ResourceList{
+											v1.ResourceCPU:    resource.MustParse("1"),
+											v1.ResourceMemory: resource.MustParse("128Mi"),
+										},
+										Limits: v1.ResourceList{
+											v1.ResourceCPU:    resource.MustParse("2"),
+											v1.ResourceMemory: resource.MustParse("256Mi"),
+										},
+									},
+								},
+							},
+						},
+					},
+				}
+			},
+			expectedBurstableCPUShares: 1024,
 		},
 	}
 
@@ -367,7 +432,9 @@ func TestQOSCPUConfigUpdate(t *testing.T) {
 
 		t.Run(testCase.name, func(t *testing.T) {
 
-			testContainerManager, err := createTestQOSContainerManager(logr.Logger{})
+			logger := logr.Discard()
+
+			testContainerManager, err := createTestQOSContainerManager(logger)
 			if err != nil {
 				t.Fatalf("Unable to create Test Qos Container Manager: %s", err)
 				return
@@ -387,7 +454,7 @@ func TestQOSCPUConfigUpdate(t *testing.T) {
 
 			// UpdateCgroups() is expected to update all QoS cgroups on each call
 			// based on the current active pod set.
-			err = testContainerManager.UpdateCgroups(logr.Logger{})
+			err = testContainerManager.UpdateCgroups(logger)
 			if err != nil {
 				t.Fatalf("Error in UpdateCgroups(): %s", err)
 			}
@@ -399,6 +466,9 @@ func TestQOSCPUConfigUpdate(t *testing.T) {
 			foundBestEffort := false
 			foundGuaranteed := false
 
+			// Start() initiates a background UpdateCgroups() goroutine which may
+			// still be running. Take a snapshot to avoid observing updates from
+			// the background UpdateCgroups() instead of the explicit UpdateCgroups() call.
 			fakecgroupManager.mutex.Lock()
 			updates := append([]*CgroupConfig(nil), fakecgroupManager.updates...)
 			fakecgroupManager.mutex.Unlock()
@@ -407,8 +477,8 @@ func TestQOSCPUConfigUpdate(t *testing.T) {
 
 				if strings.HasSuffix(config.Name.ToCgroupfs(), "burstable") {
 					foundBurstable = true
-					if *config.ResourceParameters.CPUShares != testCase.expectedCPUShares {
-						t.Fatalf("Expected CPU Shares for Burstable: %d. Got: %d", testCase.expectedCPUShares, *config.ResourceParameters.CPUShares)
+					if *config.ResourceParameters.CPUShares != testCase.expectedBurstableCPUShares {
+						t.Fatalf("Expected CPU Shares for Burstable: %d Got: %d", testCase.expectedBurstableCPUShares, *config.ResourceParameters.CPUShares)
 					}
 					continue
 				}
