@@ -381,7 +381,7 @@ func DoTestPodScheduling(ns *v1.Namespace, t *testing.T, cs clientset.Interface)
 		},
 	}
 
-	for ii := 0; ii < 5; ii++ {
+	for ii := range 5 {
 		node.Name = fmt.Sprintf("machine%d", ii+1)
 		if _, err := createNode(cs, node); err != nil {
 			t.Fatalf("Failed to create nodes: %v", err)

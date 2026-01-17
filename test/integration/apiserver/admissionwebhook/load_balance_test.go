@@ -209,7 +209,7 @@ func TestWebhookLoadBalance(t *testing.T) {
 
 			// Submit 10 parallel requests
 			wg := &sync.WaitGroup{}
-			for i := 0; i < 10; i++ {
+			for range 10 {
 				wg.Add(1)
 				go func() {
 					defer wg.Done()
@@ -232,7 +232,7 @@ func TestWebhookLoadBalance(t *testing.T) {
 
 			// Submit 10 more parallel requests
 			wg = &sync.WaitGroup{}
-			for i := 0; i < 10; i++ {
+			for range 10 {
 				wg.Add(1)
 				go func() {
 					defer wg.Done()

@@ -705,7 +705,7 @@ func (p *policyExpectationHolder) verify(t *testing.T) {
 					header = record
 				} else {
 					line := map[string]string{}
-					for i := 0; i < len(record); i++ {
+					for i := range record {
 						line[header[i]] = record[i]
 					}
 					mappedCSV = append(mappedCSV, line)

@@ -229,7 +229,7 @@ func resourceSlice(driverName, nodeName string, capacity int) *resourceapi.Resou
 		},
 	}
 
-	for i := 0; i < capacity; i++ {
+	for i := range capacity {
 		slice.Spec.Devices = append(slice.Spec.Devices,
 			resourceapi.Device{
 				Name: fmt.Sprintf("instance-%d", i),

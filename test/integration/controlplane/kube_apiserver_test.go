@@ -705,7 +705,7 @@ func testReconcilersAPIServerLease(t *testing.T, leaseCount int, apiServerCount 
 	instanceOptions := kubeapiservertesting.NewDefaultTestServerOptions()
 
 	// 1. start apiServerCount api servers
-	for i := 0; i < apiServerCount; i++ {
+	for i := range apiServerCount {
 		// start count api server
 		server := kubeapiservertesting.StartTestServerOrDie(t, instanceOptions, []string{
 			"--endpoint-reconciler-type", "master-count",
@@ -733,7 +733,7 @@ func testReconcilersAPIServerLease(t *testing.T, leaseCount int, apiServerCount 
 	}
 
 	// 3. start lease api servers
-	for i := 0; i < leaseCount; i++ {
+	for i := range leaseCount {
 		options := []string{
 			"--endpoint-reconciler-type", "lease",
 			"--advertise-address", fmt.Sprintf("10.0.1.%v", i+10),
@@ -743,7 +743,7 @@ func testReconcilersAPIServerLease(t *testing.T, leaseCount int, apiServerCount 
 	}
 
 	defer func() {
-		for i := 0; i < leaseCount; i++ {
+		for i := range leaseCount {
 			leaseServers[i].TearDownFn()
 		}
 	}()
@@ -793,7 +793,7 @@ func TestMultiAPIServerNodePortAllocation(t *testing.T) {
 	instanceOptions := kubeapiservertesting.NewDefaultTestServerOptions()
 
 	// create 2 api servers and 2 clients
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		// start count api server
 		t.Logf("starting api server: %d", i)
 		server := kubeapiservertesting.StartTestServerOrDie(t, instanceOptions, []string{
@@ -842,7 +842,7 @@ func TestMultiAPIServerNodePortAllocation(t *testing.T) {
 
 	// create and delete the same nodePortservice using different APIservers
 	// to check that API servers are using the same port allocation bitmap
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		// Create the service using the first API server
 		_, err := clientAPIServers[0].CoreV1().Services(metav1.NamespaceDefault).Create(context.TODO(), serviceObject, metav1.CreateOptions{})
 		if err != nil {

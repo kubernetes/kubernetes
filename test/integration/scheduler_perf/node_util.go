@@ -95,7 +95,7 @@ func (p *IntegrationTestNodePreparer) PrepareNodes(ctx context.Context, nextNode
 		if err != nil {
 			return fmt.Errorf("failed to get node template: %w", err)
 		}
-		for retry := 0; retry < createNodeRetries; retry++ {
+		for range createNodeRetries {
 			// Create nodes with the usual kubernetes.io/hostname label.
 			// For that we need to know the name in advance, if we want to
 			// do it in one request.

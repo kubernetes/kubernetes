@@ -422,7 +422,7 @@ func testListOptions(t *testing.T, watchCacheEnabled bool) {
 
 	var compactedRv string
 	var oldestUncompactedRv int64
-	for i := 0; i < 15; i++ {
+	for i := range 15 {
 		rs := newRS("default")
 		rs.Name = fmt.Sprintf("test-%d", i)
 		serializer := protobuf.NewSerializer(nil, nil)
@@ -661,7 +661,7 @@ func TestListResourceVersion0(t *testing.T) {
 
 			rsClient := clientSet.AppsV1().ReplicaSets(ns.Name)
 
-			for i := 0; i < 10; i++ {
+			for i := range 10 {
 				rs := newRS(ns.Name)
 				rs.Name = fmt.Sprintf("test-%d", i)
 				if _, err := rsClient.Create(tCtx, rs, metav1.CreateOptions{}); err != nil {
@@ -713,7 +713,7 @@ func TestAPIListChunking(t *testing.T) {
 
 	rsClient := clientSet.AppsV1().ReplicaSets(ns.Name)
 
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		rs := newRS(ns.Name)
 		rs.Name = fmt.Sprintf("test-%d", i)
 		if _, err := rsClient.Create(ctx, rs, metav1.CreateOptions{}); err != nil {
@@ -780,7 +780,7 @@ func TestAPIListChunkingWithLabelSelector(t *testing.T) {
 
 	rsClient := clientSet.AppsV1().ReplicaSets(ns.Name)
 
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		rs := newRS(ns.Name)
 		rs.Name = fmt.Sprintf("test-%d", i)
 		odd := i%2 != 0
@@ -849,7 +849,7 @@ func TestNameInFieldSelector(t *testing.T) {
 	defer tearDownFn()
 
 	numNamespaces := 3
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		ns := framework.CreateNamespaceOrDie(clientSet, fmt.Sprintf("ns%d", i), t)
 		defer framework.DeleteNamespaceOrDie(clientSet, ns, t)
 
@@ -2751,7 +2751,7 @@ func expectTableWatchEventsWithTypes(t *testing.T, count, columns int, policy me
 
 	var events []streamedEvent
 
-	for i := 0; i < count; i++ {
+	for i := range count {
 		var evt metav1.WatchEvent
 		if err := d.Decode(&evt); err != nil {
 			t.Fatal(err)
@@ -2874,7 +2874,7 @@ func expectTableV1WatchEvents(t *testing.T, count, columns int, policy metav1.In
 
 	var objects [][]byte
 
-	for i := 0; i < count; i++ {
+	for i := range count {
 		var evt metav1.WatchEvent
 		if err := d.Decode(&evt); err != nil {
 			t.Fatal(err)

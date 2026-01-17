@@ -2338,7 +2338,7 @@ func TestImmediateJobRecreation(t *testing.T) {
 	// more Jobs than the number of Job controller workers to make it very unlikely
 	// that syncJob executes (and cleans the in-memory state) before the corresponding
 	// replacement Jobs are created.
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, ptr.To(jobSpec(i)))
 		if err != nil {
 			t.Fatalf("Error %v when creating the job %q", err, klog.KObj(jobObj))

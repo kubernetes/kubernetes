@@ -201,7 +201,7 @@ func TestAPIServiceWaitOnStart(t *testing.T) {
 	aggregatorClient := aggregatorclient.NewForConfigOrDie(kubeClientConfig)
 
 	t.Log("Ensure both APIService objects remain")
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		if _, err := aggregatorClient.ApiregistrationV1().APIServices().Get(ctx, "v1.valid.example.com", metav1.GetOptions{}); err != nil {
 			t.Fatal(err)
 		}
@@ -232,7 +232,7 @@ func TestAPIServiceWaitOnStart(t *testing.T) {
 	}
 
 	t.Log("Ensure the valid APIService object remains")
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		time.Sleep(time.Second)
 		if _, err := aggregatorClient.ApiregistrationV1().APIServices().Get(ctx, "v1.valid.example.com", metav1.GetOptions{}); err != nil {
 			t.Fatal(err)

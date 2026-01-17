@@ -1842,7 +1842,7 @@ func (e *WorkloadExecutor) runDeletePodsOp(opIndex int, op *deletePodsOp) error 
 			ticker := time.NewTicker(time.Second / time.Duration(op.DeletePodsPerSecond))
 			defer ticker.Stop()
 
-			for i := 0; i < len(podsToDelete); i++ {
+			for i := range podsToDelete {
 				select {
 				case <-ticker.C:
 					if err := e.tCtx.Client().CoreV1().Pods(op.Namespace).Delete(e.tCtx, podsToDelete[i].Name, metav1.DeleteOptions{}); err != nil {
