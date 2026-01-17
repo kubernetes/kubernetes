@@ -18,14 +18,17 @@ package controller
 
 import (
 	"fmt"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -705,5 +708,204 @@ func expectEvents(t *testing.T, actual <-chan string, expected []string) {
 		default:
 			return // No more events, as expected.
 		}
+	}
+}
+
+// TestRunUntilRetryOnError verifies that when runOnce() fails initially,
+// the controller retries and eventually succeeds.
+func TestRunUntilRetryOnError(t *testing.T) {
+	c, r := newFakeRepair(testTimeNow)
+
+	// Setup ServiceCIDR
+	err := r.serviceCIDRStore.Add(newServiceCIDR("kubernetes", serviceCIDRv4, serviceCIDRv6))
+	if err != nil {
+		t.Fatalf("Failed to add ServiceCIDR: %v", err)
+	}
+
+	// Override sync functions
+	r.servicesSynced = func() bool { return true }
+	r.ipAddressSynced = func() bool { return true }
+	r.serviceCIDRSynced = func() bool { return true }
+
+	// Add a service that needs an IPAddress
+	svc := newServiceWithCreationTimestamp("test-svc", []string{"10.0.1.1"}, testTimeNow.Add(1*time.Second))
+	err = r.serviceStore.Add(svc)
+	if err != nil {
+		t.Fatalf("Failed to add service: %v", err)
+	}
+
+	// Track attempts and inject errors on first 2 attempts
+	var attemptCount int32
+	c.PrependReactor("create", "ipaddresses", k8stesting.ReactionFunc(func(action k8stesting.Action) (bool, runtime.Object, error) {
+		attempt := atomic.AddInt32(&attemptCount, 1)
+		if attempt <= 2 {
+			// Simulate "not yet ready to handle request" error
+			return true, nil, apierrors.NewForbidden(
+				schema.GroupResource{Group: "networking.k8s.io", Resource: "ipaddresses"},
+				action.(k8stesting.CreateAction).GetObject().(*networkingv1.IPAddress).Name,
+				fmt.Errorf("not yet ready to handle request"),
+			)
+		}
+		// Allow success on 3rd attempt - delegate to default reactor
+		return false, nil, nil
+	}))
+
+	// Track if onFirstSuccess was called
+	var successCalled int32
+	stopCh := make(chan struct{})
+
+	go r.RunUntil(func() {
+		atomic.StoreInt32(&successCalled, 1)
+	}, stopCh)
+
+	// Wait for success (with timeout)
+	deadline := time.After(35 * time.Second) // Allow for ~3 retry intervals
+	tick := time.NewTicker(100 * time.Millisecond)
+	defer tick.Stop()
+
+	for atomic.LoadInt32(&successCalled) == 0 {
+		select {
+		case <-deadline:
+			close(stopCh)
+			t.Fatalf("Timed out waiting for onFirstSuccess, attempts: %d", atomic.LoadInt32(&attemptCount))
+		case <-tick.C:
+			// continue waiting
+		}
+	}
+
+	close(stopCh)
+
+	// Verify retry happened
+	if attempts := atomic.LoadInt32(&attemptCount); attempts < 3 {
+		t.Errorf("Expected at least 3 attempts, got %d", attempts)
+	}
+
+	// Verify IPAddress was created
+	_, err = r.ipAddressLister.Get("10.0.1.1")
+	if err != nil {
+		t.Errorf("IPAddress should have been created after retries: %v", err)
+	}
+}
+
+// TestRunUntilExitsOnContextCancellation verifies that when the context is cancelled
+// (stopCh closed) before initial sync succeeds, the controller exits gracefully
+// without calling onFirstSuccess().
+func TestRunUntilExitsOnContextCancellation(t *testing.T) {
+	c, r := newFakeRepair(testTimeNow)
+
+	// Setup ServiceCIDR
+	err := r.serviceCIDRStore.Add(newServiceCIDR("kubernetes", serviceCIDRv4, serviceCIDRv6))
+	if err != nil {
+		t.Fatalf("Failed to add ServiceCIDR: %v", err)
+	}
+
+	// Override sync functions
+	r.servicesSynced = func() bool { return true }
+	r.ipAddressSynced = func() bool { return true }
+	r.serviceCIDRSynced = func() bool { return true }
+
+	// Add a service that needs an IPAddress
+	svc := newServiceWithCreationTimestamp("test-svc", []string{"10.0.1.1"}, testTimeNow.Add(1*time.Second))
+	err = r.serviceStore.Add(svc)
+	if err != nil {
+		t.Fatalf("Failed to add service: %v", err)
+	}
+
+	// Always fail with "not yet ready" error
+	c.PrependReactor("create", "ipaddresses", k8stesting.ReactionFunc(func(action k8stesting.Action) (bool, runtime.Object, error) {
+		return true, nil, apierrors.NewForbidden(
+			schema.GroupResource{Group: "networking.k8s.io", Resource: "ipaddresses"},
+			action.(k8stesting.CreateAction).GetObject().(*networkingv1.IPAddress).Name,
+			fmt.Errorf("not yet ready to handle request"),
+		)
+	}))
+
+	// Track if onFirstSuccess was called
+	var successCalled int32
+	stopCh := make(chan struct{})
+	done := make(chan struct{})
+
+	go func() {
+		r.RunUntil(func() {
+			atomic.StoreInt32(&successCalled, 1)
+		}, stopCh)
+		close(done)
+	}()
+
+	// Wait a bit then cancel context
+	time.Sleep(500 * time.Millisecond)
+	close(stopCh)
+
+	// Wait for RunUntil to exit
+	select {
+	case <-done:
+		// Good, it exited
+	case <-time.After(5 * time.Second):
+		t.Fatal("RunUntil did not exit after context cancellation")
+	}
+
+	// Verify onFirstSuccess was NOT called
+	if atomic.LoadInt32(&successCalled) != 0 {
+		t.Error("onFirstSuccess() should not have been called when context was cancelled")
+	}
+}
+
+// TestRunUntilSucceedsOnFirstAttempt verifies that when runOnce() succeeds on first attempt,
+// onFirstSuccess() is called immediately.
+func TestRunUntilSucceedsOnFirstAttempt(t *testing.T) {
+	_, r := newFakeRepair(testTimeNow)
+
+	// Setup ServiceCIDR
+	err := r.serviceCIDRStore.Add(newServiceCIDR("kubernetes", serviceCIDRv4, serviceCIDRv6))
+	if err != nil {
+		t.Fatalf("Failed to add ServiceCIDR: %v", err)
+	}
+
+	// Override sync functions
+	r.servicesSynced = func() bool { return true }
+	r.ipAddressSynced = func() bool { return true }
+	r.serviceCIDRSynced = func() bool { return true }
+
+	// Add a service with its IPAddress already in cache (no repair needed)
+	svc := newServiceWithCreationTimestamp("test-svc", []string{"10.0.1.1"}, testTimeNow.Add(1*time.Second))
+	err = r.serviceStore.Add(svc)
+	if err != nil {
+		t.Fatalf("Failed to add service: %v", err)
+	}
+
+	ipAddress := newIPAddressWithCreationTimestamp("10.0.1.1", svc, testTimeNow)
+	err = r.ipAddressStore.Add(ipAddress)
+	if err != nil {
+		t.Fatalf("Failed to add IPAddress: %v", err)
+	}
+
+	// Track if onFirstSuccess was called
+	var successCalled int32
+	stopCh := make(chan struct{})
+
+	go r.RunUntil(func() {
+		atomic.StoreInt32(&successCalled, 1)
+	}, stopCh)
+
+	// Should succeed quickly on first attempt
+	deadline := time.After(5 * time.Second)
+	tick := time.NewTicker(50 * time.Millisecond)
+	defer tick.Stop()
+
+	for atomic.LoadInt32(&successCalled) == 0 {
+		select {
+		case <-deadline:
+			close(stopCh)
+			t.Fatal("Timed out waiting for onFirstSuccess on first attempt")
+		case <-tick.C:
+			// continue waiting
+		}
+	}
+
+	close(stopCh)
+
+	// Verify success was called
+	if atomic.LoadInt32(&successCalled) != 1 {
+		t.Error("onFirstSuccess() should have been called")
 	}
 }
