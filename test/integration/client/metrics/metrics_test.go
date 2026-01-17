@@ -90,7 +90,7 @@ func TestAPIServerTransportMetrics(t *testing.T) {
 
 	requests := 30
 	errors := 0
-	for i := 0; i < requests; i++ {
+	for i := range requests {
 		apiService, err := aggregatorClient.ApiregistrationV1().APIServices().Get(context.Background(), "v1alpha1.wardle.example.com", metav1.GetOptions{})
 		if err != nil {
 			t.Fatal(err)

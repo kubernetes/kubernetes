@@ -83,7 +83,7 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 	}
 
 	// Generate numOfEvictions pods to evict
-	for i := 0; i < numOfEvictions; i++ {
+	for i := range numOfEvictions {
 		podName := fmt.Sprintf(podNameFormat, i)
 		pod := newPod(podName)
 
@@ -110,7 +110,7 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 	errCh := make(chan error, 3*numOfEvictions)
 	var wg sync.WaitGroup
 	// spawn numOfEvictions goroutines to concurrently evict the pods
-	for i := 0; i < numOfEvictions; i++ {
+	for i := range numOfEvictions {
 		wg.Add(1)
 		go func(id int, errCh chan error) {
 			defer wg.Done()

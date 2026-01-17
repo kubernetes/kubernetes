@@ -111,7 +111,7 @@ func TestServiceAllocation(t *testing.T) {
 			}
 
 			// make 5 more services to take up all IPs
-			for i := 0; i < 5; i++ {
+			for i := range 5 {
 				if _, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.TODO(), svc(i), metav1.CreateOptions{}); err != nil {
 					t.Error(err)
 				}
@@ -194,7 +194,7 @@ func TestServiceAllocIPAddressLargeCIDR(t *testing.T) {
 	}
 
 	// create 5 random services and check that the Services have an IP associated
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		svc, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(tCtx, svc(i), metav1.CreateOptions{})
 		if err != nil {
 			t.Error(err)
@@ -326,7 +326,7 @@ func TestSkewedAllocatorsRollback(t *testing.T) {
 	}
 
 	// create 5 random services and check that the Services have an IP associated
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		service, err := kubeclient1.CoreV1().Services(metav1.NamespaceDefault).Create(context.TODO(), svc(i), metav1.CreateOptions{})
 		if err != nil {
 			t.Error(err)
@@ -561,7 +561,7 @@ func TestFlagsIPAllocator(t *testing.T) {
 	}
 
 	// create 5 random services and check that the Services have an IP associated
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		service, err := kubeclient1.CoreV1().Services(metav1.NamespaceDefault).Create(context.TODO(), svc(i), metav1.CreateOptions{})
 		if err != nil {
 			t.Error(err)

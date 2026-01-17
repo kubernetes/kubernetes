@@ -74,7 +74,7 @@ func TestServiceAllocNewServiceCIDR(t *testing.T) {
 
 	// /29 = 6 services, kubernetes.default takes the first address
 	// make 5 more services to take up all IPs
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		if _, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), makeService(fmt.Sprintf("service-%d", i)), metav1.CreateOptions{}); err != nil {
 			t.Fatal(err)
 		}
@@ -174,7 +174,7 @@ func TestServiceCIDRDeletion(t *testing.T) {
 
 	// /29 = 6 services, kubernetes.default takes the first address
 	// make 5 more services to take up all IPs
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		if _, err := client.CoreV1().Services(ns.Name).Create(context.Background(), makeService(fmt.Sprintf("service-%d", i)), metav1.CreateOptions{}); err != nil {
 			t.Fatal(err)
 		}

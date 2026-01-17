@@ -46,7 +46,7 @@ func TestPatchConflicts(t *testing.T) {
 
 	UIDs := make([]types.UID, numOfConcurrentPatches)
 	ownerRefs := []metav1.OwnerReference{}
-	for i := 0; i < numOfConcurrentPatches; i++ {
+	for i := range numOfConcurrentPatches {
 		uid := types.UID(uuid.New().String())
 		ownerName := fmt.Sprintf("owner-%d", i)
 		UIDs[i] = uid
@@ -76,7 +76,7 @@ func TestPatchConflicts(t *testing.T) {
 	// Run a lot of simultaneous patch operations to exercise internal API server retry of application of patches that do not specify resourceVersion.
 	// They should all succeed.
 	wg := sync.WaitGroup{}
-	for i := 0; i < numOfConcurrentPatches; i++ {
+	for i := range numOfConcurrentPatches {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
