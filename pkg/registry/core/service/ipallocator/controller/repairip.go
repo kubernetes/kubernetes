@@ -231,8 +231,20 @@ func (r *RepairIPAddress) RunUntil(onFirstSuccess func(), stopCh chan struct{}) 
 	// First sync goes through all the Services and IPAddresses in the cache,
 	// once synced, it signals the main loop and works using the handlers, since
 	// it's less expensive and more optimal.
-	if err := r.runOnce(); err != nil {
-		runtime.HandleError(err)
+	// Retry the initial sync with a 10 second interval to handle startup race
+	// conditions where admission plugins may return "not yet ready to handle request".
+	// The PostStartHook has a 1-minute timeout for backward compatibility.
+	err = wait.PollUntilContextCancel(ctx, 10*time.Second, true, func(context.Context) (bool, error) {
+		if err := r.runOnce(); err != nil {
+			klog.V(2).InfoS("Initial sync failed, will retry", "controller", "ipallocator-repair-controller", "err", err)
+			runtime.HandleError(err)
+			return false, nil // retry on next interval
+		}
+		return true, nil // success, exit the poll loop
+	})
+	if err != nil {
+		// Context was cancelled (stopCh closed) before initial sync succeeded
+		runtime.HandleError(fmt.Errorf("ipallocator-repair-controller: initial sync was cancelled: %v", err))
 		return
 	}
 	onFirstSuccess()
