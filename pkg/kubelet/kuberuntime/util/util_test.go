@@ -28,6 +28,7 @@ import (
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubecontainertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestPodSandboxChanged(t *testing.T) {
@@ -172,6 +173,7 @@ func (*fakeRuntimeHandlerResolver) LookupRuntimeHandler(s *string) (string, erro
 }
 
 func TestNamespacesForPod(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	usernsIDs := &runtimeapi.IDMapping{
 		HostId:      65536,
 		ContainerId: 0,
@@ -310,7 +312,7 @@ func TestNamespacesForPod(t *testing.T) {
 			fakeRuntimeHelper := kubecontainertest.FakeRuntimeHelper{
 				RuntimeHandlers: test.runtimeHandlers,
 			}
-			actual, err := NamespacesForPod(test.input, &fakeRuntimeHelper, &fakeRuntimeHandlerResolver{})
+			actual, err := NamespacesForPod(tCtx, test.input, &fakeRuntimeHelper, &fakeRuntimeHandlerResolver{})
 			if test.expErr {
 				require.Error(t, err)
 			} else {

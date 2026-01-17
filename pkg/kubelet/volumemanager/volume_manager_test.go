@@ -743,6 +743,14 @@ func TestWaitForAllPodsUnmount(t *testing.T) {
 				require.ErrorAs(t, err, &aggErr, "Expected error to be an Aggregate error")
 				errs := aggErr.Errors()
 				require.Len(t, errs, test.numPods, "Expected %d errors but got %d", test.numPods, len(errs))
+
+				// Verify that each pod's volume name appears in the error messages,
+				// which proves different pods are being processed
+				errString := err.Error()
+				for i := 0; i < test.numPods; i++ {
+					volumeName := fmt.Sprintf("fake/fake-device-%d", i)
+					require.Contains(t, errString, volumeName, "Expected error to contain volume name %s for pod-%d", volumeName, i)
+				}
 			} else {
 				require.NoError(t, err, "Expected no error")
 			}
