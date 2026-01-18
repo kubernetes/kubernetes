@@ -60,6 +60,66 @@ func TestRecordDecodeError(t *testing.T) {
 	}
 }
 
+func TestRecordEtcdEvent(t *testing.T) {
+	registry := metrics.NewKubeRegistry()
+	defer registry.Reset()
+	registry.MustRegister(etcdEventsReceivedCounts)
+	testedMetrics := "apiserver_storage_events_received_total"
+	testCases := []struct {
+		desc     string
+		resource schema.GroupResource
+		want     string
+	}{
+		{
+			desc:     "record single event",
+			resource: schema.GroupResource{Group: "apps", Resource: "deployments"},
+			want: `# HELP apiserver_storage_events_received_total [BETA] Number of etcd events received split by kind.
+# TYPE apiserver_storage_events_received_total counter
+apiserver_storage_events_received_total{group="apps",resource="deployments"} 1
+`,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.desc, func(t *testing.T) {
+			RecordEtcdEvent(test.resource)
+			if err := testutil.GatherAndCompare(registry, strings.NewReader(test.want), testedMetrics); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestRecordEtcdBookmark(t *testing.T) {
+	registry := metrics.NewKubeRegistry()
+	defer registry.Reset()
+	registry.MustRegister(etcdBookmarkCounts)
+	testedMetrics := "etcd_bookmark_counts"
+	testCases := []struct {
+		desc     string
+		resource schema.GroupResource
+		want     string
+	}{
+		{
+			desc:     "record single bookmark",
+			resource: schema.GroupResource{Group: "apps", Resource: "deployments"},
+			want: `# HELP etcd_bookmark_counts [BETA] Number of etcd bookmarks (progress notify events) split by kind.
+# TYPE etcd_bookmark_counts gauge
+etcd_bookmark_counts{group="apps",resource="deployments"} 1
+`,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.desc, func(t *testing.T) {
+			RecordEtcdBookmark(test.resource)
+			if err := testutil.GatherAndCompare(registry, strings.NewReader(test.want), testedMetrics); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
 func TestRecordEtcdRequest(t *testing.T) {
 	registry := metrics.NewKubeRegistry()
 
