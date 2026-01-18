@@ -1375,7 +1375,7 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
 	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
 	</ul>
-	</div><div class="metric" data-stability="alpha">
+	</div><div class="metric" data-stability="beta">
 	<div class="metric_name">apiserver_storage_events_received_total</div>
 	<div class="metric_help">Number of etcd events received split by kind.</div>
 	<ul>
@@ -1837,7 +1837,7 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
 	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
 	</ul>
-	</div><div class="metric" data-stability="alpha">
+	</div><div class="metric" data-stability="beta">
 	<div class="metric_name">etcd_bookmark_counts</div>
 	<div class="metric_help">Number of etcd bookmarks (progress notify events) split by kind.</div>
 	<ul>

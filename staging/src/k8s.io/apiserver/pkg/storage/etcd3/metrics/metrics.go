@@ -112,7 +112,7 @@ var (
 			Subsystem:      "apiserver",
 			Name:           "storage_events_received_total",
 			Help:           "Number of etcd events received split by kind.",
-			StabilityLevel: compbasemetrics.ALPHA,
+			StabilityLevel: compbasemetrics.BETA,
 		},
 		[]string{"group", "resource"},
 	)
@@ -120,7 +120,7 @@ var (
 		&compbasemetrics.GaugeOpts{
 			Name:           "etcd_bookmark_counts",
 			Help:           "Number of etcd bookmarks (progress notify events) split by kind.",
-			StabilityLevel: compbasemetrics.ALPHA,
+			StabilityLevel: compbasemetrics.BETA,
 		},
 		[]string{"group", "resource"},
 	)

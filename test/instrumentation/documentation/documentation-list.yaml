@@ -4489,7 +4489,7 @@
   subsystem: apiserver
   help: Number of etcd events received split by kind.
   type: Counter
-  stabilityLevel: ALPHA
+  stabilityLevel: BETA
   labels:
   - group
   - resource
@@ -4654,7 +4654,7 @@
 - name: etcd_bookmark_counts
   help: Number of etcd bookmarks (progress notify events) split by kind.
   type: Gauge
-  stabilityLevel: ALPHA
+  stabilityLevel: BETA
   labels:
   - group
   - resource
