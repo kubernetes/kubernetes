@@ -697,8 +697,8 @@ func (cache *cacheImpl) run() {
 
 // updateMetrics updates cache size metric values for pods, assumed pods, and nodes
 func (cache *cacheImpl) updateMetrics() {
-	cache.mu.Lock()
-	defer cache.mu.Unlock()
+	cache.mu.RLock()
+	defer cache.mu.RUnlock()
 
 	metrics.CacheSize.WithLabelValues("assumed_pods").Set(float64(len(cache.assumedPods)))
 	metrics.CacheSize.WithLabelValues("pods").Set(float64(len(cache.podStates)))

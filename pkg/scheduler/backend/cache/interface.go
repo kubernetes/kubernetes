@@ -47,13 +47,11 @@ import (
 //	+--------------------+                     Deleted
 //	      Forget
 //
-//
 // Note that "Initial" and "Deleted" pods do not actually exist in cache.
 // Based on existing use cases, we are making the following assumptions:
 //   - No pod would be assumed twice
 //   - A pod could be added without going through scheduler. In this case, we will see Add but not Assume event.
 //   - If a pod wasn't added, it wouldn't be removed or updated.
-
 type Cache interface {
 	// NodeCount returns the number of nodes in the cache.
 	// DO NOT use outside of tests.
