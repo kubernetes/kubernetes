@@ -810,7 +810,7 @@ func TestGetMemberStatus(t *testing.T) {
 					return resp, nil
 				}
 			}
-			gotLearner, gotStarted, err := c.getMemberStatus(tt.memberID)
+			gotLearner, gotStarted, err := c.getMemberStatus(context.Background(), tt.memberID)
 			if gotLearner != tt.wantLearner {
 				t.Errorf("getMemberStatus() isLearner = %v, want %v", gotLearner, tt.wantLearner)
 			}
