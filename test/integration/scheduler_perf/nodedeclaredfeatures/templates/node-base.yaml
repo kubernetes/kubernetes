@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Node
+metadata:
+  name: node-{{ .Index }}
+spec: {}
+status:
+  capacity:
+    cpu: "128"
+    memory: "16Gi"
+    pods: "110"
+  allocatable:
+    cpu: "128"
+    memory: "16Gi"
+    pods: "110"
+  phase: Running
+  # DeclaredFeatures will be added dynamically by the test based on numNodeDeclaredFeatures param in the config.
+
