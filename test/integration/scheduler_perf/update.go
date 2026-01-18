@@ -73,7 +73,7 @@ func (c *updateAny) collectsMetrics() bool {
 	return false
 }
 
-func (c updateAny) patchParams(w *workload) (realOp, error) {
+func (c updateAny) patchParams(w *Workload) (realOp, error) {
 	if c.CountParam != "" {
 		count, err := w.Params.get(c.CountParam[1:])
 		if err != nil {

@@ -281,7 +281,7 @@ type testCase struct {
 	// be executed serially one after another.
 	WorkloadTemplate []op
 	// List of workloads to run under this testCase.
-	Workloads []*workload
+	Workloads []*Workload
 	// SchedulerConfigPath is the path of scheduler configuration
 	// Optional
 	SchedulerConfigPath string
@@ -318,10 +318,10 @@ func (tc *testCase) workloadNamesUnique() error {
 	return nil
 }
 
-// workload is a subtest under a testCase that tests the scheduler performance
+// Workload is a subtest under a testCase that tests the scheduler performance
 // for a certain ordering of ops. The set of nodes created and pods scheduled
 // in a workload may be heterogeneous.
-type workload struct {
+type Workload struct {
 	// Name of the workload.
 	Name string
 	// Values of parameters used in the workloadTemplate.
@@ -351,7 +351,12 @@ type workload struct {
 	FeatureGates map[featuregate.Feature]bool
 }
 
-func (w *workload) isValid(mcc *metricsCollectorConfig) error {
+// GetParam retrieves a parameter from the Workload's parameters as an integer.
+func (w *Workload) GetParam(key string) (int, error) {
+	return w.Params.get(key)
+}
+
+func (w *Workload) isValid(mcc *metricsCollectorConfig) error {
 	if w.Threshold.value < 0 {
 		return fmt.Errorf("invalid Threshold=%f; should be non-negative", w.Threshold.value)
 	}
@@ -364,7 +369,7 @@ func (w *workload) isValid(mcc *metricsCollectorConfig) error {
 	return w.ThresholdMetricSelector.isValid(mcc)
 }
 
-func (w *workload) setDefaults(testCaseThresholdMetricSelector *thresholdMetricSelector) {
+func (w *Workload) setDefaults(testCaseThresholdMetricSelector *thresholdMetricSelector) {
 	if w.ThresholdMetricSelector != nil {
 		return
 	}
@@ -504,7 +509,7 @@ func getParam[T float64 | string | bool](p params, key string) (T, error) {
 }
 
 // unusedParams returns the names of unusedParams
-func (w workload) unusedParams() []string {
+func (w Workload) unusedParams() []string {
 	var ret []string
 	for name := range w.Params.params {
 		if !w.Params.isUsed[name] {
@@ -579,7 +584,7 @@ type realOp interface {
 	// type, even though calls will be made from with a *realOp. This is because
 	// callers don't want the receiver to inadvertently modify the realOp
 	// (instead, it's returned as a return value).
-	patchParams(w *workload) (realOp, error)
+	patchParams(w *Workload) (realOp, error)
 }
 
 // runnableOp is an interface implemented by some operations. It makes it possible
@@ -636,7 +641,7 @@ func (*createNodesOp) collectsMetrics() bool {
 	return false
 }
 
-func (cno createNodesOp) patchParams(w *workload) (realOp, error) {
+func (cno createNodesOp) patchParams(w *Workload) (realOp, error) {
 	if cno.CountParam != "" {
 		var err error
 		cno.Count, err = w.Params.get(cno.CountParam[1:])
@@ -674,7 +679,7 @@ func (*createNamespacesOp) collectsMetrics() bool {
 	return false
 }
 
-func (cmo createNamespacesOp) patchParams(w *workload) (realOp, error) {
+func (cmo createNamespacesOp) patchParams(w *Workload) (realOp, error) {
 	if cmo.CountParam != "" {
 		var err error
 		cmo.Count, err = w.Params.get(cmo.CountParam[1:])
@@ -763,7 +768,7 @@ func (cpo *createPodsOp) collectsMetrics() bool {
 	return cpo.CollectMetrics
 }
 
-func (cpo createPodsOp) patchParams(w *workload) (realOp, error) {
+func (cpo createPodsOp) patchParams(w *Workload) (realOp, error) {
 	if cpo.CountParam != "" {
 		var err error
 		cpo.Count, err = w.Params.get(cpo.CountParam[1:])
@@ -816,7 +821,7 @@ func (cpso *createPodSetsOp) collectsMetrics() bool {
 	return cpso.CreatePodsOp.CollectMetrics
 }
 
-func (cpso createPodSetsOp) patchParams(w *workload) (realOp, error) {
+func (cpso createPodSetsOp) patchParams(w *Workload) (realOp, error) {
 	if cpso.CountParam != "" {
 		var err error
 		cpso.Count, err = w.Params.get(cpso.CountParam[1:])
@@ -863,7 +868,7 @@ func (dpo *deletePodsOp) collectsMetrics() bool {
 	return false
 }
 
-func (dpo deletePodsOp) patchParams(w *workload) (realOp, error) {
+func (dpo deletePodsOp) patchParams(w *Workload) (realOp, error) {
 	return &dpo, nil
 }
 
@@ -910,7 +915,7 @@ func (*churnOp) collectsMetrics() bool {
 	return false
 }
 
-func (co churnOp) patchParams(w *workload) (realOp, error) {
+func (co churnOp) patchParams(w *Workload) (realOp, error) {
 	return &co, nil
 }
 
@@ -951,7 +956,7 @@ func (*barrierOp) collectsMetrics() bool {
 	return false
 }
 
-func (bo barrierOp) patchParams(w *workload) (realOp, error) {
+func (bo barrierOp) patchParams(w *Workload) (realOp, error) {
 	if bo.StageRequirement == "" {
 		bo.StageRequirement = Scheduled
 	}
@@ -977,7 +982,7 @@ func (so *sleepOp) collectsMetrics() bool {
 	return false
 }
 
-func (so sleepOp) patchParams(w *workload) (realOp, error) {
+func (so sleepOp) patchParams(w *Workload) (realOp, error) {
 	if so.DurationParam != "" {
 		durationStr, err := getParam[string](w.Params, so.DurationParam[1:])
 		if err != nil {
@@ -1016,7 +1021,7 @@ func (*startCollectingMetricsOp) collectsMetrics() bool {
 	return false
 }
 
-func (scm startCollectingMetricsOp) patchParams(_ *workload) (realOp, error) {
+func (scm startCollectingMetricsOp) patchParams(_ *Workload) (realOp, error) {
 	return &scm, nil
 }
 
@@ -1036,7 +1041,7 @@ func (*stopCollectingMetricsOp) collectsMetrics() bool {
 	return true
 }
 
-func (scm stopCollectingMetricsOp) patchParams(_ *workload) (realOp, error) {
+func (scm stopCollectingMetricsOp) patchParams(_ *Workload) (realOp, error) {
 	return &scm, nil
 }
 
@@ -1251,6 +1256,17 @@ func RunBenchmarkPerfScheduling(b *testing.B, configFile string, topicName strin
 			fixJSONOutput(b)
 			for _, w := range tc.Workloads {
 				b.Run(w.Name, func(b *testing.B) {
+
+					if opts.preInitFn != nil {
+						cleanup, err := opts.preInitFn(b, w)
+						if err != nil {
+							b.Fatalf("failed to run preInitFn for workload %s: %v", w.Name, err)
+						}
+						if cleanup != nil {
+							b.Cleanup(cleanup)
+						}
+					}
+
 					if !enabled(testcaseLabelSelectors, append(tc.Labels, w.Labels...)...) {
 						b.Skipf("disabled by label filter %q", PerfSchedulingLabelFilter)
 					}
@@ -1265,13 +1281,13 @@ func RunBenchmarkPerfScheduling(b *testing.B, configFile string, topicName strin
 					}
 
 					if opts.prepareFn != nil {
-						err = opts.prepareFn(tCtx)
+						err := opts.prepareFn(tCtx)
 						if err != nil {
 							b.Fatalf("failed to run prepareFn: %v", err)
 						}
 					}
 
-					results, err := runWorkload(tCtx, tc, w, topicName, scheduler, informerFactory)
+					results, err := runWorkload(tCtx, tc, w, topicName, scheduler, informerFactory, opts)
 					if err != nil {
 						tCtx.Fatalf("Error running workload %s: %s", w.Name, err)
 					}
@@ -1352,7 +1368,12 @@ func RunBenchmarkPerfScheduling(b *testing.B, configFile string, topicName strin
 }
 
 // RunIntegrationPerfScheduling runs the scheduler performance integration tests.
-func RunIntegrationPerfScheduling(t *testing.T, configFile string) {
+func RunIntegrationPerfScheduling(t *testing.T, configFile string, options ...SchedulerPerfOption) {
+	opts := &schedulerPerfOptions{}
+	for _, option := range options {
+		option(opts)
+	}
+
 	testCases, err := getTestCases(configFile)
 	if err != nil {
 		t.Fatal(err)
@@ -1373,14 +1394,25 @@ func RunIntegrationPerfScheduling(t *testing.T, configFile string) {
 					if !enabled(testcaseLabelSelectors, append(tc.Labels, w.Labels...)...) {
 						t.Skipf("disabled by label filter %q", TestSchedulingLabelFilter)
 					}
+
+					if opts.preInitFn != nil {
+						cleanup, err := opts.preInitFn(t, w)
+						if err != nil {
+							t.Fatalf("failed to run preInitFn for workload %s: %v", w.Name, err)
+						}
+						if cleanup != nil {
+							t.Cleanup(cleanup)
+						}
+					}
+
 					featureGates := featureGatesMerge(tc.FeatureGates, w.FeatureGates)
 					scheduler, informerFactory, tCtx := setupTestCase(t, tc, featureGates, nil)
 					err := w.isValid(tc.MetricsCollectorConfig)
 					if err != nil {
-						t.Fatalf("workload %s is not valid: %v", w.Name, err)
+						t.Fatalf("Workload %s is not valid: %v", w.Name, err)
 					}
 
-					_, err = runWorkload(tCtx, tc, w, "" /* topic name not relevant */, scheduler, informerFactory)
+					_, err = runWorkload(tCtx, tc, w, "" /* topic name not relevant */, scheduler, informerFactory, opts)
 					if err != nil {
 						tCtx.Fatalf("Error running workload %s: %s", w.Name, err)
 					}
@@ -1417,7 +1449,7 @@ func loadSchedulerConfig(file string) (*config.KubeSchedulerConfiguration, error
 	return nil, fmt.Errorf("couldn't decode as KubeSchedulerConfiguration, got %s: ", gvk)
 }
 
-func unrollWorkloadTemplate(tb ktesting.TB, wt []op, w *workload) []op {
+func unrollWorkloadTemplate(tb ktesting.TB, wt []op, w *Workload) []op {
 	var unrolled []op
 	for opIndex, o := range wt {
 		realOp, err := o.realOp.patchParams(w)
@@ -1576,12 +1608,13 @@ type WorkloadExecutor struct {
 	podInformer                  coreinformers.PodInformer
 	throughputErrorMargin        float64
 	testCase                     *testCase
-	workload                     *workload
+	workload                     *Workload
 	topicName                    string
 	nextNodeIndex                int
+	opts                         *schedulerPerfOptions
 }
 
-func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, topicName string, scheduler *scheduler.Scheduler, informerFactory informers.SharedInformerFactory) ([]DataItem, error) {
+func runWorkload(tCtx ktesting.TContext, tc *testCase, w *Workload, topicName string, scheduler *scheduler.Scheduler, informerFactory informers.SharedInformerFactory, opts *schedulerPerfOptions) ([]DataItem, error) {
 	b, benchmarking := tCtx.TB().(*testing.B)
 	if benchmarking {
 		start := time.Now()
@@ -1622,6 +1655,7 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, topicName st
 		testCase:                     tc,
 		workload:                     w,
 		topicName:                    topicName,
+		opts:                         opts,
 	}
 
 	tCtx.TB().Cleanup(func() {
@@ -1694,6 +1728,16 @@ func (e *WorkloadExecutor) runCreateNodesOp(opIndex int, op *createNodesOp) erro
 		return err
 	}
 	e.nextNodeIndex += op.Count
+
+	if e.opts != nil && e.opts.nodeUpdateFn != nil {
+		nodes, err := waitListAllNodes(e.tCtx, e.tCtx.Client())
+		if err != nil {
+			return fmt.Errorf("failed to list nodes for postNodeCreationFn: %w", err)
+		}
+		if err := e.opts.nodeUpdateFn(e.tCtx, e.workload, nodes); err != nil {
+			return fmt.Errorf("postNodeCreationFn failed: %w", err)
+		}
+	}
 	return nil
 }
 
