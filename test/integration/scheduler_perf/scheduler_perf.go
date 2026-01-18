@@ -1256,7 +1256,6 @@ func RunBenchmarkPerfScheduling(b *testing.B, configFile string, topicName strin
 			fixJSONOutput(b)
 			for _, w := range tc.Workloads {
 				b.Run(w.Name, func(b *testing.B) {
-
 					if opts.preInitFn != nil {
 						cleanup, err := opts.preInitFn(b, w)
 						if err != nil {
