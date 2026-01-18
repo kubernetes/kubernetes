@@ -408,19 +408,52 @@ function kube::codegen::gen_openapi() {
             -name zz_generated.openapi.go \
             | xargs -0 rm -f
 
-        "${GOBIN}/openapi-gen" \
-            -v "${v}" \
-            --output-file zz_generated.openapi.go \
-            --go-header-file "${boilerplate}" \
-            --output-dir "${out_dir}" \
-            --output-pkg "${out_pkg}" \
-            --report-filename "${new_report}" \
-            --output-model-name-file="${output_model_name_file}" \
-            "k8s.io/apimachinery/pkg/apis/meta/v1" \
-            "k8s.io/apimachinery/pkg/runtime" \
-            "k8s.io/apimachinery/pkg/version" \
-            "k8s.io/apimachinery/pkg/api/resource" \
-            "${input_pkgs[@]}"
+        local writable_pkgs=()
+        local has_readonly=false
+        for pkg in "${openapi_inputs[@]}"; do
+            if pkg_dir=$(go list -find -f '{{.Dir}}' "$pkg" 2>/dev/null); then
+                if [ -w "$pkg_dir" ]; then
+                    writable_pkgs+=("$pkg")
+                else
+                    has_readonly="true"
+                fi
+            fi
+        done
+
+        if [ "$has_readonly" == "true" ]; then
+            # Pass 1: generate model name accessors only for writable packages
+            if [ "${#writable_pkgs[@]}" != 0 ]; then
+                "${GOBIN}/openapi-gen" \
+                    -v "${v}" \
+                    --go-header-file "${boilerplate}" \
+                    --output-dir "${out_dir}" \
+                    --output-pkg "${out_pkg}" \
+                    --report-filename "/dev/null" \
+                    --output-model-name-file="${output_model_name_file}" \
+                    --output-file "zz_generated.openapi.tmp.go" \
+                    "${writable_pkgs[@]}"
+                rm -f "${out_dir}/zz_generated.openapi.tmp.go"
+            fi
+            # Pass 2: generate the main openapi file using all packages as inputs
+            # but OMIT the model-name-file flag so it doesn't try to write to read-only deps
+            "${GOBIN}/openapi-gen" \
+                -v "${v}" \
+                --go-header-file "${boilerplate}" \
+                --output-dir "${out_dir}" \
+                --output-pkg "${out_pkg}" \
+                --report-filename "${new_report}" \
+                "${openapi_inputs[@]}"
+        else
+            "${GOBIN}/openapi-gen" \
+                -v "${v}" \
+                --output-file zz_generated.openapi.go \
+                --go-header-file "${boilerplate}" \
+                --output-dir "${out_dir}" \
+                --output-pkg "${out_pkg}" \
+                --report-filename "${new_report}" \
+                --output-model-name-file="${output_model_name_file}" \
+                "${openapi_inputs[@]}"
+        fi
     fi
 
     if [ ! -e "${report}" ]; then
