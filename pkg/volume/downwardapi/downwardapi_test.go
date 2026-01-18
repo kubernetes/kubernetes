@@ -227,7 +227,7 @@ func newDownwardAPITest(t *testing.T, name string, volumeFiles, podLabels, podAn
 		Labels:      podLabels,
 		Annotations: podAnnotations,
 	}
-	clientset := fake.NewSimpleClientset(&v1.Pod{ObjectMeta: podMeta})
+	clientset := fake.NewClientset(&v1.Pod{ObjectMeta: podMeta})
 
 	pluginMgr := volume.VolumePluginMgr{}
 	rootDir, host := newTestHost(t, clientset)

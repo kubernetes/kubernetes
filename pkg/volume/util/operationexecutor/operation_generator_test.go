@@ -595,7 +595,7 @@ func getTestPV(volumeName string, specSize string) *v1.PersistentVolume {
 }
 
 func getTestOperationGenerator(volumePluginMgr *volume.VolumePluginMgr, objects ...runtime.Object) OperationGenerator {
-	fakeKubeClient := fakeclient.NewSimpleClientset(objects...)
+	fakeKubeClient := fakeclient.NewClientset(objects...)
 	fakeRecorder := &record.FakeRecorder{}
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
 	operationGenerator := NewOperationGenerator(
@@ -607,7 +607,7 @@ func getTestOperationGenerator(volumePluginMgr *volume.VolumePluginMgr, objects 
 }
 
 func getTestOperatorGeneratorWithPVPVC(volumePluginMgr *volume.VolumePluginMgr, pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume) OperationGenerator {
-	fakeKubeClient := fakeclient.NewSimpleClientset(pvc, pv)
+	fakeKubeClient := fakeclient.NewClientset(pvc, pv)
 	fakeKubeClient.AddReactor("get", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
 		return true, pvc, nil
 	})
@@ -647,7 +647,7 @@ func getTestVolumeToUnmount(pod *v1.Pod, pvSpec v1.PersistentVolumeSpec, pluginN
 }
 
 func initTestPlugins(t *testing.T, plugs []volume.VolumePlugin, pluginName string) (*volume.VolumePluginMgr, string) {
-	client := fakeclient.NewSimpleClientset()
+	client := fakeclient.NewClientset()
 	pluginMgr, _, tmpDir := csitesting.NewTestPlugin(t, client)
 
 	err := pluginMgr.InitPlugins(plugs, nil, pluginMgr.Host)

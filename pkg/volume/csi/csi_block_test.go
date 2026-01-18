@@ -369,7 +369,7 @@ func TestBlockMapperMapPodDevice(t *testing.T) {
 }
 
 func TestBlockMapperMapPodDeviceNotSupportAttach(t *testing.T) {
-	fakeClient := fakeclient.NewSimpleClientset()
+	fakeClient := fakeclient.NewClientset()
 	attachRequired := false
 	fakeDriver := &storagev1.CSIDriver{
 		ObjectMeta: metav1.ObjectMeta{
@@ -408,7 +408,7 @@ func TestBlockMapperMapPodDeviceNotSupportAttach(t *testing.T) {
 }
 
 func TestBlockMapperMapPodDeviceWithPodInfo(t *testing.T) {
-	fakeClient := fakeclient.NewSimpleClientset()
+	fakeClient := fakeclient.NewClientset()
 	attachRequired := false
 	podInfo := true
 	fakeDriver := &storagev1.CSIDriver{

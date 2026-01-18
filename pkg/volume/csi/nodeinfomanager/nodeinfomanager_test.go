@@ -83,6 +83,7 @@ func TestInstallCSIDriver(t *testing.T) {
 			},
 			expectedCSINode: &storage.CSINode{
 				ObjectMeta: getCSINodeObjectMeta(),
+				TypeMeta:   getCSINodeTypeMeta(),
 				Spec: storage.CSINodeSpec{
 					Drivers: []storage.CSINodeDriver{
 						{
@@ -333,6 +334,7 @@ func TestInstallCSIDriver(t *testing.T) {
 			expectedCSINode: func() *storage.CSINode {
 				csiNode := &storage.CSINode{
 					ObjectMeta: getCSINodeObjectMeta(),
+					TypeMeta:   getCSINodeTypeMeta(),
 					Spec: storage.CSINodeSpec{
 						Drivers: []storage.CSINodeDriver{
 							{
@@ -373,6 +375,7 @@ func TestInstallCSIDriver(t *testing.T) {
 			},
 			expectedCSINode: &storage.CSINode{
 				ObjectMeta: getCSINodeObjectMeta(),
+				TypeMeta:   getCSINodeTypeMeta(),
 				Spec: storage.CSINodeSpec{
 					Drivers: []storage.CSINodeDriver{
 						{
@@ -398,6 +401,7 @@ func TestInstallCSIDriver(t *testing.T) {
 			},
 			expectedCSINode: &storage.CSINode{
 				ObjectMeta: getCSINodeObjectMeta(),
+				TypeMeta:   getCSINodeTypeMeta(),
 				Spec: storage.CSINodeSpec{
 					Drivers: []storage.CSINodeDriver{
 						{
@@ -528,6 +532,7 @@ func TestInstallCSIDriver(t *testing.T) {
 				},
 			},
 			expectedCSINode: &storage.CSINode{
+				TypeMeta:   getCSINodeTypeMeta(),
 				ObjectMeta: getCSINodeObjectMeta(),
 				Spec: storage.CSINodeSpec{
 					Drivers: []storage.CSINodeDriver{
@@ -557,6 +562,7 @@ func TestInstallCSIDriver(t *testing.T) {
 				},
 			},
 			expectedCSINode: &storage.CSINode{
+				TypeMeta:   getCSINodeTypeMeta(),
 				ObjectMeta: getCSINodeObjectMeta(),
 				Spec: storage.CSINodeSpec{
 					Drivers: []storage.CSINodeDriver{
@@ -586,6 +592,7 @@ func TestInstallCSIDriver(t *testing.T) {
 				},
 			},
 			expectedCSINode: &storage.CSINode{
+				TypeMeta:   getCSINodeTypeMeta(),
 				ObjectMeta: getCSINodeObjectMeta(),
 				Spec: storage.CSINodeSpec{
 					Drivers: []storage.CSINodeDriver{
@@ -616,6 +623,7 @@ func TestInstallCSIDriver(t *testing.T) {
 			},
 			expectedCSINode: &storage.CSINode{
 				ObjectMeta: getCSINodeObjectMeta(),
+				TypeMeta:   getCSINodeTypeMeta(),
 				Spec: storage.CSINodeSpec{
 					Drivers: []storage.CSINodeDriver{
 						{
@@ -702,6 +710,7 @@ func TestUninstallCSIDriver(t *testing.T) {
 			expectedCSINode: &storage.CSINode{
 				ObjectMeta: getCSINodeObjectMeta(),
 				Spec:       storage.CSINodeSpec{},
+				TypeMeta:   getCSINodeTypeMeta(),
 			},
 		},
 		{
@@ -791,6 +800,7 @@ func TestUninstallCSIDriver(t *testing.T) {
 			expectedCSINode: &storage.CSINode{
 				ObjectMeta: getCSINodeObjectMeta(),
 				Spec:       storage.CSINodeSpec{},
+				TypeMeta:   getCSINodeTypeMeta(),
 			},
 		},
 		{
@@ -809,6 +819,7 @@ func TestUninstallCSIDriver(t *testing.T) {
 			expectedCSINode: &storage.CSINode{
 				ObjectMeta: getCSINodeObjectMeta(),
 				Spec:       storage.CSINodeSpec{},
+				TypeMeta:   getCSINodeTypeMeta(),
 			},
 		},
 	}
@@ -997,7 +1008,7 @@ func TestInstallCSIDriverExistingAnnotation(t *testing.T) {
 
 		// Arrange
 		nodeName := tc.existingNode.Name
-		client := fake.NewSimpleClientset(tc.existingNode)
+		client := fake.NewClientset(tc.existingNode)
 
 		tmpDir, err := utiltesting.MkTmpdir("nodeinfomanager-test")
 		if err != nil {
@@ -1049,7 +1060,7 @@ func getClientSet(existingNode *v1.Node, existingCSINode *storage.CSINode) *fake
 	if existingCSINode != nil {
 		objects = append(objects, existingCSINode)
 	}
-	return fake.NewSimpleClientset(objects...)
+	return fake.NewClientset(objects...)
 }
 
 func test(t *testing.T, addNodeInfo bool, testcases []testcase) {
@@ -1122,8 +1133,10 @@ func test(t *testing.T, addNodeInfo bool, testcases []testcase) {
 			}
 			continue
 		}
-		if !helper.Semantic.DeepEqual(nodeInfo, tc.expectedCSINode) {
-			t.Errorf("expected CSINode %v; got: %v", tc.expectedCSINode, nodeInfo)
+
+		nodeInfoNormalized := clienttesting.StripMetadata(nodeInfo)
+		if !helper.Semantic.DeepEqual(nodeInfoNormalized, tc.expectedCSINode) {
+			t.Errorf("expected CSINode %v; got: %v", tc.expectedCSINode, nodeInfoNormalized)
 		}
 
 		if !addNodeInfo && tc.existingCSINode != nil && tc.existingNode != nil {
@@ -1182,6 +1195,13 @@ func generateCSINode(nodeIDs nodeIDMap, volumeLimits *storage.VolumeNodeResource
 		Spec: storage.CSINodeSpec{
 			Drivers: nodeDrivers,
 		},
+	}
+}
+
+func getCSINodeTypeMeta() metav1.TypeMeta {
+	return metav1.TypeMeta{
+		Kind:       "CSINode",
+		APIVersion: "storage.k8s.io/v1",
 	}
 }
 

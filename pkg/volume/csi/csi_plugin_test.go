@@ -63,7 +63,7 @@ func newTestPluginWithVolumeHost(t *testing.T, client *fakeclient.Clientset, hos
 	}
 
 	if client == nil {
-		client = fakeclient.NewSimpleClientset()
+		client = fakeclient.NewClientset()
 	}
 
 	client.Tracker().Add(&api.Node{
@@ -233,7 +233,7 @@ func TestPluginGetVolumeNameWithInline(t *testing.T) {
 		storage.VolumeLifecyclePersistent,
 	}
 	driver := getTestCSIDriver(testDriver, nil, nil, modes)
-	client := fakeclient.NewSimpleClientset(driver)
+	client := fakeclient.NewClientset(driver)
 	plug, tmpDir := newTestPlugin(t, client)
 	defer os.RemoveAll(tmpDir)
 	testCases := []struct {
@@ -502,7 +502,7 @@ func TestPluginConstructVolumeSpecWithInline(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			driver := getTestCSIDriver(testDriver, nil, nil, tc.modes)
-			client := fakeclient.NewSimpleClientset(driver)
+			client := fakeclient.NewClientset(driver)
 			plug, tmpDir := newTestPlugin(t, client)
 			defer os.RemoveAll(tmpDir)
 
@@ -708,7 +708,7 @@ func TestPluginNewMounterWithInline(t *testing.T) {
 		for _, test := range tests {
 			t.Run(test.name, func(t *testing.T) {
 				driver := getTestCSIDriver(testDriver, nil, nil, supported)
-				fakeClient := fakeclient.NewSimpleClientset(driver)
+				fakeClient := fakeclient.NewClientset(driver)
 				plug, tmpDir := newTestPlugin(t, fakeClient)
 				defer os.RemoveAll(tmpDir)
 
@@ -896,7 +896,7 @@ func TestPluginCanAttach(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			csiDriver := getTestCSIDriver(test.driverName, nil, &test.canAttach, nil)
-			fakeCSIClient := fakeclient.NewSimpleClientset(csiDriver)
+			fakeCSIClient := fakeclient.NewClientset(csiDriver)
 			plug, tmpDir := newTestPlugin(t, fakeCSIClient)
 			defer os.RemoveAll(tmpDir)
 
@@ -954,7 +954,7 @@ func TestPluginFindAttachablePlugin(t *testing.T) {
 			}
 			defer os.RemoveAll(tmpDir)
 
-			client := fakeclient.NewSimpleClientset(
+			client := fakeclient.NewClientset(
 				getTestCSIDriver(test.driverName, nil, &test.canAttach, nil),
 				&api.Node{
 					ObjectMeta: meta.ObjectMeta{
@@ -1080,7 +1080,7 @@ func TestPluginFindDeviceMountablePluginBySpec(t *testing.T) {
 			}
 			defer os.RemoveAll(tmpDir)
 
-			client := fakeclient.NewSimpleClientset(
+			client := fakeclient.NewClientset(
 				&api.Node{
 					ObjectMeta: meta.ObjectMeta{
 						Name: "fakeNode",

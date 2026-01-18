@@ -245,7 +245,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 				Spec: api.NodeSpec{},
 			})
 
-			client := fakeclient.NewSimpleClientset(objs...)
+			client := fakeclient.NewClientset(objs...)
 
 			factory := informers.NewSharedInformerFactory(client, time.Hour /* disable resync */)
 			csiDriverInformer := factory.Storage().V1().CSIDrivers()

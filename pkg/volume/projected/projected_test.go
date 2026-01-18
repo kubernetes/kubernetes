@@ -266,7 +266,7 @@ func TestCollectDataWithSecret(t *testing.T) {
 
 			testPodUID := types.UID("test_pod_uid")
 			pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, UID: testPodUID}}
-			client := fake.NewSimpleClientset(tc.secret)
+			client := fake.NewClientset(tc.secret)
 			tempDir, host := newTestHost(t, client)
 			defer os.RemoveAll(tempDir)
 			var myVolumeMounter = projectedVolumeMounter{
@@ -515,7 +515,7 @@ func TestCollectDataWithConfigMap(t *testing.T) {
 
 			testPodUID := types.UID("test_pod_uid")
 			pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, UID: testPodUID}}
-			client := fake.NewSimpleClientset(tc.configMap)
+			client := fake.NewClientset(tc.configMap)
 			tempDir, host := newTestHost(t, client)
 			defer os.RemoveAll(tempDir)
 			var myVolumeMounter = projectedVolumeMounter{
@@ -686,7 +686,7 @@ func TestCollectDataWithDownwardAPI(t *testing.T) {
 			source := makeProjection("", ptr.To[int32](tc.mode), "downwardAPI")
 			source.Sources[0].DownwardAPI.Items = tc.volumeFile
 
-			client := fake.NewSimpleClientset(tc.pod)
+			client := fake.NewClientset(tc.pod)
 			tempDir, host := newTestHost(t, client)
 			defer os.RemoveAll(tempDir)
 			var myVolumeMounter = projectedVolumeMounter{
@@ -1009,7 +1009,7 @@ func TestCollectDataWithClusterTrustBundle(t *testing.T) {
 				Spec: v1.PodSpec{ServiceAccountName: "foo"},
 			}
 
-			client := fake.NewSimpleClientset(tc.bundles...)
+			client := fake.NewClientset(tc.bundles...)
 
 			tempDir, host := newTestHost(t, client)
 			defer os.RemoveAll(tempDir)
@@ -1112,7 +1112,7 @@ func TestCollectDataWithPodCertificate(t *testing.T) {
 				Spec: v1.PodSpec{ServiceAccountName: "foo"},
 			}
 
-			client := fake.NewSimpleClientset(tc.bundles...)
+			client := fake.NewClientset(tc.bundles...)
 
 			tempDir, host := newTestHost(t, client)
 			defer os.RemoveAll(tempDir)
@@ -1180,7 +1180,7 @@ func TestPlugin(t *testing.T) {
 
 		volumeSpec    = makeVolumeSpec(testVolumeName, testName, 0644)
 		secret        = makeSecret(testNamespace, testName)
-		client        = fake.NewSimpleClientset(&secret)
+		client        = fake.NewClientset(&secret)
 		pluginMgr     = volume.VolumePluginMgr{}
 		rootDir, host = newTestHost(t, client)
 	)
@@ -1241,7 +1241,7 @@ func TestInvalidPathProjected(t *testing.T) {
 
 		volumeSpec    = makeVolumeSpec(testVolumeName, testName, 0644)
 		secret        = makeSecret(testNamespace, testName)
-		client        = fake.NewSimpleClientset(&secret)
+		client        = fake.NewClientset(&secret)
 		pluginMgr     = volume.VolumePluginMgr{}
 		rootDir, host = newTestHost(t, client)
 	)
@@ -1295,7 +1295,7 @@ func TestPluginReboot(t *testing.T) {
 
 		volumeSpec    = makeVolumeSpec(testVolumeName, testName, 0644)
 		secret        = makeSecret(testNamespace, testName)
-		client        = fake.NewSimpleClientset(&secret)
+		client        = fake.NewClientset(&secret)
 		pluginMgr     = volume.VolumePluginMgr{}
 		rootDir, host = newTestHost(t, client)
 	)
@@ -1348,7 +1348,7 @@ func TestPluginOptional(t *testing.T) {
 		trueVal        = true
 
 		volumeSpec    = makeVolumeSpec(testVolumeName, testName, 0644)
-		client        = fake.NewSimpleClientset()
+		client        = fake.NewClientset()
 		pluginMgr     = volume.VolumePluginMgr{}
 		rootDir, host = newTestHost(t, client)
 	)
@@ -1440,7 +1440,7 @@ func TestPluginOptionalKeys(t *testing.T) {
 
 		volumeSpec    = makeVolumeSpec(testVolumeName, testName, 0644)
 		secret        = makeSecret(testNamespace, testName)
-		client        = fake.NewSimpleClientset(&secret)
+		client        = fake.NewClientset(&secret)
 		pluginMgr     = volume.VolumePluginMgr{}
 		rootDir, host = newTestHost(t, client)
 	)

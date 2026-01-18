@@ -301,7 +301,7 @@ func TestPlugin(t *testing.T) {
 
 		volumeSpec    = volumeSpec(testVolumeName, testName, 0644)
 		secret        = secret(testNamespace, testName)
-		client        = fake.NewSimpleClientset(&secret)
+		client        = fake.NewClientset(&secret)
 		pluginMgr     = volume.VolumePluginMgr{}
 		rootDir, host = newTestHost(t, client)
 	)
@@ -371,7 +371,7 @@ func TestInvalidPathSecret(t *testing.T) {
 
 		volumeSpec    = volumeSpec(testVolumeName, testName, 0644)
 		secret        = secret(testNamespace, testName)
-		client        = fake.NewSimpleClientset(&secret)
+		client        = fake.NewClientset(&secret)
 		pluginMgr     = volume.VolumePluginMgr{}
 		rootDir, host = newTestHost(t, client)
 	)
@@ -425,7 +425,7 @@ func TestPluginReboot(t *testing.T) {
 
 		volumeSpec    = volumeSpec(testVolumeName, testName, 0644)
 		secret        = secret(testNamespace, testName)
-		client        = fake.NewSimpleClientset(&secret)
+		client        = fake.NewClientset(&secret)
 		pluginMgr     = volume.VolumePluginMgr{}
 		rootDir, host = newTestHost(t, client)
 	)
@@ -478,7 +478,7 @@ func TestPluginOptional(t *testing.T) {
 		trueVal        = true
 
 		volumeSpec    = volumeSpec(testVolumeName, testName, 0644)
-		client        = fake.NewSimpleClientset()
+		client        = fake.NewClientset()
 		pluginMgr     = volume.VolumePluginMgr{}
 		rootDir, host = newTestHost(t, client)
 	)
@@ -570,7 +570,7 @@ func TestPluginOptionalKeys(t *testing.T) {
 
 		volumeSpec    = volumeSpec(testVolumeName, testName, 0644)
 		secret        = secret(testNamespace, testName)
-		client        = fake.NewSimpleClientset(&secret)
+		client        = fake.NewClientset(&secret)
 		pluginMgr     = volume.VolumePluginMgr{}
 		rootDir, host = newTestHost(t, client)
 	)

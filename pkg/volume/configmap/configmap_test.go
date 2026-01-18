@@ -330,7 +330,7 @@ func TestPlugin(t *testing.T) {
 
 		volumeSpec    = volumeSpec(testVolumeName, testName, 0644)
 		configMap     = configMap(testNamespace, testName)
-		client        = fake.NewSimpleClientset(&configMap)
+		client        = fake.NewClientset(&configMap)
 		pluginMgr     = volume.VolumePluginMgr{}
 		tempDir, host = newTestHost(t, client)
 	)
@@ -396,7 +396,7 @@ func TestPluginReboot(t *testing.T) {
 
 		volumeSpec    = volumeSpec(testVolumeName, testName, 0644)
 		configMap     = configMap(testNamespace, testName)
-		client        = fake.NewSimpleClientset(&configMap)
+		client        = fake.NewClientset(&configMap)
 		pluginMgr     = volume.VolumePluginMgr{}
 		rootDir, host = newTestHost(t, client)
 	)
@@ -453,7 +453,7 @@ func TestPluginOptional(t *testing.T) {
 		trueVal        = true
 
 		volumeSpec    = volumeSpec(testVolumeName, testName, 0644)
-		client        = fake.NewSimpleClientset()
+		client        = fake.NewClientset()
 		pluginMgr     = volume.VolumePluginMgr{}
 		tempDir, host = newTestHost(t, client)
 	)
@@ -546,7 +546,7 @@ func TestPluginKeysOptional(t *testing.T) {
 
 		volumeSpec    = volumeSpec(testVolumeName, testName, 0644)
 		configMap     = configMap(testNamespace, testName)
-		client        = fake.NewSimpleClientset(&configMap)
+		client        = fake.NewClientset(&configMap)
 		pluginMgr     = volume.VolumePluginMgr{}
 		tempDir, host = newTestHost(t, client)
 	)
@@ -630,7 +630,7 @@ func TestInvalidConfigMapSetup(t *testing.T) {
 
 		volumeSpec    = volumeSpec(testVolumeName, testName, 0644)
 		configMap     = configMap(testNamespace, testName)
-		client        = fake.NewSimpleClientset(&configMap)
+		client        = fake.NewClientset(&configMap)
 		pluginMgr     = volume.VolumePluginMgr{}
 		tempDir, host = newTestHost(t, client)
 	)

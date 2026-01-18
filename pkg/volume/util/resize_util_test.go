@@ -224,7 +224,7 @@ func TestResizeFunctions(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, true)
 			pvc := tc.pvc
-			kubeClient := fake.NewSimpleClientset(pvc)
+			kubeClient := fake.NewClientset(pvc)
 
 			var err error
 

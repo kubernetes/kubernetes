@@ -38,7 +38,7 @@ func NewTestPlugin(t *testing.T, client *fakeclient.Clientset) (*volume.VolumePl
 	}
 
 	if client == nil {
-		client = fakeclient.NewSimpleClientset()
+		client = fakeclient.NewClientset()
 	}
 
 	client.Tracker().Add(&v1.Node{

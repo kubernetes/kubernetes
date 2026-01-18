@@ -45,7 +45,7 @@ func setupTest(t *testing.T, driver *v1.CSIDriver) *testFixture {
 		clientObjects = append(clientObjects, driver)
 	}
 
-	client := fakeclient.NewSimpleClientset(clientObjects...)
+	client := fakeclient.NewClientset(clientObjects...)
 	factory := informers.NewSharedInformerFactory(client, 0)
 	driverInformer := factory.Storage().V1().CSIDrivers().Informer()
 

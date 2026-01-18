@@ -221,7 +221,7 @@ func TestMounterSetUp(t *testing.T) {
 			modes := []storage.VolumeLifecycleMode{
 				storage.VolumeLifecyclePersistent,
 			}
-			fakeClient := fakeclient.NewSimpleClientset(
+			fakeClient := fakeclient.NewClientset(
 				getTestCSIDriver("no-info", &noPodMountInfo, nil, modes),
 				getTestCSIDriver("info", &currentPodInfoMount, nil, modes),
 				getTestCSIDriver("nil", nil, nil, modes),
@@ -417,7 +417,7 @@ func TestMounterSetupJsonFileHandling(t *testing.T) {
 			fileFsPolicy := storage.FileFSGroupPolicy
 			csiDriver.Spec.FSGroupPolicy = &fileFsPolicy
 
-			fakeClient := fakeclient.NewSimpleClientset(csiDriver)
+			fakeClient := fakeclient.NewClientset(csiDriver)
 			plug, tmpDir := newTestPlugin(t, fakeClient)
 			defer os.RemoveAll(tmpDir)
 
@@ -490,7 +490,7 @@ func TestMounterSetupJsonFileHandling(t *testing.T) {
 }
 
 func TestMounterSetUpSimple(t *testing.T) {
-	fakeClient := fakeclient.NewSimpleClientset()
+	fakeClient := fakeclient.NewClientset()
 	plug, tmpDir := newTestPlugin(t, fakeClient)
 	transientError := volumetypes.NewTransientOperationFailure("")
 	defer os.RemoveAll(tmpDir)
@@ -680,7 +680,7 @@ func TestMounterSetUpSimple(t *testing.T) {
 }
 
 func TestMounterSetupWithStatusTracking(t *testing.T) {
-	fakeClient := fakeclient.NewSimpleClientset()
+	fakeClient := fakeclient.NewClientset()
 	plug, tmpDir := newTestPlugin(t, fakeClient)
 	defer os.RemoveAll(tmpDir)
 	nonFinalError := volumetypes.NewUncertainProgressError("non-final-error")
@@ -840,7 +840,7 @@ func TestMounterSetUpWithInline(t *testing.T) {
 			storage.VolumeLifecyclePersistent,
 		}
 		driver := getTestCSIDriver(testDriver, nil, nil, volumeLifecycleModes)
-		fakeClient := fakeclient.NewSimpleClientset(driver)
+		fakeClient := fakeclient.NewClientset(driver)
 		plug, tmpDir := newTestPlugin(t, fakeClient)
 		defer os.RemoveAll(tmpDir)
 		registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
@@ -925,7 +925,7 @@ func TestMounterSetUpWithInline(t *testing.T) {
 }
 
 func TestMounterSetUpWithFSGroup(t *testing.T) {
-	fakeClient := fakeclient.NewSimpleClientset()
+	fakeClient := fakeclient.NewClientset()
 	plug, tmpDir := newTestPlugin(t, fakeClient)
 	defer os.RemoveAll(tmpDir)
 
@@ -1362,14 +1362,14 @@ func TestPodServiceAccountTokenAttrs(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
 			registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
-			client := fakeclient.NewSimpleClientset()
+			client := fakeclient.NewClientset()
 			if test.driver != nil {
 				test.driver.Spec.VolumeLifecycleModes = []storage.VolumeLifecycleMode{
 					storage.VolumeLifecycleEphemeral,
 					storage.VolumeLifecyclePersistent,
 				}
 				scheme.Default(test.driver)
-				client = fakeclient.NewSimpleClientset(test.driver)
+				client = fakeclient.NewClientset(test.driver)
 			}
 			client.PrependReactor("create", "serviceaccounts", clitesting.ReactionFunc(func(action clitesting.Action) (bool, runtime.Object, error) {
 				tr := action.(clitesting.CreateAction).GetObject().(*authenticationv1.TokenRequest)
@@ -1599,7 +1599,7 @@ func TestMounterGetFSGroupPolicy(t *testing.T) {
 		}
 
 		// Create the client and register the resources
-		fakeClient := fakeclient.NewSimpleClientset(driver)
+		fakeClient := fakeclient.NewClientset(driver)
 		plug, tmpDir := newTestPlugin(t, fakeClient)
 		defer os.RemoveAll(tmpDir)
 		registerFakePlugin(testDriver, "endpoint", []string{"1.3.0"}, t)

@@ -203,7 +203,7 @@ func TestAttacherAttach(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Logf("test case: %s", tc.name)
-			fakeClient := fakeclient.NewSimpleClientset()
+			fakeClient := fakeclient.NewClientset()
 			plug, tmpDir := newTestPluginWithAttachDetachVolumeHost(t, fakeClient)
 			defer os.RemoveAll(tmpDir)
 
@@ -290,7 +290,7 @@ func TestAttacherAttachWithInline(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Logf("test case: %s", tc.name)
-			fakeClient := fakeclient.NewSimpleClientset()
+			fakeClient := fakeclient.NewClientset()
 			plug, tmpDir := newTestPluginWithAttachDetachVolumeHost(t, fakeClient)
 			defer os.RemoveAll(tmpDir)
 
@@ -359,7 +359,7 @@ func TestAttacherWithCSIDriver(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fakeClient := fakeclient.NewSimpleClientset(
+			fakeClient := fakeclient.NewClientset(
 				getTestCSIDriver("not-attachable", nil, &bFalse, nil),
 				getTestCSIDriver("attachable", nil, &bTrue, nil),
 				getTestCSIDriver("nil", nil, nil, nil),
@@ -446,7 +446,7 @@ func TestAttacherWaitForVolumeAttachmentWithCSIDriver(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fakeClient := fakeclient.NewSimpleClientset(
+			fakeClient := fakeclient.NewClientset(
 				getTestCSIDriver("not-attachable", nil, &bFalse, nil),
 				getTestCSIDriver("attachable", nil, &bTrue, nil),
 				getTestCSIDriver("nil", nil, nil, nil),
@@ -532,7 +532,7 @@ func TestAttacherWaitForAttach(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fakeClient := fakeclient.NewSimpleClientset()
+			fakeClient := fakeclient.NewClientset()
 			plug, tmpDir := newTestPlugin(t, fakeClient)
 			defer os.RemoveAll(tmpDir)
 
@@ -614,7 +614,7 @@ func TestAttacherWaitForAttachWithInline(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fakeClient := fakeclient.NewSimpleClientset()
+			fakeClient := fakeclient.NewClientset()
 			plug, tmpDir := newTestPlugin(t, fakeClient)
 			defer os.RemoveAll(tmpDir)
 
@@ -844,7 +844,7 @@ func TestAttacherDetach(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Logf("running test: %v", tc.name)
-			fakeClient := fakeclient.NewSimpleClientset()
+			fakeClient := fakeclient.NewClientset()
 			plug, tmpDir := newTestPluginWithAttachDetachVolumeHost(t, fakeClient)
 			defer os.RemoveAll(tmpDir)
 
@@ -894,7 +894,7 @@ func TestAttacherDetach(t *testing.T) {
 func TestAttacherGetDeviceMountPath(t *testing.T) {
 	// Setup
 	// Create a new attacher
-	fakeClient := fakeclient.NewSimpleClientset()
+	fakeClient := fakeclient.NewClientset()
 	plug, tmpDir := newTestPlugin(t, fakeClient)
 	defer os.RemoveAll(tmpDir)
 	attacher, err0 := plug.NewAttacher()
@@ -1171,7 +1171,7 @@ func TestAttacherMountDevice(t *testing.T) {
 
 			// Setup
 			// Create a new attacher
-			fakeClient := fakeclient.NewSimpleClientset()
+			fakeClient := fakeclient.NewClientset()
 			plug, tmpDir := newTestPlugin(t, fakeClient)
 			defer os.RemoveAll(tmpDir)
 
@@ -1389,7 +1389,7 @@ func TestAttacherMountDeviceWithInline(t *testing.T) {
 
 			// Setup
 			// Create a new attacher
-			fakeClient := fakeclient.NewSimpleClientset()
+			fakeClient := fakeclient.NewClientset()
 			plug, tmpDir := newTestPlugin(t, fakeClient)
 			defer os.RemoveAll(tmpDir)
 
@@ -1534,7 +1534,7 @@ func TestAttacherUnmountDevice(t *testing.T) {
 			t.Logf("Running test case: %s", tc.testName)
 			// Setup
 			// Create a new attacher
-			fakeClient := fakeclient.NewSimpleClientset()
+			fakeClient := fakeclient.NewClientset()
 			plug, tmpDir := newTestPlugin(t, fakeClient)
 			defer os.RemoveAll(tmpDir)
 			attacher, err0 := plug.NewAttacher()
