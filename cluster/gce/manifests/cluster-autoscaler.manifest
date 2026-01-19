@@ -41,6 +41,7 @@
                     "--write-status-configmap=true",
                     "--balance-similar-node-groups=true",
                     "--expendable-pods-priority-cutoff=-10",
+                    "--bypassed-scheduler-names=non-existing-bypassed-scheduler",
                     {{params}}
                 ],
                 "env": [
