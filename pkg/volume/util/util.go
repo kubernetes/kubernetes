@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"time"
 
@@ -220,12 +221,7 @@ func JoinMountOptions(userOptions []string, systemOptions []string) []string {
 
 // ContainsAccessMode returns whether the requested mode is contained by modes
 func ContainsAccessMode(modes []v1.PersistentVolumeAccessMode, mode v1.PersistentVolumeAccessMode) bool {
-	for _, m := range modes {
-		if m == mode {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(modes, mode)
 }
 
 // ContainsAllAccessModes returns whether all of the requested modes are contained by modes
