@@ -58,9 +58,7 @@ type podGroupState struct {
 	unscheduledPods sets.Set[types.UID]
 	// assumedPods tracks pods that have reached the Reserve stage and are waiting
 	// for the rest of the gang to arrive before being allowed to bind.
-	assumedPods sets.Set[types.UID]
-	// assignedPods tracks all pods belonging to the group that are assigned (bound).
-	assignedPods sets.Set[types.UID]
+	scheduledPods sets.Set[types.UID]
 	// schedulingDeadline stores the time at which the gang will time out.
 	// It is initialized when the first pod from the group enters the Permit stage.
 	schedulingDeadline *time.Time
@@ -70,8 +68,7 @@ func newPodGroupState() *podGroupState {
 	return &podGroupState{
 		allPods:         make(map[types.UID]*v1.Pod),
 		unscheduledPods: sets.New[types.UID](),
-		assumedPods:     sets.New[types.UID](),
-		assignedPods:    sets.New[types.UID](),
+		scheduledPods:   sets.New[types.UID](),
 	}
 }
 
@@ -83,7 +80,7 @@ func (pgs *podGroupState) addPod(pod *v1.Pod) {
 
 	pgs.allPods[pod.UID] = pod
 	if pod.Spec.NodeName != "" {
-		pgs.assignedPods.Insert(pod.UID)
+		pgs.scheduledPods.Insert(pod.UID)
 	} else {
 		pgs.unscheduledPods.Insert(pod.UID)
 	}
@@ -97,10 +94,9 @@ func (pgs *podGroupState) updatePod(oldPod, newPod *v1.Pod) {
 
 	pgs.allPods[newPod.UID] = newPod
 	if oldPod.Spec.NodeName == "" && newPod.Spec.NodeName != "" {
-		pgs.assignedPods.Insert(newPod.UID)
+		pgs.scheduledPods.Insert(newPod.UID)
 		// Clear pod from unscheduled and assumed when it is assigned.
 		pgs.unscheduledPods.Delete(newPod.UID)
-		pgs.assumedPods.Delete(newPod.UID)
 	}
 }
 
@@ -111,14 +107,13 @@ func (pgs *podGroupState) deletePod(podUID types.UID) {
 
 	delete(pgs.allPods, podUID)
 	pgs.unscheduledPods.Delete(podUID)
-	pgs.assumedPods.Delete(podUID)
-	pgs.assignedPods.Delete(podUID)
+	pgs.scheduledPods.Delete(podUID)
 }
 
 // empty returns true when the group is empty.
 func (pgs *podGroupState) empty() bool {
-	pgs.lock.Lock()
-	defer pgs.lock.Unlock()
+	pgs.lock.RLock()
+	defer pgs.lock.RUnlock()
 
 	return len(pgs.allPods) == 0
 }
@@ -129,6 +124,14 @@ func (pgs *podGroupState) AllPods() sets.Set[types.UID] {
 	defer pgs.lock.RUnlock()
 
 	return sets.KeySet(pgs.allPods)
+}
+
+// AllPodsCount returns the number of all pods known to the scheduler for this group.
+func (pgs *podGroupState) AllPodsCount() int {
+	pgs.lock.RLock()
+	defer pgs.lock.RUnlock()
+
+	return len(pgs.allPods)
 }
 
 // UnscheduledPods returns all pods that are unscheduled for this group,
@@ -146,21 +149,22 @@ func (pgs *podGroupState) UnscheduledPods() map[string]*v1.Pod {
 	return unscheduledPods
 }
 
-// AssumedPods returns the UIDs of all pods for this group in the assumed state,
+// ScheduledPods returns the UIDs of all pods for this group in the scheduled state,
 // i.e., passed the Reserve gate.
-func (pgs *podGroupState) AssumedPods() sets.Set[types.UID] {
+func (pgs *podGroupState) ScheduledPods() sets.Set[types.UID] {
 	pgs.lock.RLock()
 	defer pgs.lock.RUnlock()
 
-	return pgs.assumedPods.Clone()
+	return pgs.scheduledPods.Clone()
 }
 
-// AssignedPods returns the UIDs of all pods already assigned (bound) for this group.
-func (pgs *podGroupState) AssignedPods() sets.Set[types.UID] {
+// ScheduledPodsCount returns the number of all pods for this group in the scheduled state,
+// i.e., passed the Reserve gate.
+func (pgs *podGroupState) ScheduledPodsCount() int {
 	pgs.lock.RLock()
 	defer pgs.lock.RUnlock()
 
-	return pgs.assignedPods.Clone()
+	return len(pgs.scheduledPods)
 }
 
 // SchedulingTimeout returns the remaining time until the pod group scheduling times out.
@@ -183,7 +187,7 @@ func (pgs *podGroupState) AssumePod(podUID types.UID) {
 	pgs.lock.Lock()
 	defer pgs.lock.Unlock()
 
-	pgs.assumedPods.Insert(podUID)
+	pgs.scheduledPods.Insert(podUID)
 	pgs.unscheduledPods.Delete(podUID)
 }
 
@@ -192,6 +196,10 @@ func (pgs *podGroupState) ForgetPod(podUID types.UID) {
 	pgs.lock.Lock()
 	defer pgs.lock.Unlock()
 
+	pod := pgs.allPods[podUID]
+	if pod == nil || pod.Spec.NodeName != "" {
+		return
+	}
 	pgs.unscheduledPods.Insert(podUID)
-	pgs.assumedPods.Delete(podUID)
+	pgs.scheduledPods.Delete(podUID)
 }

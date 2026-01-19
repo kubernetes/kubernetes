@@ -42,8 +42,7 @@ func TestWorkloadManager_AddPod(t *testing.T) {
 		expectedPodGroups       int
 		expectInAllPods         bool
 		expectInUnscheduledPods bool
-		expectInAssumedPods     bool
-		expectInAssignedPods    bool
+		expectInScheduledPods   bool
 	}{
 		{
 			name:                    "adding an unscheduled pod",
@@ -53,11 +52,11 @@ func TestWorkloadManager_AddPod(t *testing.T) {
 			expectInUnscheduledPods: true,
 		},
 		{
-			name:                 "adding an assigned pod",
-			podToAdd:             p2,
-			expectedPodGroups:    1,
-			expectInAllPods:      true,
-			expectInAssignedPods: true,
+			name:                  "adding an assigned pod",
+			podToAdd:              p2,
+			expectedPodGroups:     1,
+			expectInAllPods:       true,
+			expectInScheduledPods: true,
 		},
 		{
 			name:                    "adding pod with different namespace",
@@ -97,11 +96,8 @@ func TestWorkloadManager_AddPod(t *testing.T) {
 			if inAll := state.AllPods().Has(tt.podToAdd.UID); inAll != tt.expectInAllPods {
 				t.Errorf("Unexpected AllPods state, want: %v, got: %v", tt.expectInAllPods, inAll)
 			}
-			if inAssumed := state.AssumedPods().Has(tt.podToAdd.UID); inAssumed != tt.expectInAssumedPods {
-				t.Errorf("Unexpected AssumedPods state, want: %v, got: %v", tt.expectInAssumedPods, inAssumed)
-			}
-			if inAssigned := state.AssignedPods().Has(tt.podToAdd.UID); inAssigned != tt.expectInAssignedPods {
-				t.Errorf("Unexpected AssignedPods state, want: %v, got: %v", tt.expectInAssignedPods, inAssigned)
+			if scheduled := state.ScheduledPods().Has(tt.podToAdd.UID); scheduled != tt.expectInScheduledPods {
+				t.Errorf("Unexpected ScheduledPods state, want: %v, got: %v", tt.expectInScheduledPods, scheduled)
 			}
 		})
 	}
@@ -129,8 +125,7 @@ func TestWorkloadManager_UpdatePod(t *testing.T) {
 
 		expectInAllPods         bool
 		expectInUnscheduledPods bool
-		expectInAssumedPods     bool
-		expectInAssignedPods    bool
+		expectInScheduledPods   bool
 	}{
 		{
 			name:                    "updating an unscheduled pod",
@@ -140,34 +135,34 @@ func TestWorkloadManager_UpdatePod(t *testing.T) {
 			expectInUnscheduledPods: true,
 		},
 		{
-			name:                "updating an assumed pod",
-			assumePod:           true,
-			oldPod:              pod,
-			newPod:              updatedPod,
-			expectInAllPods:     true,
-			expectInAssumedPods: true,
+			name:                  "updating an assumed pod",
+			assumePod:             true,
+			oldPod:                pod,
+			newPod:                updatedPod,
+			expectInAllPods:       true,
+			expectInScheduledPods: true,
 		},
 		{
-			name:                 "updating an assigned pod",
-			oldPod:               assignedPod,
-			newPod:               updatedAssignedPod,
-			expectInAllPods:      true,
-			expectInAssignedPods: true,
+			name:                  "updating an assigned pod",
+			oldPod:                assignedPod,
+			newPod:                updatedAssignedPod,
+			expectInAllPods:       true,
+			expectInScheduledPods: true,
 		},
 		{
-			name:                 "binding an unscheduled pod",
-			oldPod:               pod,
-			newPod:               assignedPod,
-			expectInAllPods:      true,
-			expectInAssignedPods: true,
+			name:                  "binding an unscheduled pod",
+			oldPod:                pod,
+			newPod:                assignedPod,
+			expectInAllPods:       true,
+			expectInScheduledPods: true,
 		},
 		{
-			name:                 "binding an assumed pod",
-			assumePod:            true,
-			oldPod:               pod,
-			newPod:               assignedPod,
-			expectInAllPods:      true,
-			expectInAssignedPods: true,
+			name:                  "binding an assumed pod",
+			assumePod:             true,
+			oldPod:                pod,
+			newPod:                assignedPod,
+			expectInAllPods:       true,
+			expectInScheduledPods: true,
 		},
 		{
 			name:   "updating a non-workload pod is a no-op",
@@ -208,11 +203,8 @@ func TestWorkloadManager_UpdatePod(t *testing.T) {
 			if inAll := state.AllPods().Has(tt.newPod.UID); inAll != tt.expectInAllPods {
 				t.Errorf("Unexpected AllPods state, want: %v, got: %v", tt.expectInAllPods, inAll)
 			}
-			if inAssumed := state.AssumedPods().Has(tt.newPod.UID); inAssumed != tt.expectInAssumedPods {
-				t.Errorf("Unexpected AssumedPods state, want: %v, got: %v", tt.expectInAssumedPods, inAssumed)
-			}
-			if inAssigned := state.AssignedPods().Has(tt.newPod.UID); inAssigned != tt.expectInAssignedPods {
-				t.Errorf("Unexpected AssignedPods state, want: %v, got: %v", tt.expectInAssignedPods, inAssigned)
+			if scheduled := state.ScheduledPods().Has(tt.newPod.UID); scheduled != tt.expectInScheduledPods {
+				t.Errorf("Unexpected ScheduledPods state, want: %v, got: %v", tt.expectInScheduledPods, scheduled)
 			}
 		})
 	}

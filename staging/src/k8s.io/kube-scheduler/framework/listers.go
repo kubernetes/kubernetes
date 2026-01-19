@@ -157,15 +157,20 @@ type WorkloadManager interface {
 type PodGroupState interface {
 	// AllPods returns the UIDs of all pods known to the scheduler for this group.
 	AllPods() sets.Set[types.UID]
+	// AllPodsCount returns the number of all pods known to the scheduler for this group.
+	AllPodsCount() int
 	// UnscheduledPods returns all pods that are unscheduled for this group,
 	// i.e., are neither assumed nor assigned.
 	// The returned map type corresponds to the argument of the PodActivator.Activate method.
 	UnscheduledPods() map[string]*v1.Pod
-	// AssumedPods returns the UIDs of all pods for this group in the "assumed" state,
+	// ScheduledPods returns the UIDs of all pods for this group in the "assumed" state
+	// or assigned (bound).
 	// i.e., passed the Reserve gate.
-	AssumedPods() sets.Set[types.UID]
-	// AssignedPods returns the UIDs of all pods already assigned (bound) for this group.
-	AssignedPods() sets.Set[types.UID]
+	ScheduledPods() sets.Set[types.UID]
+	// ScheduledPodsCount returns the number of all pods for this group in the "assumed" state
+	// or assigned (bound).
+	// i.e., passed the Reserve gate.
+	ScheduledPodsCount() int
 	// AssumePod marks a pod as having reached the Reserve stage.
 	AssumePod(podUID types.UID)
 	// ForgetPod removes a pod from the assumed state.
