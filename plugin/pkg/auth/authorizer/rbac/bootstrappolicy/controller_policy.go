@@ -187,9 +187,6 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			rbacv1helpers.NewRule("update", "patch").Groups(legacyGroup).Resources("persistentvolumeclaims/status").RuleOrDie(),
 			rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("persistentvolumeclaims").RuleOrDie(),
 			eventsRule(),
-
-			// volume plugin - portworx
-			rbacv1helpers.NewRule("get").Groups(legacyGroup).Resources("services").RuleOrDie(),
 		},
 	})
 
@@ -313,9 +310,6 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 
 			// recyclerClient.WatchPod
 			rbacv1helpers.NewRule("watch").Groups(legacyGroup).Resources("events").RuleOrDie(),
-
-			// volume plugin - portworx
-			rbacv1helpers.NewRule("get").Groups(legacyGroup).Resources("services").RuleOrDie(),
 		},
 	})
 	addControllerRole(&controllerRoles, &controllerRoleBindings, func() rbacv1.ClusterRole {

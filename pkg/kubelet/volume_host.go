@@ -219,10 +219,6 @@ func (kvh *kubeletVolumeHost) GetMounter() mount.Interface {
 	return kvh.kubelet.mounter
 }
 
-func (kvh *kubeletVolumeHost) GetHostName() string {
-	return kvh.kubelet.hostname
-}
-
 func (kvh *kubeletVolumeHost) GetNodeAllocatable() (v1.ResourceList, error) {
 	node, err := kvh.kubelet.getNodeAnyWay()
 	if err != nil {

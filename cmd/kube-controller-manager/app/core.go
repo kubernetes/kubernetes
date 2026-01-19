@@ -423,7 +423,7 @@ func newPersistentVolumeExpanderController(ctx context.Context, controllerContex
 		controllerContext.InformerFactory.Core().V1().PersistentVolumeClaims(),
 		plugins,
 		csiTranslator,
-		csimigration.NewPluginManager(csiTranslator, utilfeature.DefaultFeatureGate),
+		csimigration.NewPluginManager(csiTranslator),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init volume expand controller: %w", err)
