@@ -1517,10 +1517,6 @@ func runNonGuPodTest(ctx context.Context, f *framework.Framework, cpuCap int64, 
 }
 
 func runMultipleGuNonGuPods(ctx context.Context, f *framework.Framework, cpuCap int64, cpuAlloc int64) {
-	var cpuListString, expAllowedCPUsListRegex string
-	var cpuList []int
-	var cpu1 int
-	var cset cpuset.CPUSet
 	var err error
 	var ctnAttrs []ctnAttribute
 	var pod1, pod2 *v1.Pod
@@ -1546,30 +1542,23 @@ func runMultipleGuNonGuPods(ctx context.Context, f *framework.Framework, cpuCap 
 	pod2 = e2epod.NewPodClient(f).CreateSync(ctx, pod2)
 
 	ginkgo.By("checking if the expected cpuset was assigned")
-	cpu1 = 1
-	if isHTEnabled() {
-		cpuList = mustParseCPUSet(getCPUSiblingList(0)).List()
-		cpu1 = cpuList[1]
-	} else if isMultiNUMA() {
-		cpuList = mustParseCPUSet(getCoreSiblingList(0)).List()
-		if len(cpuList) > 1 {
-			cpu1 = cpuList[1]
-		}
-	}
-	expAllowedCPUsListRegex = fmt.Sprintf("^%d\n$", cpu1)
-	err = e2epod.NewPodClient(f).MatchContainerOutput(ctx, pod1.Name, pod1.Spec.Containers[0].Name, expAllowedCPUsListRegex)
-	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
+	logs1, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod1.Name, pod1.Spec.Containers[0].Name)
+	framework.ExpectNoError(err, "failed to get logs for container [%s] of pod [%s]",
 		pod1.Spec.Containers[0].Name, pod1.Name)
+	guPodCPUs := getContainerAllowedCPUsFromLogs(pod1.Name, pod1.Spec.Containers[0].Name, logs1)
 
-	cpuListString = "0"
-	if cpuAlloc > 2 {
-		cset = mustParseCPUSet(fmt.Sprintf("0-%d", cpuCap-1))
-		cpuListString = cset.Difference(cpuset.New(cpu1)).String()
-	}
-	expAllowedCPUsListRegex = fmt.Sprintf("^%s\n$", cpuListString)
-	err = e2epod.NewPodClient(f).MatchContainerOutput(ctx, pod2.Name, pod2.Spec.Containers[0].Name, expAllowedCPUsListRegex)
-	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
+	logs2, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod2.Name, pod2.Spec.Containers[0].Name)
+	framework.ExpectNoError(err, "failed to get logs for container [%s] of pod [%s]",
 		pod2.Spec.Containers[0].Name, pod2.Name)
+	nonGuPodCPUs := getContainerAllowedCPUsFromLogs(pod2.Name, pod2.Spec.Containers[0].Name, logs2)
+
+	gomega.Expect(guPodCPUs.Size()).To(gomega.Equal(1), "guaranteed pod should get exactly 1 CPU, got %q", guPodCPUs.String())
+	gomega.Expect(nonGuPodCPUs.Intersection(guPodCPUs)).To(gomega.BeEmpty(),
+		"non-guaranteed pod cpuset %q should not overlap with guaranteed pod CPU %q",
+		nonGuPodCPUs.String(), guPodCPUs.String())
+	gomega.Expect(nonGuPodCPUs.Size()).To(gomega.Equal(int(cpuCap-1)),
+		"non-guaranteed pod should get exactly %d CPUs (all except gu pod), got %q", cpuCap-1, nonGuPodCPUs.String())
+
 	ginkgo.By("by deleting the pods and waiting for container removal")
 	deletePods(ctx, f, []string{pod1.Name, pod2.Name})
 	waitForContainerRemoval(ctx, pod1.Spec.Containers[0].Name, pod1.Name, pod1.Namespace)
