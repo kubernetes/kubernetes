@@ -472,20 +472,18 @@ func (c *Cluster) checkReadiness(tCtx ktesting.TContext, cmd *Cmd) {
 		c.checkHealthz(tCtx, cmd, "https", c.settings["KUBELET_HOST"], c.settings["KUBELET_PORT"])
 
 		// Also wait for the node to be ready.
-		ktesting.Eventually(tCtx.WithStep("wait for node ready"), func(tCtx ktesting.TContext) []corev1.Node {
-			nodes, err := tCtx.Client().CoreV1().Nodes().List(tCtx, metav1.ListOptions{})
-			tCtx.ExpectNoError(err, "list nodes")
-			return nodes.Items
-		}).Should(gomega.ConsistOf(gomega.HaveField("Status.Conditions", gomega.ContainElement(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+		tCtx.WithStep("wait for node ready").Eventually(func(tCtx ktesting.TContext) (*corev1.NodeList, error) {
+			return tCtx.Client().CoreV1().Nodes().List(tCtx, metav1.ListOptions{})
+		}).Should(gomega.HaveField("Items", gomega.ConsistOf(gomega.HaveField("Status.Conditions", gomega.ContainElement(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
 			"Type":   gomega.Equal(corev1.NodeReady),
 			"Status": gomega.Equal(corev1.ConditionTrue),
-		})))))
+		}))))))
 	}
 }
 
 func (c *Cluster) checkHealthz(tCtx ktesting.TContext, cmd *Cmd, method, hostIP, port string) {
 	url := fmt.Sprintf("%s://%s:%s/healthz", method, hostIP, port)
-	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) error {
+	tCtx.WithStep(fmt.Sprintf("check health %s", url)).Eventually(func(tCtx ktesting.TContext) error {
 		if !cmd.Running() {
 			return gomega.StopTrying(fmt.Sprintf("%s stopped unexpectedly", cmd.Name))
 		}
