@@ -114,6 +114,7 @@
       initNodes: 5000
       initPods: 5000
       measurePods: 1000
+    threshold: 290
   - name: 5000Nodes_2000Pods
     featureGates:
       SchedulerQueueingHints: false
@@ -183,6 +184,7 @@
       initNodes: 5000
       initPods: 5000
       measurePods: 1000
+    threshold: 195
   - name: 5000Nodes_5000Pods
     featureGates:
       SchedulerQueueingHints: false
@@ -250,6 +252,7 @@
       initNodes: 5000
       initPods: 5000
       measurePods: 1000
+    threshold: 289
   - name: 5000Nodes_5000Pods
     featureGates:
       SchedulerQueueingHints: false
