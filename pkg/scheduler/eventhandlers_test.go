@@ -184,7 +184,7 @@ func TestEventHandlers_MoveToActiveOnNominatedNodeUpdate(t *testing.T) {
 					// disable backoff queue
 					internalqueue.WithPodInitialBackoffDuration(0),
 					internalqueue.WithPodMaxBackoffDuration(0))
-				schedulerCache := internalcache.New(ctx, 30*time.Second, nil)
+				schedulerCache := internalcache.New(ctx, nil)
 
 				// Put test pods into unschedulable queue
 				for _, pod := range unschedulablePods {
@@ -230,7 +230,6 @@ func newDefaultQueueSort() fwk.LessFunc {
 }
 
 func TestUpdateAssignedPodInCache(t *testing.T) {
-	ttl := 10 * time.Second
 	nodeName := "node"
 
 	tests := []struct {
@@ -255,7 +254,7 @@ func TestUpdateAssignedPodInCache(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			sched := &Scheduler{
-				Cache:           internalcache.New(ctx, ttl, nil),
+				Cache:           internalcache.New(ctx, nil),
 				SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
 				logger:          logger,
 			}
@@ -796,7 +795,7 @@ func TestAddPod(t *testing.T) {
 			defer cancel()
 
 			sched := &Scheduler{
-				Cache:           internalcache.New(ctx, 0, nil),
+				Cache:           internalcache.New(ctx, nil),
 				SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
 				logger:          logger,
 				Profiles: profile.Map{
@@ -931,7 +930,7 @@ func TestUpdatePod(t *testing.T) {
 				t.Fatalf("Failed to create framework: %v", err)
 			}
 			sched := &Scheduler{
-				Cache:           internalcache.New(ctx, 0, nil),
+				Cache:           internalcache.New(ctx, nil),
 				SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
 				logger:          logger,
 				Profiles: profile.Map{
@@ -1050,7 +1049,7 @@ func TestDeletePod(t *testing.T) {
 				t.Fatalf("Failed to create framework: %v", err)
 			}
 			sched := &Scheduler{
-				Cache:           internalcache.New(ctx, 0, nil),
+				Cache:           internalcache.New(ctx, nil),
 				SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
 				logger:          logger,
 				Profiles: profile.Map{
