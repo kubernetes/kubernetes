@@ -145,11 +145,11 @@ Goroutine created at:
 			logs:  []containerLogs{{"kube-system", "pod", "container", ``}},
 			check: logCheck{dataRaces: true},
 			expectStdout: `<log header>] "Watching" namespace="kube-system"
-<log header>] "PodLogs status" namespace="kube-system" msg="ERROR: fake error: no log output\n"
+<log header>] "PodLogs status" namespace="kube-system" msg="ERROR: fake error: no log output"
 `,
 			expectFailure: `Unexpected errors during log data collection (see stdout for full log):
 
-    <log header>] "PodLogs status" namespace="kube-system" msg="ERROR: fake error: no log output\n"
+    <log header>] "PodLogs status" namespace="kube-system" msg="ERROR: fake error: no log output"
 `,
 		},
 		"two-data-races": {

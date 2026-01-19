@@ -490,8 +490,17 @@ type statusWriter struct {
 }
 
 // Write gets called with text that describes problems encountered while monitoring pods and their output.
-func (s *statusWriter) Write(msg []byte) (int, error) {
-	s.logger.Error(nil, "PodLogs status", "namespace", klog.KObj(s.namespace), "msg", msg)
+func (s *statusWriter) Write(data []byte) (int, error) {
+	msg := string(data)
+	msg = strings.TrimRight(msg, "\n")
+	if strings.HasPrefix(msg, "WARNING:") {
+		// Warnings are informational, podlogs recovers from problems (like "connection refused"
+		// under load, "pod not found" when a pod terminates while trying to read log output).
+		// They don't need to be treated as a logcheck failure when looking at logs later.
+		s.logger.Info("PodLogs status", "namespace", klog.KObj(s.namespace), "msg", msg)
+	} else {
+		s.logger.Error(nil, "PodLogs status", "namespace", klog.KObj(s.namespace), "msg", msg)
+	}
 	return len(msg), nil
 }
 
