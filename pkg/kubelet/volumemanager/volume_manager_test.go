@@ -731,6 +731,16 @@ func TestWaitForAllPodsUnmount(t *testing.T) {
 				}
 			}
 
+			require.Eventually(t, func() bool {
+				for _, pod := range pods {
+					uniquePodName := util.GetUniquePodName(pod)
+					if manager.actualStateOfWorld.PodHasMountedVolumes(uniquePodName) {
+						return true
+					}
+				}
+				return test.podMode == ""
+			}, 2*time.Second, 100*time.Millisecond)
+
 			unmountCtx, cancel := context.WithTimeout(ctx, 1*time.Second)
 			defer cancel()
 
