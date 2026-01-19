@@ -144,8 +144,8 @@ func (pl *GangScheduling) PreEnqueue(ctx context.Context, pod *v1.Pod) *fwk.Stat
 	if err != nil {
 		return fwk.AsStatus(err)
 	}
-	allPods := podGroupState.AllPods()
-	if len(allPods) < int(policy.Gang.MinCount) {
+	allPodsCount := podGroupState.AllPodsCount()
+	if allPodsCount < int(policy.Gang.MinCount) {
 		return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "waiting for minCount pods from a gang to appear in scheduling queue")
 	}
 
@@ -213,9 +213,8 @@ func (pl *GangScheduling) Permit(ctx context.Context, state fwk.CycleState, pod 
 	if err != nil {
 		return fwk.AsStatus(err), 0
 	}
-	assumedPods := podGroupState.AssumedPods()
-	assumedOrAssignedPods := assumedPods.Union(podGroupState.AssignedPods())
-	if len(assumedOrAssignedPods) < int(policy.Gang.MinCount) {
+	scheduledPodsCount := podGroupState.ScheduledPodsCount()
+	if scheduledPodsCount < int(policy.Gang.MinCount) {
 		// Activate unscheduled pods from this pod group in case they were waiting for this pod to be scheduled.
 		unscheduledPods := podGroupState.UnscheduledPods()
 		pl.handle.Activate(klog.FromContext(ctx), unscheduledPods)
@@ -223,10 +222,10 @@ func (pl *GangScheduling) Permit(ctx context.Context, state fwk.CycleState, pod 
 		return fwk.NewStatus(fwk.Wait, "waiting for minCount pods from a gang to be waiting on permit"), podGroupState.SchedulingTimeout()
 	}
 
-	logger.V(4).Info("Quorum is met for a gang. Allowing other pods from a gang waiting on permit", "pod", klog.KObj(pod), "workloadRef", pod.Spec.WorkloadRef, "allowedPods", len(assumedPods))
+	logger.V(4).Info("Quorum is met for a gang. Allowing other pods from a gang waiting on permit", "pod", klog.KObj(pod), "workloadRef", pod.Spec.WorkloadRef, "allowedPods", scheduledPodsCount)
 
 	// The quorum is met. Allow this pod and signal all other waiting pods from the same gang to proceed.
-	for podUID := range assumedPods {
+	for podUID := range podGroupState.AssumedPods() {
 		waitingPod := pl.handle.GetWaitingPod(podUID)
 		if waitingPod != nil {
 			waitingPod.Allow(Name)
