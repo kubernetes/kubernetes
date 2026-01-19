@@ -1770,7 +1770,7 @@ func (kl *Kubelet) initializeRuntimeDependentModules(ctx context.Context) {
 	klog.V(4).InfoS("Starting plugin manager")
 	go kl.pluginManager.Run(ctx, kl.sourcesReady, wait.NeverStop)
 
-	err = kl.shutdownManager.Start()
+	err = kl.shutdownManager.Start(ctx)
 	if err != nil {
 		// The shutdown manager is not critical for kubelet, so log failure, but don't block Kubelet startup if there was a failure starting it.
 		klog.ErrorS(err, "Failed to start node shutdown manager")
@@ -1851,7 +1851,7 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 			// Call updateRuntimeUp once before syncNodeStatus to make sure kubelet had already checked runtime state
 			// otherwise when restart kubelet, syncNodeStatus will report node notReady in first report period
 			kl.updateRuntimeUp(ctx)
-			wait.JitterUntil(kl.syncNodeStatus, kl.nodeStatusUpdateFrequency, 0.04, true, wait.NeverStop)
+			wait.JitterUntil(func() { kl.syncNodeStatus(ctx) }, kl.nodeStatusUpdateFrequency, 0.04, true, wait.NeverStop)
 		}()
 
 		go kl.fastStatusUpdateOnce()

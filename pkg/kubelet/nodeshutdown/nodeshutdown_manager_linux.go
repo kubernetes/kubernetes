@@ -20,6 +20,7 @@ limitations under the License.
 package nodeshutdown
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"sync"
@@ -62,7 +63,7 @@ type managerImpl struct {
 	nodeRef  *v1.ObjectReference
 
 	getPods        eviction.ActivePodsFunc
-	syncNodeStatus func()
+	syncNodeStatus func(context.Context)
 
 	dbusCon     dbusInhibiter
 	inhibitLock systemd.InhibitLock
@@ -143,8 +144,8 @@ func (m *managerImpl) setMetrics() {
 }
 
 // Start starts the node shutdown manager and will start watching the node for shutdown events.
-func (m *managerImpl) Start() error {
-	stop, err := m.start()
+func (m *managerImpl) Start(ctx context.Context) error {
+	stop, err := m.start(ctx)
 	if err != nil {
 		return err
 	}
@@ -156,7 +157,7 @@ func (m *managerImpl) Start() error {
 
 			time.Sleep(dbusReconnectPeriod)
 			m.logger.V(1).Info("Restarting watch for node shutdown events")
-			stop, err = m.start()
+			stop, err = m.start(ctx)
 			if err != nil {
 				m.logger.Error(err, "Unable to watch the node for shutdown events")
 			}
@@ -167,7 +168,7 @@ func (m *managerImpl) Start() error {
 	return nil
 }
 
-func (m *managerImpl) start() (chan struct{}, error) {
+func (m *managerImpl) start(ctx context.Context) (chan struct{}, error) {
 	systemBus, err := systemDbus()
 	if err != nil {
 		return nil, err
@@ -274,7 +275,7 @@ func (m *managerImpl) start() (chan struct{}, error) {
 
 				if isShuttingDown {
 					// Update node status and ready condition
-					go m.syncNodeStatus()
+					go m.syncNodeStatus(ctx)
 
 					m.processShutdownEvent()
 				} else {
