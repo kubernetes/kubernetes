@@ -99,6 +99,11 @@ type RepairIPAddress struct {
 	ipAddressLister networkinglisters.IPAddressLister
 	ipAddressSynced cache.InformerSynced
 
+	// namespaceSynced is required because admission plugins (especially webhooks)
+	// depend on the Namespace informer being synced before they can process requests.
+	// Without waiting for this, IPAddress creation may fail with "not yet ready to handle request".
+	namespaceSynced cache.InformerSynced
+
 	svcQueue         workqueue.TypedRateLimitingInterface[string]
 	ipQueue          workqueue.TypedRateLimitingInterface[string]
 	workerLoopPeriod time.Duration
@@ -114,8 +119,9 @@ func NewRepairIPAddress(interval time.Duration,
 	client kubernetes.Interface,
 	serviceInformer coreinformers.ServiceInformer,
 	serviceCIDRInformer networkinginformers.ServiceCIDRInformer,
-	ipAddressInformer networkinginformers.IPAddressInformer) *RepairIPAddress {
-	return newRepairIPAddress(interval, client, serviceInformer, serviceCIDRInformer, ipAddressInformer, clock.RealClock{})
+	ipAddressInformer networkinginformers.IPAddressInformer,
+	namespaceInformer coreinformers.NamespaceInformer) *RepairIPAddress {
+	return newRepairIPAddress(interval, client, serviceInformer, serviceCIDRInformer, ipAddressInformer, namespaceInformer, clock.RealClock{})
 }
 
 // newRepairIPAddress implements NewRepairIPAddress by additionally consuming clock.Clock.
@@ -124,6 +130,7 @@ func newRepairIPAddress(interval time.Duration,
 	serviceInformer coreinformers.ServiceInformer,
 	serviceCIDRInformer networkinginformers.ServiceCIDRInformer,
 	ipAddressInformer networkinginformers.IPAddressInformer,
+	namespaceInformer coreinformers.NamespaceInformer,
 	c clock.Clock) *RepairIPAddress {
 	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
 	recorder := eventBroadcaster.NewRecorder(legacyscheme.Scheme, "ipallocator-repair-controller")
@@ -137,6 +144,7 @@ func newRepairIPAddress(interval time.Duration,
 		serviceCIDRSynced: serviceCIDRInformer.Informer().HasSynced,
 		ipAddressLister:   ipAddressInformer.Lister(),
 		ipAddressSynced:   ipAddressInformer.Informer().HasSynced,
+		namespaceSynced:   namespaceInformer.Informer().HasSynced,
 		svcQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{Name: "services"},
@@ -210,7 +218,10 @@ func (r *RepairIPAddress) RunUntil(onFirstSuccess func(), stopCh chan struct{}) 
 	klog.Info("Starting ipallocator-repair-controller")
 	defer klog.Info("Shutting down ipallocator-repair-controller")
 
-	if !cache.WaitForNamedCacheSync("ipallocator-repair-controller", stopCh, r.ipAddressSynced, r.servicesSynced, r.serviceCIDRSynced) {
+	// Wait for all informers including Namespace informer. The Namespace informer is required
+	// because admission plugins (especially webhooks) depend on it being synced before they
+	// can process requests. Without this, IPAddress creation may fail with "not yet ready".
+	if !cache.WaitForNamedCacheSync("ipallocator-repair-controller", stopCh, r.ipAddressSynced, r.servicesSynced, r.serviceCIDRSynced, r.namespaceSynced) {
 		return
 	}
 

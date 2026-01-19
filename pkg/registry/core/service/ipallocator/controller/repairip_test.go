@@ -67,6 +67,8 @@ func newFakeRepair(testTime time.Time) (*fake.Clientset, *fakeRepair) {
 	ipInformer := informerFactory.Networking().V1().IPAddresses()
 	ipIndexer := ipInformer.Informer().GetIndexer()
 
+	namespaceInformer := informerFactory.Core().V1().Namespaces()
+
 	fakeClient.PrependReactor("create", "ipaddresses", k8stesting.ReactionFunc(func(action k8stesting.Action) (bool, runtime.Object, error) {
 		ip := action.(k8stesting.CreateAction).GetObject().(*networkingv1.IPAddress)
 		err := ipIndexer.Add(ip)
@@ -87,6 +89,7 @@ func newFakeRepair(testTime time.Time) (*fake.Clientset, *fakeRepair) {
 		serviceInformer,
 		serviceCIDRInformer,
 		ipInformer,
+		namespaceInformer,
 		fakeClock,
 	)
 	return fakeClient, &fakeRepair{r, serviceIndexer, ipIndexer, serviceCIDRIndexer}
@@ -442,6 +445,7 @@ func TestRepairServiceIP(t *testing.T) {
 			r.servicesSynced = func() bool { return true }
 			r.ipAddressSynced = func() bool { return true }
 			r.serviceCIDRSynced = func() bool { return true }
+			r.namespaceSynced = func() bool { return true }
 			recorder := events.NewFakeRecorder(100)
 			r.recorder = recorder
 			for _, svc := range test.svcs {
@@ -726,6 +730,7 @@ func TestRunUntilRetryOnError(t *testing.T) {
 	r.servicesSynced = func() bool { return true }
 	r.ipAddressSynced = func() bool { return true }
 	r.serviceCIDRSynced = func() bool { return true }
+	r.namespaceSynced = func() bool { return true }
 
 	// Add a service that needs an IPAddress
 	svc := newServiceWithCreationTimestamp("test-svc", []string{"10.0.1.1"}, testTimeNow.Add(1*time.Second))
@@ -803,6 +808,7 @@ func TestRunUntilExitsOnContextCancellation(t *testing.T) {
 	r.servicesSynced = func() bool { return true }
 	r.ipAddressSynced = func() bool { return true }
 	r.serviceCIDRSynced = func() bool { return true }
+	r.namespaceSynced = func() bool { return true }
 
 	// Add a service that needs an IPAddress
 	svc := newServiceWithCreationTimestamp("test-svc", []string{"10.0.1.1"}, testTimeNow.Add(1*time.Second))
@@ -865,6 +871,7 @@ func TestRunUntilSucceedsOnFirstAttempt(t *testing.T) {
 	r.servicesSynced = func() bool { return true }
 	r.ipAddressSynced = func() bool { return true }
 	r.serviceCIDRSynced = func() bool { return true }
+	r.namespaceSynced = func() bool { return true }
 
 	// Add a service with its IPAddress already in cache (no repair needed)
 	svc := newServiceWithCreationTimestamp("test-svc", []string{"10.0.1.1"}, testTimeNow.Add(1*time.Second))
