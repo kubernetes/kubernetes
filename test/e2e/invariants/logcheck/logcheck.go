@@ -33,6 +33,27 @@ limitations under the License.
 // detection (https://github.com/kubernetes/kubernetes/pull/133834/files).
 // It's also necessary to specify which containers to check. Other output
 // (e.g. kubelet in a kind cluster) currently cannot be checked.
+//
+// In ginkgo.ReportBeforeSuite, the main Ginkgo worker process starts
+// monitoring log output:
+//
+//   - The podlogs package watches pods in namespaces of interest (by default,
+//     any that have "system" in their name). For each container in those pods,
+//     a logOutputChecker instance is created and is passed log output lines
+//     via Write. podlogs streams output, similar to "kubectl logs -f".
+//
+//   - Kubelet log output is retrieved periodically via the node log query
+//     feature. Start and end times of each chunk are chosen so that there
+//     are no gaps. The output is stripped of additional journald line
+//     headers and then passed to one logOutputChecker per node.
+//
+//   - logOutputChecker detects DATA RACE reports based on their prefix and suffix lines.
+//
+//   - Log entries emitted during monitoring are buffered.
+//
+// In ginkgo.ReportAfterSuite, the log output is emitted as stdout of the check
+// together with a summary of what was checked without detecting problems.
+// DATA RACEs and unexpected log errors are turned into a failure.
 package logcheck
 
 import (
