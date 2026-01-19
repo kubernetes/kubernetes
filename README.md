@@ -40,20 +40,40 @@ and documentation, who to contact about what, etc.
 
 If you want to build Kubernetes right away there are two options:
 
-##### You have a working [Go environment].
+### Prerequisites
 
-```
+Before building Kubernetes, ensure you have:
+- **Go 1.21+** installed and configured
+- **Git** for version control
+- **Make** build tool
+- At least **8GB RAM** and **20GB disk space**
+
+### Option 1: Build with Go environment
+
+If you have a working [Go environment]:
+
+```bash
 git clone https://github.com/kubernetes/kubernetes
 cd kubernetes
 make
 ```
 
-##### You have a working [Docker environment].
+### Option 2: Build with Docker environment
 
-```
+If you have a working [Docker environment]:
+
+```bash
 git clone https://github.com/kubernetes/kubernetes
 cd kubernetes
 make quick-release
+```
+
+### Verify your build
+
+After building, verify the installation:
+
+```bash
+./_output/bin/kubectl version --client
 ```
 
 For the full story, head over to the [developer's documentation].
