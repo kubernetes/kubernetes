@@ -121,7 +121,7 @@ func hostIPNamePort(hostWithPort string) (ip, name string, port int) {
 	if parsedPort, err = strconv.ParseUint(portPart, 10, 16); err == nil {
 		port = int(parsedPort) // nolint: gosec  // Bit size of 16 checked above.
 	}
-	return
+	return ip, name, port
 }
 
 // EndUserAttributesFromHTTPRequest generates attributes of the

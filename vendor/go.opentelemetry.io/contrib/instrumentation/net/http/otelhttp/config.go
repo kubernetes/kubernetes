@@ -8,9 +8,8 @@ import (
 	"net/http"
 	"net/http/httptrace"
 
-	"go.opentelemetry.io/otel/attribute"
-
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
@@ -27,7 +26,6 @@ type config struct {
 	Meter             metric.Meter
 	Propagators       propagation.TextMapPropagator
 	SpanStartOptions  []trace.SpanStartOption
-	PublicEndpoint    bool
 	PublicEndpointFn  func(*http.Request) bool
 	ReadEvent         bool
 	WriteEvent        bool
@@ -97,17 +95,19 @@ func WithMeterProvider(provider metric.MeterProvider) Option {
 // WithPublicEndpoint configures the Handler to link the span with an incoming
 // span context. If this option is not provided, then the association is a child
 // association instead of a link.
+//
+// Deprecated: Use [WithPublicEndpointFn] instead.
+// To migrate, replace WithPublicEndpoint() with:
+//
+//	WithPublicEndpointFn(func(*http.Request) bool { return true })
 func WithPublicEndpoint() Option {
-	return optionFunc(func(c *config) {
-		c.PublicEndpoint = true
-	})
+	return WithPublicEndpointFn(func(*http.Request) bool { return true })
 }
 
 // WithPublicEndpointFn runs with every request, and allows conditionally
 // configuring the Handler to link the span with an incoming span context. If
 // this option is not provided or returns false, then the association is a
 // child association instead of a link.
-// Note: WithPublicEndpoint takes precedence over WithPublicEndpointFn.
 func WithPublicEndpointFn(fn func(*http.Request) bool) Option {
 	return optionFunc(func(c *config) {
 		c.PublicEndpointFn = fn
@@ -144,11 +144,13 @@ func WithFilter(f Filter) Option {
 	})
 }
 
-type event int
+// Event represents message event types for [WithMessageEvents].
+type Event int
 
 // Different types of events that can be recorded, see WithMessageEvents.
 const (
-	ReadEvents event = iota
+	unspecifiedEvents Event = iota
+	ReadEvents
 	WriteEvents
 )
 
@@ -161,7 +163,7 @@ const (
 //     using the ReadBytesKey
 //   - WriteEvents: Record the number of bytes written after every http.ResponeWriter.Write
 //     using the WriteBytesKey
-func WithMessageEvents(events ...event) Option {
+func WithMessageEvents(events ...Event) Option {
 	return optionFunc(func(c *config) {
 		for _, e := range events {
 			switch e {

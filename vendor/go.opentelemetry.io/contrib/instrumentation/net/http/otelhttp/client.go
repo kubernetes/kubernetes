@@ -14,11 +14,17 @@ import (
 // DefaultClient is the default Client and is used by Get, Head, Post and PostForm.
 // Please be careful of initialization order - for example, if you change
 // the global propagator, the DefaultClient might still be using the old one.
+//
+// Deprecated: [DefaultClient] will be removed in a future release.
+// Create your own [http.Client] based on the [Transport] example: https://pkg.go.dev/go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp#example-NewTransport
 var DefaultClient = &http.Client{Transport: NewTransport(http.DefaultTransport)}
 
 // Get is a convenient replacement for http.Get that adds a span around the request.
+//
+// Deprecated: [Get] will be removed in a future release.
+// Create your own [http.Client] based on the [Transport] example: https://pkg.go.dev/go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp#example-NewTransport
 func Get(ctx context.Context, targetURL string) (resp *http.Response, err error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, targetURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, targetURL, http.NoBody)
 	if err != nil {
 		return nil, err
 	}
@@ -26,8 +32,11 @@ func Get(ctx context.Context, targetURL string) (resp *http.Response, err error)
 }
 
 // Head is a convenient replacement for http.Head that adds a span around the request.
+//
+// Deprecated: [Head] will be removed in a future release.
+// Create your own [http.Client] based on the [Transport] example: https://pkg.go.dev/go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp#example-NewTransport
 func Head(ctx context.Context, targetURL string) (resp *http.Response, err error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodHead, targetURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodHead, targetURL, http.NoBody)
 	if err != nil {
 		return nil, err
 	}
@@ -35,6 +44,9 @@ func Head(ctx context.Context, targetURL string) (resp *http.Response, err error
 }
 
 // Post is a convenient replacement for http.Post that adds a span around the request.
+//
+// Deprecated: [Post] will be removed in a future release.
+// Create your own [http.Client] based on the [Transport] example: https://pkg.go.dev/go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp#example-NewTransport
 func Post(ctx context.Context, targetURL, contentType string, body io.Reader) (resp *http.Response, err error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, targetURL, body)
 	if err != nil {
@@ -45,6 +57,9 @@ func Post(ctx context.Context, targetURL, contentType string, body io.Reader) (r
 }
 
 // PostForm is a convenient replacement for http.PostForm that adds a span around the request.
+//
+// Deprecated: [PostForm] will be removed in a future release.
+// Create your own [http.Client] based on the [Transport] example: https://pkg.go.dev/go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp#example-NewTransport
 func PostForm(ctx context.Context, targetURL string, data url.Values) (resp *http.Response, err error) {
 	return Post(ctx, targetURL, "application/x-www-form-urlencoded", strings.NewReader(data.Encode()))
 }
