@@ -29,25 +29,27 @@ import (
 
 // ClientStream implements streaming functionality for a gRPC client.
 type ClientStream struct {
-	*Stream // Embed for common stream functionality.
+	Stream // Embed for common stream functionality.
 
 	ct       *http2Client
 	done     chan struct{} // closed at the end of stream to unblock writers.
 	doneFunc func()        // invoked at the end of stream.
 
-	headerChan       chan struct{} // closed to indicate the end of header metadata.
-	headerChanClosed uint32        // set when headerChan is closed. Used to avoid closing headerChan multiple times.
+	headerChan chan struct{} // closed to indicate the end of header metadata.
+	header     metadata.MD   // the received header metadata
+
+	status *status.Status // the status error received from the server
+
+	// Non-pointer fields are at the end to optimize GC allocations.
+
 	// headerValid indicates whether a valid header was received.  Only
 	// meaningful after headerChan is closed (always call waitOnHeader() before
 	// reading its value).
-	headerValid bool
-	header      metadata.MD // the received header metadata
-	noHeaders   bool        // set if the client never received headers (set only after the stream is done).
-
-	bytesReceived atomic.Bool // indicates whether any bytes have been received on this stream
-	unprocessed   atomic.Bool // set if the server sends a refused stream or GOAWAY including this stream
-
-	status *status.Status // the status error received from the server
+	headerValid      bool
+	noHeaders        bool        // set if the client never received headers (set only after the stream is done).
+	headerChanClosed uint32      // set when headerChan is closed. Used to avoid closing headerChan multiple times.
+	bytesReceived    atomic.Bool // indicates whether any bytes have been received on this stream
+	unprocessed      atomic.Bool // set if the server sends a refused stream or GOAWAY including this stream
 }
 
 // Read reads an n byte message from the input stream.
@@ -141,4 +143,12 @@ func (s *ClientStream) TrailersOnly() bool {
 // that is, after Done() is closed.
 func (s *ClientStream) Status() *status.Status {
 	return s.status
+}
+
+func (s *ClientStream) requestRead(n int) {
+	s.ct.adjustWindow(s, uint32(n))
+}
+
+func (s *ClientStream) updateWindow(n int) {
+	s.ct.updateWindow(s, uint32(n))
 }

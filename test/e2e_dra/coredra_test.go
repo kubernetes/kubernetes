@@ -56,13 +56,13 @@ func coreDRA(tCtx ktesting.TContext, b *drautils.Builder) upgradedTestFunc {
 			// to the restarted apiserver. Sometimes, attempts fail with "EOF" as error
 			// or (even weirder) with
 			//     getting *v1.Pod: pods "tester-2" is forbidden: User "kubernetes-admin" cannot get resource "pods" in API group "" in the namespace "dra-9021"
-			ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) error {
+			tCtx.Eventually(func(tCtx ktesting.TContext) error {
 				return tCtx.Client().ResourceV1beta1().ResourceClaims(namespace).Delete(tCtx, claim.Name, metav1.DeleteOptions{})
 			}).Should(gomega.Succeed(), "delete claim after downgrade")
-			ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) error {
+			tCtx.Eventually(func(tCtx ktesting.TContext) error {
 				return tCtx.Client().CoreV1().Pods(namespace).Delete(tCtx, pod.Name, metav1.DeleteOptions{})
 			}).Should(gomega.Succeed(), "delete pod after downgrade")
-			ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) *v1.Pod {
+			tCtx.Eventually(func(tCtx ktesting.TContext) *v1.Pod {
 				pod, err := tCtx.Client().CoreV1().Pods(namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
 				if apierrors.IsNotFound(err) {
 					return nil

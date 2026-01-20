@@ -360,10 +360,10 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 				return fmt.Errorf("checkpoint ResourceClaim cache: %w", err)
 			}
 
-			// If this claim is already prepared, there is no need to prepare it again.
+			// If this claim is already prepared, continue preparing for any remaining claims.
 			if claimInfo.isPrepared() {
 				logger.V(5).Info("Resources already prepared", "pod", klog.KObj(pod), "podClaim", podClaim.Name, "claim", klog.KObj(resourceClaim))
-				return nil
+				continue
 			}
 
 			// This saved claim will be used to update ClaimInfo cache

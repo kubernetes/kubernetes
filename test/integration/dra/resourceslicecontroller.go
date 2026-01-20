@@ -87,7 +87,7 @@ func TestCreateResourceSlices(tCtx ktesting.TContext, numSlices int) {
 	tCtx.ExpectNoError(err, "start controller")
 	tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
 		controller.Stop()
-		ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) *resourceapi.ResourceSliceList {
+		tCtx.Eventually(func(tCtx ktesting.TContext) *resourceapi.ResourceSliceList {
 			err := tCtx.Client().ResourceV1().ResourceSlices().DeleteCollection(tCtx, metav1.DeleteOptions{}, metav1.ListOptions{
 				FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + driverName,
 			})
@@ -97,7 +97,7 @@ func TestCreateResourceSlices(tCtx ktesting.TContext, numSlices int) {
 	})
 
 	// Eventually we should have all desired slices.
-	ktesting.Eventually(tCtx, listSlices).WithTimeout(3 * time.Minute).Should(gomega.HaveField("Items", gomega.HaveLen(numSlices)))
+	tCtx.Eventually(listSlices).WithTimeout(3 * time.Minute).Should(gomega.HaveField("Items", gomega.HaveLen(numSlices)))
 
 	// Verify state.
 	expectSlices := listSlices(tCtx)
@@ -110,7 +110,7 @@ func TestCreateResourceSlices(tCtx ktesting.TContext, numSlices int) {
 
 	// No further changes expected now, after checking again.
 	getStats := func(tCtx ktesting.TContext) resourceslice.Stats { return controller.GetStats() }
-	ktesting.Consistently(tCtx, getStats).WithTimeout(2 * mutationCacheTTL).Should(gomega.Equal(expectStats))
+	tCtx.Consistently(getStats).WithTimeout(2 * mutationCacheTTL).Should(gomega.Equal(expectStats))
 
 	// Ask the controller to delete all slices except for one empty slice.
 	tCtx.Log("Deleting slices")
@@ -120,7 +120,7 @@ func TestCreateResourceSlices(tCtx ktesting.TContext, numSlices int) {
 
 	// One empty slice should remain, after removing the full ones and adding the empty one.
 	emptySlice := gomega.HaveField("Spec.Devices", gomega.BeEmpty())
-	ktesting.Eventually(tCtx, listSlices).WithTimeout(2 * time.Minute).Should(gomega.HaveField("Items", gomega.HaveExactElements(emptySlice)))
+	tCtx.Eventually(listSlices).WithTimeout(2 * time.Minute).Should(gomega.HaveField("Items", gomega.HaveExactElements(emptySlice)))
 	expectStats = resourceslice.Stats{NumCreates: int64(numSlices) + 1, NumDeletes: int64(numSlices)}
 
 	// There is a window of time where the ResourceSlice exists and is
@@ -128,7 +128,7 @@ func TestCreateResourceSlices(tCtx ktesting.TContext, numSlices int) {
 	// in the controller's stats, consisting mostly of network latency
 	// between this test process and the API server. Wait for the stats
 	// to converge before asserting there are no further changes.
-	ktesting.Eventually(tCtx, getStats).WithTimeout(30 * time.Second).Should(gomega.Equal(expectStats))
+	tCtx.Eventually(getStats).WithTimeout(30 * time.Second).Should(gomega.Equal(expectStats))
 
-	ktesting.Consistently(tCtx, getStats).WithTimeout(2 * mutationCacheTTL).Should(gomega.Equal(expectStats))
+	tCtx.Consistently(getStats).WithTimeout(2 * mutationCacheTTL).Should(gomega.Equal(expectStats))
 }

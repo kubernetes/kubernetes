@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"slices"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -286,6 +287,23 @@ type Validator interface {
 
 	// Docs returns documentation for each known tag.
 	Docs() []TagDoc
+
+	// Stability returns the stability level for a given tag.
+	Stability(tag string) (StabilityLevel, error)
+}
+
+// Stability returns the stability level for a given tag.
+func (reg *registry) Stability(tag string) (StabilityLevel, error) {
+	tagName := strings.TrimPrefix(tag, "+")
+	tv, ok := reg.tagValidators[tagName]
+	if !ok {
+		return "", fmt.Errorf("tag %q doesn't have stability level", tag)
+	}
+
+	if tv.Docs().StabilityLevel == "" {
+		return "", fmt.Errorf("tag %q doesn't have stability level", tag)
+	}
+	return tv.Docs().StabilityLevel, nil
 }
 
 // InitGlobalValidator must be called exactly once by the main application to

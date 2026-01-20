@@ -1013,9 +1013,6 @@ func (sched *Scheduler) extendersBinding(logger klog.Logger, pod *v1.Pod, node s
 }
 
 func (sched *Scheduler) finishBinding(logger klog.Logger, fwk framework.Framework, assumed *v1.Pod, targetNode string, status *fwk.Status) {
-	if finErr := sched.Cache.FinishBinding(logger, assumed); finErr != nil {
-		utilruntime.HandleErrorWithLogger(logger, finErr, "Scheduler cache FinishBinding failed")
-	}
 	if !status.IsSuccess() {
 		logger.V(1).Info("Failed to bind pod", "pod", klog.KObj(assumed))
 		return

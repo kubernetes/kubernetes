@@ -26,7 +26,7 @@ import (
 
 	"google.golang.org/grpc/balancer"
 	"google.golang.org/grpc/balancer/endpointsharding"
-	"google.golang.org/grpc/balancer/pickfirst/pickfirstleaf"
+	"google.golang.org/grpc/balancer/pickfirst"
 	"google.golang.org/grpc/grpclog"
 	internalgrpclog "google.golang.org/grpc/internal/grpclog"
 )
@@ -47,7 +47,7 @@ func (bb builder) Name() string {
 }
 
 func (bb builder) Build(cc balancer.ClientConn, opts balancer.BuildOptions) balancer.Balancer {
-	childBuilder := balancer.Get(pickfirstleaf.Name).Build
+	childBuilder := balancer.Get(pickfirst.Name).Build
 	bal := &rrBalancer{
 		cc:       cc,
 		Balancer: endpointsharding.NewBalancer(cc, opts, childBuilder, endpointsharding.Options{}),
@@ -67,6 +67,6 @@ func (b *rrBalancer) UpdateClientConnState(ccs balancer.ClientConnState) error {
 	return b.Balancer.UpdateClientConnState(balancer.ClientConnState{
 		// Enable the health listener in pickfirst children for client side health
 		// checks and outlier detection, if configured.
-		ResolverState: pickfirstleaf.EnableHealthListener(ccs.ResolverState),
+		ResolverState: pickfirst.EnableHealthListener(ccs.ResolverState),
 	})
 }

@@ -21,10 +21,8 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/component-base/featuregate"
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -38,14 +36,12 @@ type PluginNameMapper interface {
 // PluginManager keeps track of migrated state of in-tree plugins
 type PluginManager struct {
 	PluginNameMapper
-	featureGate featuregate.FeatureGate
 }
 
 // NewPluginManager returns a new PluginManager instance
-func NewPluginManager(m PluginNameMapper, featureGate featuregate.FeatureGate) PluginManager {
+func NewPluginManager(m PluginNameMapper) PluginManager {
 	return PluginManager{
 		PluginNameMapper: m,
-		featureGate:      featureGate,
 	}
 }
 
@@ -74,7 +70,7 @@ func (pm PluginManager) IsMigrationCompleteForPlugin(pluginName string) bool {
 	case csilibplugins.VSphereInTreePluginName:
 		return true
 	case csilibplugins.PortworxVolumePluginName:
-		return pm.featureGate.Enabled(features.InTreePluginPortworxUnregister)
+		return true
 	default:
 		return false
 	}
@@ -100,7 +96,7 @@ func (pm PluginManager) IsMigrationEnabledForPlugin(pluginName string) bool {
 	case csilibplugins.VSphereInTreePluginName:
 		return true
 	case csilibplugins.PortworxVolumePluginName:
-		return pm.featureGate.Enabled(features.CSIMigrationPortworx)
+		return true
 	default:
 		return false
 	}
@@ -151,16 +147,4 @@ func TranslateInTreeSpecToCSI(logger klog.Logger, spec *volume.Spec, podNamespac
 		ReadOnly:                        spec.ReadOnly,
 		InlineVolumeSpecForCSIMigration: inlineVolume,
 	}, nil
-}
-
-// CheckMigrationFeatureFlags checks the configuration of feature flags related
-// to CSI Migration is valid. It will return whether the migration is complete
-// by looking up the pluginUnregister flag
-func CheckMigrationFeatureFlags(f featuregate.FeatureGate, pluginMigration,
-	pluginUnregister featuregate.Feature) (migrationComplete bool, err error) {
-	// This is for in-tree plugin that get migration finished
-	if f.Enabled(pluginMigration) && f.Enabled(pluginUnregister) {
-		return true, nil
-	}
-	return false, nil
 }

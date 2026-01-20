@@ -444,10 +444,8 @@ profiles:
 
 	// The scheduler should hit the binding timeout and surface that on the pod.
 	// We poll the pod's conditions until we see a message containing "binding timeout".
-	tCtx.Eventually(func(tCtx ktesting.TContext) *v1.Pod {
-		p, err := tCtx.Client().CoreV1().Pods(namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
-		tCtx.ExpectNoError(err, "get pod")
-		return p
+	tCtx.Eventually(func(tCtx ktesting.TContext) (*v1.Pod, error) {
+		return tCtx.Client().CoreV1().Pods(namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
 	}).WithTimeout(maxTO).WithPolling(300*time.Millisecond).Should(
 		gomega.HaveField("Status.Conditions",
 			gomega.ContainElement(
@@ -465,10 +463,8 @@ profiles:
 		"bindingTimeout should trigger roughly near %s (observed %v)", wantTO, elapsed,
 	)
 	// Verify that the pod remains unscheduled after the binding timeout.
-	tCtx.Eventually(func(tCtx ktesting.TContext) *v1.Pod {
-		pod, err := tCtx.Client().CoreV1().Pods(namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
-		tCtx.ExpectNoError(err, "get pod")
-		return pod
+	tCtx.Eventually(func(tCtx ktesting.TContext) (*v1.Pod, error) {
+		return tCtx.Client().CoreV1().Pods(namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
 	}).WithTimeout(wantTO).WithPolling(200 * time.Millisecond).Should(gomega.SatisfyAll(
 		gomega.HaveField("Spec.NodeName", gomega.BeEmpty()),
 
@@ -570,10 +566,8 @@ profiles:
 		gomega.Succeed(), "slice must be created before binding timeout")
 
 	// Wait until the binding timeout occurs.
-	tCtx.Eventually(func(tCtx ktesting.TContext) *v1.Pod {
-		p, err := tCtx.Client().CoreV1().Pods(namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
-		tCtx.ExpectNoError(err, "get pod")
-		return p
+	tCtx.Eventually(func(tCtx ktesting.TContext) (*v1.Pod, error) {
+		return tCtx.Client().CoreV1().Pods(namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
 	}).WithTimeout(20*time.Second).WithPolling(300*time.Millisecond).Should(
 		gomega.HaveField("Status.Conditions",
 			gomega.ContainElement(
@@ -586,10 +580,8 @@ profiles:
 	)
 
 	// Verify recovery to the newly added device without BindingConditions through rescheduling triggered by binding timeout.
-	tCtx.Eventually(func(tCtx ktesting.TContext) *resourceapi.ResourceClaim {
-		c, err := tCtx.Client().ResourceV1().ResourceClaims(namespace).Get(tCtx, claim1.Name, metav1.GetOptions{})
-		tCtx.ExpectNoError(err)
-		return c
+	tCtx.Eventually(func(tCtx ktesting.TContext) (*resourceapi.ResourceClaim, error) {
+		return tCtx.Client().ResourceV1().ResourceClaims(namespace).Get(tCtx, claim1.Name, metav1.GetOptions{})
 	}).WithTimeout(10*time.Second).WithPolling(1*time.Second).Should(gomega.HaveField(
 		"Status.Allocation",
 		gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{

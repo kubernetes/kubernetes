@@ -9513,7 +9513,7 @@
         },
         "portworxVolume": {
           "$ref": "#/definitions/io.k8s.api.core.v1.PortworxVolumeSource",
-          "description": "portworxVolume represents a portworx volume attached and mounted on kubelets host machine. Deprecated: PortworxVolume is deprecated. All operations for the in-tree portworxVolume type are redirected to the pxd.portworx.com CSI driver when the CSIMigrationPortworx feature-gate is on."
+          "description": "portworxVolume represents a portworx volume attached and mounted on kubelets host machine. Deprecated: PortworxVolume is deprecated. All operations for the in-tree portworxVolume type are redirected to the pxd.portworx.com CSI driver."
         },
         "quobyte": {
           "$ref": "#/definitions/io.k8s.api.core.v1.QuobyteVolumeSource",
@@ -12375,7 +12375,7 @@
         },
         "portworxVolume": {
           "$ref": "#/definitions/io.k8s.api.core.v1.PortworxVolumeSource",
-          "description": "portworxVolume represents a portworx volume attached and mounted on kubelets host machine. Deprecated: PortworxVolume is deprecated. All operations for the in-tree portworxVolume type are redirected to the pxd.portworx.com CSI driver when the CSIMigrationPortworx feature-gate is on."
+          "description": "portworxVolume represents a portworx volume attached and mounted on kubelets host machine. Deprecated: PortworxVolume is deprecated. All operations for the in-tree portworxVolume type are redirected to the pxd.portworx.com CSI driver."
         },
         "projected": {
           "$ref": "#/definitions/io.k8s.api.core.v1.ProjectedVolumeSource",

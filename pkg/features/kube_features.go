@@ -110,12 +110,6 @@ const (
 	// Allow the usage of options to fine-tune the cpumanager policies.
 	CPUManagerPolicyOptions featuregate.Feature = "CPUManagerPolicyOptions"
 
-	// owner: @trierra
-	// kep:  http://kep.k8s.io/2589
-	//
-	// Enables the Portworx in-tree driver to Portworx migration feature.
-	CSIMigrationPortworx featuregate.Feature = "CSIMigrationPortworx"
-
 	// owner: @aramase
 	// kep:  http://kep.k8s.io/5538
 	//
@@ -426,11 +420,6 @@ const (
 	// Allow memory resize for containers in Guaranteed pods (default false) when Memory Manager Policy is set to Static.
 	// Applies only in nodes with InPlacePodVerticalScaling and Memory Manager features enabled.
 	InPlacePodVerticalScalingExclusiveMemory featuregate.Feature = "InPlacePodVerticalScalingExclusiveMemory"
-
-	// owner: @trierra
-	//
-	// Disables the Portworx in-tree driver.
-	InTreePluginPortworxUnregister featuregate.Feature = "InTreePluginPortworxUnregister"
 
 	// owner: @mimowo
 	// kep: https://kep.k8s.io/3850
@@ -1165,13 +1154,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.36
 	},
 
-	CSIMigrationPortworx: {
-		{Version: version.MustParse("1.23"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.25"), Default: false, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},                    // On by default (requires Portworx CSI driver)
-		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.36
-	},
-
 	CSIServiceAccountTokenSecrets: {
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
 	},
@@ -1388,10 +1370,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	InPlacePodVerticalScalingExclusiveMemory: {
 		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Alpha},
-	},
-
-	InTreePluginPortworxUnregister: {
-		{Version: version.MustParse("1.23"), Default: false, PreRelease: featuregate.Alpha}, // remove it along with CSIMigrationPortworx in 1.36
 	},
 
 	JobBackoffLimitPerIndex: {
@@ -2166,8 +2144,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	CPUManagerPolicyOptions: {},
 
-	CSIMigrationPortworx: {},
-
 	CSIServiceAccountTokenSecrets: {},
 
 	CSIVolumeHealth: {},
@@ -2261,8 +2237,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	InPlacePodVerticalScalingExclusiveCPUs: {InPlacePodVerticalScaling},
 
 	InPlacePodVerticalScalingExclusiveMemory: {InPlacePodVerticalScaling, MemoryManager},
-
-	InTreePluginPortworxUnregister: {},
 
 	JobBackoffLimitPerIndex: {},
 

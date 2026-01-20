@@ -165,8 +165,8 @@ func createPod(tCtx ktesting.TContext, namespace string, suffix string, pod *v1.
 func waitForPodScheduled(tCtx ktesting.TContext, namespace, podName string) {
 	tCtx.Helper()
 
-	tCtx.Eventually(func(tCtx ktesting.TContext) *v1.Pod {
-		return must(tCtx, tCtx.Client().CoreV1().Pods(namespace).Get, podName, metav1.GetOptions{})
+	tCtx.Eventually(func(tCtx ktesting.TContext) (*v1.Pod, error) {
+		return tCtx.Client().CoreV1().Pods(namespace).Get(tCtx, podName, metav1.GetOptions{})
 	}).WithTimeout(60*time.Second).Should(
 		gomega.HaveField("Status.Conditions", gomega.ContainElement(
 			gomega.And(
@@ -207,11 +207,10 @@ func waitForNotFound[T any](tCtx ktesting.TContext, get func(context.Context, st
 func waitForClaim(tCtx ktesting.TContext, namespace, claimName string, timeout time.Duration, match gtypes.GomegaMatcher, description ...any) *resourceapi.ResourceClaim {
 	tCtx.Helper()
 	var latestClaim *resourceapi.ResourceClaim
-	tCtx.Eventually(func(tCtx ktesting.TContext) *resourceapi.ResourceClaim {
+	tCtx.Eventually(func(tCtx ktesting.TContext) (*resourceapi.ResourceClaim, error) {
 		c, err := tCtx.Client().ResourceV1().ResourceClaims(namespace).Get(tCtx, claimName, metav1.GetOptions{})
-		tCtx.ExpectNoError(err, "get claim")
 		latestClaim = c
-		return latestClaim
+		return c, err
 	}).WithTimeout(timeout).WithPolling(time.Second).Should(match, description...)
 	return latestClaim
 }

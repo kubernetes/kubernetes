@@ -612,6 +612,9 @@ message JSONSchema {
     // parameter. Use this to avoid having auto generated path parameter names
     // for overlapping paths.
     string path_param_name = 47;
+    // Declares this field to be deprecated. Allows for the generated OpenAPI
+    // parameter to be marked as deprecated without affecting the proto field.
+    bool deprecated = 49;
   }
   // Custom properties that start with "x-" such as "x-foo" used to describe
   // extra functionality that is not covered by the standard OpenAPI Specification.

@@ -618,10 +618,8 @@ func testPrioritizedList(tCtx ktesting.TContext, enabled bool) {
 			"Message": gomega.Equal("0/8 nodes are available: 8 cannot allocate all claims. still not schedulable, preemption: 0/8 nodes are available: 8 Preemption is not helpful for scheduling."),
 		}),
 	))
-	tCtx.Eventually(func(tCtx ktesting.TContext) *v1.Pod {
-		pod, err := tCtx.Client().CoreV1().Pods(namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
-		tCtx.ExpectNoError(err, "get pod")
-		return pod
+	tCtx.Eventually(func(tCtx ktesting.TContext) (*v1.Pod, error) {
+		return tCtx.Client().CoreV1().Pods(namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
 	}).WithTimeout(10 * time.Second).WithPolling(time.Second).Should(schedulingAttempted)
 }
 
@@ -689,10 +687,8 @@ func testPrioritizedListScoring(tCtx ktesting.TContext) {
 
 		_ = createPod(tCtx, namespace, "-pl-single-claim", podWithClaimName, claim)
 		expectedSelectedRequest := fmt.Sprintf("%s/%s", claim.Spec.Devices.Requests[0].Name, claim.Spec.Devices.Requests[0].FirstAvailable[0].Name)
-		tCtx.Eventually(func(tCtx ktesting.TContext) *resourceapi.ResourceClaim {
-			c, err := tCtx.Client().ResourceV1().ResourceClaims(namespace).Get(tCtx, claim.Name, metav1.GetOptions{})
-			tCtx.ExpectNoError(err)
-			return c
+		tCtx.Eventually(func(tCtx ktesting.TContext) (*resourceapi.ResourceClaim, error) {
+			return tCtx.Client().ResourceV1().ResourceClaims(namespace).Get(tCtx, claim.Name, metav1.GetOptions{})
 		}).WithTimeout(10 * time.Second).WithPolling(time.Second).Should(expectedAllocatedClaim(expectedSelectedRequest, nodeInfos[0]))
 	})
 
@@ -751,18 +747,14 @@ func testPrioritizedListScoring(tCtx ktesting.TContext) {
 
 		// The second subrequest in claim1 is for nodeInfos[2], so it should be chosen.
 		expectedSelectedRequest := fmt.Sprintf("%s/%s", claim1.Spec.Devices.Requests[0].Name, claim1.Spec.Devices.Requests[0].FirstAvailable[1].Name)
-		tCtx.Eventually(func(tCtx ktesting.TContext) *resourceapi.ResourceClaim {
-			c, err := tCtx.Client().ResourceV1().ResourceClaims(namespace).Get(tCtx, claimPrioritizedList1.Name, metav1.GetOptions{})
-			tCtx.ExpectNoError(err)
-			return c
+		tCtx.Eventually(func(tCtx ktesting.TContext) (*resourceapi.ResourceClaim, error) {
+			return tCtx.Client().ResourceV1().ResourceClaims(namespace).Get(tCtx, claimPrioritizedList1.Name, metav1.GetOptions{})
 		}).WithTimeout(10 * time.Second).WithPolling(time.Second).Should(expectedAllocatedClaim(expectedSelectedRequest, nodeInfos[2]))
 
 		// The first subrequest in claim2 is for nodeInfos[2], so it should be chosen.
 		expectedSelectedRequest = fmt.Sprintf("%s/%s", claim2.Spec.Devices.Requests[0].Name, claim2.Spec.Devices.Requests[0].FirstAvailable[0].Name)
-		tCtx.Eventually(func(tCtx ktesting.TContext) *resourceapi.ResourceClaim {
-			c, err := tCtx.Client().ResourceV1().ResourceClaims(namespace).Get(tCtx, claimPrioritizedList2.Name, metav1.GetOptions{})
-			tCtx.ExpectNoError(err)
-			return c
+		tCtx.Eventually(func(tCtx ktesting.TContext) (*resourceapi.ResourceClaim, error) {
+			return tCtx.Client().ResourceV1().ResourceClaims(namespace).Get(tCtx, claimPrioritizedList2.Name, metav1.GetOptions{})
 		}).WithTimeout(10 * time.Second).WithPolling(time.Second).Should(expectedAllocatedClaim(expectedSelectedRequest, nodeInfos[2]))
 	})
 }
@@ -833,10 +825,8 @@ func testExtendedResource(tCtx ktesting.TContext, enabled bool) {
 				}),
 			))
 		}
-		tCtx.Eventually(func(tCtx ktesting.TContext) *v1.Pod {
-			pod, err := tCtx.Client().CoreV1().Pods(namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
-			tCtx.ExpectNoError(err, "get pod")
-			return pod
+		tCtx.Eventually(func(tCtx ktesting.TContext) (*v1.Pod, error) {
+			return tCtx.Client().CoreV1().Pods(namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
 		}).WithTimeout(time.Minute).WithPolling(time.Second).Should(schedulingAttempted)
 	})
 }
@@ -1716,18 +1706,14 @@ func testInvalidResourceSlices(tCtx ktesting.TContext) {
 			schedulingAttempted := gomega.HaveField("Status.Conditions", gomega.ContainElement(
 				gstruct.MatchFields(gstruct.IgnoreExtras, tc.expectedPodScheduledCondition),
 			))
-			tCtx.Eventually(func(tCtx ktesting.TContext) *v1.Pod {
-				pod, err := tCtx.Client().CoreV1().Pods(namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
-				tCtx.ExpectNoError(err, "get pod")
-				return pod
+			tCtx.Eventually(func(tCtx ktesting.TContext) (*v1.Pod, error) {
+				return tCtx.Client().CoreV1().Pods(namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
 			}).WithTimeout(10 * time.Second).WithPolling(time.Second).Should(schedulingAttempted)
 
 			// Only check the ResourceClaim if we expected the Pod to schedule.
 			if tc.expectPodToSchedule {
-				tCtx.Eventually(func(tCtx ktesting.TContext) *resourceapi.ResourceClaim {
-					c, err := tCtx.Client().ResourceV1().ResourceClaims(namespace).Get(tCtx, claim.Name, metav1.GetOptions{})
-					tCtx.ExpectNoError(err)
-					return c
+				tCtx.Eventually(func(tCtx ktesting.TContext) (*resourceapi.ResourceClaim, error) {
+					return tCtx.Client().ResourceV1().ResourceClaims(namespace).Get(tCtx, claim.Name, metav1.GetOptions{})
 				}).WithTimeout(10 * time.Second).WithPolling(time.Second).Should(gomega.HaveField("Status.Allocation", gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
 					"Devices": gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
 						"Results": gomega.HaveExactElements(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{

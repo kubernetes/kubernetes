@@ -773,7 +773,7 @@ func TestPrepareCandidate(t *testing.T) {
 					informerFactory.WaitForCacheSync(ctx.Done())
 					fakePreemptionScorePostFilterPlugin := &FakePreemptionScorePostFilterPlugin{}
 					if asyncAPICallsEnabled {
-						cache := internalcache.New(ctx, 100*time.Millisecond, apiDispatcher)
+						cache := internalcache.New(ctx, apiDispatcher)
 						fwk.SetAPICacher(apicache.New(nil, cache))
 					}
 
@@ -1126,7 +1126,7 @@ func TestCallExtenders(t *testing.T) {
 			}
 			informerFactory.Start(ctx.Done())
 			informerFactory.WaitForCacheSync(ctx.Done())
-			cache := internalcache.New(ctx, 100*time.Millisecond, apiDispatcher)
+			cache := internalcache.New(ctx, apiDispatcher)
 			fwk.SetAPICacher(apicache.New(nil, cache))
 
 			fakePreemptionScorePostFilterPlugin := &FakePreemptionScorePostFilterPlugin{}
@@ -1361,7 +1361,7 @@ func TestPrepareCandidateAsyncSetsPreemptingSets(t *testing.T) {
 				informerFactory.Start(ctx.Done())
 				fakePreemptionScorePostFilterPlugin := &FakePreemptionScorePostFilterPlugin{}
 				if asyncAPICallsEnabled {
-					cache := internalcache.New(ctx, 100*time.Millisecond, apiDispatcher)
+					cache := internalcache.New(ctx, apiDispatcher)
 					fwk.SetAPICacher(apicache.New(nil, cache))
 				}
 
