@@ -320,14 +320,14 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 			}
 
 			kubelet.updateRuntimeUp(tCtx)
-			assert.NoError(t, kubelet.updateNodeStatus(tCtx))
+			require.NoError(t, kubelet.updateNodeStatus(tCtx))
 			actions := kubeClient.Actions()
 			require.Len(t, actions, 2)
 			require.True(t, actions[1].Matches("patch", "nodes"))
 			require.Equal(t, "status", actions[1].GetSubresource())
 
 			updatedNode, err := applyNodeStatusPatch(&existingNode, actions[1].(core.PatchActionImpl).GetPatch())
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			for i, cond := range updatedNode.Status.Conditions {
 				assert.False(t, cond.LastHeartbeatTime.IsZero(), "LastHeartbeatTime for %v condition is zero", cond.Type)
 				assert.False(t, cond.LastTransitionTime.IsZero(), "LastTransitionTime for %v condition is zero", cond.Type)
@@ -510,7 +510,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 	}
 
 	kubelet.updateRuntimeUp(tCtx)
-	assert.NoError(t, kubelet.updateNodeStatus(tCtx))
+	require.NoError(t, kubelet.updateNodeStatus(tCtx))
 
 	actions := kubeClient.Actions()
 	assert.Len(t, actions, 2)
@@ -548,7 +548,7 @@ func TestUpdateExistingNodeStatusTimeout(t *testing.T) {
 
 	// set up a listener that hangs connections
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer ln.Close()
 	go func() {
 		// accept connections and just let them hang
@@ -568,7 +568,7 @@ func TestUpdateExistingNodeStatusTimeout(t *testing.T) {
 		QPS:     -1,
 		Timeout: time.Second,
 	}
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
@@ -592,7 +592,7 @@ func TestUpdateExistingNodeStatusTimeout(t *testing.T) {
 	}
 
 	// should return an error, but not hang
-	assert.Error(t, kubelet.updateNodeStatus(tCtx))
+	require.Error(t, kubelet.updateNodeStatus(tCtx))
 
 	// should have attempted multiple times
 	if actualAttempts := atomic.LoadInt64(&attempts); actualAttempts < nodeStatusUpdateRetry {
@@ -1146,7 +1146,7 @@ func TestUpdateNodeStatusAndVolumesInUseWithNodeLease(t *testing.T) {
 			kubelet.nodeLister = delegatingNodeLister{client: kubeClient}
 
 			// Execute
-			assert.NoError(t, kubelet.updateNodeStatus(tCtx))
+			require.NoError(t, kubelet.updateNodeStatus(tCtx))
 
 			// Validate
 			actions := kubeClient.Actions()
@@ -1651,7 +1651,7 @@ func TestUpdateNewNodeStatusTooLargeReservation(t *testing.T) {
 	require.Equal(t, "status", actions[0].GetSubresource())
 
 	updatedNode, err := applyNodeStatusPatch(&existingNode, actions[0].(core.PatchActionImpl).GetPatch())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, apiequality.Semantic.DeepEqual(expectedNode.Status.Allocatable, updatedNode.Status.Allocatable), "%s", cmp.Diff(expectedNode.Status.Allocatable, updatedNode.Status.Allocatable))
 }
 
@@ -2735,7 +2735,7 @@ func TestValidateNodeIPParam(t *testing.T) {
 	for _, test := range tests {
 		err := validateNodeIP(netutils.ParseIPSloppy(test.nodeIP))
 		if test.success {
-			assert.NoErrorf(t, err, "test %s", test.testName)
+			require.NoErrorf(t, err, "test %s", test.testName)
 		} else {
 			assert.Errorf(t, err, "test %s", test.testName)
 		}
@@ -3076,14 +3076,14 @@ func TestUpdateNodeAddresses(t *testing.T) {
 			}
 
 			_, err := kubeClient.CoreV1().Nodes().Update(tCtx, oldNode, metav1.UpdateOptions{})
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			kubelet.setNodeStatusFuncs = []func(context.Context, *v1.Node) error{
 				func(_ context.Context, node *v1.Node) error {
 					node.Status.Addresses = expectedNode.Status.Addresses
 					return nil
 				},
 			}
-			assert.NoError(t, kubelet.updateNodeStatus(tCtx))
+			require.NoError(t, kubelet.updateNodeStatus(tCtx))
 
 			actions := kubeClient.Actions()
 			lastAction := actions[len(actions)-1]
