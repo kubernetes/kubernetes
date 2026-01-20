@@ -143,6 +143,32 @@ A pod is **inactive** if: fully terminated OR (terminal phase AND not actively t
 
 **Used by**: `allocationManager.AddPod()`, admission handlers, resource calculations.
 
+## Testing
+
+### Running Unit Tests
+
+```bash
+# Run all kubelet unit tests
+make test WHAT=./pkg/kubelet/...
+
+# Run tests for a specific subpackage
+make test WHAT=./pkg/kubelet/lifecycle GOFLAGS=-v
+
+# Run with coverage
+make test WHAT=./pkg/kubelet/... KUBE_COVER=y
+
+# Run directly with go test (faster iteration)
+go test -v ./pkg/kubelet/nodeinfocache/...
+```
+
+### Key Variables
+
+| Variable | Purpose |
+|----------|---------|
+| `WHAT` | Package path to test |
+| `GOFLAGS` | Extra flags (e.g., `-v` for verbose) |
+| `KUBE_COVER` | Set to `y` for coverage |
+
 ## Design Notes
 
 - The kubelet watches for pods from multiple sources (API server, file, HTTP)

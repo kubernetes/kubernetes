@@ -59,6 +59,29 @@ nodeInfo.SetNode(freshNode) // Safe - it's a deep copy, SetNode() available on c
 - **HandlePodAdditions/Updates/Removes**: Call cache update methods
 - **kubelet_nodecache.go**: Calls `SetNode()` when cached node updates
 
+## Testing
+
+```bash
+# Run unit tests
+make test WHAT=./pkg/kubelet/nodeinfocache GOFLAGS=-v
+
+# Or directly with go test
+go test -v ./pkg/kubelet/nodeinfocache/...
+
+# Run with race detector
+go test -race ./pkg/kubelet/nodeinfocache/...
+```
+
+### Test Coverage
+
+| Test | What It Verifies |
+|------|------------------|
+| `TestCacheAddRemovePod` | Add/remove pods, resource tracking |
+| `TestCacheSnapshotIsolation` | Snapshot is deep copy, not affected by mutations |
+| `TestCacheConcurrentAccess` | Thread safety with concurrent readers/writers |
+| `TestCacheSetNode` | Node metadata storage and retrieval |
+| `TestCacheUpdatePod` | Update replaces old pod resources |
+
 ## Design Notes
 
 - NodeInfo itself is NOT thread-safe, hence the wrapper
