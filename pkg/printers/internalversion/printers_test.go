@@ -5843,6 +5843,140 @@ func TestPrintStorageClass(t *testing.T) {
 	}
 }
 
+func TestPrintStorageClassListEffectiveDefault(t *testing.T) {
+	now := time.Now()
+	earlier := now.Add(-1 * time.Hour)
+
+	tests := []struct {
+		name     string
+		scList   storage.StorageClassList
+		expected []metav1.TableRow
+	}{
+		{
+			name: "single default",
+			scList: storage.StorageClassList{
+				Items: []storage.StorageClass{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "standard",
+							CreationTimestamp: metav1.Time{Time: now},
+							Annotations: map[string]string{
+								"storageclass.kubernetes.io/is-default-class": "true",
+							},
+						},
+						Provisioner: "kubernetes.io/gce-pd",
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "fast",
+							CreationTimestamp: metav1.Time{Time: earlier},
+						},
+						Provisioner: "kubernetes.io/gce-pd",
+					},
+				},
+			},
+			expected: []metav1.TableRow{
+				{Cells: []interface{}{"standard (default)", "kubernetes.io/gce-pd", "Delete", "Immediate", false, "0s"}},
+				{Cells: []interface{}{"fast", "kubernetes.io/gce-pd", "Delete", "Immediate", false, "60m"}},
+			},
+		},
+		{
+			name: "multiple defaults - newest wins",
+			scList: storage.StorageClassList{
+				Items: []storage.StorageClass{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "standard",
+							CreationTimestamp: metav1.Time{Time: earlier},
+							Annotations: map[string]string{
+								"storageclass.kubernetes.io/is-default-class": "true",
+							},
+						},
+						Provisioner: "kubernetes.io/gce-pd",
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "fast",
+							CreationTimestamp: metav1.Time{Time: now},
+							Annotations: map[string]string{
+								"storageclass.kubernetes.io/is-default-class": "true",
+							},
+						},
+						Provisioner: "kubernetes.io/gce-pd",
+					},
+				},
+			},
+			expected: []metav1.TableRow{
+				{Cells: []interface{}{"standard", "kubernetes.io/gce-pd", "Delete", "Immediate", false, "60m"}},
+				{Cells: []interface{}{"fast (default)", "kubernetes.io/gce-pd", "Delete", "Immediate", false, "0s"}},
+			},
+		},
+		{
+			name: "multiple defaults same timestamp - alphabetically first wins",
+			scList: storage.StorageClassList{
+				Items: []storage.StorageClass{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "zeta",
+							CreationTimestamp: metav1.Time{Time: now},
+							Annotations: map[string]string{
+								"storageclass.kubernetes.io/is-default-class": "true",
+							},
+						},
+						Provisioner: "kubernetes.io/gce-pd",
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "alpha",
+							CreationTimestamp: metav1.Time{Time: now},
+							Annotations: map[string]string{
+								"storageclass.kubernetes.io/is-default-class": "true",
+							},
+						},
+						Provisioner: "kubernetes.io/gce-pd",
+					},
+				},
+			},
+			expected: []metav1.TableRow{
+				{Cells: []interface{}{"zeta", "kubernetes.io/gce-pd", "Delete", "Immediate", false, "0s"}},
+				{Cells: []interface{}{"alpha (default)", "kubernetes.io/gce-pd", "Delete", "Immediate", false, "0s"}},
+			},
+		},
+		{
+			name: "no defaults",
+			scList: storage.StorageClassList{
+				Items: []storage.StorageClass{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "standard",
+							CreationTimestamp: metav1.Time{Time: now},
+						},
+						Provisioner: "kubernetes.io/gce-pd",
+					},
+				},
+			},
+			expected: []metav1.TableRow{
+				{Cells: []interface{}{"standard", "kubernetes.io/gce-pd", "Delete", "Immediate", false, "0s"}},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			rows, err := printStorageClassList(&test.scList, printers.GenerateOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			for i := range rows {
+				rows[i].Object.Object = nil
+			}
+			if !reflect.DeepEqual(test.expected, rows) {
+				t.Errorf("mismatch: %s", cmp.Diff(test.expected, rows))
+			}
+		})
+	}
+}
+
 func TestPrintVolumeAttributesClass(t *testing.T) {
 	tests := []struct {
 		vac      storage.VolumeAttributesClass
