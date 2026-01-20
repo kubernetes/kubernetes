@@ -1,5 +1,5 @@
 /*
-Copyright 2019 The Kubernetes Authors.
+Copyright 2026 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,22 +14,24 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package metric
 
 import (
 	"k8s.io/component-base/metrics"
 )
 
+// Metric type constants.
 const (
-	counterMetricType    = "Counter"
-	gaugeMetricType      = "Gauge"
-	histogramMetricType  = "Histogram"
-	summaryMetricType    = "Summary"
-	timingRatioHistogram = "TimingRatioHistogram"
-	customType           = "Custom"
+	TypeCounter              = "Counter"
+	TypeGauge                = "Gauge"
+	TypeHistogram            = "Histogram"
+	TypeSummary              = "Summary"
+	TypeTimingRatioHistogram = "TimingRatioHistogram"
+	TypeCustom               = "Custom"
 )
 
-type metric struct {
+// Metric represents a parsed Kubernetes metric definition.
+type Metric struct {
 	Name              string              `yaml:"name" json:"name"`
 	Subsystem         string              `yaml:"subsystem,omitempty" json:"subsystem,omitempty"`
 	Namespace         string              `yaml:"namespace,omitempty" json:"namespace,omitempty"`
@@ -46,21 +48,23 @@ type metric struct {
 	ConstLabels       map[string]string   `yaml:"constLabels,omitempty" json:"constLabels,omitempty"`
 }
 
-func (m metric) buildFQName() string {
+// BuildFQName returns the fully qualified metric name.
+func (m Metric) BuildFQName() string {
 	return metrics.BuildFQName(m.Namespace, m.Subsystem, m.Name)
 }
 
-type byFQName []metric
+// ByFQName implements sort.Interface for []Metric based on stability level and FQName.
+type ByFQName []Metric
 
-func (ms byFQName) Len() int { return len(ms) }
-func (ms byFQName) Less(i, j int) bool {
+func (ms ByFQName) Len() int { return len(ms) }
+func (ms ByFQName) Less(i, j int) bool {
 	if ms[i].StabilityLevel < ms[j].StabilityLevel {
 		return true
 	} else if ms[i].StabilityLevel > ms[j].StabilityLevel {
 		return false
 	}
-	return ms[i].buildFQName() < ms[j].buildFQName()
+	return ms[i].BuildFQName() < ms[j].BuildFQName()
 }
-func (ms byFQName) Swap(i, j int) {
+func (ms ByFQName) Swap(i, j int) {
 	ms[i], ms[j] = ms[j], ms[i]
 }

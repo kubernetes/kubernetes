@@ -24,6 +24,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"k8s.io/component-base/metrics"
+	"k8s.io/kubernetes/test/instrumentation/internal/metric"
 )
 
 const fakeFilename = "testdata/metric.go"
@@ -122,18 +123,18 @@ func TestStableMetric(t *testing.T) {
 	for _, test := range []struct {
 		testName string
 		src      string
-		metric   metric
+		metric   metric.Metric
 	}{
 		{
 			testName: "Counter",
-			metric: metric{
+			metric: metric.Metric{
 				Name:              "metric",
 				Namespace:         "namespace",
 				Subsystem:         "subsystem",
 				StabilityLevel:    "STABLE",
 				DeprecatedVersion: "1.16",
 				Help:              "help",
-				Type:              counterMetricType,
+				Type:              metric.TypeCounter,
 			},
 			src: `
 package test
@@ -151,7 +152,7 @@ var _ = metrics.NewCounter(
 `},
 		{
 			testName: "CounterVec",
-			metric: metric{
+			metric: metric.Metric{
 				Name:              "metric",
 				Namespace:         "namespace",
 				Subsystem:         "subsystem",
@@ -159,7 +160,7 @@ var _ = metrics.NewCounter(
 				StabilityLevel:    "STABLE",
 				DeprecatedVersion: "1.16",
 				Help:              "help",
-				Type:              counterMetricType,
+				Type:              metric.TypeCounter,
 			},
 			src: `
 package test
@@ -178,14 +179,14 @@ var _ = metrics.NewCounterVec(
 `},
 		{
 			testName: "Gauge",
-			metric: metric{
+			metric: metric.Metric{
 				Name:              "gauge",
 				Namespace:         "namespace",
 				Subsystem:         "subsystem",
 				StabilityLevel:    "STABLE",
 				DeprecatedVersion: "1.16",
 				Help:              "help",
-				Type:              gaugeMetricType,
+				Type:              metric.TypeGauge,
 			},
 			src: `
 package test
@@ -203,14 +204,14 @@ var _ = metrics.NewGauge(
 `},
 		{
 			testName: "GaugeVec",
-			metric: metric{
+			metric: metric.Metric{
 				Name:              "gauge",
 				Namespace:         "namespace",
 				Subsystem:         "subsystem",
 				StabilityLevel:    "STABLE",
 				DeprecatedVersion: "1.16",
 				Help:              "help",
-				Type:              gaugeMetricType,
+				Type:              metric.TypeGauge,
 				Labels:            []string{"label-1", "label-2"},
 			},
 			src: `
@@ -230,7 +231,7 @@ var _ = metrics.NewGaugeVec(
 `},
 		{
 			testName: "Histogram",
-			metric: metric{
+			metric: metric.Metric{
 				Name:              "histogram",
 				Namespace:         "namespace",
 				Subsystem:         "subsystem",
@@ -238,7 +239,7 @@ var _ = metrics.NewGaugeVec(
 				StabilityLevel:    "STABLE",
 				Buckets:           []float64{0.001, 0.01, 0.1, 1, 10, 100},
 				Help:              "help",
-				Type:              histogramMetricType,
+				Type:              metric.TypeHistogram,
 			},
 			src: `
 package test
@@ -257,7 +258,7 @@ var _ = metrics.NewHistogram(
 `},
 		{
 			testName: "HistogramVec",
-			metric: metric{
+			metric: metric.Metric{
 				Name:              "histogram",
 				Namespace:         "namespace",
 				Subsystem:         "subsystem",
@@ -265,7 +266,7 @@ var _ = metrics.NewHistogram(
 				StabilityLevel:    "STABLE",
 				Buckets:           []float64{0.001, 0.01, 0.1, 1, 10, 100},
 				Help:              "help",
-				Type:              histogramMetricType,
+				Type:              metric.TypeHistogram,
 				Labels:            []string{"label-1", "label-2"},
 			},
 			src: `
@@ -286,10 +287,10 @@ var _ = metrics.NewHistogramVec(
 `},
 		{
 			testName: "Custom import",
-			metric: metric{
+			metric: metric.Metric{
 				Name:           "metric",
 				StabilityLevel: "STABLE",
-				Type:           counterMetricType,
+				Type:           metric.TypeCounter,
 			},
 			src: `
 package test
@@ -303,12 +304,12 @@ var _ = custom.NewCounter(
 `},
 		{
 			testName: "Custom import NewDesc",
-			metric: metric{
+			metric: metric.Metric{
 				Name:           "apiserver_storage_size_bytes",
 				Help:           "Size of the storage database file physically allocated in bytes.",
 				Labels:         []string{"server"},
 				StabilityLevel: "STABLE",
-				Type:           customType,
+				Type:           metric.TypeCustom,
 				ConstLabels:    map[string]string{},
 			},
 			src: `
@@ -318,10 +319,10 @@ var _ = custom.NewDesc("apiserver_storage_size_bytes", "Size of the storage data
 `},
 		{
 			testName: "Const",
-			metric: metric{
+			metric: metric.Metric{
 				Name:           "metric",
 				StabilityLevel: "STABLE",
-				Type:           counterMetricType,
+				Type:           metric.TypeCounter,
 			},
 			src: `
 package test
@@ -336,10 +337,10 @@ var _ = metrics.NewCounter(
 `},
 		{
 			testName: "Variable",
-			metric: metric{
+			metric: metric.Metric{
 				Name:           "metric",
 				StabilityLevel: "STABLE",
-				Type:           counterMetricType,
+				Type:           metric.TypeCounter,
 			},
 			src: `
 package test
@@ -354,10 +355,10 @@ var _ = metrics.NewCounter(
 `},
 		{
 			testName: "Multiple consts in block",
-			metric: metric{
+			metric: metric.Metric{
 				Name:           "metric",
 				StabilityLevel: "STABLE",
-				Type:           counterMetricType,
+				Type:           metric.TypeCounter,
 			},
 			src: `
 package test
@@ -376,10 +377,10 @@ var _ = metrics.NewCounter(
 `},
 		{
 			testName: "Multiple variables in Block",
-			metric: metric{
+			metric: metric.Metric{
 				Name:           "metric",
 				StabilityLevel: "STABLE",
-				Type:           counterMetricType,
+				Type:           metric.TypeCounter,
 			},
 			src: `
 package test
@@ -397,11 +398,11 @@ var (
 `},
 		{
 			testName: "Histogram with linear buckets",
-			metric: metric{
+			metric: metric.Metric{
 				Name:           "histogram",
 				StabilityLevel: "STABLE",
 				Buckets:        metrics.LinearBuckets(1, 1, 3),
-				Type:           histogramMetricType,
+				Type:           metric.TypeHistogram,
 			},
 			src: `
 package test
@@ -416,11 +417,11 @@ var _ = metrics.NewHistogram(
 `},
 		{
 			testName: "Histogram with exponential buckets",
-			metric: metric{
+			metric: metric.Metric{
 				Name:           "histogram",
 				StabilityLevel: "STABLE",
 				Buckets:        metrics.ExponentialBuckets(1, 2, 3),
-				Type:           histogramMetricType,
+				Type:           metric.TypeHistogram,
 			},
 			src: `
 package test
@@ -435,11 +436,11 @@ var _ = metrics.NewHistogram(
 `},
 		{
 			testName: "Histogram with default buckets",
-			metric: metric{
+			metric: metric.Metric{
 				Name:           "histogram",
 				StabilityLevel: "STABLE",
 				Buckets:        metrics.DefBuckets,
-				Type:           histogramMetricType,
+				Type:           metric.TypeHistogram,
 			},
 			src: `
 package test
@@ -454,11 +455,11 @@ var _ = metrics.NewHistogram(
 `},
 		{
 			testName: "Imported k8s.io constant",
-			metric: metric{
+			metric: metric.Metric{
 				Name:           "importedCounter",
 				StabilityLevel: "STABLE",
 				Subsystem:      "kubelet",
-				Type:           counterMetricType,
+				Type:           metric.TypeCounter,
 			},
 			src: `
 package test

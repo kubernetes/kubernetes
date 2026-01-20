@@ -32,6 +32,8 @@ import (
 	"strings"
 
 	yaml "go.yaml.in/yaml/v2"
+
+	"k8s.io/kubernetes/test/instrumentation/internal/metric"
 )
 
 const (
@@ -67,7 +69,7 @@ func main() {
 		os.Exit(64)
 	}
 	stableMetricNames := map[string]struct{}{}
-	stableMetrics := []metric{}
+	stableMetrics := []metric.Metric{}
 	errors := []error{}
 
 	addStdin := false
@@ -78,7 +80,7 @@ func main() {
 		}
 		ms, es := searchPathForStableMetrics(arg)
 		for _, m := range ms {
-			fqName := m.buildFQName()
+			fqName := m.BuildFQName()
 			if _, ok := stableMetricNames[fqName]; !ok {
 				stableMetrics = append(stableMetrics, m)
 			}
@@ -112,7 +114,7 @@ func main() {
 		}
 		stableMetrics[i] = m
 	}
-	sort.Sort(byFQName(stableMetrics))
+	sort.Sort(metric.ByFQName(stableMetrics))
 	data, err := yaml.Marshal(stableMetrics)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%s\n", err)
@@ -122,8 +124,8 @@ func main() {
 	fmt.Print(string(data))
 }
 
-func searchPathForStableMetrics(path string) ([]metric, []error) {
-	metrics := []metric{}
+func searchPathForStableMetrics(path string) ([]metric.Metric, []error) {
+	metrics := []metric.Metric{}
 	errors := []error{}
 	err := filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
 		if strings.HasPrefix(path, "vendor") {
@@ -144,24 +146,24 @@ func searchPathForStableMetrics(path string) ([]metric, []error) {
 }
 
 // Pass either only filename of existing file or src including source code in any format and a filename that it comes from
-func searchFileForStableMetrics(filename string, src interface{}) ([]metric, []error) {
+func searchFileForStableMetrics(filename string, src interface{}) ([]metric.Metric, []error) {
 	fileset := token.NewFileSet()
 	tree, err := parser.ParseFile(fileset, filename, src, parser.AllErrors)
 	if err != nil {
-		return []metric{}, []error{err}
+		return []metric.Metric{}, []error{err}
 	}
 	metricsImportName, err := getLocalNameOfImportedPackage(tree, kubeMetricImportPath, kubeMetricsDefaultImportName)
 	if err != nil {
-		return []metric{}, addFileInformationToErrors([]error{err}, fileset)
+		return []metric.Metric{}, addFileInformationToErrors([]error{err}, fileset)
 	}
 	if metricsImportName == "" {
-		return []metric{}, []error{}
+		return []metric.Metric{}, []error{}
 	}
 	variables := globalVariableDeclarations(tree)
 
 	variables, err = importedGlobalVariableDeclaration(variables, tree.Imports)
 	if err != nil {
-		return []metric{}, addFileInformationToErrors([]error{err}, fileset)
+		return []metric.Metric{}, addFileInformationToErrors([]error{err}, fileset)
 	}
 
 	stableMetricsFunctionCalls, errors := findStableMetricDeclaration(tree, metricsImportName)

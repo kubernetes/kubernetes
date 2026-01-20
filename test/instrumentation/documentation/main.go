@@ -28,7 +28,8 @@ import (
 	flag "github.com/spf13/pflag"
 
 	yaml "go.yaml.in/yaml/v2"
-	"k8s.io/component-base/metrics"
+
+	"k8s.io/kubernetes/test/instrumentation/internal/metric"
 )
 
 var (
@@ -116,9 +117,9 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 )
 
 type templateData struct {
-	AlphaMetrics     []metric
-	BetaMetrics      []metric
-	StableMetrics    []metric
+	AlphaMetrics     []metric.Metric
+	BetaMetrics      []metric.Metric
+	StableMetrics    []metric.Metric
 	GeneratedDate    time.Time
 	GeneratedVersion string
 }
@@ -132,12 +133,12 @@ func main() {
 	println(major, minor)
 	dat, err := os.ReadFile("test/instrumentation/documentation/documentation-list.yaml")
 	if err == nil {
-		var parsedMetrics []metric
+		var parsedMetrics []metric.Metric
 		err = yaml.Unmarshal(dat, &parsedMetrics)
 		if err != nil {
 			println("err", err)
 		}
-		sort.Sort(byFQName(parsedMetrics))
+		sort.Sort(metric.ByFQName(parsedMetrics))
 		t := template.New("t").Funcs(funcMap)
 		t, err := t.Parse(templ)
 		if err != nil {
@@ -168,47 +169,11 @@ func main() {
 
 }
 
-type metric struct {
-	Name              string              `yaml:"name" json:"name"`
-	Subsystem         string              `yaml:"subsystem,omitempty" json:"subsystem,omitempty"`
-	Namespace         string              `yaml:"namespace,omitempty" json:"namespace,omitempty"`
-	Help              string              `yaml:"help,omitempty" json:"help,omitempty"`
-	Type              string              `yaml:"type,omitempty" json:"type,omitempty"`
-	DeprecatedVersion string              `yaml:"deprecatedVersion,omitempty" json:"deprecatedVersion,omitempty"`
-	StabilityLevel    string              `yaml:"stabilityLevel,omitempty" json:"stabilityLevel,omitempty"`
-	Labels            []string            `yaml:"labels,omitempty" json:"labels,omitempty"`
-	Buckets           []float64           `yaml:"buckets,omitempty" json:"buckets,omitempty"`
-	Objectives        map[float64]float64 `yaml:"objectives,omitempty" json:"objectives,omitempty"`
-	AgeBuckets        uint32              `yaml:"ageBuckets,omitempty" json:"ageBuckets,omitempty"`
-	BufCap            uint32              `yaml:"bufCap,omitempty" json:"bufCap,omitempty"`
-	MaxAge            int64               `yaml:"maxAge,omitempty" json:"maxAge,omitempty"`
-	ConstLabels       map[string]string   `yaml:"constLabels,omitempty" json:"constLabels,omitempty"`
-}
-
-func (m metric) BuildFQName() string {
-	return metrics.BuildFQName(m.Namespace, m.Subsystem, m.Name)
-}
-
-type byFQName []metric
-
-func (ms byFQName) Len() int { return len(ms) }
-func (ms byFQName) Less(i, j int) bool {
-	if ms[i].StabilityLevel < ms[j].StabilityLevel {
-		return true
-	} else if ms[i].StabilityLevel > ms[j].StabilityLevel {
-		return false
-	}
-	return ms[i].BuildFQName() < ms[j].BuildFQName()
-}
-func (ms byFQName) Swap(i, j int) {
-	ms[i], ms[j] = ms[j], ms[i]
-}
-
-func byStabilityLevel(ms []metric) map[string][]metric {
-	res := map[string][]metric{}
+func byStabilityLevel(ms []metric.Metric) map[string][]metric.Metric {
+	res := map[string][]metric.Metric{}
 	for _, m := range ms {
 		if _, ok := res[m.StabilityLevel]; !ok {
-			res[m.StabilityLevel] = []metric{}
+			res[m.StabilityLevel] = []metric.Metric{}
 		}
 		res[m.StabilityLevel] = append(res[m.StabilityLevel], m)
 	}
