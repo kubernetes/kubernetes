@@ -4703,7 +4703,7 @@ func TestPriorityQueue_MoveAllToActiveOrBackoffQueue_OnlyRegisteredPluginsExecut
 
 	if otherPluginCalled {
 		t.Errorf("Expected NodeResourcesFit QueueingHintFn not to be called for EventUnscheduledPodAdd")
-  }
+	}
 }
 
 func TestUnschedulablePodsMetric(t *testing.T) {
