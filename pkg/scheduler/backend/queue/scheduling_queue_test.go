@@ -1134,7 +1134,7 @@ func TestPriorityQueue_Update(t *testing.T) {
 	skipPlugin := "skipPlugin"
 	queueingHintMap := QueueingHintMapPerProfile{
 		"": {
-			framework.EventUnscheduledPodUpdate: {
+			framework.EventPodItselfUpdate: {
 				{
 					PluginName:     queuePlugin,
 					QueueingHintFn: queueHintReturnQueue,
@@ -1329,7 +1329,7 @@ func TestPriorityQueue_UpdateWhenInflight(t *testing.T) {
 
 	m := makeEmptyQueueingHintMapPerProfile()
 	// fakePlugin could change its scheduling result by any updates in Pods.
-	m[""][framework.EventUnscheduledPodUpdate] = []*QueueingHintFunction{
+	m[""][framework.EventPodItselfUpdate] = []*QueueingHintFunction{
 		{
 			PluginName:     "fakePlugin",
 			QueueingHintFn: queueHintReturnQueue,
@@ -3804,7 +3804,7 @@ scheduler_pending_pods{queue="unschedulable"} 0
 			resetPodInfos()
 
 			m := makeEmptyQueueingHintMapPerProfile()
-			m[""][framework.EventUnscheduledPodUpdate] = []*QueueingHintFunction{
+			m[""][framework.EventPodItselfUpdate] = []*QueueingHintFunction{
 				{
 					PluginName:     preenqueuePluginName,
 					QueueingHintFn: queueHintReturnQueue,
@@ -4656,6 +4656,54 @@ func TestPriorityQueue_GetPod(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPriorityQueue_MoveAllToActiveOrBackoffQueue_OnlyRegisteredPluginsExecuted(t *testing.T) {
+	c := testingclock.NewFakeClock(time.Now())
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	gangSchedulingCalled := false
+	otherPluginCalled := false
+
+	m := makeEmptyQueueingHintMapPerProfile()
+	m[""][framework.EventUnscheduledPodAdd] = []*QueueingHintFunction{
+		{
+			PluginName: names.GangScheduling,
+			QueueingHintFn: func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+				gangSchedulingCalled = true
+				return fwk.Queue, nil
+			},
+		},
+	}
+	m[""][framework.EventAssignedPodAdd] = []*QueueingHintFunction{
+		{
+			PluginName: names.NodeResourcesFit,
+			QueueingHintFn: func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+				otherPluginCalled = true
+				return fwk.Queue, nil
+			},
+		},
+	}
+
+	q := NewTestQueue(ctx, newDefaultQueueSort(), WithClock(c), WithQueueingHintMapPerProfile(m))
+
+	// Add a pod to unschedulable pods, and make sure it was previously rejected by both plugins.
+	pod := st.MakePod().Name("pod1").Obj()
+	pInfo := q.newQueuedPodInfo(pod, names.GangScheduling, names.NodeResourcesFit)
+	q.unschedulablePods.addOrUpdate(pInfo, false, framework.EventUnscheduledPodAdd.Label())
+
+	// Execution of MoveAllToActiveOrBackoffQueue after the event EventUnscheduledPodAdd was triggered.
+	q.MoveAllToActiveOrBackoffQueue(logger, framework.EventUnscheduledPodAdd, nil, nil, nil)
+
+	if !gangSchedulingCalled {
+		t.Errorf("Expected GangScheduling QueueingHintFn to be called for EventUnscheduledPodAdd")
+	}
+
+	if otherPluginCalled {
+		t.Errorf("Expected NodeResourcesFit QueueingHintFn not to be called for EventUnscheduledPodAdd")
+  }
 }
 
 func TestUnschedulablePodsMetric(t *testing.T) {

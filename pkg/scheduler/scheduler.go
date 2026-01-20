@@ -497,10 +497,18 @@ func buildQueueingHintMap(ctx context.Context, es []fwk.EnqueueExtensions) (inte
 				}
 			}
 
-			queueingHintMap[event.Event] = append(queueingHintMap[event.Event], &internalqueue.QueueingHintFunction{
+			queuingHintFn := &internalqueue.QueueingHintFunction{
 				PluginName:     e.Name(),
 				QueueingHintFn: fn,
-			})
+			}
+
+			if event.Event.Resource == fwk.Pod {
+				for _, podevent := range framework.UnrollPodEvent(event.Event) {
+					queueingHintMap[podevent] = append(queueingHintMap[podevent], queuingHintFn)
+				}
+			}
+
+			queueingHintMap[event.Event] = append(queueingHintMap[event.Event], queuingHintFn)
 		}
 		if registerNodeAdded && !registerNodeTaintUpdated {
 			// Temporally fix for the issue https://github.com/kubernetes/kubernetes/issues/109437

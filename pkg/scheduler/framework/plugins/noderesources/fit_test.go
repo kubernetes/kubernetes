@@ -1439,15 +1439,16 @@ func TestEventsToRegister(t *testing.T) {
 			name:                            "Register events with InPlacePodVerticalScaling feature enabled",
 			enableInPlacePodVerticalScaling: true,
 			expectedClusterEvents: []fwk.ClusterEventWithHint{
-				{Event: fwk.ClusterEvent{Resource: "Pod", ActionType: fwk.UpdatePodScaleDown | fwk.Delete}},
+				{Event: fwk.ClusterEvent{Resource: "AssignedPod", ActionType: fwk.UpdatePodScaleDown | fwk.Delete}},
 				{Event: fwk.ClusterEvent{Resource: "Node", ActionType: fwk.Add | fwk.UpdateNodeAllocatable | fwk.UpdateNodeTaint | fwk.UpdateNodeLabel}},
+				{Event: fwk.ClusterEvent{Resource: "PodItself", ActionType: fwk.UpdatePodScaleDown}},
 			},
 		},
 		{
 			name:                      "Register events with SchedulingQueueHint feature enabled",
 			enableSchedulingQueueHint: true,
 			expectedClusterEvents: []fwk.ClusterEventWithHint{
-				{Event: fwk.ClusterEvent{Resource: "Pod", ActionType: fwk.Delete}},
+				{Event: fwk.ClusterEvent{Resource: "AssignedPod", ActionType: fwk.Delete}},
 				{Event: fwk.ClusterEvent{Resource: "Node", ActionType: fwk.Add | fwk.UpdateNodeAllocatable}},
 			},
 		},
@@ -1455,7 +1456,7 @@ func TestEventsToRegister(t *testing.T) {
 			name:                            "Register events with InPlacePodVerticalScaling feature disabled",
 			enableInPlacePodVerticalScaling: false,
 			expectedClusterEvents: []fwk.ClusterEventWithHint{
-				{Event: fwk.ClusterEvent{Resource: "Pod", ActionType: fwk.Delete}},
+				{Event: fwk.ClusterEvent{Resource: "AssignedPod", ActionType: fwk.Delete}},
 				{Event: fwk.ClusterEvent{Resource: "Node", ActionType: fwk.Add | fwk.UpdateNodeAllocatable | fwk.UpdateNodeTaint | fwk.UpdateNodeLabel}},
 			},
 		},
@@ -1463,7 +1464,7 @@ func TestEventsToRegister(t *testing.T) {
 			name:                      "Register events with DRAExtendedResource feature enabled",
 			enableDRAExtendedResource: true,
 			expectedClusterEvents: []fwk.ClusterEventWithHint{
-				{Event: fwk.ClusterEvent{Resource: "Pod", ActionType: fwk.Delete}},
+				{Event: fwk.ClusterEvent{Resource: "AssignedPod", ActionType: fwk.Delete}},
 				{Event: fwk.ClusterEvent{Resource: "Node", ActionType: fwk.Add | fwk.UpdateNodeAllocatable | fwk.UpdateNodeTaint | fwk.UpdateNodeLabel}},
 				{Event: fwk.ClusterEvent{Resource: fwk.DeviceClass, ActionType: fwk.Add | fwk.Update}},
 			},
@@ -1472,7 +1473,7 @@ func TestEventsToRegister(t *testing.T) {
 			name:                      "Register events with DRAExtendedResource feature disabled",
 			enableDRAExtendedResource: false,
 			expectedClusterEvents: []fwk.ClusterEventWithHint{
-				{Event: fwk.ClusterEvent{Resource: "Pod", ActionType: fwk.Delete}},
+				{Event: fwk.ClusterEvent{Resource: "AssignedPod", ActionType: fwk.Delete}},
 				{Event: fwk.ClusterEvent{Resource: "Node", ActionType: fwk.Add | fwk.UpdateNodeAllocatable | fwk.UpdateNodeTaint | fwk.UpdateNodeLabel}},
 			},
 		},

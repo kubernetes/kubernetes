@@ -2016,7 +2016,7 @@ func TestCloudEvent_Match(t *testing.T) {
 		{
 			name:        "event with resource = 'Pod' matching with coming events carries unschedulablePod",
 			event:       fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.UpdateNodeLabel | fwk.UpdateNodeTaint},
-			comingEvent: fwk.ClusterEvent{Resource: unschedulablePod, ActionType: fwk.UpdateNodeLabel},
+			comingEvent: fwk.ClusterEvent{Resource: fwk.UnscheduledPod, ActionType: fwk.UpdateNodeLabel},
 			wantResult:  true,
 		},
 		{
