@@ -719,7 +719,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 				conf.ImagePullCredentialsVerificationPolicy = "invalid"
 				return conf
 			},
-			errMsg: `option "invalid" specified for imagePullCredentialsVerificationPolicy. Valid options are "NeverVerify", "NeverVerifyPreloadedImages", "NeverVerifyAllowlistedImages" or "AlwaysVerify"]`,
+			errMsg: `option "invalid" specified for imagePullCredentialsVerificationPolicy. Valid options are "NeverVerify", "NeverVerifyPreloadedImages", "NeverVerifyAllowlistedImages" or "AlwaysVerify"`,
 		}, {
 			name: "invalid PreloadedImagesVerificationAllowlist configuration - featuregate enabled",
 			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
@@ -728,7 +728,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 				conf.PreloadedImagesVerificationAllowlist = []string{"test.test/repo"}
 				return conf
 			},
-			errMsg: "can't set `preloadedImagesVerificationAllowlist` if `imagePullCredentialsVertificationPolicy` is not \"NeverVerifyAllowlistedImages\"]",
+			errMsg: "can't set `preloadedImagesVerificationAllowlist` if `imagePullCredentialsVertificationPolicy` is not \"NeverVerifyAllowlistedImages\"",
 		}, {
 			name: "invalid PreloadedImagesVerificationAllowlist configuration - featuregate disabled",
 			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
