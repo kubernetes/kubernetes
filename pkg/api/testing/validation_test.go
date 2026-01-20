@@ -64,6 +64,11 @@ func TestVersionedValidationByFuzzing(t *testing.T) {
 
 	for _, gv := range typesWithDeclarativeValidation {
 		for kind := range legacyscheme.Scheme.KnownTypes(gv) {
+			// Scale is a virtual subresource and does not have declarative
+			// validation implemented in any API group.
+			if kind == "Scale" {
+				continue
+			}
 			gvk := gv.WithKind(kind)
 			t.Run(gvk.String(), func(t *testing.T) {
 				for i := 0; i < fuzzIters; i++ {
