@@ -286,7 +286,7 @@ func (c *Cache) UpdatePod(logger klog.Logger, oldPod, newPod *v1.Pod) error {
 func (c *Cache) Snapshot() *framework.NodeInfo {
     c.mu.RLock()
     defer c.mu.RUnlock()
-    return c.nodeInfo.Snapshot()
+    return c.nodeInfo.SnapshotConcrete()
 }
 
 // PodCount returns the number of pods in the cache.
@@ -305,6 +305,7 @@ func (c *Cache) PodCount() int {
 package nodeinfocache
 
 import (
+    "fmt"
     "testing"
 
     v1 "k8s.io/api/core/v1"

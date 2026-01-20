@@ -60,6 +60,8 @@ nodeInfo.SetNode(node)
 
 This is the **performance bottleneck** addressed by issue #132858. The `OtherPods` comes from `PodAdmitAttributes` passed by `allocationManager.canAdmitPod()`.
 
+**Type Note**: This code uses `schedulerframework.NewNodeInfo()` which returns `*framework.NodeInfo` (concrete type), allowing `SetNode()` to be called. When using a cached NodeInfo, ensure the cache returns the concrete type via `SnapshotConcrete()`, not the `fwk.NodeInfo` interface. See `pkg/scheduler/framework/CLAUDE.md` for details.
+
 ### Admit() Flow
 
 1. **Get Node**: Calls `getNodeAnyWayFunc(ctx, true)` to get cached node

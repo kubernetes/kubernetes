@@ -13,8 +13,10 @@ Thread-safe cache for `framework.NodeInfo` with incremental updates. Created for
 - `AddPod(pod)`: Adds pod incrementally (O(1))
 - `RemovePod(logger, pod)`: Removes pod (O(n) - finds by UID)
 - `UpdatePod(logger, old, new)`: Updates pod (remove + add)
-- `Snapshot()`: Returns deep copy for concurrent use (O(n))
+- `Snapshot()`: Returns `*framework.NodeInfo` deep copy for concurrent use (O(n))
 - `PodCount()`: Returns number of cached pods
+
+**Important**: The cache's `Snapshot()` must use `nodeInfo.SnapshotConcrete()` internally (not `nodeInfo.Snapshot()`) to return the concrete `*framework.NodeInfo` type. This allows callers to call `SetNode()` on the returned snapshot. See `pkg/scheduler/framework/CLAUDE.md` for interface vs concrete type details.
 
 ## Thread Safety
 
@@ -45,9 +47,9 @@ for _, pod := range activePods {
     cache.AddPod(pod)
 }
 
-// Get snapshot for admission
+// Get snapshot for admission (returns *framework.NodeInfo)
 nodeInfo := cache.Snapshot()
-nodeInfo.SetNode(freshNode) // Safe - it's a copy
+nodeInfo.SetNode(freshNode) // Safe - it's a deep copy, SetNode() available on concrete type
 ```
 
 ## Integration Points

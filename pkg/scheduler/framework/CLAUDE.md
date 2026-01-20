@@ -33,6 +33,28 @@ Aggregates node and pod information for scheduling decisions. Contains:
 
 **Thread Safety**: NodeInfo is **NOT thread-safe**. Requires external synchronization (typically via `sync.RWMutex` in a cache wrapper).
 
+#### Interface vs Concrete Type
+
+**Critical distinction** for callers:
+
+| Type | Package | Has `SetNode()`? | Use Case |
+|------|---------|------------------|----------|
+| `fwk.NodeInfo` | `k8s.io/kube-scheduler/framework` | No (interface) | Read-only access |
+| `*framework.NodeInfo` | `k8s.io/kubernetes/pkg/scheduler/framework` | Yes (concrete) | When mutation needed |
+
+The `Snapshot()` method (line 286) returns `fwk.NodeInfo` (interface), but `SnapshotConcrete()` (line 291) returns `*NodeInfo` (concrete type).
+
+**Use `SnapshotConcrete()` when you need to call `SetNode()` afterward**:
+```go
+// WRONG: Snapshot() returns interface, SetNode() not available
+nodeInfo := cache.Snapshot()
+nodeInfo.SetNode(node)  // Compile error!
+
+// CORRECT: SnapshotConcrete() returns concrete type
+nodeInfo := cache.SnapshotConcrete()
+nodeInfo.SetNode(node)  // Works
+```
+
 #### Incremental Update Methods
 
 | Method | Line | Complexity | Description |
