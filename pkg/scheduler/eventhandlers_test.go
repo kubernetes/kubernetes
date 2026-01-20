@@ -1079,7 +1079,7 @@ func TestUpdatePod_WakeUpPodsOnExternalScheduling(t *testing.T) {
 					// disable backoff queue
 					internalqueue.WithPodInitialBackoffDuration(0),
 					internalqueue.WithPodMaxBackoffDuration(0))
-				schedulerCache := internalcache.New(ctx, 30*time.Second, nil)
+				schedulerCache := internalcache.New(ctx, nil)
 
 				// Put test pods into unschedulable queue
 				for _, pod := range unschedulablePods {
