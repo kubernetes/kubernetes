@@ -350,13 +350,18 @@ func (f *Fit) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, e
 	}
 
 	events := []fwk.ClusterEventWithHint{
-		{Event: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: podActionType}, QueueingHintFn: f.isSchedulableAfterPodEvent},
+		{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: podActionType}, QueueingHintFn: f.isSchedulableAfterPodEvent},
 		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: nodeActionType}, QueueingHintFn: f.isSchedulableAfterNodeChange},
 	}
 	if f.enableDRAExtendedResource {
 		events = append(events,
 			// A pod might be waiting for an exteneded resurce from a class to get created or modified.
 			fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.DeviceClass, ActionType: fwk.Add | fwk.Update}, QueueingHintFn: f.isSchedulableAfterDeviceClassEvent})
+	}
+	if f.enableInPlacePodVerticalScaling {
+		events = append(events,
+			// Plugin is also concerned with UpdatePodScaleDown event for PodItself.
+			fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.PodItself, ActionType: fwk.UpdatePodScaleDown}, QueueingHintFn: f.isSchedulableAfterPodEvent})
 	}
 	return events, nil
 }

@@ -116,7 +116,7 @@ func (pl *NodePorts) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWith
 
 	return []fwk.ClusterEventWithHint{
 		// Due to immutable fields `spec.containers[*].ports`, pod update events are ignored.
-		{Event: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.Delete}, QueueingHintFn: pl.isSchedulableAfterPodDeleted},
+		{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.Delete}, QueueingHintFn: pl.isSchedulableAfterPodDeleted},
 		// We don't need the QueueingHintFn here because the scheduling of Pods will be always retried with backoff when this Event happens.
 		// (the same as Queue)
 		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: nodeActionType}},

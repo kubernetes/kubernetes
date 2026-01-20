@@ -155,19 +155,8 @@ func (pl *PodTopologySpread) setListers(factory informers.SharedInformerFactory)
 // failed by this plugin schedulable.
 func (pl *PodTopologySpread) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
 	podActionType := fwk.Add | fwk.UpdatePodLabel | fwk.Delete
-	if pl.enableSchedulingQueueHint {
-		// When the QueueingHint feature is enabled, the scheduling queue uses Pod/Update Queueing Hint
-		// to determine whether a Pod's update makes the Pod schedulable or not.
-		// https://github.com/kubernetes/kubernetes/pull/122234
-		// (If not, the scheduling queue always retries the unschedulable Pods when they're updated.)
-		//
-		// The Pod rejected by this plugin can be schedulable when the Pod has a spread constraint with NodeTaintsPolicy:Honor
-		// and has got a new toleration.
-		// So, we add UpdatePodToleration here only when QHint is enabled.
-		podActionType = fwk.Add | fwk.UpdatePodLabel | fwk.UpdatePodToleration | fwk.Delete
-	}
 
-	return []fwk.ClusterEventWithHint{
+	events := []fwk.ClusterEventWithHint{
 		// All ActionType includes the following events:
 		// - Add. An unschedulable Pod may fail due to violating topology spread constraints,
 		// adding an assigned Pod may make it schedulable.
@@ -175,11 +164,22 @@ func (pl *PodTopologySpread) EventsToRegister(_ context.Context) ([]fwk.ClusterE
 		// an unschedulable Pod schedulable.
 		// - Delete. An unschedulable Pod may fail due to violating an existing Pod's topology spread constraints,
 		// deleting an existing Pod may make it schedulable.
-		{Event: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: podActionType}, QueueingHintFn: pl.isSchedulableAfterPodChange},
+		{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: podActionType}, QueueingHintFn: pl.isSchedulableAfterPodChange},
 		// Node add|delete|update maybe lead an topology key changed,
 		// and make these pod in scheduling schedulable or unschedulable.
 		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add | fwk.Delete | fwk.UpdateNodeLabel | fwk.UpdateNodeTaint}, QueueingHintFn: pl.isSchedulableAfterNodeChange},
-	}, nil
+	}
+
+	if pl.enableSchedulingQueueHint {
+		// Plugin is concerned with PodItself that has a spread constraint with NodeTaintsPolicy:Honor
+		// and has got a new toleration.
+		events = append(events, fwk.ClusterEventWithHint{
+			Event:          fwk.ClusterEvent{Resource: fwk.PodItself, ActionType: fwk.UpdatePodToleration},
+			QueueingHintFn: pl.isSchedulableAfterPodChange,
+		})
+	}
+
+	return events, nil
 }
 
 // involvedInTopologySpreading returns true if the incomingPod is involved in the topology spreading of podWithSpreading.

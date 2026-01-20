@@ -1079,3 +1079,91 @@ func TestDeletePod(t *testing.T) {
 		})
 	}
 }
+
+// TestAddPod_GangSchedulingEnabled verifies that when a new gang pod is added via addPod,
+// previously unschedulable gang pods are automatically requeued due to queueing hints.
+func TestAddPod_GangSchedulingEnabled(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GangScheduling, true)
+
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	// Create cluster event, queueing hint function, queue, and scheduler
+	eventUnscheduledPodAdd := fwk.ClusterEvent{Resource: fwk.UnscheduledPod, ActionType: fwk.Add}
+	gangSchedulingHint := func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+		_, eventPod, err := util.As[*v1.Pod](oldObj, newObj)
+
+		if err != nil || eventPod == nil {
+			return fwk.QueueSkip, nil
+		}
+		if pod.Spec.WorkloadRef == nil || eventPod.Spec.WorkloadRef == nil {
+			return fwk.QueueSkip, nil
+		}
+		if pod.Namespace != eventPod.Namespace {
+			return fwk.QueueSkip, nil
+		}
+		if *pod.Spec.WorkloadRef == *eventPod.Spec.WorkloadRef {
+			return fwk.Queue, nil
+		}
+		return fwk.QueueSkip, nil
+	}
+	queueingHintMap := internalqueue.QueueingHintMapPerProfile{
+		"": {
+			eventUnscheduledPodAdd: {
+				{
+					PluginName:     "GangScheduling",
+					QueueingHintFn: gangSchedulingHint,
+				},
+			},
+		},
+	}
+	queue := internalqueue.NewTestQueue(ctx, newDefaultQueueSort(),
+		internalqueue.WithQueueingHintMapPerProfile(queueingHintMap))
+	sched := &Scheduler{
+		Cache:           internalcache.New(ctx, 0, nil),
+		SchedulingQueue: queue,
+		logger:          logger,
+		Profiles: profile.Map{
+			"": nil,
+		},
+	}
+
+	// Create workload and pods
+	workloadRef := &v1.WorkloadReference{Name: "workload-1", PodGroup: "pg-1"}
+	pod1 := st.MakePod().Name("gang-pod-1").Namespace("default").WorkloadRef(workloadRef).Obj()
+	pod2 := st.MakePod().Name("gang-pod-2").Namespace("default").WorkloadRef(workloadRef).Obj()
+	pod3 := st.MakePod().Name("gang-pod-3").Namespace("default").WorkloadRef(workloadRef).Obj()
+
+	// Add first two pods and mark them as unschedulable
+	queue.Add(logger, pod1)
+	pod, _ := queue.Pop(logger)
+	pod.UnschedulablePlugins = sets.New("GangScheduling")
+	err := queue.AddUnschedulableIfNotPresent(logger, pod, queue.SchedulingCycle())
+	if err != nil {
+		t.Fatalf("Failed to add pod1 to unschedulable queue: %v", err)
+	}
+
+	queue.Add(logger, pod2)
+	pod, _ = queue.Pop(logger)
+	pod.UnschedulablePlugins = sets.New("GangScheduling")
+	err = queue.AddUnschedulableIfNotPresent(logger, pod, queue.SchedulingCycle())
+	if err != nil {
+		t.Fatalf("Failed to add pod2 to unschedulable queue: %v", err)
+	}
+
+	if len(queue.UnschedulablePods()) != 2 {
+		t.Errorf("Expected 2 unschedulable pods after adding pod1 and pod2, got %d", len(queue.UnschedulablePods()))
+	}
+
+	// Add third pod, and verify requeuing of first two pods into active or backoff queue
+	sched.addPod(pod3)
+	podsInActiveOrBackoff := append(queue.PodsInActiveQ(), queue.PodsInBackoffQ()...)
+	if len(podsInActiveOrBackoff) != 3 {
+		t.Errorf("Expected 3 pods in active or backoff queue after adding pod3, got %d", len(podsInActiveOrBackoff))
+	}
+	if len(queue.UnschedulablePods()) != 0 {
+		t.Errorf("Expected 0 unschedulable pods after adding pod3, got %d", len(queue.UnschedulablePods()))
+	}
+}
