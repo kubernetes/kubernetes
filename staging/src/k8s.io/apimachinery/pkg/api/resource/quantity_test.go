@@ -557,9 +557,9 @@ func TestQuantityParse(t *testing.T) {
 // and that they can be represented as int64.
 func TestQuantityParseInt(t *testing.T) {
 	table := []struct {
-		input       string
-		expect      Quantity
-		expectError bool
+		input             string
+		expect            Quantity
+		expectToGoDecPath bool
 	}{
 		{"0", intQuantity(0, 0, DecimalSI), false},
 		{"2048", intQuantity(2048, 0, DecimalSI), false},
@@ -590,7 +590,7 @@ func TestQuantityParseInt(t *testing.T) {
 
 		j, ok := got.AsInt64()
 
-		if item.expectError {
+		if item.expectToGoDecPath {
 			if ok {
 				t.Errorf("%v: expected not to be able to convert to int64, got %d", item.input, j)
 			}
@@ -606,12 +606,7 @@ func TestQuantityParseInt(t *testing.T) {
 
 		i, ok := item.expect.AsInt64()
 		if !ok {
-			continue
-		}
-		if !ok {
-			if got.d.Dec == nil && got.i.scale >= 0 {
-				t.Errorf("%v: is an int64Amount, but can't return AsInt64: %v", item.input, got)
-			}
+			t.Errorf("%v: expected to be able to convert expected value to int64, got %d", item.input, i)
 			continue
 		}
 		if i != j {
