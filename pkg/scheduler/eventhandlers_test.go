@@ -1122,7 +1122,7 @@ func TestAddPod_GangSchedulingEnabled(t *testing.T) {
 	queue := internalqueue.NewTestQueue(ctx, newDefaultQueueSort(),
 		internalqueue.WithQueueingHintMapPerProfile(queueingHintMap))
 	sched := &Scheduler{
-		Cache:           internalcache.New(ctx, 0, nil),
+		Cache:           internalcache.New(ctx, nil),
 		SchedulingQueue: queue,
 		logger:          logger,
 		Profiles: profile.Map{
