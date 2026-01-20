@@ -258,7 +258,7 @@ func TestUpdateAssignedPodInCache(t *testing.T) {
 				SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
 				logger:          logger,
 			}
-			sched.addAssignedPodToCache(tt.oldPod)
+			sched.addAssignedPodToCache(tt.oldPod, nil)
 			sched.updateAssignedPodInCache(tt.oldPod, tt.newPod)
 
 			if tt.oldPod.UID != tt.newPod.UID {
