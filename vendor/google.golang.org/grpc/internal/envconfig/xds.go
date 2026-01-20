@@ -68,4 +68,15 @@ var (
 	// trust.  For more details, see:
 	// https://github.com/grpc/proposal/blob/master/A87-mtls-spiffe-support.md
 	XDSSPIFFEEnabled = boolFromEnv("GRPC_EXPERIMENTAL_XDS_MTLS_SPIFFE", false)
+
+	// XDSHTTPConnectEnabled is true if gRPC should parse custom Metadata
+	// configuring use of an HTTP CONNECT proxy via xDS from cluster resources.
+	// For more details, see:
+	// https://github.com/grpc/proposal/blob/master/A86-xds-http-connect.md
+	XDSHTTPConnectEnabled = boolFromEnv("GRPC_EXPERIMENTAL_XDS_HTTP_CONNECT", false)
+
+	// XDSBootstrapCallCredsEnabled controls if call credentials can be used in
+	// xDS bootstrap configuration via the `call_creds` field. For more details,
+	// see: https://github.com/grpc/proposal/blob/master/A97-xds-jwt-call-creds.md
+	XDSBootstrapCallCredsEnabled = boolFromEnv("GRPC_EXPERIMENTAL_XDS_BOOTSTRAP_CALL_CREDS", false)
 )

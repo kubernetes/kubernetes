@@ -44,8 +44,7 @@ type PerRPCCredentials interface {
 	// A54). uri is the URI of the entry point for the request.  When supported
 	// by the underlying implementation, ctx can be used for timeout and
 	// cancellation. Additionally, RequestInfo data will be available via ctx
-	// to this call.  TODO(zhaoq): Define the set of the qualified keys instead
-	// of leaving it as an arbitrary string.
+	// to this call.
 	GetRequestMetadata(ctx context.Context, uri ...string) (map[string]string, error)
 	// RequireTransportSecurity indicates whether the credentials requires
 	// transport security.

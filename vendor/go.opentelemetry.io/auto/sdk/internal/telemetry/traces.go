@@ -71,7 +71,7 @@ func (td *Traces) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// A collection of ScopeSpans from a Resource.
+// ResourceSpans is a collection of ScopeSpans from a Resource.
 type ResourceSpans struct {
 	// The resource for the spans in this message.
 	// If this field is not set then no resource info is known.
@@ -128,7 +128,7 @@ func (rs *ResourceSpans) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// A collection of Spans produced by an InstrumentationScope.
+// ScopeSpans is a collection of Spans produced by an InstrumentationScope.
 type ScopeSpans struct {
 	// The instrumentation scope information for the spans in this message.
 	// Semantically when InstrumentationScope isn't set, it is equivalent with

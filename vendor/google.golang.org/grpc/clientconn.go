@@ -35,16 +35,19 @@ import (
 	"google.golang.org/grpc/balancer/pickfirst"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/connectivity"
+	"google.golang.org/grpc/credentials"
+	expstats "google.golang.org/grpc/experimental/stats"
 	"google.golang.org/grpc/internal"
 	"google.golang.org/grpc/internal/channelz"
 	"google.golang.org/grpc/internal/grpcsync"
 	"google.golang.org/grpc/internal/idle"
 	iresolver "google.golang.org/grpc/internal/resolver"
-	"google.golang.org/grpc/internal/stats"
+	istats "google.golang.org/grpc/internal/stats"
 	"google.golang.org/grpc/internal/transport"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/resolver"
 	"google.golang.org/grpc/serviceconfig"
+	"google.golang.org/grpc/stats"
 	"google.golang.org/grpc/status"
 
 	_ "google.golang.org/grpc/balancer/roundrobin"           // To register roundrobin.
@@ -95,6 +98,41 @@ var (
 	// security information (e.g., OAuth2 token) which requires secure
 	// connection on an insecure connection.
 	errTransportCredentialsMissing = errors.New("grpc: the credentials require transport level security (use grpc.WithTransportCredentials() to set)")
+)
+
+var (
+	disconnectionsMetric = expstats.RegisterInt64Count(expstats.MetricDescriptor{
+		Name:           "grpc.subchannel.disconnections",
+		Description:    "EXPERIMENTAL. Number of times the selected subchannel becomes disconnected.",
+		Unit:           "{disconnection}",
+		Labels:         []string{"grpc.target"},
+		OptionalLabels: []string{"grpc.lb.backend_service", "grpc.lb.locality", "grpc.disconnect_error"},
+		Default:        false,
+	})
+	connectionAttemptsSucceededMetric = expstats.RegisterInt64Count(expstats.MetricDescriptor{
+		Name:           "grpc.subchannel.connection_attempts_succeeded",
+		Description:    "EXPERIMENTAL. Number of successful connection attempts.",
+		Unit:           "{attempt}",
+		Labels:         []string{"grpc.target"},
+		OptionalLabels: []string{"grpc.lb.backend_service", "grpc.lb.locality"},
+		Default:        false,
+	})
+	connectionAttemptsFailedMetric = expstats.RegisterInt64Count(expstats.MetricDescriptor{
+		Name:           "grpc.subchannel.connection_attempts_failed",
+		Description:    "EXPERIMENTAL. Number of failed connection attempts.",
+		Unit:           "{attempt}",
+		Labels:         []string{"grpc.target"},
+		OptionalLabels: []string{"grpc.lb.backend_service", "grpc.lb.locality"},
+		Default:        false,
+	})
+	openConnectionsMetric = expstats.RegisterInt64UpDownCount(expstats.MetricDescriptor{
+		Name:           "grpc.subchannel.open_connections",
+		Description:    "EXPERIMENTAL. Number of open connections.",
+		Unit:           "{attempt}",
+		Labels:         []string{"grpc.target"},
+		OptionalLabels: []string{"grpc.lb.backend_service", "grpc.security_level", "grpc.lb.locality"},
+		Default:        false,
+	})
 )
 
 const (
@@ -210,7 +248,8 @@ func NewClient(target string, opts ...DialOption) (conn *ClientConn, err error) 
 	cc.csMgr = newConnectivityStateManager(cc.ctx, cc.channelz)
 	cc.pickerWrapper = newPickerWrapper()
 
-	cc.metricsRecorderList = stats.NewMetricsRecorderList(cc.dopts.copts.StatsHandlers)
+	cc.metricsRecorderList = istats.NewMetricsRecorderList(cc.dopts.copts.StatsHandlers)
+	cc.statsHandler = istats.NewCombinedHandler(cc.dopts.copts.StatsHandlers...)
 
 	cc.initIdleStateLocked() // Safe to call without the lock, since nothing else has a reference to cc.
 	cc.idlenessMgr = idle.NewManager((*idler)(cc), cc.dopts.idleTimeout)
@@ -260,9 +299,10 @@ func DialContext(ctx context.Context, target string, opts ...DialOption) (conn *
 	}()
 
 	// This creates the name resolver, load balancer, etc.
-	if err := cc.idlenessMgr.ExitIdleMode(); err != nil {
-		return nil, err
+	if err := cc.exitIdleMode(); err != nil {
+		return nil, fmt.Errorf("failed to exit idle mode: %w", err)
 	}
+	cc.idlenessMgr.UnsafeSetNotIdle()
 
 	// Return now for non-blocking dials.
 	if !cc.dopts.block {
@@ -330,7 +370,7 @@ func (cc *ClientConn) addTraceEvent(msg string) {
 			Severity: channelz.CtInfo,
 		}
 	}
-	channelz.AddTraceEvent(logger, cc.channelz, 0, ted)
+	channelz.AddTraceEvent(logger, cc.channelz, 1, ted)
 }
 
 type idler ClientConn
@@ -339,14 +379,17 @@ func (i *idler) EnterIdleMode() {
 	(*ClientConn)(i).enterIdleMode()
 }
 
-func (i *idler) ExitIdleMode() error {
-	return (*ClientConn)(i).exitIdleMode()
+func (i *idler) ExitIdleMode() {
+	// Ignore the error returned from this method, because from the perspective
+	// of the caller (idleness manager), the channel would have always moved out
+	// of IDLE by the time this method returns.
+	(*ClientConn)(i).exitIdleMode()
 }
 
 // exitIdleMode moves the channel out of idle mode by recreating the name
 // resolver and load balancer.  This should never be called directly; use
 // cc.idlenessMgr.ExitIdleMode instead.
-func (cc *ClientConn) exitIdleMode() (err error) {
+func (cc *ClientConn) exitIdleMode() error {
 	cc.mu.Lock()
 	if cc.conns == nil {
 		cc.mu.Unlock()
@@ -354,11 +397,23 @@ func (cc *ClientConn) exitIdleMode() (err error) {
 	}
 	cc.mu.Unlock()
 
+	// Set state to CONNECTING before building the name resolver
+	// so the channel does not remain in IDLE.
+	cc.csMgr.updateState(connectivity.Connecting)
+
 	// This needs to be called without cc.mu because this builds a new resolver
 	// which might update state or report error inline, which would then need to
 	// acquire cc.mu.
 	if err := cc.resolverWrapper.start(); err != nil {
-		return err
+		// If resolver creation fails, treat it like an error reported by the
+		// resolver before any valid updates. Set channel's state to
+		// TransientFailure, and set an erroring picker with the resolver build
+		// error, which will returned as part of any subsequent RPCs.
+		logger.Warningf("Failed to start resolver: %v", err)
+		cc.csMgr.updateState(connectivity.TransientFailure)
+		cc.mu.Lock()
+		cc.updateResolverStateAndUnlock(resolver.State{}, err)
+		return fmt.Errorf("failed to start resolver: %w", err)
 	}
 
 	cc.addTraceEvent("exiting idle mode")
@@ -456,7 +511,7 @@ func (cc *ClientConn) validateTransportCredentials() error {
 func (cc *ClientConn) channelzRegistration(target string) {
 	parentChannel, _ := cc.dopts.channelzParent.(*channelz.Channel)
 	cc.channelz = channelz.RegisterChannel(parentChannel, target)
-	cc.addTraceEvent("created")
+	cc.addTraceEvent(fmt.Sprintf("created for target %q", target))
 }
 
 // chainUnaryClientInterceptors chains all unary client interceptors into one.
@@ -621,7 +676,8 @@ type ClientConn struct {
 	channelz            *channelz.Channel // Channelz object.
 	resolverBuilder     resolver.Builder  // See initParsedTargetAndResolverBuilder().
 	idlenessMgr         *idle.Manager
-	metricsRecorderList *stats.MetricsRecorderList
+	metricsRecorderList *istats.MetricsRecorderList
+	statsHandler        stats.Handler
 
 	// The following provide their own synchronization, and therefore don't
 	// require cc.mu to be held to access them.
@@ -678,10 +734,8 @@ func (cc *ClientConn) GetState() connectivity.State {
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later
 // release.
 func (cc *ClientConn) Connect() {
-	if err := cc.idlenessMgr.ExitIdleMode(); err != nil {
-		cc.addTraceEvent(err.Error())
-		return
-	}
+	cc.idlenessMgr.ExitIdleMode()
+
 	// If the ClientConn was not in idle mode, we need to call ExitIdle on the
 	// LB policy so that connections can be created.
 	cc.mu.Lock()
@@ -732,8 +786,8 @@ func init() {
 	internal.EnterIdleModeForTesting = func(cc *ClientConn) {
 		cc.idlenessMgr.EnterIdleModeForTesting()
 	}
-	internal.ExitIdleModeForTesting = func(cc *ClientConn) error {
-		return cc.idlenessMgr.ExitIdleMode()
+	internal.ExitIdleModeForTesting = func(cc *ClientConn) {
+		cc.idlenessMgr.ExitIdleMode()
 	}
 }
 
@@ -858,6 +912,7 @@ func (cc *ClientConn) newAddrConnLocked(addrs []resolver.Address, opts balancer.
 		channelz:     channelz.RegisterSubChannel(cc.channelz, ""),
 		resetBackoff: make(chan struct{}),
 	}
+	ac.updateTelemetryLabelsLocked()
 	ac.ctx, ac.cancel = context.WithCancel(cc.ctx)
 	// Start with our address set to the first address; this may be updated if
 	// we connect to different addresses.
@@ -974,7 +1029,7 @@ func (ac *addrConn) updateAddrs(addrs []resolver.Address) {
 	}
 
 	ac.addrs = addrs
-
+	ac.updateTelemetryLabelsLocked()
 	if ac.state == connectivity.Shutdown ||
 		ac.state == connectivity.TransientFailure ||
 		ac.state == connectivity.Idle {
@@ -1213,12 +1268,27 @@ type addrConn struct {
 	resetBackoff chan struct{}
 
 	channelz *channelz.SubChannel
+
+	localityLabel       string
+	backendServiceLabel string
 }
 
 // Note: this requires a lock on ac.mu.
 func (ac *addrConn) updateConnectivityState(s connectivity.State, lastErr error) {
 	if ac.state == s {
 		return
+	}
+
+	// If we are transitioning out of Ready, it means there is a disconnection.
+	// A SubConn can also transition from CONNECTING directly to IDLE when
+	// a transport is successfully created, but the connection fails
+	// before the SubConn can send the notification for READY. We treat
+	// this as a successful connection and transition to IDLE.
+	// TODO: https://github.com/grpc/grpc-go/issues/7862 - Remove the second
+	// part of the if condition below once the issue is fixed.
+	if ac.state == connectivity.Ready || (ac.state == connectivity.Connecting && s == connectivity.Idle) {
+		disconnectionsMetric.Record(ac.cc.metricsRecorderList, 1, ac.cc.target, ac.backendServiceLabel, ac.localityLabel, "unknown")
+		openConnectionsMetric.Record(ac.cc.metricsRecorderList, -1, ac.cc.target, ac.backendServiceLabel, ac.securityLevelLocked(), ac.localityLabel)
 	}
 	ac.state = s
 	ac.channelz.ChannelMetrics.State.Store(&s)
@@ -1277,6 +1347,15 @@ func (ac *addrConn) resetTransportAndUnlock() {
 	ac.mu.Unlock()
 
 	if err := ac.tryAllAddrs(acCtx, addrs, connectDeadline); err != nil {
+		if !errors.Is(err, context.Canceled) {
+			connectionAttemptsFailedMetric.Record(ac.cc.metricsRecorderList, 1, ac.cc.target, ac.backendServiceLabel, ac.localityLabel)
+		} else {
+			if logger.V(2) {
+				// This records cancelled connection attempts which can be later
+				// replaced by a metric.
+				logger.Infof("Context cancellation detected; not recording this as a failed connection attempt.")
+			}
+		}
 		// TODO: #7534 - Move re-resolution requests into the pick_first LB policy
 		// to ensure one resolution request per pass instead of per subconn failure.
 		ac.cc.resolveNow(resolver.ResolveNowOptions{})
@@ -1316,8 +1395,48 @@ func (ac *addrConn) resetTransportAndUnlock() {
 	}
 	// Success; reset backoff.
 	ac.mu.Lock()
+	connectionAttemptsSucceededMetric.Record(ac.cc.metricsRecorderList, 1, ac.cc.target, ac.backendServiceLabel, ac.localityLabel)
+	openConnectionsMetric.Record(ac.cc.metricsRecorderList, 1, ac.cc.target, ac.backendServiceLabel, ac.securityLevelLocked(), ac.localityLabel)
 	ac.backoffIdx = 0
 	ac.mu.Unlock()
+}
+
+// updateTelemetryLabelsLocked calculates and caches the telemetry labels based on the
+// first address in addrConn.
+func (ac *addrConn) updateTelemetryLabelsLocked() {
+	labelsFunc, ok := internal.AddressToTelemetryLabels.(func(resolver.Address) map[string]string)
+	if !ok || len(ac.addrs) == 0 {
+		// Reset defaults
+		ac.localityLabel = ""
+		ac.backendServiceLabel = ""
+		return
+	}
+	labels := labelsFunc(ac.addrs[0])
+	ac.localityLabel = labels["grpc.lb.locality"]
+	ac.backendServiceLabel = labels["grpc.lb.backend_service"]
+}
+
+type securityLevelKey struct{}
+
+func (ac *addrConn) securityLevelLocked() string {
+	var secLevel string
+	// During disconnection, ac.transport is nil. Fall back to the security level
+	// stored in the current address during connection.
+	if ac.transport == nil {
+		secLevel, _ = ac.curAddr.Attributes.Value(securityLevelKey{}).(string)
+		return secLevel
+	}
+	authInfo := ac.transport.Peer().AuthInfo
+	if ci, ok := authInfo.(interface {
+		GetCommonAuthInfo() credentials.CommonAuthInfo
+	}); ok {
+		secLevel = ci.GetCommonAuthInfo().SecurityLevel.String()
+		// Store the security level in the current address' attributes so
+		// that it remains available for disconnection metrics after the
+		// transport is closed.
+		ac.curAddr.Attributes = ac.curAddr.Attributes.WithValue(securityLevelKey{}, secLevel)
+	}
+	return secLevel
 }
 
 // tryAllAddrs tries to create a connection to the addresses, and stop when at

@@ -52,12 +52,6 @@ var (
 	// or "false".
 	EnforceALPNEnabled = boolFromEnv("GRPC_ENFORCE_ALPN_ENABLED", true)
 
-	// NewPickFirstEnabled is set if the new pickfirst leaf policy is to be used
-	// instead of the exiting pickfirst implementation. This can be disabled by
-	// setting the environment variable "GRPC_EXPERIMENTAL_ENABLE_NEW_PICK_FIRST"
-	// to "false".
-	NewPickFirstEnabled = boolFromEnv("GRPC_EXPERIMENTAL_ENABLE_NEW_PICK_FIRST", true)
-
 	// XDSEndpointHashKeyBackwardCompat controls the parsing of the endpoint hash
 	// key from EDS LbEndpoint metadata. Endpoint hash keys can be disabled by
 	// setting "GRPC_XDS_ENDPOINT_HASH_KEY_BACKWARD_COMPAT" to "true". When the
@@ -75,6 +69,19 @@ var (
 	// ALTSHandshakerKeepaliveParams is set if we should add the
 	// KeepaliveParams when dial the ALTS handshaker service.
 	ALTSHandshakerKeepaliveParams = boolFromEnv("GRPC_EXPERIMENTAL_ALTS_HANDSHAKER_KEEPALIVE_PARAMS", false)
+
+	// EnableDefaultPortForProxyTarget controls whether the resolver adds a default port 443
+	// to a target address that lacks one. This flag only has an effect when all of
+	// the following conditions are met:
+	//   - A connect proxy is being used.
+	//   - Target resolution is disabled.
+	//   - The DNS resolver is being used.
+	EnableDefaultPortForProxyTarget = boolFromEnv("GRPC_EXPERIMENTAL_ENABLE_DEFAULT_PORT_FOR_PROXY_TARGET", true)
+
+	// XDSAuthorityRewrite indicates whether xDS authority rewriting is enabled.
+	// This feature is defined in gRFC A81 and is enabled by setting the
+	// environment variable GRPC_EXPERIMENTAL_XDS_AUTHORITY_REWRITE to "true".
+	XDSAuthorityRewrite = boolFromEnv("GRPC_EXPERIMENTAL_XDS_AUTHORITY_REWRITE", false)
 )
 
 func boolFromEnv(envVar string, def bool) bool {
