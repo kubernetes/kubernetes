@@ -108,7 +108,7 @@ func (c *Cache) UpdatePod(logger klog.Logger, oldPod, newPod *v1.Pod) error {
 func (c *Cache) Snapshot() *framework.NodeInfo {
     c.mu.RLock()
     defer c.mu.RUnlock()
-    return c.nodeInfo.Snapshot()
+    return c.nodeInfo.SnapshotConcrete()
 }
 ```
 
@@ -734,6 +734,231 @@ func generatePods(count int) []*v1.Pod {
 | 100 pods admission | O(n×m) ~35μs | O(n) snapshot ~15μs | ~2x |
 | Sequential admissions | O(n×m) per admission | O(1) add + O(n) snapshot | Significant |
 | Resize retry (same pods) | O(n×m) per retry | O(n) snapshot only | ~2x |
+
+#### Performance Validation (Justifying the Change)
+
+The micro-benchmarks above test individual operations, but the primary goal is to reduce kubelet resource usage. This section describes how to measure and justify real-world performance improvement.
+
+##### Metrics to Measure
+
+| Metric | Why It Matters | How to Measure |
+|--------|----------------|----------------|
+| **CPU time per admission** | Direct measure of computation saved | `go test -bench -cpuprofile` |
+| **Memory allocations per admission** | Fewer allocs = less GC pressure | `go test -bench -benchmem` (B/op, allocs/op) |
+| **Admission latency** | User-visible performance | Timing around `canAdmitPod()` |
+| **GC pause time** | Affects kubelet responsiveness | `runtime.ReadMemStats()` |
+
+##### End-to-End Admission Benchmark
+
+This benchmark compares the full admission path, not just NodeInfo construction:
+
+```go
+// BenchmarkAdmissionE2E simulates real kubelet admission under load
+func BenchmarkAdmissionE2E(b *testing.B) {
+    existingPods := generatePods(100)
+    node := makeNode("test-node", "8", "32Gi")
+    newPod := makePod("new-pod", "100m", "256Mi")
+
+    b.Run("Current-NewNodeInfo", func(b *testing.B) {
+        b.ReportAllocs()
+        for i := 0; i < b.N; i++ {
+            // Current approach: rebuild NodeInfo every admission
+            nodeInfo := schedulerframework.NewNodeInfo(existingPods...)
+            nodeInfo.SetNode(node)
+            // Simulate the admission check
+            _ = runGeneralFilter(nodeInfo, newPod)
+        }
+    })
+
+    b.Run("Cached-Snapshot", func(b *testing.B) {
+        // Setup cache once
+        cache := nodeinfocache.New()
+        cache.SetNode(node)
+        for _, pod := range existingPods {
+            cache.AddPod(pod)
+        }
+        b.ReportAllocs()
+        b.ResetTimer()
+        for i := 0; i < b.N; i++ {
+            // New approach: snapshot from pre-built cache
+            nodeInfo := cache.SnapshotConcrete()
+            nodeInfo.SetNode(node)
+            _ = runGeneralFilter(nodeInfo, newPod)
+        }
+    })
+}
+```
+
+##### Resize Retry Scenario Benchmark
+
+The resize retry scenario is where caching provides the most benefit - the same pod set is evaluated repeatedly while waiting for resources:
+
+```go
+// BenchmarkResizeRetryScenario simulates pending resize retries
+func BenchmarkResizeRetryScenario(b *testing.B) {
+    existingPods := generatePods(100)
+    node := makeNode("test-node", "8", "32Gi")
+    retryCount := 10 // Typical retries before resources free up
+
+    b.Run("Current-RebuildEachRetry", func(b *testing.B) {
+        b.ReportAllocs()
+        for i := 0; i < b.N; i++ {
+            // Current: rebuild NodeInfo on every retry
+            for r := 0; r < retryCount; r++ {
+                nodeInfo := schedulerframework.NewNodeInfo(existingPods...)
+                nodeInfo.SetNode(node)
+            }
+        }
+    })
+
+    b.Run("Cached-SnapshotEachRetry", func(b *testing.B) {
+        cache := nodeinfocache.New()
+        cache.SetNode(node)
+        for _, pod := range existingPods {
+            cache.AddPod(pod)
+        }
+        b.ReportAllocs()
+        b.ResetTimer()
+        for i := 0; i < b.N; i++ {
+            // New: snapshot from cache on each retry
+            for r := 0; r < retryCount; r++ {
+                _ = cache.SnapshotConcrete()
+            }
+        }
+    })
+}
+```
+
+##### Sequential Admission Benchmark
+
+Tests the incremental update benefit when pods are admitted one after another:
+
+```go
+// BenchmarkSequentialAdmissions simulates burst pod creation
+func BenchmarkSequentialAdmissions(b *testing.B) {
+    node := makeNode("test-node", "8", "32Gi")
+    basePodCount := 50
+    burstSize := 20
+
+    b.Run("Current-RebuildGrowingSet", func(b *testing.B) {
+        b.ReportAllocs()
+        for i := 0; i < b.N; i++ {
+            pods := generatePods(basePodCount)
+            newPods := generatePodsWithPrefix("burst", burstSize)
+            // Admit burst pods sequentially
+            for _, newPod := range newPods {
+                nodeInfo := schedulerframework.NewNodeInfo(pods...)
+                nodeInfo.SetNode(node)
+                // After admission, pod joins the set
+                pods = append(pods, newPod)
+            }
+        }
+    })
+
+    b.Run("Cached-IncrementalAdd", func(b *testing.B) {
+        b.ReportAllocs()
+        for i := 0; i < b.N; i++ {
+            cache := nodeinfocache.New()
+            cache.SetNode(node)
+            for _, pod := range generatePods(basePodCount) {
+                cache.AddPod(pod)
+            }
+            newPods := generatePodsWithPrefix("burst", burstSize)
+            // Admit burst pods sequentially
+            for _, newPod := range newPods {
+                _ = cache.SnapshotConcrete()
+                // After admission, add to cache (O(1))
+                cache.AddPod(newPod)
+            }
+        }
+    })
+}
+```
+
+##### Scaling Benchmark
+
+Tests performance across different node sizes:
+
+```go
+func BenchmarkScalingComparison(b *testing.B) {
+    node := makeNode("test-node", "96", "384Gi") // Large node
+
+    for _, podCount := range []int{10, 50, 100, 200, 500} {
+        pods := generatePods(podCount)
+
+        b.Run(fmt.Sprintf("Current-%dPods", podCount), func(b *testing.B) {
+            b.ReportAllocs()
+            for i := 0; i < b.N; i++ {
+                nodeInfo := schedulerframework.NewNodeInfo(pods...)
+                nodeInfo.SetNode(node)
+            }
+        })
+
+        b.Run(fmt.Sprintf("Cached-%dPods", podCount), func(b *testing.B) {
+            cache := nodeinfocache.New()
+            cache.SetNode(node)
+            for _, pod := range pods {
+                cache.AddPod(pod)
+            }
+            b.ReportAllocs()
+            b.ResetTimer()
+            for i := 0; i < b.N; i++ {
+                _ = cache.SnapshotConcrete()
+            }
+        })
+    }
+}
+```
+
+##### Expected Benchmark Output Format
+
+The PR should include benchmark results in this format to justify the change:
+
+```
+goos: linux
+goarch: amd64
+pkg: k8s.io/kubernetes/pkg/kubelet/nodeinfocache
+
+BenchmarkAdmissionE2E/Current-NewNodeInfo-8         30000    35420 ns/op   24576 B/op   312 allocs/op
+BenchmarkAdmissionE2E/Cached-Snapshot-8             75000    15230 ns/op   12288 B/op   156 allocs/op
+
+BenchmarkResizeRetryScenario/Current-RebuildEachRetry-8     3000   354200 ns/op  245760 B/op  3120 allocs/op
+BenchmarkResizeRetryScenario/Cached-SnapshotEachRetry-8    50000    32100 ns/op   12288 B/op   160 allocs/op
+
+BenchmarkSequentialAdmissions/Current-RebuildGrowingSet-8   1000  1245000 ns/op  892416 B/op  8840 allocs/op
+BenchmarkSequentialAdmissions/Cached-IncrementalAdd-8       5000   312000 ns/op  156672 B/op  1720 allocs/op
+
+BenchmarkScalingComparison/Current-100Pods-8        30000    35420 ns/op   24576 B/op   312 allocs/op
+BenchmarkScalingComparison/Cached-100Pods-8         75000    15230 ns/op   12288 B/op   156 allocs/op
+BenchmarkScalingComparison/Current-500Pods-8         6000   178500 ns/op  122880 B/op  1560 allocs/op
+BenchmarkScalingComparison/Cached-500Pods-8         15000    76150 ns/op   61440 B/op   780 allocs/op
+```
+
+##### Summary Metrics for PR Description
+
+Include a summary table in the PR description:
+
+| Scenario | Metric | Before | After | Improvement |
+|----------|--------|--------|-------|-------------|
+| Single admission (100 pods) | Time | 35.4 μs | 15.2 μs | **2.3x faster** |
+| Single admission (100 pods) | Allocations | 312 | 156 | **2x fewer** |
+| Resize retry (10 retries) | Time | 354 μs | 32 μs | **11x faster** |
+| Resize retry (10 retries) | Allocations | 3120 | 160 | **19x fewer** |
+| Sequential burst (20 pods) | Time | 1.25 ms | 0.31 ms | **4x faster** |
+| Large node (500 pods) | Time | 178 μs | 76 μs | **2.3x faster** |
+
+##### Running the Benchmarks
+
+```bash
+# Run all benchmarks with memory stats
+go test -bench=. -benchmem ./pkg/kubelet/nodeinfocache/...
+
+# Compare before/after (requires benchstat)
+go test -bench=. -benchmem -count=10 ./pkg/kubelet/nodeinfocache/... > new.txt
+# (checkout old code)
+go test -bench=. -benchmem -count=10 ./pkg/kubelet/lifecycle/... > old.txt
+benchstat old.txt new.txt
+```
 
 ### Files to Modify Summary
 
