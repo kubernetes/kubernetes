@@ -645,21 +645,20 @@ func TestCSILimits(t *testing.T) {
 				enableMigrationOnNode(csiNode, csilibplugins.AWSEBSInTreePluginName)
 			}
 			csiTranslator := csitrans.New()
-			vas := getFakeVolumeAttachmentLister(test.vaCount, test.driverNames...)
-			fakecli := fake.NewClientset(vas...)
-			informerfactory := informers.NewSharedInformerFactory(fakecli, 0)
-			if err := informerfactory.Storage().V1().VolumeAttachments().Informer().AddIndexers(cache.Indexers{vaIndexKey: volumeAttachmentIndexer}); err != nil {
+			fakecli := buildFakeClientWithVALister(test.vaCount, test.driverNames...)
+			informerFactory := informers.NewSharedInformerFactory(fakecli, 0)
+			if err := informerFactory.Storage().V1().VolumeAttachments().Informer().AddIndexers(cache.Indexers{vaIndexKey: volumeAttachmentIndexer}); err != nil {
 				t.Error(err)
 			}
 			_, ctx := ktesting.NewTestContext(t)
-			informerfactory.Start(ctx.Done())
-			informerfactory.WaitForCacheSync(ctx.Done())
+			informerFactory.Start(ctx.Done())
+			informerFactory.WaitForCacheSync(ctx.Done())
 			p := &CSILimits{
 				csiManager:           NewCSIManager(getFakeCSINodeLister(csiNode)),
 				pvLister:             getFakeCSIPVLister(test.filterName, test.driverNames...),
 				pvcLister:            append(getFakeCSIPVCLister(test.filterName, scName, test.driverNames...), test.extraClaims...),
 				scLister:             getFakeCSIStorageClassLister(scName, test.driverNames[0]),
-				vaIndexer:            informerfactory.Storage().V1().VolumeAttachments().Informer().GetIndexer(),
+				vaIndexer:            informerFactory.Storage().V1().VolumeAttachments().Informer().GetIndexer(),
 				randomVolumeIDPrefix: rand.String(32),
 				translator:           csiTranslator,
 			}
@@ -1086,12 +1085,12 @@ func TestCSILimitsAfterCSINodeUpdatedQHint(t *testing.T) {
 	}
 }
 
-func getFakeVolumeAttachmentLister(count int, driverNames ...string) []runtime.Object {
-	vaLister := []runtime.Object{}
+func buildFakeClientWithVALister(count int, driverNames ...string) *fake.Clientset {
+	vas := []runtime.Object{}
 	for _, driver := range driverNames {
 		for j := 0; j < count; j++ {
 			pvName := fmt.Sprintf("csi-%s-%d", driver, j)
-			va := storagev1.VolumeAttachment{
+			va := &storagev1.VolumeAttachment{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: fmt.Sprintf("va-%s-%d", driver, j),
 				},
@@ -1103,11 +1102,13 @@ func getFakeVolumeAttachmentLister(count int, driverNames ...string) []runtime.O
 					},
 				},
 			}
-			vaLister = append(vaLister, &va)
+			vas = append(vas, va)
 		}
 	}
-	return vaLister
+	fakeCli := fake.NewClientset(vas...)
+	return fakeCli
 }
+
 func getFakeCSIPVLister(volumeName string, driverNames ...string) tf.PersistentVolumeLister {
 	pvLister := tf.PersistentVolumeLister{}
 	for _, driver := range driverNames {
@@ -1336,15 +1337,14 @@ func TestVolumeLimitScalingGate(t *testing.T) {
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
 			node, csiNode := getNodeWithPodAndVolumeLimits(tt.limitSource, []*v1.Pod{}, tt.limit, ebsCSIDriverName)
-			vas := getFakeVolumeAttachmentLister(0, ebsCSIDriverName)
-			fakecli := fake.NewClientset(vas...)
-			informerfactory := informers.NewSharedInformerFactory(fakecli, 0)
-			if err := informerfactory.Storage().V1().VolumeAttachments().Informer().AddIndexers(cache.Indexers{vaIndexKey: volumeAttachmentIndexer}); err != nil {
+			fakecli := buildFakeClientWithVALister(0, ebsCSIDriverName)
+			informerFactory := informers.NewSharedInformerFactory(fakecli, 0)
+			if err := informerFactory.Storage().V1().VolumeAttachments().Informer().AddIndexers(cache.Indexers{vaIndexKey: volumeAttachmentIndexer}); err != nil {
 				t.Error(err)
 			}
 			_, ctx := ktesting.NewTestContext(t)
-			informerfactory.Start(ctx.Done())
-			informerfactory.WaitForCacheSync(ctx.Done())
+			informerFactory.Start(ctx.Done())
+			informerFactory.WaitForCacheSync(ctx.Done())
 
 			csiTranslator := csitrans.New()
 			p := &CSILimits{
@@ -1352,8 +1352,8 @@ func TestVolumeLimitScalingGate(t *testing.T) {
 				pvLister:   getFakeCSIPVLister("csi", ebsCSIDriverName),
 				pvcLister:  getFakeCSIPVCLister("csi", scName, ebsCSIDriverName),
 				scLister:   getFakeCSIStorageClassLister(scName, ebsCSIDriverName),
-				vaLister:   informerfactory.Storage().V1().VolumeAttachments().Lister(),
-				vaIndexer:  informerfactory.Storage().V1().VolumeAttachments().Informer().GetIndexer(),
+				vaLister:   informerFactory.Storage().V1().VolumeAttachments().Lister(),
+				vaIndexer:  informerFactory.Storage().V1().VolumeAttachments().Informer().GetIndexer(),
 				csiDriverLister: func() fakeCSIDriverLister {
 					if tt.csiDriverPresent {
 						return getFakeCSIDriverLister(ebsCSIDriverName)

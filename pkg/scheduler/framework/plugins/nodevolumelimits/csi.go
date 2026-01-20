@@ -600,9 +600,8 @@ func NewCSI(_ context.Context, _ runtime.Object, handle fwk.Handle, fts feature.
 	scLister := informerFactory.Storage().V1().StorageClasses().Lister()
 	vaLister := informerFactory.Storage().V1().VolumeAttachments().Lister()
 	csiDriverLister := informerFactory.Storage().V1().CSIDrivers().Lister()
-	vaIndexer := informerFactory.Storage().V1().VolumeAttachments().Informer().GetIndexer()
-	if err := informerFactory.Storage().V1().VolumeAttachments().Informer().AddIndexers(cache.Indexers{vaIndexKey: volumeAttachmentIndexer}); err != nil {
-		vaInformer := informerFactory.Storage().V1().VolumeAttachments().Informer()
+	vaInformer := informerFactory.Storage().V1().VolumeAttachments().Informer()
+	if err := vaInformer.AddIndexers(cache.Indexers{vaIndexKey: volumeAttachmentIndexer}); err != nil {
 		if vaInformer.GetIndexer().GetIndexers()[vaIndexKey] == nil {
 			return nil, fmt.Errorf("failed to add index to VA informer: %w", err)
 		}
@@ -619,7 +618,7 @@ func NewCSI(_ context.Context, _ runtime.Object, handle fwk.Handle, fts feature.
 		enableVolumeLimitScaling: fts.EnableVolumeLimitScaling,
 		randomVolumeIDPrefix:     rand.String(32),
 		translator:               csiTranslator,
-		vaIndexer:                vaIndexer,
+		vaIndexer:                vaInformer.GetIndexer(),
 	}, nil
 }
 
@@ -651,7 +650,8 @@ func (pl *CSILimits) getNodeVolumeAttachmentInfo(logger klog.Logger, nodeName st
 	for _, vao := range vas {
 		va, ok := vao.(*storagev1.VolumeAttachment)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("unexpected object type in volume attachment indexer: %v", vao))
+			utilruntime.HandleErrorWithLogger(logger, fmt.Errorf("unexpected object type in volume attachment indexer: %v", vao),
+				"volume indexer not available")
 			continue
 		}
 		if va.Spec.NodeName == nodeName {
