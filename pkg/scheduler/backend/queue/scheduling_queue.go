@@ -606,8 +606,19 @@ func (p *PriorityQueue) runPreEnqueuePlugin(ctx context.Context, logger klog.Log
 	if shouldRecordMetric {
 		p.metricsRecorder.ObservePluginDurationAsync(preEnqueue, pl.Name(), s.Code().String(), p.clock.Since(startTime).Seconds())
 	}
+	onFinish := make(chan error, 1)
 	if s.IsSuccess() {
 		// No need to change GatingPlugin; it's overwritten by the next PreEnqueue plugin if they gate this pod, or it's overwritten with an empty string if all PreEnqueue plugins pass.
+		p.apiDispatcher.Add(apicalls.Implementations.PodStatusPatch(pod, &v1.PodCondition{
+			Type:               v1.PodReasonSchedulingGated,
+			Status:             v1.ConditionFalse,
+			Reason:             "PreEnqueuePluginSuccess",
+			Message:            "PreEnqueuePluginSuccess",
+			ObservedGeneration: pod.Generation,
+			LastProbeTime:      metav1.Now(),
+		}, nil), fwk.APICallOptions{
+			OnFinish: onFinish,
+		})
 		return s
 	}
 	// Only increment metric and insert if not already incremented for this plugin
@@ -623,6 +634,16 @@ func (p *PriorityQueue) runPreEnqueuePlugin(ctx context.Context, logger klog.Log
 		logger.V(4).Info("Status after running PreEnqueue plugin", "pod", klog.KObj(pod), "plugin", pl.Name(), "status", s)
 	}
 
+	p.apiDispatcher.Add(apicalls.Implementations.PodStatusPatch(pod, &v1.PodCondition{
+		Type:               v1.PodReasonSchedulingGated,
+		Status:             v1.ConditionTrue,
+		Reason:             "PreEnqueuePluginFailed",
+		Message:            s.Message(),
+		ObservedGeneration: pod.Generation,
+		LastProbeTime:      metav1.Now(),
+	}, nil), fwk.APICallOptions{
+		OnFinish: onFinish,
+	})
 	return s
 }
 
