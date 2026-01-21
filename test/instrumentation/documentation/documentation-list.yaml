@@ -891,6 +891,17 @@
   componentEndpoints:
   - component: kube-controller-manager
     endpoint: /metrics
+- name: stale_sync_skips_total
+  subsystem: statefulset_controller
+  help: Total number of StatefulSet syncs skipped due to a stale watch cache.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - group
+  - resource
+  componentEndpoints:
+  - component: kube-controller-manager
+    endpoint: /metrics
 - name: statefulset_max_unavailable
   subsystem: statefulset_controller
   help: Maximum number of unavailable pods allowed during StatefulSet rolling updates
@@ -978,9 +989,20 @@
   componentEndpoints:
   - component: kube-controller-manager
     endpoint: /metrics
+- name: volume_operation_errors_total
+  help: Total volume operation errors
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - operation_name
+  - plugin_name
+  componentEndpoints:
+  - component: kube-controller-manager
+    endpoint: /metrics
 - name: volume_operation_total_errors
   help: Total volume operation errors
   type: Counter
+  deprecatedVersion: 1.36.0
   stabilityLevel: ALPHA
   labels:
   - operation_name
