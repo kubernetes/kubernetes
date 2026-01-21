@@ -62,14 +62,14 @@ nodeInfo.SetNode(freshNode) // Safe - it's a deep copy, SetNode() available on c
 ## Testing
 
 ```bash
-# Run unit tests
-make test WHAT=./pkg/kubelet/nodeinfocache GOFLAGS=-v
-
-# Or directly with go test
+# Preferred: Run directly with go test (faster, avoids make script issues)
 go test -v ./pkg/kubelet/nodeinfocache/...
 
 # Run with race detector
 go test -race ./pkg/kubelet/nodeinfocache/...
+
+# Via make (may fail on some systems due to ulimit issue - see pkg/kubelet/CLAUDE.md)
+make test WHAT=./pkg/kubelet/nodeinfocache GOFLAGS=-v
 ```
 
 ### Test Coverage

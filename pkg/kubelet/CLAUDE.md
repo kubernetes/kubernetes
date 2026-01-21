@@ -148,20 +148,25 @@ A pod is **inactive** if: fully terminated OR (terminal phase AND not actively t
 ### Running Unit Tests
 
 ```bash
-# Run all kubelet unit tests
-make test WHAT=./pkg/kubelet/...
-
-# Run tests for a specific subpackage
-make test WHAT=./pkg/kubelet/lifecycle GOFLAGS=-v
-
-# Run with coverage
-make test WHAT=./pkg/kubelet/... KUBE_COVER=y
-
-# Run directly with go test (faster iteration)
+# Preferred: Run directly with go test (faster, avoids script issues)
 go test -v ./pkg/kubelet/nodeinfocache/...
+go test -v ./pkg/kubelet/lifecycle/...
+
+# Run with race detector
+go test -race ./pkg/kubelet/nodeinfocache/...
+
+# Run all kubelet tests
+go test ./pkg/kubelet/...
+
+# Via make (may fail on some systems - see note below)
+make test WHAT=./pkg/kubelet/lifecycle GOFLAGS=-v
 ```
 
-### Key Variables
+### Note on `make test`
+
+The `make test` command runs `hack/make-rules/test.sh` which may fail on systems where `ulimit -n` returns "unlimited" (macOS with certain configurations). The script has a numeric comparison that doesn't handle this case. Use `go test` directly for local development.
+
+### Key Variables (for make test)
 
 | Variable | Purpose |
 |----------|---------|
