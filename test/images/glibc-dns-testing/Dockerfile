@@ -12,21 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# glibc-dns-testing: A glibc-based image for testing DNS resolution behavior.
+#
+# This image exists to test that glibc-based programs can resolve Service DNS
+# names correctly. It complements agnhost (which uses Alpine/musl) to ensure
+# Kubernetes DNS works correctly regardless of which C library the application
+# uses. See issue #10161 for the original discussion about libc DNS differences.
+#
+# Key differences between glibc and musl DNS resolution:
+# - glibc queries nameservers sequentially; musl queries in parallel
+# - glibc and musl handle ndots and search domains differently
+# - The hostname command behaves differently between glibc and musl
+
 ARG BASEIMAGE
 FROM $BASEIMAGE
 
 CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
 
-# WARNING: Please note that the script below removes the security packages from arm64 and ppc64el images
-# as they do not exist anymore in the debian repositories for jessie. So we do not recommend using this
-# image for any production use and limit use of this image to just test scenarios.
-
-COPY fixup-apt-list.sh /
-RUN ["/fixup-apt-list.sh"]
-
-RUN apt-get -q update && \
-    apt-get install -y --force-yes dnsutils && \
-    apt-get clean
+RUN apt-get update && \
+    apt-get install -y dnsutils && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 ADD https://github.com/coredns/coredns/releases/download/v1.5.0/coredns_1.5.0_linux_BASEARCH.tgz /coredns.tgz
 RUN tar -xzvf /coredns.tgz && rm -f /coredns.tgz
