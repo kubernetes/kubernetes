@@ -18,10 +18,11 @@ package util
 
 import (
 	"fmt"
-	"strconv"
+	"strings"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/types"
@@ -95,105 +96,105 @@ func TestGetFullQualifiedPluginNameForVolume(t *testing.T) {
 }
 
 func TestStorageOperationMetric(t *testing.T) {
-	tests := []struct {
-		name              string
-		plugin            string
-		operationName     string
-		status            string
-		migrated          bool
-		operationComplete func()
-	}{
-		{
-			name:          "storage operation metric with success status",
-			plugin:        "kubernetes.io/fake-plugin",
-			operationName: "mount_volume",
-			status:        statusSuccess,
-			migrated:      false,
-			operationComplete: func() {
-				hook := OperationCompleteHook("kubernetes.io/fake-plugin", "mount_volume")
-				err := error(nil)
-				hook(types.CompleteFuncParam{Err: &err, Migrated: ptr.To(false)})
-			},
-		},
-		{
-			name:          "storage operation metric with fail status",
-			plugin:        "kubernetes.io/fake-plugin",
-			operationName: "unmount_volume",
-			status:        statusFailUnknown,
-			migrated:      true,
-			operationComplete: func() {
-				hook := OperationCompleteHook("kubernetes.io/fake-plugin", "unmount_volume")
-				err := fmt.Errorf("test error")
-				hook(types.CompleteFuncParam{Err: &err, Migrated: ptr.To(true)})
-			},
-		},
-	}
+	// Verify the whole metric struct (HELP/TYPE/labels/buckets) using a deterministic observation.
+	StorageOperationMetric.Reset()
+	StorageOperationMetric.WithLabelValues("kubernetes.io/fake-plugin", "mount_volume", statusSuccess, "false").Observe(0)
+	StorageOperationMetric.WithLabelValues("kubernetes.io/fake-plugin", "unmount_volume", statusFailUnknown, "true").Observe(0)
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			// Reset before each test
-			StorageOperationMetric.Reset()
+	want := `
+# HELP storage_operation_duration_seconds [BETA] Storage operation duration
+# TYPE storage_operation_duration_seconds histogram
+storage_operation_duration_seconds_bucket{migrated="false",operation_name="mount_volume",status="success",volume_plugin="kubernetes.io/fake-plugin",le="0.1"} 1
+storage_operation_duration_seconds_bucket{migrated="false",operation_name="mount_volume",status="success",volume_plugin="kubernetes.io/fake-plugin",le="0.25"} 1
+storage_operation_duration_seconds_bucket{migrated="false",operation_name="mount_volume",status="success",volume_plugin="kubernetes.io/fake-plugin",le="0.5"} 1
+storage_operation_duration_seconds_bucket{migrated="false",operation_name="mount_volume",status="success",volume_plugin="kubernetes.io/fake-plugin",le="1"} 1
+storage_operation_duration_seconds_bucket{migrated="false",operation_name="mount_volume",status="success",volume_plugin="kubernetes.io/fake-plugin",le="2.5"} 1
+storage_operation_duration_seconds_bucket{migrated="false",operation_name="mount_volume",status="success",volume_plugin="kubernetes.io/fake-plugin",le="5"} 1
+storage_operation_duration_seconds_bucket{migrated="false",operation_name="mount_volume",status="success",volume_plugin="kubernetes.io/fake-plugin",le="10"} 1
+storage_operation_duration_seconds_bucket{migrated="false",operation_name="mount_volume",status="success",volume_plugin="kubernetes.io/fake-plugin",le="15"} 1
+storage_operation_duration_seconds_bucket{migrated="false",operation_name="mount_volume",status="success",volume_plugin="kubernetes.io/fake-plugin",le="25"} 1
+storage_operation_duration_seconds_bucket{migrated="false",operation_name="mount_volume",status="success",volume_plugin="kubernetes.io/fake-plugin",le="50"} 1
+storage_operation_duration_seconds_bucket{migrated="false",operation_name="mount_volume",status="success",volume_plugin="kubernetes.io/fake-plugin",le="120"} 1
+storage_operation_duration_seconds_bucket{migrated="false",operation_name="mount_volume",status="success",volume_plugin="kubernetes.io/fake-plugin",le="300"} 1
+storage_operation_duration_seconds_bucket{migrated="false",operation_name="mount_volume",status="success",volume_plugin="kubernetes.io/fake-plugin",le="600"} 1
+storage_operation_duration_seconds_bucket{migrated="false",operation_name="mount_volume",status="success",volume_plugin="kubernetes.io/fake-plugin",le="+Inf"} 1
+storage_operation_duration_seconds_sum{migrated="false",operation_name="mount_volume",status="success",volume_plugin="kubernetes.io/fake-plugin"} 0
+storage_operation_duration_seconds_count{migrated="false",operation_name="mount_volume",status="success",volume_plugin="kubernetes.io/fake-plugin"} 1
+storage_operation_duration_seconds_bucket{migrated="true",operation_name="unmount_volume",status="fail-unknown",volume_plugin="kubernetes.io/fake-plugin",le="0.1"} 1
+storage_operation_duration_seconds_bucket{migrated="true",operation_name="unmount_volume",status="fail-unknown",volume_plugin="kubernetes.io/fake-plugin",le="0.25"} 1
+storage_operation_duration_seconds_bucket{migrated="true",operation_name="unmount_volume",status="fail-unknown",volume_plugin="kubernetes.io/fake-plugin",le="0.5"} 1
+storage_operation_duration_seconds_bucket{migrated="true",operation_name="unmount_volume",status="fail-unknown",volume_plugin="kubernetes.io/fake-plugin",le="1"} 1
+storage_operation_duration_seconds_bucket{migrated="true",operation_name="unmount_volume",status="fail-unknown",volume_plugin="kubernetes.io/fake-plugin",le="2.5"} 1
+storage_operation_duration_seconds_bucket{migrated="true",operation_name="unmount_volume",status="fail-unknown",volume_plugin="kubernetes.io/fake-plugin",le="5"} 1
+storage_operation_duration_seconds_bucket{migrated="true",operation_name="unmount_volume",status="fail-unknown",volume_plugin="kubernetes.io/fake-plugin",le="10"} 1
+storage_operation_duration_seconds_bucket{migrated="true",operation_name="unmount_volume",status="fail-unknown",volume_plugin="kubernetes.io/fake-plugin",le="15"} 1
+storage_operation_duration_seconds_bucket{migrated="true",operation_name="unmount_volume",status="fail-unknown",volume_plugin="kubernetes.io/fake-plugin",le="25"} 1
+storage_operation_duration_seconds_bucket{migrated="true",operation_name="unmount_volume",status="fail-unknown",volume_plugin="kubernetes.io/fake-plugin",le="50"} 1
+storage_operation_duration_seconds_bucket{migrated="true",operation_name="unmount_volume",status="fail-unknown",volume_plugin="kubernetes.io/fake-plugin",le="120"} 1
+storage_operation_duration_seconds_bucket{migrated="true",operation_name="unmount_volume",status="fail-unknown",volume_plugin="kubernetes.io/fake-plugin",le="300"} 1
+storage_operation_duration_seconds_bucket{migrated="true",operation_name="unmount_volume",status="fail-unknown",volume_plugin="kubernetes.io/fake-plugin",le="600"} 1
+storage_operation_duration_seconds_bucket{migrated="true",operation_name="unmount_volume",status="fail-unknown",volume_plugin="kubernetes.io/fake-plugin",le="+Inf"} 1
+storage_operation_duration_seconds_sum{migrated="true",operation_name="unmount_volume",status="fail-unknown",volume_plugin="kubernetes.io/fake-plugin"} 0
+storage_operation_duration_seconds_count{migrated="true",operation_name="unmount_volume",status="fail-unknown",volume_plugin="kubernetes.io/fake-plugin"} 1
+`
 
-			// Get count before operation
-			metric := StorageOperationMetric.WithLabelValues(test.plugin, test.operationName, test.status, strconv.FormatBool(test.migrated))
-			countBefore, _ := testutil.GetHistogramMetricCount(metric)
-
-			// Execute the operation
-			test.operationComplete()
-
-			// Verify the metric was emitted with correct labels
-			countAfter, err := testutil.GetHistogramMetricCount(metric)
-			if err != nil {
-				t.Fatalf("Failed to get metric count: %v", err)
-			}
-			if countAfter != countBefore+1 {
-				t.Errorf("Expected metric count to increase by 1, got countBefore=%d, countAfter=%d", countBefore, countAfter)
-			}
-		})
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(want), "storage_operation_duration_seconds"); err != nil {
+		t.Errorf("failed to gather metrics: %v", err)
 	}
 }
 
+func TestOperationCompleteHookEmitsStorageOperationMetric(t *testing.T) {
+	StorageOperationMetric.Reset()
+
+	hook := OperationCompleteHook("kubernetes.io/fake-plugin", "mount_volume")
+	err := error(nil)
+	hook(types.CompleteFuncParam{Err: &err})
+
+	testutil.AssertHistogramTotalCount(t, "storage_operation_duration_seconds", map[string]string{
+		"volume_plugin":  "kubernetes.io/fake-plugin",
+		"operation_name": "mount_volume",
+		"status":         statusSuccess,
+		"migrated":       "false",
+	}, 1)
+
+	hook = OperationCompleteHook("kubernetes.io/fake-plugin", "unmount_volume")
+	err = fmt.Errorf("test error")
+	hook(types.CompleteFuncParam{Err: &err, Migrated: ptr.To(true)})
+
+	testutil.AssertHistogramTotalCount(t, "storage_operation_duration_seconds", map[string]string{
+		"volume_plugin":  "kubernetes.io/fake-plugin",
+		"operation_name": "unmount_volume",
+		"status":         statusFailUnknown,
+		"migrated":       "true",
+	}, 1)
+}
+
 func TestVolumeOperationTotalSecondsMetric(t *testing.T) {
-	tests := []struct {
-		name          string
-		plugin        string
-		operationName string
-		secondsTaken  float64
-	}{
-		{
-			name:          "volume operation metric with mount operation",
-			plugin:        "kubernetes.io/fake-plugin",
-			operationName: "mount_volume",
-			secondsTaken:  0.5,
-		},
-		{
-			name:          "volume operation metric with unmount operation",
-			plugin:        "kubernetes.io/fake-plugin",
-			operationName: "unmount_volume",
-			secondsTaken:  0.3,
-		},
-	}
+	storageOperationEndToEndLatencyMetric.Reset()
+	RecordOperationLatencyMetric("kubernetes.io/fake-plugin", "mount_volume", 0.5)
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			// Reset before each test
-			storageOperationEndToEndLatencyMetric.Reset()
+	want := `
+# HELP volume_operation_total_seconds [BETA] Storage operation end to end duration in seconds
+# TYPE volume_operation_total_seconds histogram
+volume_operation_total_seconds_bucket{operation_name="mount_volume",plugin_name="kubernetes.io/fake-plugin",le="0.1"} 0
+volume_operation_total_seconds_bucket{operation_name="mount_volume",plugin_name="kubernetes.io/fake-plugin",le="0.25"} 0
+volume_operation_total_seconds_bucket{operation_name="mount_volume",plugin_name="kubernetes.io/fake-plugin",le="0.5"} 1
+volume_operation_total_seconds_bucket{operation_name="mount_volume",plugin_name="kubernetes.io/fake-plugin",le="1"} 1
+volume_operation_total_seconds_bucket{operation_name="mount_volume",plugin_name="kubernetes.io/fake-plugin",le="2.5"} 1
+volume_operation_total_seconds_bucket{operation_name="mount_volume",plugin_name="kubernetes.io/fake-plugin",le="5"} 1
+volume_operation_total_seconds_bucket{operation_name="mount_volume",plugin_name="kubernetes.io/fake-plugin",le="10"} 1
+volume_operation_total_seconds_bucket{operation_name="mount_volume",plugin_name="kubernetes.io/fake-plugin",le="15"} 1
+volume_operation_total_seconds_bucket{operation_name="mount_volume",plugin_name="kubernetes.io/fake-plugin",le="25"} 1
+volume_operation_total_seconds_bucket{operation_name="mount_volume",plugin_name="kubernetes.io/fake-plugin",le="50"} 1
+volume_operation_total_seconds_bucket{operation_name="mount_volume",plugin_name="kubernetes.io/fake-plugin",le="120"} 1
+volume_operation_total_seconds_bucket{operation_name="mount_volume",plugin_name="kubernetes.io/fake-plugin",le="300"} 1
+volume_operation_total_seconds_bucket{operation_name="mount_volume",plugin_name="kubernetes.io/fake-plugin",le="600"} 1
+volume_operation_total_seconds_bucket{operation_name="mount_volume",plugin_name="kubernetes.io/fake-plugin",le="+Inf"} 1
+volume_operation_total_seconds_sum{operation_name="mount_volume",plugin_name="kubernetes.io/fake-plugin"} 0.5
+volume_operation_total_seconds_count{operation_name="mount_volume",plugin_name="kubernetes.io/fake-plugin"} 1
+`
 
-			// Get count before recording
-			metric := storageOperationEndToEndLatencyMetric.WithLabelValues(test.plugin, test.operationName)
-			countBefore, _ := testutil.GetHistogramMetricCount(metric)
-
-			// Record the metric
-			RecordOperationLatencyMetric(test.plugin, test.operationName, test.secondsTaken)
-
-			// Verify the metric was emitted with correct labels
-			countAfter, err := testutil.GetHistogramMetricCount(metric)
-			if err != nil {
-				t.Fatalf("Failed to get metric count: %v", err)
-			}
-			if countAfter != countBefore+1 {
-				t.Errorf("Expected metric count to increase by 1, got countBefore=%d, countAfter=%d", countBefore, countAfter)
-			}
-		})
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(want), "volume_operation_total_seconds"); err != nil {
+		t.Errorf("failed to gather metrics: %v", err)
 	}
 }
