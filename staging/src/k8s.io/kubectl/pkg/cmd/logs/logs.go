@@ -32,6 +32,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/rest"
@@ -405,17 +406,11 @@ func (o LogsOptions) parallelConsumeRequest(ctx context.Context, requests map[co
 		go func(objRef corev1.ObjectReference, request rest.ResponseWrapper) {
 			defer wg.Done()
 			out := o.addPrefixIfNeeded(objRef, writer)
-			if err := o.ConsumeRequestFn(ctx, request, out); err != nil {
-				if !o.IgnoreLogErrors {
-					writer.CloseWithError(err)
-
-					// It's important to return here to propagate the error via the pipe
-					return
-				}
-
-				fmt.Fprintf(writer, "error: %v\n", err)
+			if err := o.consumeWithRetry(ctx, request, out, writer); err != nil {
+				writer.CloseWithError(err)
+				// It's important to return here to propagate the error via the pipe
+				return
 			}
-
 		}(objRef, request)
 	}
 
@@ -431,16 +426,43 @@ func (o LogsOptions) parallelConsumeRequest(ctx context.Context, requests map[co
 func (o LogsOptions) sequentialConsumeRequest(ctx context.Context, requests map[corev1.ObjectReference]rest.ResponseWrapper) error {
 	for objRef, request := range requests {
 		out := o.addPrefixIfNeeded(objRef, o.Out)
-		if err := o.ConsumeRequestFn(ctx, request, out); err != nil {
-			if !o.IgnoreLogErrors {
-				return err
-			}
-
-			fmt.Fprintf(o.Out, "error: %v\n", err)
+		if err := o.consumeWithRetry(ctx, request, out, o.Out); err != nil {
+			return err
 		}
 	}
 
 	return nil
+}
+
+func (o LogsOptions) consumeWithRetry(ctx context.Context, request rest.ResponseWrapper, out io.Writer, internalErrOut io.Writer) error {
+	if !o.Follow {
+		err := o.ConsumeRequestFn(ctx, request, out)
+		if err != nil && o.IgnoreLogErrors {
+			fmt.Fprint(internalErrOut, "error: "+err.Error()+"\n")
+			return nil
+		}
+		return err
+	}
+
+	return wait.PollUntilContextTimeout(ctx, 1*time.Second, o.GetPodTimeout, true, func(_ context.Context) (bool, error) {
+		err := o.ConsumeRequestFn(ctx, request, out)
+		if err == nil {
+			return true, nil
+		}
+
+		if o.IgnoreLogErrors {
+			fmt.Fprint(internalErrOut, "error: "+err.Error()+"\n")
+			return true, nil
+		}
+
+		o.ErrOut.Write([]byte(err.Error() + "\n"))
+
+		if _, ok := err.(apierrors.APIStatus); ok {
+			return false, nil
+		}
+
+		return false, err
+	})
 }
 
 func (o LogsOptions) addPrefixIfNeeded(ref corev1.ObjectReference, writer io.Writer) io.Writer {
