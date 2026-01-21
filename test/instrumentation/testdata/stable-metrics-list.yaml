@@ -272,6 +272,13 @@
   labels:
   - deprecated_version
   - stability_level
+- name: running_managed_controllers
+  help: Indicates where instances of a controller are currently running
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - manager
+  - name
 - name: pod_scheduling_sli_duration_seconds
   subsystem: scheduler
   help: E2e latency for a pod being scheduled, from the time the pod enters the scheduling
