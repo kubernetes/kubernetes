@@ -6,10 +6,10 @@ description: >-
   Details of the metric data that Kubernetes components export.
 ---
 
-## Metrics (v1.36)
+## Metrics (v1.25)
 
-<!-- (auto-generated 2026 Jan 09) -->
-<!-- (auto-generated v1.36) -->
+<!-- (auto-generated 2026 Jan 21) -->
+<!-- (auto-generated v1.25) -->
 This page details the metrics that different Kubernetes components export. You can query the metrics endpoint for these 
 components using an HTTP scrape, and fetch the current metrics data in Prometheus format.
 
@@ -472,6 +472,13 @@ Beta metrics observe a looser API contract than its stable counterparts. No labe
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">BETA</span></li>
 	<li data-type="histogram"><label class="metric_detail">Type:</label> <span class="metric_type">Histogram</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">attempts</span></li></ul>
+	</div><div class="metric" data-stability="beta">
+	<div class="metric_name">volume_operation_total_errors</div>
+	<div class="metric_help">Total volume operation errors</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">BETA</span></li>
+	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">operation_name</span><span class="metric_label">plugin_name</span></li></ul>
 	</div><div class="metric" data-stability="beta">
 	<div class="metric_name">workqueue_adds_total</div>
 	<div class="metric_help">Total number of adds handled by workqueue</div>
@@ -3741,13 +3748,6 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
 	<li data-type="custom"><label class="metric_detail">Type:</label> <span class="metric_type">Custom</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">plugin_name</span><span class="metric_label">state</span></li></ul>
-	</div><div class="metric" data-stability="alpha">
-	<div class="metric_name">volume_operation_total_errors</div>
-	<div class="metric_help">Total volume operation errors</div>
-	<ul>
-	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
-	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
-	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">operation_name</span><span class="metric_label">plugin_name</span></li></ul>
 	</div><div class="metric" data-stability="alpha">
 	<div class="metric_name">volume_operation_total_seconds</div>
 	<div class="metric_help">Storage operation end to end duration in seconds</div>
