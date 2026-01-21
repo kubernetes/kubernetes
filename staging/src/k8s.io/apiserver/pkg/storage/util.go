@@ -21,11 +21,26 @@ import (
 	"strings"
 	"sync/atomic"
 
+	"context"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/validation/path"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
+
+type prefetchKeyType int
+
+const prefetchKey prefetchKeyType = iota
+
+func WithPrefetch(ctx context.Context) context.Context {
+	return context.WithValue(ctx, prefetchKey, true)
+}
+
+func AllowPrefetch(ctx context.Context) bool {
+	v := ctx.Value(prefetchKey)
+	return v != nil && v.(bool)
+}
 
 type SimpleUpdateFunc func(runtime.Object) (runtime.Object, error)
 
