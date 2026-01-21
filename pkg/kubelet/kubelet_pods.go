@@ -1293,7 +1293,7 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 	// in the future (volumes, mount dirs, logs, and containers could all be
 	// better separated)
 	logger.V(3).Info("Clean up orphaned pod directories")
-	err = kl.cleanupOrphanedPodDirs(allPods, runningRuntimePods)
+	err = kl.cleanupOrphanedPodDirs(logger, allPods, runningRuntimePods)
 	if err != nil {
 		// We want all cleanup tasks to be run even if one of them failed. So
 		// we just log an error here and continue other cleanup tasks.
@@ -2842,7 +2842,7 @@ func (kl *Kubelet) cleanupOrphanedPodCgroups(logger klog.Logger, pcm cm.PodConta
 		// so any memory backed volumes don't have their charges propagated to the
 		// parent croup.  If the volumes still exist, reduce the cpu shares for any
 		// process in the cgroup to the minimum value while we wait.
-		if podVolumesExist := kl.podVolumesExist(uid); podVolumesExist {
+		if podVolumesExist := kl.podVolumesExist(logger, uid); podVolumesExist {
 			logger.V(3).Info("Orphaned pod found, but volumes not yet removed.  Reducing cpu to minimum", "podUID", uid)
 			if err := pcm.ReduceCPULimits(logger, val); err != nil {
 				logger.Info("Failed to reduce cpu time for pod pending volume cleanup", "podUID", uid, "err", err)
