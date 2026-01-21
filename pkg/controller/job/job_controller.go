@@ -1816,8 +1816,9 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 						atomic.AddInt32(&active, -1)
 						errCh <- err
 						atomic.AddInt32(&creationsFailed, 1)
+					} else {
+						atomic.AddInt32(&creationsSucceeded, 1)
 					}
-					atomic.AddInt32(&creationsSucceeded, 1)
 				}()
 			}
 			wait.Wait()
