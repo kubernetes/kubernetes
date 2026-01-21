@@ -231,3 +231,66 @@ func validateTerminatedPodsTrackingFinalizerTotal(event string, want int) error 
 	}
 	return nil
 }
+
+func TestRecordJobPodFailurePolicyActions(t *testing.T) {
+	metrics.Register()
+
+	cases := map[string]struct {
+		input map[string]int
+		want  map[string]int
+	}{
+		"no actions": {
+			input: nil,
+			want: map[string]int{
+				"FailJob": 0,
+				"Ignore":  0,
+				"Count":   0,
+			},
+		},
+		"single action": {
+			input: map[string]int{
+				"FailJob": 2,
+			},
+			want: map[string]int{
+				"FailJob": 2,
+				"Ignore":  0,
+				"Count":   0,
+			},
+		},
+		"multiple actions": {
+			input: map[string]int{
+				"FailJob": 2,
+				"Ignore":  3,
+				"Count":   1,
+			},
+			want: map[string]int{
+				"FailJob": 2,
+				"Ignore":  3,
+				"Count":   1,
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			metrics.PodFailuresHandledByFailurePolicy.Reset()
+			recordJobPodFailurePolicyActions(tc.input)
+			for action, want := range tc.want {
+				if err := validatePodFailuresHandledByFailurePolicyTotal(action, want); err != nil {
+					t.Errorf("Failed validating pod_failures_handled_by_failure_policy_total(%s): %v", action, err)
+				}
+			}
+		})
+	}
+}
+
+func validatePodFailuresHandledByFailurePolicyTotal(action string, want int) error {
+	got, err := testutil.GetCounterMetricValue(metrics.PodFailuresHandledByFailurePolicy.WithLabelValues(action))
+	if err != nil {
+		return err
+	}
+	if int(got) != want {
+		return fmt.Errorf("got value %d, want %d", int(got), want)
+	}
+	return nil
+}
