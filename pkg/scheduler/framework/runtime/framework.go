@@ -1214,24 +1214,21 @@ func addGENominatedPods(ctx context.Context, fh fwk.Handle, pod *v1.Pod, state f
 	if len(nominatedPodInfos) == 0 {
 		return false, state, nodeInfo, nil
 	}
-	nodeInfoOut := nodeInfo.Snapshot()
+	nodeInfoOut := nodeInfo
 	stateOut := state
 	podsAdded := false
-	podsToAdd := []fwk.PodInfo{}
 	for _, pi := range nominatedPodInfos {
 		if corev1.PodPriority(pi.GetPod()) >= corev1.PodPriority(pod) && pi.GetPod().UID != pod.UID {
-			podsToAdd = append(podsToAdd, pi)
 			if !podsAdded {
 				stateOut = state.Clone()
+				nodeInfoOut = nodeInfo.Snapshot()
+				podsAdded = true
 			}
-			podsAdded = true
-		}
-	}
-	for _, pi := range podsToAdd {
-		nodeInfoOut.AddPodInfo(pi)
-		status := fh.RunPreFilterExtensionAddPod(ctx, stateOut, pod, pi, nodeInfoOut)
-		if !status.IsSuccess() {
-			return false, state, nodeInfo, status.AsError()
+			nodeInfoOut.AddPodInfo(pi)
+			status := fh.RunPreFilterExtensionAddPod(ctx, stateOut, pod, pi, nodeInfoOut)
+			if !status.IsSuccess() {
+				return false, state, nodeInfo, status.AsError()
+			}
 		}
 	}
 	return podsAdded, stateOut, nodeInfoOut, nil
