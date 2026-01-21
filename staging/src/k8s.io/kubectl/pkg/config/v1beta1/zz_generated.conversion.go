@@ -118,7 +118,7 @@ func Convert_config_AliasOverride_To_v1beta1_AliasOverride(in *config.AliasOverr
 }
 
 func autoConvert_v1beta1_AllowlistEntry_To_config_AllowlistEntry(in *AllowlistEntry, out *config.AllowlistEntry, s conversion.Scope) error {
-	out.Name = in.Name
+	out.Command = in.Command
 	return nil
 }
 
@@ -128,7 +128,7 @@ func Convert_v1beta1_AllowlistEntry_To_config_AllowlistEntry(in *AllowlistEntry,
 }
 
 func autoConvert_config_AllowlistEntry_To_v1beta1_AllowlistEntry(in *config.AllowlistEntry, out *AllowlistEntry, s conversion.Scope) error {
-	out.Name = in.Name
+	out.Command = in.Command
 	return nil
 }
 
