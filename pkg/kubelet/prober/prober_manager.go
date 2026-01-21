@@ -114,6 +114,9 @@ type manager struct {
 	// prober executes the probe actions.
 	prober *prober
 
+	// recorder records events associated with the probe
+	recorder record.EventRecorder
+
 	start time.Time
 }
 
@@ -130,6 +133,7 @@ func NewManager(
 	return &manager{
 		statusManager:    statusManager,
 		prober:           prober,
+		recorder:         recorder,
 		readinessManager: readinessManager,
 		livenessManager:  livenessManager,
 		startupManager:   startupManager,
@@ -198,7 +202,7 @@ func (m *manager) AddPod(ctx context.Context, pod *v1.Pod) {
 					"pod", klog.KObj(pod), "containerName", c.Name)
 				return
 			}
-			w := newWorker(m, startup, pod, c)
+			w := newWorker(m, m.recorder, startup, pod, c)
 			m.workers[key] = w
 			go w.run(ctx)
 		}
@@ -210,7 +214,7 @@ func (m *manager) AddPod(ctx context.Context, pod *v1.Pod) {
 					"pod", klog.KObj(pod), "containerName", c.Name)
 				return
 			}
-			w := newWorker(m, readiness, pod, c)
+			w := newWorker(m, m.recorder, readiness, pod, c)
 			m.workers[key] = w
 			go w.run(ctx)
 		}
@@ -222,7 +226,7 @@ func (m *manager) AddPod(ctx context.Context, pod *v1.Pod) {
 					"pod", klog.KObj(pod), "containerName", c.Name)
 				return
 			}
-			w := newWorker(m, liveness, pod, c)
+			w := newWorker(m, m.recorder, liveness, pod, c)
 			m.workers[key] = w
 			go w.run(ctx)
 		}
