@@ -16,7 +16,7 @@ type (
 	// set into a wire representation.
 	Encoder interface {
 		// Encode returns the serialized encoding of the attribute set using
-		// its Iterator. This result may be cached by a attribute.Set.
+		// its Iterator. This result may be cached by an attribute.Set.
 		Encode(iterator Iterator) string
 
 		// ID returns a value that is unique for each class of attribute

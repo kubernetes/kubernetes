@@ -34,7 +34,7 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// AnyValue is used to represent any type of attribute value. AnyValue may contain a
+// Represents any type of attribute value. AnyValue may contain a
 // primitive value such as a string or integer or it may contain an arbitrary nested
 // object containing arrays, key-value lists and primitives.
 type AnyValue struct {
@@ -252,8 +252,10 @@ type KeyValueList struct {
 
 	// A collection of key/value pairs of key-value pairs. The list may be empty (may
 	// contain 0 elements).
+	//
 	// The keys MUST be unique (it is not allowed to have more than one
 	// value with the same key).
+	// The behavior of software that receives duplicated keys can be unpredictable.
 	Values []*KeyValue `protobuf:"bytes,1,rep,name=values,proto3" json:"values,omitempty"`
 }
 
@@ -296,14 +298,16 @@ func (x *KeyValueList) GetValues() []*KeyValue {
 	return nil
 }
 
-// KeyValue is a key-value pair that is used to store Span attributes, Link
+// Represents a key-value pair that is used to store Span attributes, Link
 // attributes, etc.
 type KeyValue struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Key   string    `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	// The key name of the pair.
+	Key string `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	// The value of the pair.
 	Value *AnyValue `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
 }
 
@@ -360,14 +364,21 @@ type InstrumentationScope struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
+	// A name denoting the Instrumentation scope.
 	// An empty instrumentation scope name means the name is unknown.
-	Name    string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// Defines the version of the instrumentation scope.
+	// An empty instrumentation scope version means the version is unknown.
 	Version string `protobuf:"bytes,2,opt,name=version,proto3" json:"version,omitempty"`
 	// Additional attributes that describe the scope. [Optional].
 	// Attribute keys MUST be unique (it is not allowed to have more than one
 	// attribute with the same key).
-	Attributes             []*KeyValue `protobuf:"bytes,3,rep,name=attributes,proto3" json:"attributes,omitempty"`
-	DroppedAttributesCount uint32      `protobuf:"varint,4,opt,name=dropped_attributes_count,json=droppedAttributesCount,proto3" json:"dropped_attributes_count,omitempty"`
+	// The behavior of software that receives duplicated keys can be unpredictable.
+	Attributes []*KeyValue `protobuf:"bytes,3,rep,name=attributes,proto3" json:"attributes,omitempty"`
+	// The number of attributes that were discarded. Attributes
+	// can be discarded because their keys are too long or because there are too many
+	// attributes. If this value is 0, then no attributes were dropped.
+	DroppedAttributesCount uint32 `protobuf:"varint,4,opt,name=dropped_attributes_count,json=droppedAttributesCount,proto3" json:"dropped_attributes_count,omitempty"`
 }
 
 func (x *InstrumentationScope) Reset() {
@@ -430,6 +441,101 @@ func (x *InstrumentationScope) GetDroppedAttributesCount() uint32 {
 	return 0
 }
 
+// A reference to an Entity.
+// Entity represents an object of interest associated with produced telemetry: e.g spans, metrics, profiles, or logs.
+//
+// Status: [Development]
+type EntityRef struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	// The Schema URL, if known. This is the identifier of the Schema that the entity data
+	// is recorded in. To learn more about Schema URL see
+	// https://opentelemetry.io/docs/specs/otel/schemas/#schema-url
+	//
+	// This schema_url applies to the data in this message and to the Resource attributes
+	// referenced by id_keys and description_keys.
+	// TODO: discuss if we are happy with this somewhat complicated definition of what
+	// the schema_url applies to.
+	//
+	// This field obsoletes the schema_url field in ResourceMetrics/ResourceSpans/ResourceLogs.
+	SchemaUrl string `protobuf:"bytes,1,opt,name=schema_url,json=schemaUrl,proto3" json:"schema_url,omitempty"`
+	// Defines the type of the entity. MUST not change during the lifetime of the entity.
+	// For example: "service" or "host". This field is required and MUST not be empty
+	// for valid entities.
+	Type string `protobuf:"bytes,2,opt,name=type,proto3" json:"type,omitempty"`
+	// Attribute Keys that identify the entity.
+	// MUST not change during the lifetime of the entity. The Id must contain at least one attribute.
+	// These keys MUST exist in the containing {message}.attributes.
+	IdKeys []string `protobuf:"bytes,3,rep,name=id_keys,json=idKeys,proto3" json:"id_keys,omitempty"`
+	// Descriptive (non-identifying) attribute keys of the entity.
+	// MAY change over the lifetime of the entity. MAY be empty.
+	// These attribute keys are not part of entity's identity.
+	// These keys MUST exist in the containing {message}.attributes.
+	DescriptionKeys []string `protobuf:"bytes,4,rep,name=description_keys,json=descriptionKeys,proto3" json:"description_keys,omitempty"`
+}
+
+func (x *EntityRef) Reset() {
+	*x = EntityRef{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_opentelemetry_proto_common_v1_common_proto_msgTypes[5]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *EntityRef) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EntityRef) ProtoMessage() {}
+
+func (x *EntityRef) ProtoReflect() protoreflect.Message {
+	mi := &file_opentelemetry_proto_common_v1_common_proto_msgTypes[5]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EntityRef.ProtoReflect.Descriptor instead.
+func (*EntityRef) Descriptor() ([]byte, []int) {
+	return file_opentelemetry_proto_common_v1_common_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *EntityRef) GetSchemaUrl() string {
+	if x != nil {
+		return x.SchemaUrl
+	}
+	return ""
+}
+
+func (x *EntityRef) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *EntityRef) GetIdKeys() []string {
+	if x != nil {
+		return x.IdKeys
+	}
+	return nil
+}
+
+func (x *EntityRef) GetDescriptionKeys() []string {
+	if x != nil {
+		return x.DescriptionKeys
+	}
+	return nil
+}
+
 var File_opentelemetry_proto_common_v1_common_proto protoreflect.FileDescriptor
 
 var file_opentelemetry_proto_common_v1_common_proto_rawDesc = []byte{
@@ -488,15 +594,23 @@ var file_opentelemetry_proto_common_v1_common_proto_rawDesc = []byte{
 	0x72, 0x6f, 0x70, 0x70, 0x65, 0x64, 0x5f, 0x61, 0x74, 0x74, 0x72, 0x69, 0x62, 0x75, 0x74, 0x65,
 	0x73, 0x5f, 0x63, 0x6f, 0x75, 0x6e, 0x74, 0x18, 0x04, 0x20, 0x01, 0x28, 0x0d, 0x52, 0x16, 0x64,
 	0x72, 0x6f, 0x70, 0x70, 0x65, 0x64, 0x41, 0x74, 0x74, 0x72, 0x69, 0x62, 0x75, 0x74, 0x65, 0x73,
-	0x43, 0x6f, 0x75, 0x6e, 0x74, 0x42, 0x7b, 0x0a, 0x20, 0x69, 0x6f, 0x2e, 0x6f, 0x70, 0x65, 0x6e,
-	0x74, 0x65, 0x6c, 0x65, 0x6d, 0x65, 0x74, 0x72, 0x79, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e,
-	0x63, 0x6f, 0x6d, 0x6d, 0x6f, 0x6e, 0x2e, 0x76, 0x31, 0x42, 0x0b, 0x43, 0x6f, 0x6d, 0x6d, 0x6f,
-	0x6e, 0x50, 0x72, 0x6f, 0x74, 0x6f, 0x50, 0x01, 0x5a, 0x28, 0x67, 0x6f, 0x2e, 0x6f, 0x70, 0x65,
-	0x6e, 0x74, 0x65, 0x6c, 0x65, 0x6d, 0x65, 0x74, 0x72, 0x79, 0x2e, 0x69, 0x6f, 0x2f, 0x70, 0x72,
-	0x6f, 0x74, 0x6f, 0x2f, 0x6f, 0x74, 0x6c, 0x70, 0x2f, 0x63, 0x6f, 0x6d, 0x6d, 0x6f, 0x6e, 0x2f,
-	0x76, 0x31, 0xaa, 0x02, 0x1d, 0x4f, 0x70, 0x65, 0x6e, 0x54, 0x65, 0x6c, 0x65, 0x6d, 0x65, 0x74,
-	0x72, 0x79, 0x2e, 0x50, 0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x43, 0x6f, 0x6d, 0x6d, 0x6f, 0x6e, 0x2e,
-	0x56, 0x31, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x43, 0x6f, 0x75, 0x6e, 0x74, 0x22, 0x82, 0x01, 0x0a, 0x09, 0x45, 0x6e, 0x74, 0x69, 0x74, 0x79,
+	0x52, 0x65, 0x66, 0x12, 0x1d, 0x0a, 0x0a, 0x73, 0x63, 0x68, 0x65, 0x6d, 0x61, 0x5f, 0x75, 0x72,
+	0x6c, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x09, 0x73, 0x63, 0x68, 0x65, 0x6d, 0x61, 0x55,
+	0x72, 0x6c, 0x12, 0x12, 0x0a, 0x04, 0x74, 0x79, 0x70, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09,
+	0x52, 0x04, 0x74, 0x79, 0x70, 0x65, 0x12, 0x17, 0x0a, 0x07, 0x69, 0x64, 0x5f, 0x6b, 0x65, 0x79,
+	0x73, 0x18, 0x03, 0x20, 0x03, 0x28, 0x09, 0x52, 0x06, 0x69, 0x64, 0x4b, 0x65, 0x79, 0x73, 0x12,
+	0x29, 0x0a, 0x10, 0x64, 0x65, 0x73, 0x63, 0x72, 0x69, 0x70, 0x74, 0x69, 0x6f, 0x6e, 0x5f, 0x6b,
+	0x65, 0x79, 0x73, 0x18, 0x04, 0x20, 0x03, 0x28, 0x09, 0x52, 0x0f, 0x64, 0x65, 0x73, 0x63, 0x72,
+	0x69, 0x70, 0x74, 0x69, 0x6f, 0x6e, 0x4b, 0x65, 0x79, 0x73, 0x42, 0x7b, 0x0a, 0x20, 0x69, 0x6f,
+	0x2e, 0x6f, 0x70, 0x65, 0x6e, 0x74, 0x65, 0x6c, 0x65, 0x6d, 0x65, 0x74, 0x72, 0x79, 0x2e, 0x70,
+	0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x63, 0x6f, 0x6d, 0x6d, 0x6f, 0x6e, 0x2e, 0x76, 0x31, 0x42, 0x0b,
+	0x43, 0x6f, 0x6d, 0x6d, 0x6f, 0x6e, 0x50, 0x72, 0x6f, 0x74, 0x6f, 0x50, 0x01, 0x5a, 0x28, 0x67,
+	0x6f, 0x2e, 0x6f, 0x70, 0x65, 0x6e, 0x74, 0x65, 0x6c, 0x65, 0x6d, 0x65, 0x74, 0x72, 0x79, 0x2e,
+	0x69, 0x6f, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2f, 0x6f, 0x74, 0x6c, 0x70, 0x2f, 0x63, 0x6f,
+	0x6d, 0x6d, 0x6f, 0x6e, 0x2f, 0x76, 0x31, 0xaa, 0x02, 0x1d, 0x4f, 0x70, 0x65, 0x6e, 0x54, 0x65,
+	0x6c, 0x65, 0x6d, 0x65, 0x74, 0x72, 0x79, 0x2e, 0x50, 0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x43, 0x6f,
+	0x6d, 0x6d, 0x6f, 0x6e, 0x2e, 0x56, 0x31, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -511,13 +625,14 @@ func file_opentelemetry_proto_common_v1_common_proto_rawDescGZIP() []byte {
 	return file_opentelemetry_proto_common_v1_common_proto_rawDescData
 }
 
-var file_opentelemetry_proto_common_v1_common_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_opentelemetry_proto_common_v1_common_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_opentelemetry_proto_common_v1_common_proto_goTypes = []interface{}{
 	(*AnyValue)(nil),             // 0: opentelemetry.proto.common.v1.AnyValue
 	(*ArrayValue)(nil),           // 1: opentelemetry.proto.common.v1.ArrayValue
 	(*KeyValueList)(nil),         // 2: opentelemetry.proto.common.v1.KeyValueList
 	(*KeyValue)(nil),             // 3: opentelemetry.proto.common.v1.KeyValue
 	(*InstrumentationScope)(nil), // 4: opentelemetry.proto.common.v1.InstrumentationScope
+	(*EntityRef)(nil),            // 5: opentelemetry.proto.common.v1.EntityRef
 }
 var file_opentelemetry_proto_common_v1_common_proto_depIdxs = []int32{
 	1, // 0: opentelemetry.proto.common.v1.AnyValue.array_value:type_name -> opentelemetry.proto.common.v1.ArrayValue
@@ -599,6 +714,18 @@ func file_opentelemetry_proto_common_v1_common_proto_init() {
 				return nil
 			}
 		}
+		file_opentelemetry_proto_common_v1_common_proto_msgTypes[5].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*EntityRef); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 	}
 	file_opentelemetry_proto_common_v1_common_proto_msgTypes[0].OneofWrappers = []interface{}{
 		(*AnyValue_StringValue)(nil),
@@ -615,7 +742,7 @@ func file_opentelemetry_proto_common_v1_common_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_opentelemetry_proto_common_v1_common_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   5,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

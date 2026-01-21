@@ -3,7 +3,7 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-// Package httpconv provides types and functionality for OpenTelemetry semantic
+// Package otelconv provides types and functionality for OpenTelemetry semantic
 // conventions in the "otel" namespace.
 package otelconv
 
@@ -172,6 +172,11 @@ type SDKExporterLogExported struct {
 	metric.Int64Counter
 }
 
+var newSDKExporterLogExportedOpts = []metric.Int64CounterOption{
+	metric.WithDescription("The number of log records for which the export has finished, either successful or failed."),
+	metric.WithUnit("{log_record}"),
+}
+
 // NewSDKExporterLogExported returns a new SDKExporterLogExported instrument.
 func NewSDKExporterLogExported(
 	m metric.Meter,
@@ -182,15 +187,18 @@ func NewSDKExporterLogExported(
 		return SDKExporterLogExported{noop.Int64Counter{}}, nil
 	}
 
+	if len(opt) == 0 {
+		opt = newSDKExporterLogExportedOpts
+	} else {
+		opt = append(opt, newSDKExporterLogExportedOpts...)
+	}
+
 	i, err := m.Int64Counter(
 		"otel.sdk.exporter.log.exported",
-		append([]metric.Int64CounterOption{
-			metric.WithDescription("The number of log records for which the export has finished, either successful or failed."),
-			metric.WithUnit("{log_record}"),
-		}, opt...)...,
+		opt...,
 	)
 	if err != nil {
-	    return SDKExporterLogExported{noop.Int64Counter{}}, err
+		return SDKExporterLogExported{noop.Int64Counter{}}, err
 	}
 	return SDKExporterLogExported{i}, nil
 }
@@ -319,6 +327,11 @@ type SDKExporterLogInflight struct {
 	metric.Int64UpDownCounter
 }
 
+var newSDKExporterLogInflightOpts = []metric.Int64UpDownCounterOption{
+	metric.WithDescription("The number of log records which were passed to the exporter, but that have not been exported yet (neither successful, nor failed)."),
+	metric.WithUnit("{log_record}"),
+}
+
 // NewSDKExporterLogInflight returns a new SDKExporterLogInflight instrument.
 func NewSDKExporterLogInflight(
 	m metric.Meter,
@@ -329,15 +342,18 @@ func NewSDKExporterLogInflight(
 		return SDKExporterLogInflight{noop.Int64UpDownCounter{}}, nil
 	}
 
+	if len(opt) == 0 {
+		opt = newSDKExporterLogInflightOpts
+	} else {
+		opt = append(opt, newSDKExporterLogInflightOpts...)
+	}
+
 	i, err := m.Int64UpDownCounter(
 		"otel.sdk.exporter.log.inflight",
-		append([]metric.Int64UpDownCounterOption{
-			metric.WithDescription("The number of log records which were passed to the exporter, but that have not been exported yet (neither successful, nor failed)."),
-			metric.WithUnit("{log_record}"),
-		}, opt...)...,
+		opt...,
 	)
 	if err != nil {
-	    return SDKExporterLogInflight{noop.Int64UpDownCounter{}}, err
+		return SDKExporterLogInflight{noop.Int64UpDownCounter{}}, err
 	}
 	return SDKExporterLogInflight{i}, nil
 }
@@ -449,6 +465,11 @@ type SDKExporterMetricDataPointExported struct {
 	metric.Int64Counter
 }
 
+var newSDKExporterMetricDataPointExportedOpts = []metric.Int64CounterOption{
+	metric.WithDescription("The number of metric data points for which the export has finished, either successful or failed."),
+	metric.WithUnit("{data_point}"),
+}
+
 // NewSDKExporterMetricDataPointExported returns a new
 // SDKExporterMetricDataPointExported instrument.
 func NewSDKExporterMetricDataPointExported(
@@ -460,15 +481,18 @@ func NewSDKExporterMetricDataPointExported(
 		return SDKExporterMetricDataPointExported{noop.Int64Counter{}}, nil
 	}
 
+	if len(opt) == 0 {
+		opt = newSDKExporterMetricDataPointExportedOpts
+	} else {
+		opt = append(opt, newSDKExporterMetricDataPointExportedOpts...)
+	}
+
 	i, err := m.Int64Counter(
 		"otel.sdk.exporter.metric_data_point.exported",
-		append([]metric.Int64CounterOption{
-			metric.WithDescription("The number of metric data points for which the export has finished, either successful or failed."),
-			metric.WithUnit("{data_point}"),
-		}, opt...)...,
+		opt...,
 	)
 	if err != nil {
-	    return SDKExporterMetricDataPointExported{noop.Int64Counter{}}, err
+		return SDKExporterMetricDataPointExported{noop.Int64Counter{}}, err
 	}
 	return SDKExporterMetricDataPointExported{i}, nil
 }
@@ -598,6 +622,11 @@ type SDKExporterMetricDataPointInflight struct {
 	metric.Int64UpDownCounter
 }
 
+var newSDKExporterMetricDataPointInflightOpts = []metric.Int64UpDownCounterOption{
+	metric.WithDescription("The number of metric data points which were passed to the exporter, but that have not been exported yet (neither successful, nor failed)."),
+	metric.WithUnit("{data_point}"),
+}
+
 // NewSDKExporterMetricDataPointInflight returns a new
 // SDKExporterMetricDataPointInflight instrument.
 func NewSDKExporterMetricDataPointInflight(
@@ -609,15 +638,18 @@ func NewSDKExporterMetricDataPointInflight(
 		return SDKExporterMetricDataPointInflight{noop.Int64UpDownCounter{}}, nil
 	}
 
+	if len(opt) == 0 {
+		opt = newSDKExporterMetricDataPointInflightOpts
+	} else {
+		opt = append(opt, newSDKExporterMetricDataPointInflightOpts...)
+	}
+
 	i, err := m.Int64UpDownCounter(
 		"otel.sdk.exporter.metric_data_point.inflight",
-		append([]metric.Int64UpDownCounterOption{
-			metric.WithDescription("The number of metric data points which were passed to the exporter, but that have not been exported yet (neither successful, nor failed)."),
-			metric.WithUnit("{data_point}"),
-		}, opt...)...,
+		opt...,
 	)
 	if err != nil {
-	    return SDKExporterMetricDataPointInflight{noop.Int64UpDownCounter{}}, err
+		return SDKExporterMetricDataPointInflight{noop.Int64UpDownCounter{}}, err
 	}
 	return SDKExporterMetricDataPointInflight{i}, nil
 }
@@ -728,6 +760,11 @@ type SDKExporterOperationDuration struct {
 	metric.Float64Histogram
 }
 
+var newSDKExporterOperationDurationOpts = []metric.Float64HistogramOption{
+	metric.WithDescription("The duration of exporting a batch of telemetry records."),
+	metric.WithUnit("s"),
+}
+
 // NewSDKExporterOperationDuration returns a new SDKExporterOperationDuration
 // instrument.
 func NewSDKExporterOperationDuration(
@@ -739,15 +776,18 @@ func NewSDKExporterOperationDuration(
 		return SDKExporterOperationDuration{noop.Float64Histogram{}}, nil
 	}
 
+	if len(opt) == 0 {
+		opt = newSDKExporterOperationDurationOpts
+	} else {
+		opt = append(opt, newSDKExporterOperationDurationOpts...)
+	}
+
 	i, err := m.Float64Histogram(
 		"otel.sdk.exporter.operation.duration",
-		append([]metric.Float64HistogramOption{
-			metric.WithDescription("The duration of exporting a batch of telemetry records."),
-			metric.WithUnit("s"),
-		}, opt...)...,
+		opt...,
 	)
 	if err != nil {
-	    return SDKExporterOperationDuration{noop.Float64Histogram{}}, err
+		return SDKExporterOperationDuration{noop.Float64Histogram{}}, err
 	}
 	return SDKExporterOperationDuration{i}, nil
 }
@@ -825,6 +865,7 @@ func (m SDKExporterOperationDuration) Record(
 func (m SDKExporterOperationDuration) RecordSet(ctx context.Context, val float64, set attribute.Set) {
 	if set.Len() == 0 {
 		m.Float64Histogram.Record(ctx, val)
+		return
 	}
 
 	o := recOptPool.Get().(*[]metric.RecordOption)
@@ -893,6 +934,11 @@ type SDKExporterSpanExported struct {
 	metric.Int64Counter
 }
 
+var newSDKExporterSpanExportedOpts = []metric.Int64CounterOption{
+	metric.WithDescription("The number of spans for which the export has finished, either successful or failed."),
+	metric.WithUnit("{span}"),
+}
+
 // NewSDKExporterSpanExported returns a new SDKExporterSpanExported instrument.
 func NewSDKExporterSpanExported(
 	m metric.Meter,
@@ -903,15 +949,18 @@ func NewSDKExporterSpanExported(
 		return SDKExporterSpanExported{noop.Int64Counter{}}, nil
 	}
 
+	if len(opt) == 0 {
+		opt = newSDKExporterSpanExportedOpts
+	} else {
+		opt = append(opt, newSDKExporterSpanExportedOpts...)
+	}
+
 	i, err := m.Int64Counter(
 		"otel.sdk.exporter.span.exported",
-		append([]metric.Int64CounterOption{
-			metric.WithDescription("The number of spans for which the export has finished, either successful or failed."),
-			metric.WithUnit("{span}"),
-		}, opt...)...,
+		opt...,
 	)
 	if err != nil {
-	    return SDKExporterSpanExported{noop.Int64Counter{}}, err
+		return SDKExporterSpanExported{noop.Int64Counter{}}, err
 	}
 	return SDKExporterSpanExported{i}, nil
 }
@@ -1040,6 +1089,11 @@ type SDKExporterSpanInflight struct {
 	metric.Int64UpDownCounter
 }
 
+var newSDKExporterSpanInflightOpts = []metric.Int64UpDownCounterOption{
+	metric.WithDescription("The number of spans which were passed to the exporter, but that have not been exported yet (neither successful, nor failed)."),
+	metric.WithUnit("{span}"),
+}
+
 // NewSDKExporterSpanInflight returns a new SDKExporterSpanInflight instrument.
 func NewSDKExporterSpanInflight(
 	m metric.Meter,
@@ -1050,15 +1104,18 @@ func NewSDKExporterSpanInflight(
 		return SDKExporterSpanInflight{noop.Int64UpDownCounter{}}, nil
 	}
 
+	if len(opt) == 0 {
+		opt = newSDKExporterSpanInflightOpts
+	} else {
+		opt = append(opt, newSDKExporterSpanInflightOpts...)
+	}
+
 	i, err := m.Int64UpDownCounter(
 		"otel.sdk.exporter.span.inflight",
-		append([]metric.Int64UpDownCounterOption{
-			metric.WithDescription("The number of spans which were passed to the exporter, but that have not been exported yet (neither successful, nor failed)."),
-			metric.WithUnit("{span}"),
-		}, opt...)...,
+		opt...,
 	)
 	if err != nil {
-	    return SDKExporterSpanInflight{noop.Int64UpDownCounter{}}, err
+		return SDKExporterSpanInflight{noop.Int64UpDownCounter{}}, err
 	}
 	return SDKExporterSpanInflight{i}, nil
 }
@@ -1169,6 +1226,11 @@ type SDKLogCreated struct {
 	metric.Int64Counter
 }
 
+var newSDKLogCreatedOpts = []metric.Int64CounterOption{
+	metric.WithDescription("The number of logs submitted to enabled SDK Loggers."),
+	metric.WithUnit("{log_record}"),
+}
+
 // NewSDKLogCreated returns a new SDKLogCreated instrument.
 func NewSDKLogCreated(
 	m metric.Meter,
@@ -1179,15 +1241,18 @@ func NewSDKLogCreated(
 		return SDKLogCreated{noop.Int64Counter{}}, nil
 	}
 
+	if len(opt) == 0 {
+		opt = newSDKLogCreatedOpts
+	} else {
+		opt = append(opt, newSDKLogCreatedOpts...)
+	}
+
 	i, err := m.Int64Counter(
 		"otel.sdk.log.created",
-		append([]metric.Int64CounterOption{
-			metric.WithDescription("The number of logs submitted to enabled SDK Loggers."),
-			metric.WithUnit("{log_record}"),
-		}, opt...)...,
+		opt...,
 	)
 	if err != nil {
-	    return SDKLogCreated{noop.Int64Counter{}}, err
+		return SDKLogCreated{noop.Int64Counter{}}, err
 	}
 	return SDKLogCreated{i}, nil
 }
@@ -1254,6 +1319,11 @@ type SDKMetricReaderCollectionDuration struct {
 	metric.Float64Histogram
 }
 
+var newSDKMetricReaderCollectionDurationOpts = []metric.Float64HistogramOption{
+	metric.WithDescription("The duration of the collect operation of the metric reader."),
+	metric.WithUnit("s"),
+}
+
 // NewSDKMetricReaderCollectionDuration returns a new
 // SDKMetricReaderCollectionDuration instrument.
 func NewSDKMetricReaderCollectionDuration(
@@ -1265,15 +1335,18 @@ func NewSDKMetricReaderCollectionDuration(
 		return SDKMetricReaderCollectionDuration{noop.Float64Histogram{}}, nil
 	}
 
+	if len(opt) == 0 {
+		opt = newSDKMetricReaderCollectionDurationOpts
+	} else {
+		opt = append(opt, newSDKMetricReaderCollectionDurationOpts...)
+	}
+
 	i, err := m.Float64Histogram(
 		"otel.sdk.metric_reader.collection.duration",
-		append([]metric.Float64HistogramOption{
-			metric.WithDescription("The duration of the collect operation of the metric reader."),
-			metric.WithUnit("s"),
-		}, opt...)...,
+		opt...,
 	)
 	if err != nil {
-	    return SDKMetricReaderCollectionDuration{noop.Float64Histogram{}}, err
+		return SDKMetricReaderCollectionDuration{noop.Float64Histogram{}}, err
 	}
 	return SDKMetricReaderCollectionDuration{i}, nil
 }
@@ -1343,6 +1416,7 @@ func (m SDKMetricReaderCollectionDuration) Record(
 func (m SDKMetricReaderCollectionDuration) RecordSet(ctx context.Context, val float64, set attribute.Set) {
 	if set.Len() == 0 {
 		m.Float64Histogram.Record(ctx, val)
+		return
 	}
 
 	o := recOptPool.Get().(*[]metric.RecordOption)
@@ -1384,6 +1458,11 @@ type SDKProcessorLogProcessed struct {
 	metric.Int64Counter
 }
 
+var newSDKProcessorLogProcessedOpts = []metric.Int64CounterOption{
+	metric.WithDescription("The number of log records for which the processing has finished, either successful or failed."),
+	metric.WithUnit("{log_record}"),
+}
+
 // NewSDKProcessorLogProcessed returns a new SDKProcessorLogProcessed instrument.
 func NewSDKProcessorLogProcessed(
 	m metric.Meter,
@@ -1394,15 +1473,18 @@ func NewSDKProcessorLogProcessed(
 		return SDKProcessorLogProcessed{noop.Int64Counter{}}, nil
 	}
 
+	if len(opt) == 0 {
+		opt = newSDKProcessorLogProcessedOpts
+	} else {
+		opt = append(opt, newSDKProcessorLogProcessedOpts...)
+	}
+
 	i, err := m.Int64Counter(
 		"otel.sdk.processor.log.processed",
-		append([]metric.Int64CounterOption{
-			metric.WithDescription("The number of log records for which the processing has finished, either successful or failed."),
-			metric.WithUnit("{log_record}"),
-		}, opt...)...,
+		opt...,
 	)
 	if err != nil {
-	    return SDKProcessorLogProcessed{noop.Int64Counter{}}, err
+		return SDKProcessorLogProcessed{noop.Int64Counter{}}, err
 	}
 	return SDKProcessorLogProcessed{i}, nil
 }
@@ -1515,6 +1597,11 @@ type SDKProcessorLogQueueCapacity struct {
 	metric.Int64ObservableUpDownCounter
 }
 
+var newSDKProcessorLogQueueCapacityOpts = []metric.Int64ObservableUpDownCounterOption{
+	metric.WithDescription("The maximum number of log records the queue of a given instance of an SDK Log Record processor can hold."),
+	metric.WithUnit("{log_record}"),
+}
+
 // NewSDKProcessorLogQueueCapacity returns a new SDKProcessorLogQueueCapacity
 // instrument.
 func NewSDKProcessorLogQueueCapacity(
@@ -1526,15 +1613,18 @@ func NewSDKProcessorLogQueueCapacity(
 		return SDKProcessorLogQueueCapacity{noop.Int64ObservableUpDownCounter{}}, nil
 	}
 
+	if len(opt) == 0 {
+		opt = newSDKProcessorLogQueueCapacityOpts
+	} else {
+		opt = append(opt, newSDKProcessorLogQueueCapacityOpts...)
+	}
+
 	i, err := m.Int64ObservableUpDownCounter(
 		"otel.sdk.processor.log.queue.capacity",
-		append([]metric.Int64ObservableUpDownCounterOption{
-			metric.WithDescription("The maximum number of log records the queue of a given instance of an SDK Log Record processor can hold."),
-			metric.WithUnit("{log_record}"),
-		}, opt...)...,
+		opt...,
 	)
 	if err != nil {
-	    return SDKProcessorLogQueueCapacity{noop.Int64ObservableUpDownCounter{}}, err
+		return SDKProcessorLogQueueCapacity{noop.Int64ObservableUpDownCounter{}}, err
 	}
 	return SDKProcessorLogQueueCapacity{i}, nil
 }
@@ -1581,6 +1671,11 @@ type SDKProcessorLogQueueSize struct {
 	metric.Int64ObservableUpDownCounter
 }
 
+var newSDKProcessorLogQueueSizeOpts = []metric.Int64ObservableUpDownCounterOption{
+	metric.WithDescription("The number of log records in the queue of a given instance of an SDK log processor."),
+	metric.WithUnit("{log_record}"),
+}
+
 // NewSDKProcessorLogQueueSize returns a new SDKProcessorLogQueueSize instrument.
 func NewSDKProcessorLogQueueSize(
 	m metric.Meter,
@@ -1591,15 +1686,18 @@ func NewSDKProcessorLogQueueSize(
 		return SDKProcessorLogQueueSize{noop.Int64ObservableUpDownCounter{}}, nil
 	}
 
+	if len(opt) == 0 {
+		opt = newSDKProcessorLogQueueSizeOpts
+	} else {
+		opt = append(opt, newSDKProcessorLogQueueSizeOpts...)
+	}
+
 	i, err := m.Int64ObservableUpDownCounter(
 		"otel.sdk.processor.log.queue.size",
-		append([]metric.Int64ObservableUpDownCounterOption{
-			metric.WithDescription("The number of log records in the queue of a given instance of an SDK log processor."),
-			metric.WithUnit("{log_record}"),
-		}, opt...)...,
+		opt...,
 	)
 	if err != nil {
-	    return SDKProcessorLogQueueSize{noop.Int64ObservableUpDownCounter{}}, err
+		return SDKProcessorLogQueueSize{noop.Int64ObservableUpDownCounter{}}, err
 	}
 	return SDKProcessorLogQueueSize{i}, nil
 }
@@ -1646,6 +1744,11 @@ type SDKProcessorSpanProcessed struct {
 	metric.Int64Counter
 }
 
+var newSDKProcessorSpanProcessedOpts = []metric.Int64CounterOption{
+	metric.WithDescription("The number of spans for which the processing has finished, either successful or failed."),
+	metric.WithUnit("{span}"),
+}
+
 // NewSDKProcessorSpanProcessed returns a new SDKProcessorSpanProcessed
 // instrument.
 func NewSDKProcessorSpanProcessed(
@@ -1657,15 +1760,18 @@ func NewSDKProcessorSpanProcessed(
 		return SDKProcessorSpanProcessed{noop.Int64Counter{}}, nil
 	}
 
+	if len(opt) == 0 {
+		opt = newSDKProcessorSpanProcessedOpts
+	} else {
+		opt = append(opt, newSDKProcessorSpanProcessedOpts...)
+	}
+
 	i, err := m.Int64Counter(
 		"otel.sdk.processor.span.processed",
-		append([]metric.Int64CounterOption{
-			metric.WithDescription("The number of spans for which the processing has finished, either successful or failed."),
-			metric.WithUnit("{span}"),
-		}, opt...)...,
+		opt...,
 	)
 	if err != nil {
-	    return SDKProcessorSpanProcessed{noop.Int64Counter{}}, err
+		return SDKProcessorSpanProcessed{noop.Int64Counter{}}, err
 	}
 	return SDKProcessorSpanProcessed{i}, nil
 }
@@ -1778,6 +1884,11 @@ type SDKProcessorSpanQueueCapacity struct {
 	metric.Int64ObservableUpDownCounter
 }
 
+var newSDKProcessorSpanQueueCapacityOpts = []metric.Int64ObservableUpDownCounterOption{
+	metric.WithDescription("The maximum number of spans the queue of a given instance of an SDK span processor can hold."),
+	metric.WithUnit("{span}"),
+}
+
 // NewSDKProcessorSpanQueueCapacity returns a new SDKProcessorSpanQueueCapacity
 // instrument.
 func NewSDKProcessorSpanQueueCapacity(
@@ -1789,15 +1900,18 @@ func NewSDKProcessorSpanQueueCapacity(
 		return SDKProcessorSpanQueueCapacity{noop.Int64ObservableUpDownCounter{}}, nil
 	}
 
+	if len(opt) == 0 {
+		opt = newSDKProcessorSpanQueueCapacityOpts
+	} else {
+		opt = append(opt, newSDKProcessorSpanQueueCapacityOpts...)
+	}
+
 	i, err := m.Int64ObservableUpDownCounter(
 		"otel.sdk.processor.span.queue.capacity",
-		append([]metric.Int64ObservableUpDownCounterOption{
-			metric.WithDescription("The maximum number of spans the queue of a given instance of an SDK span processor can hold."),
-			metric.WithUnit("{span}"),
-		}, opt...)...,
+		opt...,
 	)
 	if err != nil {
-	    return SDKProcessorSpanQueueCapacity{noop.Int64ObservableUpDownCounter{}}, err
+		return SDKProcessorSpanQueueCapacity{noop.Int64ObservableUpDownCounter{}}, err
 	}
 	return SDKProcessorSpanQueueCapacity{i}, nil
 }
@@ -1844,6 +1958,11 @@ type SDKProcessorSpanQueueSize struct {
 	metric.Int64ObservableUpDownCounter
 }
 
+var newSDKProcessorSpanQueueSizeOpts = []metric.Int64ObservableUpDownCounterOption{
+	metric.WithDescription("The number of spans in the queue of a given instance of an SDK span processor."),
+	metric.WithUnit("{span}"),
+}
+
 // NewSDKProcessorSpanQueueSize returns a new SDKProcessorSpanQueueSize
 // instrument.
 func NewSDKProcessorSpanQueueSize(
@@ -1855,15 +1974,18 @@ func NewSDKProcessorSpanQueueSize(
 		return SDKProcessorSpanQueueSize{noop.Int64ObservableUpDownCounter{}}, nil
 	}
 
+	if len(opt) == 0 {
+		opt = newSDKProcessorSpanQueueSizeOpts
+	} else {
+		opt = append(opt, newSDKProcessorSpanQueueSizeOpts...)
+	}
+
 	i, err := m.Int64ObservableUpDownCounter(
 		"otel.sdk.processor.span.queue.size",
-		append([]metric.Int64ObservableUpDownCounterOption{
-			metric.WithDescription("The number of spans in the queue of a given instance of an SDK span processor."),
-			metric.WithUnit("{span}"),
-		}, opt...)...,
+		opt...,
 	)
 	if err != nil {
-	    return SDKProcessorSpanQueueSize{noop.Int64ObservableUpDownCounter{}}, err
+		return SDKProcessorSpanQueueSize{noop.Int64ObservableUpDownCounter{}}, err
 	}
 	return SDKProcessorSpanQueueSize{i}, nil
 }
@@ -1910,6 +2032,11 @@ type SDKSpanLive struct {
 	metric.Int64UpDownCounter
 }
 
+var newSDKSpanLiveOpts = []metric.Int64UpDownCounterOption{
+	metric.WithDescription("The number of created spans with `recording=true` for which the end operation has not been called yet."),
+	metric.WithUnit("{span}"),
+}
+
 // NewSDKSpanLive returns a new SDKSpanLive instrument.
 func NewSDKSpanLive(
 	m metric.Meter,
@@ -1920,15 +2047,18 @@ func NewSDKSpanLive(
 		return SDKSpanLive{noop.Int64UpDownCounter{}}, nil
 	}
 
+	if len(opt) == 0 {
+		opt = newSDKSpanLiveOpts
+	} else {
+		opt = append(opt, newSDKSpanLiveOpts...)
+	}
+
 	i, err := m.Int64UpDownCounter(
 		"otel.sdk.span.live",
-		append([]metric.Int64UpDownCounterOption{
-			metric.WithDescription("The number of created spans with `recording=true` for which the end operation has not been called yet."),
-			metric.WithUnit("{span}"),
-		}, opt...)...,
+		opt...,
 	)
 	if err != nil {
-	    return SDKSpanLive{noop.Int64UpDownCounter{}}, err
+		return SDKSpanLive{noop.Int64UpDownCounter{}}, err
 	}
 	return SDKSpanLive{i}, nil
 }
@@ -2013,6 +2143,11 @@ type SDKSpanStarted struct {
 	metric.Int64Counter
 }
 
+var newSDKSpanStartedOpts = []metric.Int64CounterOption{
+	metric.WithDescription("The number of created spans."),
+	metric.WithUnit("{span}"),
+}
+
 // NewSDKSpanStarted returns a new SDKSpanStarted instrument.
 func NewSDKSpanStarted(
 	m metric.Meter,
@@ -2023,15 +2158,18 @@ func NewSDKSpanStarted(
 		return SDKSpanStarted{noop.Int64Counter{}}, nil
 	}
 
+	if len(opt) == 0 {
+		opt = newSDKSpanStartedOpts
+	} else {
+		opt = append(opt, newSDKSpanStartedOpts...)
+	}
+
 	i, err := m.Int64Counter(
 		"otel.sdk.span.started",
-		append([]metric.Int64CounterOption{
-			metric.WithDescription("The number of created spans."),
-			metric.WithUnit("{span}"),
-		}, opt...)...,
+		opt...,
 	)
 	if err != nil {
-	    return SDKSpanStarted{noop.Int64Counter{}}, err
+		return SDKSpanStarted{noop.Int64Counter{}}, err
 	}
 	return SDKSpanStarted{i}, nil
 }
