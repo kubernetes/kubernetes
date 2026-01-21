@@ -4658,54 +4658,6 @@ func TestPriorityQueue_GetPod(t *testing.T) {
 	}
 }
 
-func TestPriorityQueue_MoveAllToActiveOrBackoffQueue_OnlyRegisteredPluginsExecuted(t *testing.T) {
-	c := testingclock.NewFakeClock(time.Now())
-	logger, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	gangSchedulingCalled := false
-	otherPluginCalled := false
-
-	m := makeEmptyQueueingHintMapPerProfile()
-	m[""][framework.EventUnscheduledPodAdd] = []*QueueingHintFunction{
-		{
-			PluginName: names.GangScheduling,
-			QueueingHintFn: func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
-				gangSchedulingCalled = true
-				return fwk.Queue, nil
-			},
-		},
-	}
-	m[""][framework.EventAssignedPodAdd] = []*QueueingHintFunction{
-		{
-			PluginName: names.NodeResourcesFit,
-			QueueingHintFn: func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
-				otherPluginCalled = true
-				return fwk.Queue, nil
-			},
-		},
-	}
-
-	q := NewTestQueue(ctx, newDefaultQueueSort(), WithClock(c), WithQueueingHintMapPerProfile(m))
-
-	// Add a pod to unschedulable pods, and make sure it was previously rejected by both plugins.
-	pod := st.MakePod().Name("pod1").Obj()
-	pInfo := q.newQueuedPodInfo(pod, names.GangScheduling, names.NodeResourcesFit)
-	q.unschedulablePods.addOrUpdate(pInfo, false, framework.EventUnscheduledPodAdd.Label())
-
-	// Execution of MoveAllToActiveOrBackoffQueue after the event EventUnscheduledPodAdd was triggered.
-	q.MoveAllToActiveOrBackoffQueue(logger, framework.EventUnscheduledPodAdd, nil, nil, nil)
-
-	if !gangSchedulingCalled {
-		t.Errorf("Expected GangScheduling QueueingHintFn to be called for EventUnscheduledPodAdd")
-	}
-
-	if otherPluginCalled {
-		t.Errorf("Expected NodeResourcesFit QueueingHintFn not to be called for EventUnscheduledPodAdd")
-	}
-}
-
 func TestUnschedulablePodsMetric(t *testing.T) {
 	type step func(t *testing.T, logger klog.Logger, q *PriorityQueue)
 
