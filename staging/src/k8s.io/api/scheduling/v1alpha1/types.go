@@ -37,6 +37,7 @@ type PriorityClass struct {
 
 	// value represents the integer value of this priority class. This is the actual priority that pods
 	// receive when they have the name of this class in their pod spec.
+	// +optional
 	Value int32 `json:"value" protobuf:"bytes,2,opt,name=value"`
 
 	// globalDefault specifies whether this PriorityClass should be considered as

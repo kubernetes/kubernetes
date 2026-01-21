@@ -53207,7 +53207,6 @@ func schema_k8sio_api_scheduling_v1_PriorityClass(ref common.ReferenceCallback) 
 						},
 					},
 				},
-				Required: []string{"value"},
 			},
 		},
 		Dependencies: []string{
@@ -53416,7 +53415,6 @@ func schema_k8sio_api_scheduling_v1alpha1_PriorityClass(ref common.ReferenceCall
 						},
 					},
 				},
-				Required: []string{"value"},
 			},
 		},
 		Dependencies: []string{
@@ -53710,7 +53708,6 @@ func schema_k8sio_api_scheduling_v1beta1_PriorityClass(ref common.ReferenceCallb
 						},
 					},
 				},
-				Required: []string{"value"},
 			},
 		},
 		Dependencies: []string{
