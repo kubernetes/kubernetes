@@ -175,6 +175,13 @@ func (o objectTrackerReact) Create(action CreateActionImpl) (runtime.Object, err
 			})
 		} else {
 			// If the historical object type is different from the current object type, need to make sure we return the object submitted,don't persist the submitted object in the tracker.
+			// Special case: eviction subresource should delete the pod
+			if action.GetSubresource() == "eviction" && gvr.Resource == "pods" {
+				err = o.tracker.Delete(gvr, ns, objMeta.GetName())
+				if err != nil {
+					return nil, err
+				}
+			}
 			return action.GetObject(), nil
 		}
 	}

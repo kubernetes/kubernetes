@@ -752,3 +752,48 @@ func TestDoesClientSupportWatchListSemantics(t *testing.T) {
 		t.Fatalf("ObjectTracker should NOT support WatchList semantics")
 	}
 }
+
+func TestEvictionDeletesPod(t *testing.T) {
+	podResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
+	scheme := runtime.NewScheme()
+	scheme.AddKnownTypes(podResource.GroupVersion(), &v1.Pod{})
+	codecs := serializer.NewCodecFactory(scheme)
+	o := NewObjectTracker(scheme, codecs.UniversalDecoder())
+
+	// Create a pod
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-pod",
+			Namespace: "default",
+		},
+	}
+	err := o.Create(podResource, pod, "default")
+	require.NoError(t, err, "pod creation should succeed")
+
+	// Verify pod exists
+	_, err = o.Get(podResource, "default", "test-pod")
+	require.NoError(t, err, "pod should exist after creation")
+
+	// Create an eviction action (simulating what the fake client does)
+	eviction := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "policy/v1",
+			"kind":       "Eviction",
+			"metadata": map[string]interface{}{
+				"name":      "test-pod",
+				"namespace": "default",
+			},
+		},
+	}
+	action := NewCreateSubresourceAction(podResource, "test-pod", "eviction", "default", eviction)
+
+	// Execute the reaction
+	reaction := ObjectReaction(o)
+	handled, _, err := reaction(action)
+	assert.True(t, handled)
+	require.NoError(t, err, "eviction should succeed")
+
+	// Verify pod was deleted
+	_, err = o.Get(podResource, "default", "test-pod")
+	assert.True(t, errors.IsNotFound(err), "pod should be deleted after eviction")
+}

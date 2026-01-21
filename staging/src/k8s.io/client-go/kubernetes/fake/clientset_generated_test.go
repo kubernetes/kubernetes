@@ -20,7 +20,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
@@ -31,7 +30,6 @@ import (
 
 func TestNewSimpleClientset(t *testing.T) {
 	client := NewSimpleClientset()
-	expectedPods := []*v1.Pod{}
 
 	pod, err := client.CoreV1().Pods("default").Create(context.Background(), &v1.Pod{
 		ObjectMeta: meta_v1.ObjectMeta{
@@ -40,16 +38,20 @@ func TestNewSimpleClientset(t *testing.T) {
 		},
 	}, meta_v1.CreateOptions{})
 	require.NoError(t, err)
-	expectedPods = append(expectedPods, pod)
+	require.NotNil(t, pod)
 
-	pod, err = client.CoreV1().Pods("default").Create(context.Background(), &v1.Pod{
+	_, err = client.CoreV1().Pods("default").Create(context.Background(), &v1.Pod{
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name:      "pod-2",
 			Namespace: "default",
 		},
 	}, meta_v1.CreateOptions{})
 	require.NoError(t, err)
-	expectedPods = append(expectedPods, pod)
+
+	// Verify we have 2 pods before eviction
+	pods, err := client.CoreV1().Pods("default").List(context.Background(), meta_v1.ListOptions{})
+	require.NoError(t, err)
+	require.Len(t, pods.Items, 2, "expected 2 pods before eviction")
 
 	err = client.CoreV1().Pods("default").EvictV1(context.Background(), &policy.Eviction{
 		ObjectMeta: meta_v1.ObjectMeta{
@@ -58,9 +60,42 @@ func TestNewSimpleClientset(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	pods, err := client.CoreV1().Pods("default").List(context.Background(), meta_v1.ListOptions{})
+	// Verify pod-2 was deleted after eviction
+	pods, err = client.CoreV1().Pods("default").List(context.Background(), meta_v1.ListOptions{})
 	require.NoError(t, err)
-	cmp.Equal(expectedPods, pods.Items)
+	require.Len(t, pods.Items, 1, "expected 1 pod after eviction")
+	require.Equal(t, "pod-1", pods.Items[0].Name, "expected pod-1 to remain after evicting pod-2")
+}
+
+func TestEvictionDeletesPod(t *testing.T) {
+	client := NewSimpleClientset()
+	ctx := context.Background()
+	namespace := "default"
+	podName := "eviction-test-pod"
+
+	// Create a pod
+	_, err := client.CoreV1().Pods(namespace).Create(ctx, &v1.Pod{
+		ObjectMeta: meta_v1.ObjectMeta{Name: podName, Namespace: namespace},
+	}, meta_v1.CreateOptions{})
+	require.NoError(t, err, "pod creation should succeed")
+
+	// Verify pod exists
+	pods, err := client.CoreV1().Pods(namespace).List(ctx, meta_v1.ListOptions{})
+	require.NoError(t, err)
+	require.Len(t, pods.Items, 1, "pod should exist after creation")
+
+	// Evict the pod using PolicyV1
+	err = client.PolicyV1().Evictions(namespace).Evict(ctx, &policy.Eviction{
+		TypeMeta:      meta_v1.TypeMeta{APIVersion: "policy/v1", Kind: "Eviction"},
+		ObjectMeta:    meta_v1.ObjectMeta{Name: podName, Namespace: namespace},
+		DeleteOptions: &meta_v1.DeleteOptions{},
+	})
+	require.NoError(t, err, "eviction should succeed")
+
+	// Verify pod was deleted
+	pods, err = client.CoreV1().Pods(namespace).List(ctx, meta_v1.ListOptions{})
+	require.NoError(t, err)
+	require.Len(t, pods.Items, 0, "pod should be deleted after eviction")
 }
 
 func TestManagedFieldClientset(t *testing.T) {
