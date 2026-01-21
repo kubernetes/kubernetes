@@ -29,8 +29,8 @@ This image was originally named `jessie-dnsutils` (based on Debian Jessie). It w
 renamed to `glibc-dns-testing` to better reflect its actual purpose: testing glibc
 DNS resolution behavior, not any specific Debian version.
 
-See issue #10161 for the original discussion about libc DNS differences that
-motivated creating this image.
+See issue [#10161](https://github.com/kubernetes/kubernetes/issues/10161) for the
+original discussion about libc DNS differences that motivated creating this image.
 
 ## Contents
 
