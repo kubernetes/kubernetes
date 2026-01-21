@@ -4660,7 +4660,7 @@ func setupTestScheduler(ctx context.Context, t *testing.T, client clientset.Inte
 		nodeInfoSnapshot:         snapshot,
 		percentageOfNodesToScore: schedulerapi.DefaultPercentageOfNodesToScore,
 		NextPod: func(logger klog.Logger) (*framework.QueuedPodInfo, error) {
-			return &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(t, clientcache.Pop(queuedPodStore).(*v1.Pod))}, nil
+			return &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(t, pop(queuedPodStore).(*v1.Pod))}, nil
 		},
 		SchedulingQueue: schedulingQueue,
 		APIDispatcher:   apiDispatcher,
@@ -4742,4 +4742,14 @@ func mustNewPodInfo(t *testing.T, pod *v1.Pod) *framework.PodInfo {
 		t.Fatal(err)
 	}
 	return podInfo
+}
+
+func pop(queue clientcache.Queue) interface{} {
+	obj, err := queue.Pop(func(obj interface{}, isInInitialList bool) error {
+		return nil
+	})
+	if err != nil {
+		return nil
+	}
+	return obj
 }
