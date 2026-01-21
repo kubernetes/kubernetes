@@ -2773,6 +2773,8 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 				recordAdmissionRejection(reason)
 				continue
 			}
+			// Update NodeInfo cache after successful admission
+			kl.nodeInfoCache.AddPod(pod)
 
 			if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 				// Backfill the queue of pending resizes, but only after all the pods have
@@ -2809,6 +2811,10 @@ func (kl *Kubelet) HandlePodUpdates(logger klog.Logger, pods []*v1.Pod) {
 	for _, pod := range pods {
 		oldPod, _ := kl.podManager.GetPodByUID(pod.UID)
 		kl.podManager.UpdatePod(pod)
+		// Update NodeInfo cache if pod resources may have changed
+		if oldPod != nil {
+			kl.nodeInfoCache.UpdatePod(logger, oldPod, pod)
+		}
 
 		pod, mirrorPod, wasMirror := kl.podManager.GetPodAndMirrorPod(pod)
 		if wasMirror {
@@ -2954,9 +2960,12 @@ func resizeOperationForResources(new, old *resource.Quantity) string {
 // being removed from a config source.
 func (kl *Kubelet) HandlePodRemoves(pods []*v1.Pod) {
 	start := kl.clock.Now()
+	logger := klog.FromContext(context.TODO())
 	for _, pod := range pods {
 		kl.podCertificateManager.ForgetPod(context.TODO(), pod)
 		kl.podManager.RemovePod(pod)
+		// Remove from NodeInfo cache
+		kl.nodeInfoCache.RemovePod(logger, pod)
 		kl.allocationManager.RemovePod(pod.UID)
 
 		pod, mirrorPod, wasMirror := kl.podManager.GetPodAndMirrorPod(pod)
