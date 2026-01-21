@@ -472,7 +472,7 @@ func (c *Controller) syncPod(ctx context.Context, pod *v1.Pod) error {
 			if volumeutil.IsMultipleSELinuxLabelsError(err) {
 				c.eventRecorder.Eventf(pod, v1.EventTypeWarning, "MultipleSELinuxLabels", "Volume %q is mounted twice with different SELinux labels inside this pod", mount)
 			}
-			logger.V(4).Error(err, "failed to get SELinux label", "pod", klog.KObj(pod), "volume", mount)
+			logger.V(4).Info("failed to get SELinux label", "pod", klog.KObj(pod), "volume", mount, "error", err)
 			errs = append(errs, err)
 			continue
 		}
