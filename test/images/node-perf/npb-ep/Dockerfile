@@ -20,7 +20,8 @@ CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
 RUN apt-get update && apt-get install -y libc6-dev g++ bzip2 dpkg-dev build-essential gfortran
 
 ADD http://www.nas.nasa.gov/assets/npb/NPB3.4.3.tar.gz .
-RUN tar xzf NPB3.4.3.tar.gz
+# Fix permissions for cross-build with QEMU emulation
+RUN tar xzf NPB3.4.3.tar.gz && chmod -R a+rX NPB3.4.3
 
 WORKDIR ./NPB3.4.3/NPB3.4-OMP
 RUN if [ $(arch) != "x86_64" ]; then \

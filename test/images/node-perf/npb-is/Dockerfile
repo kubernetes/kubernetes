@@ -20,7 +20,8 @@ CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
 RUN apt-get update && apt-get install -y build-essential gfortran
 
 ADD http://www.nas.nasa.gov/assets/npb/NPB3.3.1.tar.gz .
-RUN tar xzf NPB3.3.1.tar.gz
+# Fix permissions for cross-build with QEMU emulation
+RUN tar xzf NPB3.3.1.tar.gz && chmod -R a+rX NPB3.3.1
 
 WORKDIR ./NPB3.3.1/NPB3.3-OMP
 
