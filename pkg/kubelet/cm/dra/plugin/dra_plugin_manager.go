@@ -395,7 +395,7 @@ func (pm *DRAPluginManager) add(driverName string, endpoint string, chosenServic
 				logger.V(4).Info("Attempting to start WatchResources health stream")
 				stream, err := p.NodeWatchResources(ctx)
 				if err != nil {
-					logger.V(3).Error(err, "Failed to establish WatchResources stream, will retry")
+					logger.V(3).Info("Failed to establish WatchResources stream, will retry", "err", err)
 					return
 				}
 
