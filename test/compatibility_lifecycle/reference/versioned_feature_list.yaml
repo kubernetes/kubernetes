@@ -1878,7 +1878,7 @@
     preRelease: Beta
     version: "1.28"
   - default: true
-    lockToDefault: false
+    lockToDefault: true
     preRelease: GA
     version: "1.32"
 - name: TranslateStreamCloseWebsocketRequests
