@@ -306,6 +306,90 @@ var (
 		},
 		[]string{"ip_family"},
 	)
+
+	// WinKernelClusterIPLBCreateFailure is the number of winkernel clusterip lb create failures that the proxy has
+	// seen.
+	WinKernelClusterIPLBCreateFailure = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      kubeProxySubsystem,
+			Name:           "sync_proxy_rules_winkernel_clusterip_lb_create_failures_total",
+			Help:           "Cumulative proxy winkernel clusterip lb create failures",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"ip_family"},
+	)
+
+	// WinKernelNodePortLBCreateFailure is the number of winkernel nodeport lb create failures that the proxy has
+	// seen.
+	WinKernelNodePortLBCreateFailure = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      kubeProxySubsystem,
+			Name:           "sync_proxy_rules_winkernel_nodeport_lb_create_failures_total",
+			Help:           "Cumulative proxy winkernel nodeport lb create failures",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"ip_family"},
+	)
+
+	// WinKernelIngressIPLBCreateFailure is the number of winkernel ingressip lb create failures that the proxy has
+	// seen.
+	WinKernelIngressIPLBCreateFailure = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      kubeProxySubsystem,
+			Name:           "sync_proxy_rules_winkernel_ingressip_lb_create_failures_total",
+			Help:           "Cumulative proxy winkernel ingressip lb create failures",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"ip_family"},
+	)
+
+	// WinKernelClusterIPLBUpdateFailure is the number of winkernel clusterip lb update failures that the proxy has
+	// seen.
+	WinKernelClusterIPLBUpdateFailure = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      kubeProxySubsystem,
+			Name:           "sync_proxy_rules_winkernel_clusterip_lb_update_failures_total",
+			Help:           "Cumulative proxy winkernel clusterip lb update failures",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"ip_family"},
+	)
+
+	// WinKernelNodePortLBUpdateFailure is the number of winkernel nodeport lb update failures that the proxy has
+	// seen.
+	WinKernelNodePortLBUpdateFailure = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      kubeProxySubsystem,
+			Name:           "sync_proxy_rules_winkernel_nodeport_lb_update_failures_total",
+			Help:           "Cumulative proxy winkernel nodeport lb update failures",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"ip_family"},
+	)
+
+	// WinKernelIngressIPLBUpdateFailure is the number of winkernel ingressip lb update failures that the proxy has
+	// seen.
+	WinKernelIngressIPLBUpdateFailure = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      kubeProxySubsystem,
+			Name:           "sync_proxy_rules_winkernel_ingressip_lb_update_failures_total",
+			Help:           "Cumulative proxy winkernel ingressip lb update failures",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"ip_family"},
+	)
+
+	// WinKernelLBDeleteFailure is the number of winkernel all lb delete failures that the proxy has
+	// seen.
+	WinKernelLBDeleteFailure = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      kubeProxySubsystem,
+			Name:           "sync_proxy_rules_winkernel_lb_delete_failures_total",
+			Help:           "Cumulative proxy winkernel lb delete failures",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"ip_family"},
+	)
 )
 
 var registerMetricsOnce sync.Once
@@ -361,7 +445,13 @@ func RegisterMetrics(mode kubeproxyconfig.ProxyMode) {
 			legacyregistry.MustRegister(ReconcileConntrackFlowsDeletedEntriesTotal)
 
 		case kubeproxyconfig.ProxyModeKernelspace:
-			// currently no winkernel-specific metrics
+			legacyregistry.MustRegister(WinKernelClusterIPLBCreateFailure)
+			legacyregistry.MustRegister(WinKernelNodePortLBCreateFailure)
+			legacyregistry.MustRegister(WinKernelIngressIPLBCreateFailure)
+			legacyregistry.MustRegister(WinKernelClusterIPLBUpdateFailure)
+			legacyregistry.MustRegister(WinKernelNodePortLBUpdateFailure)
+			legacyregistry.MustRegister(WinKernelIngressIPLBUpdateFailure)
+			legacyregistry.MustRegister(WinKernelLBDeleteFailure)
 		}
 	})
 }
