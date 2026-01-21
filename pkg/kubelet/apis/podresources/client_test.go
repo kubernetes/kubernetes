@@ -19,70 +19,59 @@ package podresources
 import (
 	"context"
 	"net"
-	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 
 	v1 "k8s.io/kubelet/pkg/apis/podresources/v1"
 	"k8s.io/kubelet/pkg/apis/podresources/v1alpha1"
 )
 
-func TestGetV1alpha1Client(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	socketPath := filepath.Join(tmpDir, "podresources.sock")
-	listener, err := net.Listen("unix", socketPath)
-	if err != nil {
-		t.Fatalf("failed to listen: %v", err)
+func TestGetClient(t *testing.T) {
+	tests := []struct {
+		name      string
+		setupFunc func(*grpc.Server)
+		getClient func(string, time.Duration, int) (interface{}, *grpc.ClientConn, error)
+	}{
+		{
+			name: "v1alpha1",
+			setupFunc: func(server *grpc.Server) {
+				v1alpha1.RegisterPodResourcesListerServer(server, &mockV1alpha1Server{})
+			},
+			getClient: func(socket string, timeout time.Duration, maxSize int) (interface{}, *grpc.ClientConn, error) {
+				return GetV1alpha1Client(socket, timeout, maxSize)
+			},
+		},
+		{
+			name: "v1",
+			setupFunc: func(server *grpc.Server) {
+				v1.RegisterPodResourcesListerServer(server, &mockV1Server{})
+			},
+			getClient: func(socket string, timeout time.Duration, maxSize int) (interface{}, *grpc.ClientConn, error) {
+				return GetV1Client(socket, timeout, maxSize)
+			},
+		},
 	}
-	defer listener.Close()
 
-	cleanup := startTestServer(t, listener, func(server *grpc.Server) {
-		v1alpha1.RegisterPodResourcesListerServer(server, &mockV1alpha1Server{})
-	})
-	defer cleanup()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			socketPath := filepath.Join(t.TempDir(), "podresources.sock")
+			listener, err := net.Listen("unix", socketPath)
+			require.NoError(t, err)
+			defer listener.Close()
 
-	client, conn, err := GetV1alpha1Client(socketPath, 10*time.Second, 1024*1024)
-	if err != nil {
-		t.Fatalf("GetV1alpha1Client failed: %v", err)
-	}
-	defer conn.Close()
+			cleanup := startTestServer(t, listener, tt.setupFunc)
+			defer cleanup()
 
-	if client == nil {
-		t.Fatal("client is nil")
-	}
-}
+			client, conn, err := tt.getClient(socketPath, 10*time.Second, 1024*1024)
+			require.NoError(t, err)
+			defer conn.Close()
 
-func TestGetV1Client(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "podresources-test")
-	if err != nil {
-		t.Fatalf("failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
-
-	socketPath := filepath.Join(tmpDir, "podresources.sock")
-	listener, err := net.Listen("unix", socketPath)
-	if err != nil {
-		t.Fatalf("failed to listen: %v", err)
-	}
-	defer listener.Close()
-
-	cleanup := startTestServer(t, listener, func(server *grpc.Server) {
-		v1.RegisterPodResourcesListerServer(server, &mockV1Server{})
-	})
-	defer cleanup()
-
-	client, conn, err := GetV1Client(socketPath, 10*time.Second, 1024*1024)
-	if err != nil {
-		t.Fatalf("GetV1Client failed: %v", err)
-	}
-	defer conn.Close()
-
-	if client == nil {
-		t.Fatal("client is nil")
+			require.NotNil(t, client)
+		})
 	}
 }
 
