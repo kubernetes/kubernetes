@@ -176,7 +176,9 @@ func TestRelisting(t *testing.T) {
 	verifyEvents(t, expected, actual)
 }
 
-// TestEventChannelFull test when channel is full, the events will be discard.
+// TestEventChannelFull tests that when the channel is full, events are not
+// permanently lost. Instead, pods with dropped events are added to the
+// reinspection list and events are regenerated on the next relist cycle.
 func TestEventChannelFull(t *testing.T) {
 	testPleg := newTestGenericPLEGWithChannelSize(4)
 	pleg, runtime := testPleg.pleg, testPleg.runtime
@@ -231,10 +233,144 @@ func TestEventChannelFull(t *testing.T) {
 		{ID: "4567", Type: ContainerRemoved, Data: "c1"},
 		{ID: "4567", Type: ContainerStarted, Data: "c4"},
 	}
-	// event channel is full, discard events
+	// When event channel is full, some events are dropped but pods are added
+	// to reinspection list so events can be regenerated on next relist.
 	actual = getEventsFromChannel(ch)
 	assert.Len(t, actual, 4, "channel length should be 4")
-	assert.Subsetf(t, allEvents, actual, "actual events should in all events")
+	assert.Subsetf(t, allEvents, actual, "actual events should be in all events")
+
+	// Now drain the channel and do another relist - the dropped events should
+	// be regenerated because the pods were added to needsReinspection.
+	pleg.Relist()
+	actual = getEventsFromChannel(ch)
+	// The remaining events that were dropped should now be delivered.
+	// Together with the first batch, we should eventually get all events.
+	assert.NotEmpty(t, actual, "dropped events should be regenerated on next relist")
+}
+
+// TestEventChannelFullEventualDelivery verifies that when the event channel is
+// full and events are dropped, those events are eventually delivered on
+// subsequent relist cycles. This tests the fix for the race condition where
+// podRecords was updated before event delivery, causing permanent event loss.
+func TestEventChannelFullEventualDelivery(t *testing.T) {
+	// Use a channel size of 1 to force event drops
+	testPleg := newTestGenericPLEGWithChannelSize(1)
+	pleg, runtime := testPleg.pleg, testPleg.runtime
+	ch := pleg.Watch()
+
+	// Initial state: one pod with one running container
+	runtime.AllPodList = []*containertest.FakePod{
+		{Pod: &kubecontainer.Pod{
+			ID: "test-pod",
+			Containers: []*kubecontainer.Container{
+				createTestContainer("c1", kubecontainer.ContainerStateRunning),
+			},
+		}},
+	}
+	pleg.Relist()
+	// First relist generates ContainerStarted event
+	actual := getEventsFromChannel(ch)
+	assert.Len(t, actual, 1, "first relist should generate 1 event")
+	assert.Equal(t, ContainerStarted, actual[0].Type)
+
+	// Change state: c1 dies, c2 and c3 start - this will generate 3 events
+	// but channel can only hold 1, so 2 will be dropped initially
+	runtime.AllPodList = []*containertest.FakePod{
+		{Pod: &kubecontainer.Pod{
+			ID: "test-pod",
+			Containers: []*kubecontainer.Container{
+				createTestContainer("c1", kubecontainer.ContainerStateExited),
+				createTestContainer("c2", kubecontainer.ContainerStateRunning),
+				createTestContainer("c3", kubecontainer.ContainerStateRunning),
+			},
+		}},
+	}
+
+	allExpectedEvents := map[string]EventType{
+		"c1": ContainerDied,
+		"c2": ContainerStarted,
+		"c3": ContainerStarted,
+	}
+	receivedEvents := make(map[string]EventType)
+
+	// Keep relisting and draining until all events are received
+	// With the fix, dropped events should be regenerated on subsequent relists
+	maxIterations := 10
+	for i := 0; i < maxIterations; i++ {
+		pleg.Relist()
+		events := getEventsFromChannel(ch)
+		for _, e := range events {
+			if containerID, ok := e.Data.(string); ok {
+				receivedEvents[containerID] = e.Type
+			}
+		}
+		// Check if we've received all expected events
+		if len(receivedEvents) == len(allExpectedEvents) {
+			break
+		}
+	}
+
+	// Verify all events were eventually delivered
+	assert.Equal(t, len(allExpectedEvents), len(receivedEvents),
+		"all events should eventually be delivered after multiple relists")
+	for containerID, expectedType := range allExpectedEvents {
+		actualType, ok := receivedEvents[containerID]
+		assert.True(t, ok, "event for container %s should be received", containerID)
+		assert.Equal(t, expectedType, actualType,
+			"event type for container %s should match", containerID)
+	}
+}
+
+// TestEventChannelFullNoEventLoss verifies that no events are permanently lost
+// when the channel is saturated, even under repeated state changes.
+func TestEventChannelFullNoEventLoss(t *testing.T) {
+	// Use channel size of 2
+	testPleg := newTestGenericPLEGWithChannelSize(2)
+	pleg, runtime := testPleg.pleg, testPleg.runtime
+	ch := pleg.Watch()
+
+	// Start with empty state
+	runtime.AllPodList = []*containertest.FakePod{}
+	pleg.Relist()
+	getEventsFromChannel(ch) // drain
+
+	// Add a pod with multiple containers - generates multiple events
+	runtime.AllPodList = []*containertest.FakePod{
+		{Pod: &kubecontainer.Pod{
+			ID: "pod1",
+			Containers: []*kubecontainer.Container{
+				createTestContainer("c1", kubecontainer.ContainerStateRunning),
+				createTestContainer("c2", kubecontainer.ContainerStateRunning),
+				createTestContainer("c3", kubecontainer.ContainerStateRunning),
+				createTestContainer("c4", kubecontainer.ContainerStateRunning),
+			},
+		}},
+	}
+
+	// Collect all events across multiple relists
+	allReceivedEvents := make(map[string]bool)
+	expectedContainers := []string{"c1", "c2", "c3", "c4"}
+
+	for i := 0; i < 10; i++ {
+		pleg.Relist()
+		events := getEventsFromChannel(ch)
+		for _, e := range events {
+			if e.Type == ContainerStarted {
+				if containerID, ok := e.Data.(string); ok {
+					allReceivedEvents[containerID] = true
+				}
+			}
+		}
+		if len(allReceivedEvents) == len(expectedContainers) {
+			break
+		}
+	}
+
+	// All container start events should eventually be received
+	for _, containerID := range expectedContainers {
+		assert.True(t, allReceivedEvents[containerID],
+			"ContainerStarted event for %s should eventually be delivered", containerID)
+	}
 }
 
 func TestDetectingContainerDeaths(t *testing.T) {

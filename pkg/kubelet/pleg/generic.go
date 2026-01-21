@@ -324,11 +324,13 @@ func (g *GenericPLEG) Relist() {
 			events = append(events, &PodLifecycleEvent{ID: pid, Type: ConditionMet})
 		}
 
-		// Update the internal storage and send out the events.
-		g.podRecords.update(pid)
-
 		// Map from containerId to exit code; used as a temporary cache for lookup
 		containerExitCode := make(map[string]int)
+
+		// Track whether all events were successfully delivered to the channel.
+		// If any event is dropped due to channel saturation, we must NOT update
+		// podRecords so that the next relist cycle will regenerate the events.
+		allEventsDelivered := true
 
 		for i := range events {
 			// Filter out events that are not reliable and no other components use yet.
@@ -340,6 +342,7 @@ func (g *GenericPLEG) Relist() {
 			default:
 				metrics.PLEGDiscardEvents.Inc()
 				g.logger.Error(nil, "Event channel is full, discard this relist() cycle event")
+				allEventsDelivered = false
 			}
 			// Log exit code of containers when they finished in a particular event
 			if events[i].Type == ContainerDied {
@@ -357,6 +360,19 @@ func (g *GenericPLEG) Relist() {
 					}
 				}
 			}
+		}
+
+		// Only update the internal storage after all events have been successfully
+		// delivered. If any event was dropped due to channel saturation, we leave
+		// podRecords unchanged so that the next relist cycle will detect the same
+		// state transition and regenerate the events, giving them another chance
+		// to be delivered. This prevents silent event loss that cannot be recovered.
+		if allEventsDelivered {
+			g.podRecords.update(pid)
+		} else {
+			// Add this pod to reinspection list so events will be regenerated
+			// on the next relist cycle when the channel may have capacity.
+			needsReinspection[pid] = pod
 		}
 	}
 
