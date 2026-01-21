@@ -702,6 +702,11 @@ func NewMainKubelet(ctx context.Context,
 		kubeDeps.Recorder,
 	)
 
+	// Initialize NodeInfo cache for efficient pod admission.
+	// The node will be set when GetCachedNode is first called.
+	// Pods will be added incrementally via HandlePodAdditions.
+	klet.nodeInfoCache = nodeinfocache.New()
+
 	klet.resourceAnalyzer = serverstats.NewResourceAnalyzer(ctx, klet, kubeCfg.VolumeStatsAggPeriod.Duration, kubeDeps.Recorder)
 
 	klet.runtimeService = kubeDeps.RemoteRuntimeService
