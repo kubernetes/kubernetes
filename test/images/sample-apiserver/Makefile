@@ -30,7 +30,7 @@ bin:
 			mkdir -p /go/src /go/bin && \
 			git clone https://github.com/kubernetes/sample-apiserver /go/src/k8s.io/sample-apiserver && \
 			cd /go/src/k8s.io/sample-apiserver && \
-			git checkout tags/v0.33.2 && \
+			git checkout tags/v0.33.7 && \
 			go mod tidy && \
 			GO111MODULE=on CGO_ENABLED=0 GOARM=${GOARM} GOOS=${OS} GOARCH=${ARCH} go install . && \
 			find /go/bin -name sample-apiserver* -exec cp {} ${TARGET}/sample-apiserver \;"

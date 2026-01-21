@@ -201,7 +201,7 @@ func (hns hns) getEndpointByIpAddress(ip string, networkName string) (*endpointI
 	}
 	for _, endpoint := range endpoints {
 		equal := false
-		if endpoint.IpConfigurations != nil && len(endpoint.IpConfigurations) > 0 {
+		if len(endpoint.IpConfigurations) > 0 {
 			equal = endpoint.IpConfigurations[0].IpAddress == ip
 
 			if !equal && len(endpoint.IpConfigurations) > 1 {
@@ -275,11 +275,13 @@ func (hns hns) createEndpoint(ep *endpointInfo, networkName string) (*endpointIn
 		if err != nil {
 			return nil, err
 		}
+		klog.V(3).InfoS("Created remote endpoint resource", "hnsID", createdEndpoint.Id)
 	} else {
 		createdEndpoint, err = hns.hcn.CreateEndpoint(hnsNetwork, hnsEndpoint)
 		if err != nil {
 			return nil, err
 		}
+		klog.V(3).InfoS("Created local endpoint resource", "hnsID", createdEndpoint.Id)
 	}
 	return &endpointInfo{
 		ip:              createdEndpoint.IpConfigurations[0].IpAddress,
@@ -303,17 +305,14 @@ func (hns hns) deleteEndpoint(hnsID string) error {
 }
 
 // findLoadBalancerID will construct a id from the provided loadbalancer fields
-func findLoadBalancerID(endpoints []endpointInfo, vip string, protocol, internalPort, externalPort uint16) (loadBalancerIdentifier, error) {
+func findLoadBalancerID(endpoints []endpointInfo, vip string, protocol, internalPort, externalPort uint16, isIpv6 bool) (loadBalancerIdentifier, error) {
 	// Compute hash from backends (endpoint IDs)
 	hash, err := hashEndpoints(endpoints)
 	if err != nil {
 		klog.V(2).ErrorS(err, "Error hashing endpoints", "endpoints", endpoints)
 		return loadBalancerIdentifier{}, err
 	}
-	if len(vip) > 0 {
-		return loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, vip: vip, endpointsHash: hash}, nil
-	}
-	return loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, endpointsHash: hash}, nil
+	return loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, vip: vip, endpointsHash: hash, isIPv6: isIpv6}, nil
 }
 
 func (hns hns) getAllLoadBalancers() (map[loadBalancerIdentifier]*loadBalancerInfo, error) {
@@ -324,6 +323,7 @@ func (hns hns) getAllLoadBalancers() (map[loadBalancerIdentifier]*loadBalancerIn
 	}
 	loadBalancers := make(map[loadBalancerIdentifier]*(loadBalancerInfo))
 	for _, lb := range lbs {
+		isIPv6 := (lb.Flags & LoadBalancerFlagsIPv6) == LoadBalancerFlagsIPv6
 		portMap := lb.PortMappings[0]
 		// Compute hash from backends (endpoint IDs)
 		hash, err := hashEndpoints(lb.HostComputeEndpoints)
@@ -333,9 +333,9 @@ func (hns hns) getAllLoadBalancers() (map[loadBalancerIdentifier]*loadBalancerIn
 		}
 		if len(lb.FrontendVIPs) == 0 {
 			// Leave VIP uninitialized
-			id = loadBalancerIdentifier{protocol: uint16(portMap.Protocol), internalPort: portMap.InternalPort, externalPort: portMap.ExternalPort, endpointsHash: hash}
+			id = loadBalancerIdentifier{protocol: uint16(portMap.Protocol), internalPort: portMap.InternalPort, externalPort: portMap.ExternalPort, endpointsHash: hash, isIPv6: isIPv6}
 		} else {
-			id = loadBalancerIdentifier{protocol: uint16(portMap.Protocol), internalPort: portMap.InternalPort, externalPort: portMap.ExternalPort, vip: lb.FrontendVIPs[0], endpointsHash: hash}
+			id = loadBalancerIdentifier{protocol: uint16(portMap.Protocol), internalPort: portMap.InternalPort, externalPort: portMap.ExternalPort, vip: lb.FrontendVIPs[0], endpointsHash: hash, isIPv6: isIPv6}
 		}
 		loadBalancers[id] = &loadBalancerInfo{
 			hnsID: lb.Id,
@@ -354,6 +354,7 @@ func (hns hns) getLoadBalancer(endpoints []endpointInfo, flags loadBalancerFlags
 		protocol,
 		internalPort,
 		externalPort,
+		flags.isIPv6,
 	)
 
 	if lbIdErr != nil {
@@ -460,10 +461,10 @@ func (hns hns) updateLoadBalancer(hnsID string,
 		return nil, err
 	}
 	if len(vip) > 0 {
-		id = loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, vip: vip, endpointsHash: hash}
+		id = loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, vip: vip, endpointsHash: hash, isIPv6: flags.isIPv6}
 		vips = append(vips, vip)
 	} else {
-		id = loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, endpointsHash: hash}
+		id = loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, endpointsHash: hash, isIPv6: flags.isIPv6}
 	}
 
 	if lb, found := previousLoadBalancers[id]; found {
@@ -530,8 +531,13 @@ func (hns hns) deleteLoadBalancer(hnsID string) error {
 		// There is a bug in Windows Server 2019, that can cause the delete call to fail sometimes. We retry one more time.
 		// TODO: The logic in syncProxyRules  should be rewritten in the future to better stage and handle a call like this failing using the policyApplied fields.
 		klog.V(1).ErrorS(err, "Error deleting Hns loadbalancer policy resource. Attempting one more time...", "loadBalancer", lb)
-		return hns.hcn.DeleteLoadBalancer(lb)
+		err = hns.hcn.DeleteLoadBalancer(lb)
 	}
+	if err != nil {
+		klog.V(2).ErrorS(err, "Error deleting Hns loadbalancer policy resource again.", "hnsID", hnsID)
+		return err
+	}
+	klog.V(3).InfoS("Deleted Hns loadbalancer policy resource", "hnsID", hnsID)
 	return err
 }
 

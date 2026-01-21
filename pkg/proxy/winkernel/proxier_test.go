@@ -56,13 +56,19 @@ const (
 	guid              = "123ABC"
 	networkId         = "123ABC"
 	endpointGuid1     = "EPID-1"
+	emptyLbID         = ""
 	loadbalancerGuid1 = "LBID-1"
 	loadbalancerGuid2 = "LBID-2"
 	endpointLocal1    = "EP-LOCAL-1"
 	endpointLocal2    = "EP-LOCAL-2"
 	endpointGw        = "EP-GW"
 	epIpAddressGw     = "192.168.2.1"
+	epIpAddressGwv6   = "192::1"
 	epMacAddressGw    = "00-11-22-33-44-66"
+)
+
+var (
+	loadbalancerGuids = []string{emptyLbID, "LBID-1", "LBID-2", "LBID-3", "LBID-4", "LBID-5", "LBID-6", "LBID-7", "LBID-8"}
 )
 
 func newHnsNetwork(networkInfo *hnsNetworkInfo) *hcn.HostComputeNetwork {
@@ -91,8 +97,18 @@ func newHnsNetwork(networkInfo *hnsNetworkInfo) *hcn.HostComputeNetwork {
 	return network
 }
 
-func NewFakeProxier(t *testing.T, nodeName string, nodeIP net.IP, networkType string, enableDSR bool) *Proxier {
+func NewFakeProxier(t *testing.T, nodeName string, nodeIP net.IP, networkType string, enableDSR bool, ipFamily ...v1.IPFamily) *Proxier {
 	sourceVip := "192.168.1.2"
+
+	// Default to IPv4 if no ipFamily is provided
+	family := v1.IPv4Protocol
+	if len(ipFamily) > 0 {
+		family = ipFamily[0]
+	}
+
+	if family == v1.IPv6Protocol {
+		sourceVip = "192::1:2"
+	}
 
 	// enable `WinDSR` feature gate
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.WinDSR, true)
@@ -107,7 +123,7 @@ func NewFakeProxier(t *testing.T, nodeName string, nodeIP net.IP, networkType st
 	hcnMock := getHcnMock(networkType)
 
 	proxier, _ := newProxierInternal(
-		v1.IPv4Protocol,
+		family,
 		nodeName,
 		nodeIP,
 		healthcheck.NewFakeServiceHealthServer(),
@@ -1714,6 +1730,203 @@ func TestWinDSRWithOverlayEnabled(t *testing.T) {
 	}
 }
 
+func testDualStackService(t *testing.T, enableDsr bool, dualStackFamilyPolicy v1.IPFamilyPolicy, trafficPolicy v1.ServiceExternalTrafficPolicy) {
+	baseFlag := hcn.LoadBalancerFlagsNone
+	if trafficPolicy == v1.ServiceExternalTrafficPolicyLocal {
+		baseFlag = hcn.LoadBalancerFlagsDSR
+	}
+
+	v4Proxier := NewFakeProxier(t, testNodeName, netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY, enableDsr)
+	if v4Proxier == nil {
+		t.Error()
+	}
+	v6Proxier := NewFakeProxier(t, testNodeName, netutils.ParseIPSloppy("10::1"), NETWORK_TYPE_OVERLAY, enableDsr, v1.IPv6Protocol)
+	if v6Proxier == nil {
+		t.Error()
+	}
+	v6Proxier.hcn = v4Proxier.hcn // Share the same HCN mock to simulate dual stack behavior
+
+	svcPort := 80
+	svcNodePort := 3001
+	svcPortName := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "svc1"),
+		Port:           "p80",
+		Protocol:       v1.ProtocolTCP,
+	}
+
+	v4ClusterIP, v6ClusterIP := "10.20.30.41", "fd00::21"
+	v4LbIP, v6LbIP := "11.21.31.41", "fd00::1"
+
+	testService := makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
+		svc.Spec.Type = v1.ServiceTypeLoadBalancer
+		svc.Spec.ClusterIP = v4ClusterIP
+		svc.Spec.ClusterIPs = []string{v4ClusterIP, v6ClusterIP}
+		svc.Spec.IPFamilyPolicy = &dualStackFamilyPolicy
+		svc.Spec.IPFamilies = []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol}
+		svc.Spec.ExternalTrafficPolicy = trafficPolicy
+		svc.Spec.Ports = []v1.ServicePort{{
+			Name:     svcPortName.Port,
+			Port:     int32(svcPort),
+			Protocol: v1.ProtocolTCP,
+			NodePort: int32(svcNodePort),
+		}}
+		svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{
+			{IP: v4LbIP},
+			{IP: v6LbIP},
+		}
+	})
+
+	v4Endpoints := []discovery.Endpoint{{
+		Addresses: []string{epIpAddressLocal},
+		NodeName:  ptr.To(testNodeName),
+	}}
+
+	v6Endpoints := []discovery.Endpoint{{
+		Addresses: []string{epIpAddressLocalv6},
+		NodeName:  ptr.To(testNodeName),
+	}}
+
+	if trafficPolicy == v1.ServiceExternalTrafficPolicyCluster {
+		v4Endpoints = append(v4Endpoints, discovery.Endpoint{
+			Addresses: []string{epIpAddressRemote},
+		})
+		v6Endpoints = append(v6Endpoints, discovery.Endpoint{
+			Addresses: []string{epIpAddressRemotev6},
+		})
+	}
+
+	testEpSliceV4 := makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
+		eps.AddressType = discovery.AddressTypeIPv4
+		eps.Endpoints = v4Endpoints
+		eps.Ports = []discovery.EndpointPort{{
+			Name:     ptr.To(svcPortName.Port),
+			Port:     ptr.To(int32(svcPort)),
+			Protocol: ptr.To(v1.ProtocolTCP),
+		}}
+	})
+
+	testEpSliceV6 := makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
+		eps.AddressType = discovery.AddressTypeIPv6
+		eps.Endpoints = v6Endpoints
+		eps.Ports = []discovery.EndpointPort{{
+			Name:     ptr.To(svcPortName.Port),
+			Port:     ptr.To(int32(svcPort)),
+			Protocol: ptr.To(v1.ProtocolTCP),
+		}}
+	})
+
+	makeServiceMap(v4Proxier, testService)
+	makeServiceMap(v6Proxier, testService)
+
+	populateEndpointSlices(v4Proxier, testEpSliceV4)
+	populateEndpointSlices(v6Proxier, testEpSliceV6)
+
+	hcnMock := (v4Proxier.hcn).(*fakehcn.HcnMock)
+	v4Proxier.rootHnsEndpointName = endpointGw
+	v6Proxier.rootHnsEndpointName = endpointGw
+	hcnMock.PopulateQueriedEndpoints(endpointLocal1, guid, epIpAddressLocal, macAddress, prefixLen)
+	hcnMock.PopulateQueriedEndpoints(endpointLocal1, guid, epIpAddressLocalv6, macAddress, prefixLen)
+	hcnMock.PopulateQueriedEndpoints(endpointGw, guid, epIpAddressGw, epMacAddressGw, prefixLen)
+	hcnMock.PopulateQueriedEndpoints(endpointGw, guid, epIpAddressGwv6, epMacAddressGw, prefixLen)
+	v4Proxier.setInitialized(true)
+	v4Proxier.syncProxyRules()
+
+	v4Svc := v4Proxier.svcPortMap[svcPortName]
+	v4SvcInfo, ok := v4Svc.(*serviceInfo)
+	assert.True(t, ok, "Failed to cast serviceInfo %q", svcPortName.String())
+	assert.Equal(t, loadbalancerGuids[1], v4SvcInfo.hnsID, "The Hns Loadbalancer Id %v does not match %v. ServicePortName %q", v4SvcInfo.hnsID, loadbalancerGuids[1], svcPortName.String())
+	assert.Equal(t, v4LbIP, v4SvcInfo.loadBalancerIngressIPs[0].ip, "LoadBalancer Ingress IP 0 should be %s", v4LbIP)
+	assert.Equal(t, loadbalancerGuids[2], v4SvcInfo.nodePorthnsID, "The Hns NodePort Loadbalancer Id %v does not match %v. ServicePortName %q", v4SvcInfo.nodePorthnsID, loadbalancerGuids[2], svcPortName.String())
+	assert.Equal(t, 1, len(v4SvcInfo.loadBalancerIngressIPs), "Expected 1 LoadBalancer Ingress IP, found %d", len(v4SvcInfo.loadBalancerIngressIPs))
+	assert.Equal(t, loadbalancerGuids[3], v4SvcInfo.loadBalancerIngressIPs[0].hnsID, "The Hns Loadbalancer Ingress Id %v does not match %v. ServicePortName %q", v4SvcInfo.loadBalancerIngressIPs[0].hnsID, loadbalancerGuids[3], svcPortName.String())
+	assert.Equal(t, loadbalancerGuids[4], v4SvcInfo.loadBalancerIngressIPs[0].healthCheckHnsID, "The Hns Loadbalancer HealthCheck Id %v does not match %v. ServicePortName %q", v4SvcInfo.loadBalancerIngressIPs[0].healthCheckHnsID, loadbalancerGuids[4], svcPortName.String())
+
+	// Validating ClusterIP Loadbalancer
+	clusterIPLb, err := v4Proxier.hcn.GetLoadBalancerByID(v4SvcInfo.hnsID)
+	assert.Equal(t, nil, err, "Failed to fetch loadbalancer: %v", err)
+	assert.NotEqual(t, nil, clusterIPLb, "Loadbalancer object should not be nil")
+	assert.Equal(t, baseFlag, clusterIPLb.Flags, "Loadbalancer Flags should be %v for IPv4 stack", baseFlag)
+
+	// Validating NodePort Loadbalancer
+	nodePortLb, err := v4Proxier.hcn.GetLoadBalancerByID(v4SvcInfo.nodePorthnsID)
+	assert.Equal(t, nil, err, "Failed to fetch NodePort loadbalancer: %v", err)
+	assert.NotEqual(t, nil, nodePortLb, "NodePort Loadbalancer object should not be nil")
+	assert.Equal(t, baseFlag, nodePortLb.Flags, "NodePort Loadbalancer Flags should be %v for IPv4 stack", baseFlag)
+
+	// Validating V4 IngressIP Loadbalancer
+	ingressLb, err := v4Proxier.hcn.GetLoadBalancerByID(v4SvcInfo.loadBalancerIngressIPs[0].hnsID)
+	assert.Equal(t, nil, err, "Failed to fetch IngressIP loadbalancer: %v", err)
+	assert.NotEqual(t, nil, ingressLb, "IngressIP Loadbalancer object should not be nil")
+	assert.Equal(t, baseFlag, ingressLb.Flags, "IngressIP Loadbalancer Flags should be %v for IPv4 stack", baseFlag)
+
+	if trafficPolicy == v1.ServiceExternalTrafficPolicyLocal {
+		assert.Equal(t, 1, len(clusterIPLb.HostComputeEndpoints), "Expected 1 endpoint for local traffic policy, found %d", len(clusterIPLb.HostComputeEndpoints))
+		assert.Equal(t, 1, len(nodePortLb.HostComputeEndpoints), "Expected 1 endpoint for local traffic policy, found %d", len(nodePortLb.HostComputeEndpoints))
+		assert.Equal(t, 1, len(ingressLb.HostComputeEndpoints), "Expected 1 endpoint for local traffic policy, found %d", len(ingressLb.HostComputeEndpoints))
+	} else {
+		assert.Equal(t, 2, len(clusterIPLb.HostComputeEndpoints), "Expected 2 endpoints for cluster traffic policy, found %d", len(clusterIPLb.HostComputeEndpoints))
+		assert.Equal(t, 2, len(nodePortLb.HostComputeEndpoints), "Expected 2 endpoints for cluster traffic policy, found %d", len(nodePortLb.HostComputeEndpoints))
+		assert.Equal(t, 2, len(ingressLb.HostComputeEndpoints), "Expected 2 endpoints for cluster traffic policy, found %d", len(ingressLb.HostComputeEndpoints))
+	}
+
+	// Initiating v6 tests.
+	v6Proxier.setInitialized(true)
+	v6Proxier.syncProxyRules()
+
+	v6Svc := v6Proxier.svcPortMap[svcPortName]
+	v6SvcInfo, ok := v6Svc.(*serviceInfo)
+	assert.True(t, ok, "Failed to cast serviceInfo %q", svcPortName.String())
+	assert.Equal(t, loadbalancerGuids[5], v6SvcInfo.hnsID, "The Hns Loadbalancer Id %v does not match %v. ServicePortName %q", v6SvcInfo.hnsID, loadbalancerGuids[5], svcPortName.String())
+	assert.Equal(t, loadbalancerGuids[6], v6SvcInfo.nodePorthnsID, "The Hns NodePort Loadbalancer Id %v does not match %v. ServicePortName %q", v6SvcInfo.nodePorthnsID, loadbalancerGuids[6], svcPortName.String())
+	assert.Equal(t, 1, len(v6SvcInfo.loadBalancerIngressIPs), "Expected 1 LoadBalancer Ingress IP, found %d", len(v6SvcInfo.loadBalancerIngressIPs))
+	assert.Equal(t, v6LbIP, v6SvcInfo.loadBalancerIngressIPs[0].ip, "LoadBalancer Ingress IP 0 should be %s", v6LbIP)
+	assert.Equal(t, loadbalancerGuids[7], v6SvcInfo.loadBalancerIngressIPs[0].hnsID, "The Hns Loadbalancer Ingress Id %v does not match %v for IPv6 LB. ServicePortName %q", v6SvcInfo.loadBalancerIngressIPs[0].hnsID, loadbalancerGuids[7], svcPortName.String())
+	assert.Equal(t, loadbalancerGuids[8], v6SvcInfo.loadBalancerIngressIPs[0].healthCheckHnsID, "The Hns Loadbalancer HealthCheck Id %v does not match %v. ServicePortName %q", v6SvcInfo.loadBalancerIngressIPs[0].healthCheckHnsID, loadbalancerGuids[8], svcPortName.String())
+
+	// Validating ClusterIP Loadbalancer
+	clusterIPLb, err = v6Proxier.hcn.GetLoadBalancerByID(v6SvcInfo.hnsID)
+	assert.Equal(t, nil, err, "Failed to fetch loadbalancer: %v", err)
+	assert.NotEqual(t, nil, clusterIPLb, "Loadbalancer object should not be nil")
+	assert.Equal(t, baseFlag|hcn.LoadBalancerFlagsIPv6, clusterIPLb.Flags, "Loadbalancer Flags should be %v for IPv6 stack", baseFlag|hcn.LoadBalancerFlagsIPv6)
+
+	// Validating V6 IngressIP Loadbalancer
+	ingressLb, err = v6Proxier.hcn.GetLoadBalancerByID(v6SvcInfo.loadBalancerIngressIPs[0].hnsID)
+	assert.Equal(t, nil, err, "Failed to fetch IngressIP loadbalancer: %v", err)
+	assert.NotEqual(t, nil, ingressLb, "IngressIP Loadbalancer object should not be nil")
+	assert.Equal(t, baseFlag|hcn.LoadBalancerFlagsIPv6, ingressLb.Flags, "IngressIP Loadbalancer Flags should be %v for IPv6 stack", baseFlag|hcn.LoadBalancerFlagsIPv6)
+
+	eps, _ := hcnMock.ListEndpoints()
+	if trafficPolicy == v1.ServiceExternalTrafficPolicyLocal {
+		assert.Equal(t, 10, len(eps), "Expected 10 endpoints for local traffic policy, found %d", len(eps))
+
+		assert.Equal(t, 1, len(clusterIPLb.HostComputeEndpoints), "Expected 1 endpoint for local traffic policy, found %d", len(clusterIPLb.HostComputeEndpoints))
+		assert.Equal(t, 1, len(nodePortLb.HostComputeEndpoints), "Expected 1 endpoint for local traffic policy, found %d", len(nodePortLb.HostComputeEndpoints))
+		assert.Equal(t, 1, len(ingressLb.HostComputeEndpoints), "Expected 1 endpoint for local traffic policy, found %d", len(ingressLb.HostComputeEndpoints))
+	} else {
+		assert.Equal(t, 14, len(eps), "Expected 14 endpoints for cluster traffic policy, found %d", len(eps))
+
+		assert.Equal(t, 2, len(clusterIPLb.HostComputeEndpoints), "Expected 2 endpoints for cluster traffic policy, found %d", len(clusterIPLb.HostComputeEndpoints))
+		assert.Equal(t, 2, len(nodePortLb.HostComputeEndpoints), "Expected 2 endpoints for cluster traffic policy, found %d", len(nodePortLb.HostComputeEndpoints))
+		assert.Equal(t, 2, len(ingressLb.HostComputeEndpoints), "Expected 2 endpoints for cluster traffic policy, found %d", len(ingressLb.HostComputeEndpoints))
+	}
+}
+
+func TestETPLocalIngressIPServiceWithPreferDualStack(t *testing.T) {
+	testDualStackService(t, true, v1.IPFamilyPolicyPreferDualStack, v1.ServiceExternalTrafficPolicyLocal)
+}
+
+func TestETPLocalIngressIPServiceWithRequireDualStack(t *testing.T) {
+	testDualStackService(t, true, v1.IPFamilyPolicyRequireDualStack, v1.ServiceExternalTrafficPolicyLocal)
+}
+
+func TestETPClusterIngressIPServiceWithPreferDualStack(t *testing.T) {
+	testDualStackService(t, false, v1.IPFamilyPolicyPreferDualStack, v1.ServiceExternalTrafficPolicyCluster)
+}
+
+func TestETPClusterIngressIPServiceWithRequireDualStack(t *testing.T) {
+	testDualStackService(t, false, v1.IPFamilyPolicyRequireDualStack, v1.ServiceExternalTrafficPolicyCluster)
+}
+
 func makeNSN(namespace, name string) types.NamespacedName {
 	return types.NamespacedName{Namespace: namespace, Name: name}
 }
@@ -1765,6 +1978,10 @@ func populateEndpointSlices(proxier *Proxier, allEndpointSlices ...*discovery.En
 	for i := range allEndpointSlices {
 		proxier.OnEndpointSliceAdd(allEndpointSlices[i])
 	}
+
+	proxier.mu.Lock()
+	defer proxier.mu.Unlock()
+	proxier.endpointSlicesSynced = true
 }
 
 func makeTestEndpointSlice(namespace, name string, sliceNum int, epsFunc func(*discovery.EndpointSlice)) *discovery.EndpointSlice {

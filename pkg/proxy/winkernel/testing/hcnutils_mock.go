@@ -69,6 +69,15 @@ func NewHcnMock(hnsNetwork *hcn.HostComputeNetwork) *HcnMock {
 }
 
 func (hcnObj HcnMock) PopulateQueriedEndpoints(epId, hnsId, ipAddress, mac string, prefixLen uint8) {
+
+	if endpoint, ok := endpointMap[epId]; ok {
+		endpoint.IpConfigurations = append(endpoint.IpConfigurations, hcn.IpConfig{
+			IpAddress:    ipAddress,
+			PrefixLength: prefixLen,
+		})
+		return
+	}
+
 	endpoint := &hcn.HostComputeEndpoint{
 		Id:                 epId,
 		Name:               epId,
@@ -177,6 +186,17 @@ func (hcnObj HcnMock) GetLoadBalancerByID(loadBalancerId string) (*hcn.HostCompu
 func (hcnObj HcnMock) CreateLoadBalancer(loadBalancer *hcn.HostComputeLoadBalancer) (*hcn.HostComputeLoadBalancer, error) {
 	if _, ok := loadbalancerMap[loadBalancer.Id]; ok {
 		return nil, fmt.Errorf("LoadBalancer id %s Already Present", loadBalancer.Id)
+	}
+	for _, lb := range loadbalancerMap {
+		portMappingMatched := lb.PortMappings != nil && lb.PortMappings[0].ExternalPort == loadBalancer.PortMappings[0].ExternalPort && lb.PortMappings[0].Protocol == loadBalancer.PortMappings[0].Protocol
+		portMappingMatched = portMappingMatched && (lb.PortMappings[0].InternalPort == loadBalancer.PortMappings[0].InternalPort)
+		portMappingMatched = portMappingMatched && len(lb.FrontendVIPs) != 0 && len(loadBalancer.FrontendVIPs) != 0 && lb.FrontendVIPs[0] == loadBalancer.FrontendVIPs[0]
+		if portMappingMatched && ((lb.Flags & hcn.LoadBalancerFlagsIPv6) == (loadBalancer.Flags & hcn.LoadBalancerFlagsIPv6)) {
+			return nil, fmt.Errorf("The specified port already exists.")
+		}
+		if portMappingMatched && lb.PortMappings[0].Flags&hcn.LoadBalancerPortMappingFlagsLocalRoutedVIP == 0 && lb.FrontendVIPs[0] == loadBalancer.FrontendVIPs[0] {
+			return nil, fmt.Errorf("The specified port already exists.")
+		}
 	}
 	loadBalancer.Id = hcnObj.generateLoadbalancerGuid()
 	loadbalancerMap[loadBalancer.Id] = loadBalancer

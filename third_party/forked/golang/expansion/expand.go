@@ -2,6 +2,7 @@ package expansion
 
 import (
 	"bytes"
+	"unicode/utf8"
 )
 
 const (
@@ -79,10 +80,11 @@ func Expand(input string, mapping func(string) string) string {
 //
 // The input string is assumed not to contain the initial operator.
 func tryReadVariableName(input string) (string, bool, int) {
-	switch input[0] {
+	r, size := utf8.DecodeRuneInString(input)
+	switch r {
 	case operator:
 		// Escaped operator; return it.
-		return input[0:1], false, 1
+		return input[0:size], false, size
 	case referenceOpener:
 		// Scan to expression closer
 		for i := 1; i < len(input); i++ {
@@ -97,6 +99,7 @@ func tryReadVariableName(input string) (string, bool, int) {
 		// Not the beginning of an expression, ie, an operator
 		// that doesn't begin an expression.  Return the operator
 		// and the first rune in the string.
-		return (string(operator) + string(input[0])), false, 1
+
+		return string(operator) + string(r), false, size
 	}
 }
