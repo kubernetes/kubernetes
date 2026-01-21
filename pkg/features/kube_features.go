@@ -583,11 +583,6 @@ const (
 	// Enables maxUnavailable for StatefulSet
 	MaxUnavailableStatefulSet featuregate.Feature = "MaxUnavailableStatefulSet"
 
-	// owner: @cynepco3hahue(alukiano) @cezaryzukowski @k-wiatrzyk, @Tal-or (only for GA graduation)
-	//
-	// Allows setting memory affinity for a container based on NUMA topology
-	MemoryManager featuregate.Feature = "MemoryManager"
-
 	// owner: @xiaoxubeii
 	// kep: https://kep.k8s.io/2570
 	//
@@ -1493,12 +1488,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
 	},
 
-	MemoryManager: {
-		{Version: version.MustParse("1.21"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.22"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	},
-
 	MemoryQoS: {
 		{Version: version.MustParse("1.22"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -2236,7 +2225,7 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	InPlacePodVerticalScalingExclusiveCPUs: {InPlacePodVerticalScaling},
 
-	InPlacePodVerticalScalingExclusiveMemory: {InPlacePodVerticalScaling, MemoryManager},
+	InPlacePodVerticalScalingExclusiveMemory: {InPlacePodVerticalScaling},
 
 	JobBackoffLimitPerIndex: {},
 
@@ -2283,8 +2272,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	MatchLabelKeysInPodTopologySpreadSelectorMerge: {MatchLabelKeysInPodTopologySpread},
 
 	MaxUnavailableStatefulSet: {},
-
-	MemoryManager: {},
 
 	MemoryQoS: {},
 
@@ -2438,7 +2425,7 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	WinOverlay: {},
 
-	WindowsCPUAndMemoryAffinity: {MemoryManager},
+	WindowsCPUAndMemoryAffinity: {},
 
 	WindowsGracefulNodeShutdown: {GracefulNodeShutdown},
 
