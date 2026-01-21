@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2025 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -29,22 +29,22 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
-// tfWideDeepWorkload defines a workload to run
-// https://github.com/tensorflow/models/tree/master/official/r1/wide_deep.
-type tfWideDeepWorkload struct{}
+// pytorchWideDeepWorkload defines a workload to run a PyTorch Wide-Deep
+// model training benchmark for CPU Manager validation.
+type pytorchWideDeepWorkload struct{}
 
-// Ensure tfWideDeepWorkload implements NodePerfWorkload interface.
-var _ NodePerfWorkload = &tfWideDeepWorkload{}
+// Ensure pytorchWideDeepWorkload implements NodePerfWorkload interface.
+var _ NodePerfWorkload = &pytorchWideDeepWorkload{}
 
-func (w tfWideDeepWorkload) Name() string {
-	return "tensorflow-wide-deep"
+func (w pytorchWideDeepWorkload) Name() string {
+	return "pytorch-wide-deep"
 }
 
-func (w tfWideDeepWorkload) PodSpec() v1.PodSpec {
+func (w pytorchWideDeepWorkload) PodSpec() v1.PodSpec {
 	var containers []v1.Container
 	ctn := v1.Container{
 		Name:  fmt.Sprintf("%s-ctn", w.Name()),
-		Image: imageutils.GetE2EImage(imageutils.NodePerfTfWideDeep),
+		Image: imageutils.GetE2EImage(imageutils.NodePerfPytorchWideDeep),
 		Resources: v1.ResourceRequirements{
 			Requests: v1.ResourceList{
 				v1.ResourceName(v1.ResourceCPU):    resource.MustParse("15000m"),
@@ -55,8 +55,7 @@ func (w tfWideDeepWorkload) PodSpec() v1.PodSpec {
 				v1.ResourceName(v1.ResourceMemory): resource.MustParse("16Gi"),
 			},
 		},
-		Command: []string{"/bin/sh"},
-		Args:    []string{"-c", "time -p python ./wide_deep.py --model_type=wide_deep --train_epochs=300 --epochs_between_evals=300 --batch_size=32561"},
+		// The container entrypoint already runs: time -p python /train_wide_deep.py
 	}
 	containers = append(containers, ctn)
 
@@ -66,11 +65,11 @@ func (w tfWideDeepWorkload) PodSpec() v1.PodSpec {
 	}
 }
 
-func (w tfWideDeepWorkload) Timeout() time.Duration {
+func (w pytorchWideDeepWorkload) Timeout() time.Duration {
 	return 15 * time.Minute
 }
 
-func (w tfWideDeepWorkload) KubeletConfig(oldCfg *kubeletconfig.KubeletConfiguration) (newCfg *kubeletconfig.KubeletConfiguration, err error) {
+func (w pytorchWideDeepWorkload) KubeletConfig(oldCfg *kubeletconfig.KubeletConfiguration) (newCfg *kubeletconfig.KubeletConfiguration, err error) {
 	// Enable CPU Manager in Kubelet with static policy.
 	newCfg = oldCfg.DeepCopy()
 	// Set the CPU Manager policy to static.
@@ -92,7 +91,7 @@ func (w tfWideDeepWorkload) KubeletConfig(oldCfg *kubeletconfig.KubeletConfigura
 	return newCfg, nil
 }
 
-func (w tfWideDeepWorkload) PreTestExec() error {
+func (w pytorchWideDeepWorkload) PreTestExec() error {
 	cmd := "/bin/sh"
 	args := []string{"-c", "rm -f /var/lib/kubelet/cpu_manager_state"}
 	err := runCmd(cmd, args)
@@ -100,7 +99,7 @@ func (w tfWideDeepWorkload) PreTestExec() error {
 	return err
 }
 
-func (w tfWideDeepWorkload) PostTestExec() error {
+func (w pytorchWideDeepWorkload) PostTestExec() error {
 	cmd := "/bin/sh"
 	args := []string{"-c", "rm -f /var/lib/kubelet/cpu_manager_state"}
 	err := runCmd(cmd, args)
@@ -108,7 +107,7 @@ func (w tfWideDeepWorkload) PostTestExec() error {
 	return err
 }
 
-func (w tfWideDeepWorkload) ExtractPerformanceFromLogs(logs string) (perf time.Duration, err error) {
+func (w pytorchWideDeepWorkload) ExtractPerformanceFromLogs(logs string) (perf time.Duration, err error) {
 	perfLine, err := getMatchingLineFromLog(logs, "real")
 	if err != nil {
 		return perf, err
