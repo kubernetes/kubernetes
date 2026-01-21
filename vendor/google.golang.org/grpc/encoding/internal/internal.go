@@ -1,6 +1,6 @@
 /*
  *
- * Copyright 2018 gRPC authors.
+ * Copyright 2025 gRPC authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,13 @@
  *
  */
 
-package grpc
+// Package internal contains code internal to the encoding package.
+package internal
 
-// Version is the current grpc version.
-const Version = "1.78.0"
+// RegisterCompressorForTesting registers a compressor in the global compressor
+// registry. It returns a cleanup function that should be called at the end
+// of the test to unregister the compressor.
+//
+// This prevents compressors registered in one test from appearing in the
+// encoding headers of subsequent tests.
+var RegisterCompressorForTesting any // func RegisterCompressor(c Compressor) func()

@@ -21,13 +21,16 @@ RUN apt-get update && apt-get install -y wget time
 
 RUN pip install tensorflow==2.20.0
 
-RUN wget https://github.com/tensorflow/models/archive/v2.15.0.tar.gz \
-&& tar xzf v2.15.0.tar.gz \
-&& rm -f v2.15.0.tar.gz
+# Use models v1.9.0 which contains the wide_deep implementation.
+# The wide_deep directory was removed in later versions of tensorflow/models.
+# The v1.9.0 code uses tf.estimator APIs which are still available in TF 2.x.
+RUN wget https://github.com/tensorflow/models/archive/v1.9.0.tar.gz \
+&& tar xzf v1.9.0.tar.gz \
+&& rm -f v1.9.0.tar.gz
 
-RUN python /models-2.15.0/official/wide_deep/data_download.py
+RUN python /models-1.9.0/official/wide_deep/data_download.py
 
-WORKDIR $HOME/models-2.15.0/official/wide_deep
-ENV PYTHONPATH=$PYTHONPATH:$HOME/models-2.15.0
+WORKDIR $HOME/models-1.9.0/official/wide_deep
+ENV PYTHONPATH=$PYTHONPATH:$HOME/models-1.9.0
 
 ENTRYPOINT python ./wide_deep.py

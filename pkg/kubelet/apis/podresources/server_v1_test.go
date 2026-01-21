@@ -1738,3 +1738,217 @@ func TestGetPodResourcesWithInitContainersV1(t *testing.T) {
 		})
 	}
 }
+
+// TestGetPodResourcesV1FeatureGateDisabled tests Get() when the feature gate is disabled
+func TestGetPodResourcesV1FeatureGateDisabled(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.KubeletPodResourcesGet, false)
+
+	tCtx := ktesting.Init(t)
+	podName := "pod-name"
+	podNamespace := "pod-namespace"
+
+	mockDevicesProvider := podresourcetest.NewMockDevicesProvider(t)
+	mockPodsProvider := podresourcetest.NewMockPodsProvider(t)
+	mockCPUsProvider := podresourcetest.NewMockCPUsProvider(t)
+	mockMemoryProvider := podresourcetest.NewMockMemoryProvider(t)
+	mockDynamicResourcesProvider := podresourcetest.NewMockDynamicResourcesProvider(t)
+
+	providers := PodResourcesProviders{
+		Pods:             mockPodsProvider,
+		Devices:          mockDevicesProvider,
+		Cpus:             mockCPUsProvider,
+		Memory:           mockMemoryProvider,
+		DynamicResources: mockDynamicResourcesProvider,
+	}
+	server := NewV1PodResourcesServer(tCtx, providers)
+	podReq := &podresourcesapi.GetPodResourcesRequest{PodName: podName, PodNamespace: podNamespace}
+	_, err := server.Get(tCtx, podReq)
+	if err == nil {
+		t.Errorf("expected error when feature gate is disabled, got nil")
+	}
+	expectedErr := "PodResources API Get method disabled"
+	if err.Error() != expectedErr {
+		t.Errorf("expected error %q, got %q", expectedErr, err.Error())
+	}
+}
+
+// TestListPodResourcesV1WithTerminalPods tests List() with terminal pods when useActivePods=false
+func TestListPodResourcesV1WithTerminalPods(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.KubeletPodResourcesListUseActivePods, false)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.KubeletPodResourcesDynamicResources, true)
+
+	tCtx := ktesting.Init(t)
+	containerName := "container-name"
+
+	// Create pods with different phases
+	runningPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "running-pod",
+			Namespace: "default",
+			UID:       types.UID("running-uid"),
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{Name: containerName}},
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodRunning,
+		},
+	}
+
+	failedPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "failed-pod",
+			Namespace: "default",
+			UID:       types.UID("failed-uid"),
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{Name: containerName}},
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodFailed,
+		},
+	}
+
+	succeededPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "succeeded-pod",
+			Namespace: "default",
+			UID:       types.UID("succeeded-uid"),
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{Name: containerName}},
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodSucceeded,
+		},
+	}
+
+	pendingPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pending-pod",
+			Namespace: "default",
+			UID:       types.UID("pending-uid"),
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{Name: containerName}},
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodPending,
+		},
+	}
+
+	allPods := []*v1.Pod{runningPod, failedPod, succeededPod, pendingPod}
+
+	mockDevicesProvider := podresourcetest.NewMockDevicesProvider(t)
+	mockPodsProvider := podresourcetest.NewMockPodsProvider(t)
+	mockCPUsProvider := podresourcetest.NewMockCPUsProvider(t)
+	mockMemoryProvider := podresourcetest.NewMockMemoryProvider(t)
+	mockDynamicResourcesProvider := podresourcetest.NewMockDynamicResourcesProvider(t)
+
+	mockPodsProvider.EXPECT().GetPods().Return(allPods)
+	mockDevicesProvider.EXPECT().UpdateAllocatedDevices().Return()
+
+	// Only non-terminal pods should have their resources queried
+	for _, pod := range []*v1.Pod{runningPod, pendingPod} {
+		mockDevicesProvider.EXPECT().GetDevices(string(pod.UID), containerName).Return([]*podresourcesapi.ContainerDevices{})
+		mockCPUsProvider.EXPECT().GetCPUs(string(pod.UID), containerName).Return([]int64{})
+		mockMemoryProvider.EXPECT().GetMemory(string(pod.UID), containerName).Return([]*podresourcesapi.ContainerMemory{})
+		mockDynamicResourcesProvider.EXPECT().GetDynamicResources(pod, &pod.Spec.Containers[0]).Return([]*podresourcesapi.DynamicResource{})
+	}
+
+	providers := PodResourcesProviders{
+		Pods:             mockPodsProvider,
+		Devices:          mockDevicesProvider,
+		Cpus:             mockCPUsProvider,
+		Memory:           mockMemoryProvider,
+		DynamicResources: mockDynamicResourcesProvider,
+	}
+	server := NewV1PodResourcesServer(tCtx, providers)
+	resp, err := server.List(tCtx, &podresourcesapi.ListPodResourcesRequest{})
+	if err != nil {
+		t.Errorf("want err = %v, got %q", nil, err)
+	}
+
+	// Verify only non-terminal pods are in the response
+	if len(resp.PodResources) != 2 {
+		t.Errorf("expected 2 pods in response (running and pending), got %d", len(resp.PodResources))
+	}
+
+	podNames := make(map[string]bool)
+	for _, pr := range resp.PodResources {
+		podNames[pr.Name] = true
+	}
+
+	if !podNames["running-pod"] {
+		t.Errorf("expected running-pod in response")
+	}
+	if !podNames["pending-pod"] {
+		t.Errorf("expected pending-pod in response")
+	}
+	if podNames["failed-pod"] {
+		t.Errorf("did not expect failed-pod in response")
+	}
+	if podNames["succeeded-pod"] {
+		t.Errorf("did not expect succeeded-pod in response")
+	}
+}
+
+// TestListPodResourcesV1WithActivePodsEnabled tests List() with useActivePods=true
+func TestListPodResourcesV1WithActivePodsEnabled(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.KubeletPodResourcesListUseActivePods, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.KubeletPodResourcesDynamicResources, true)
+
+	tCtx := ktesting.Init(t)
+	containerName := "container-name"
+
+	activePod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "active-pod",
+			Namespace: "default",
+			UID:       types.UID("active-uid"),
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{Name: containerName}},
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodRunning,
+		},
+	}
+
+	activePods := []*v1.Pod{activePod}
+
+	mockDevicesProvider := podresourcetest.NewMockDevicesProvider(t)
+	mockPodsProvider := podresourcetest.NewMockPodsProvider(t)
+	mockCPUsProvider := podresourcetest.NewMockCPUsProvider(t)
+	mockMemoryProvider := podresourcetest.NewMockMemoryProvider(t)
+	mockDynamicResourcesProvider := podresourcetest.NewMockDynamicResourcesProvider(t)
+
+	// When useActivePods=true, GetActivePods should be called
+	mockPodsProvider.EXPECT().GetActivePods().Return(activePods)
+	mockDevicesProvider.EXPECT().UpdateAllocatedDevices().Return()
+	mockDevicesProvider.EXPECT().GetDevices(string(activePod.UID), containerName).Return([]*podresourcesapi.ContainerDevices{})
+	mockCPUsProvider.EXPECT().GetCPUs(string(activePod.UID), containerName).Return([]int64{})
+	mockMemoryProvider.EXPECT().GetMemory(string(activePod.UID), containerName).Return([]*podresourcesapi.ContainerMemory{})
+	mockDynamicResourcesProvider.EXPECT().GetDynamicResources(activePod, &activePod.Spec.Containers[0]).Return([]*podresourcesapi.DynamicResource{})
+
+	providers := PodResourcesProviders{
+		Pods:             mockPodsProvider,
+		Devices:          mockDevicesProvider,
+		Cpus:             mockCPUsProvider,
+		Memory:           mockMemoryProvider,
+		DynamicResources: mockDynamicResourcesProvider,
+	}
+	server := NewV1PodResourcesServer(tCtx, providers)
+	resp, err := server.List(tCtx, &podresourcesapi.ListPodResourcesRequest{})
+	if err != nil {
+		t.Errorf("want err = %v, got %q", nil, err)
+	}
+
+	if len(resp.PodResources) != 1 {
+		t.Errorf("expected 1 pod in response, got %d", len(resp.PodResources))
+	}
+
+	if resp.PodResources[0].Name != "active-pod" {
+		t.Errorf("expected active-pod in response, got %s", resp.PodResources[0].Name)
+	}
+}
