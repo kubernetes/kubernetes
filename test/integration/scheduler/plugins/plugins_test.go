@@ -752,7 +752,7 @@ func TestPreFilterPlugin(t *testing.T) {
 			}
 
 			if test.reject {
-				if err = testutils.WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
+				if err = testutils.WaitForPodUnschedulableWithTimeout(testCtx.Ctx, testCtx.ClientSet, pod, 60*time.Second); err != nil {
 					t.Errorf("Didn't expect the pod to be scheduled. error: %v", err)
 				}
 			} else if test.fail {
@@ -1302,7 +1302,7 @@ func TestPrebindPlugin(t *testing.T) {
 					t.Errorf("Expected a scheduling error, but didn't get it. error: %v", err)
 				}
 			} else if test.reject {
-				if err = testutils.WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
+				if err = testutils.WaitForPodUnschedulableWithTimeout(testCtx.Ctx, testCtx.ClientSet, pod, 60*time.Second); err != nil {
 					t.Errorf("Expected the pod to be unschedulable")
 				}
 			} else if err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
@@ -1534,7 +1534,7 @@ func TestUnReservePermitPlugins(t *testing.T) {
 			}
 
 			if test.reject {
-				if err = testutils.WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
+				if err = testutils.WaitForPodUnschedulableWithTimeout(testCtx.Ctx, testCtx.ClientSet, pod, 60*time.Second); err != nil {
 					t.Errorf("Didn't expect the pod to be scheduled. error: %v", err)
 				}
 
@@ -1606,7 +1606,7 @@ func TestUnReservePreBindPlugins(t *testing.T) {
 			}
 
 			if test.wantReject {
-				if err = testutils.WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
+				if err = testutils.WaitForPodUnschedulableWithTimeout(testCtx.Ctx, testCtx.ClientSet, pod, 60*time.Second); err != nil {
 					t.Errorf("Expected a reasons other than Unschedulable, but got: %v", err)
 				}
 
@@ -2052,7 +2052,7 @@ func TestPermitPlugin(t *testing.T) {
 				}
 			} else {
 				if test.reject || test.timeout {
-					if err = testutils.WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
+					if err = testutils.WaitForPodUnschedulableWithTimeout(testCtx.Ctx, testCtx.ClientSet, pod, 60*time.Second); err != nil {
 						t.Errorf("Didn't expect the pod to be scheduled. error: %v", err)
 					}
 				} else {
