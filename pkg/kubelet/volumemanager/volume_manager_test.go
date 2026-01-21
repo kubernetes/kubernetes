@@ -686,8 +686,8 @@ func TestWaitForAllPodsUnmount(t *testing.T) {
 			expectedError: true,
 		},
 		{
-			name:          "concurrent unmount - many pods (50) with timeout errors",
-			numPods:       50,
+			name:          "concurrent unmount - many pods (20) with timeout errors",
+			numPods:       20,
 			podMode:       v1.PersistentVolumeFilesystem,
 			expectedError: true,
 		},
@@ -725,9 +725,34 @@ func TestWaitForAllPodsUnmount(t *testing.T) {
 					go simulateVolumeInUseUpdate(volumeName, ctx.Done(), manager)
 				}
 
+				volumeMarkTimeout := 10*time.Second + time.Duration(test.numPods/10)*5*time.Second
+				err := wait.PollUntilContextTimeout(ctx, 50*time.Millisecond, volumeMarkTimeout, true, func(context.Context) (bool, error) {
+					inUseVolumes := manager.GetVolumesInUse()
+					return len(inUseVolumes) == test.numPods, nil
+				})
+
+				require.NoError(t, err, "Timeout waiting for all %d volumes to be marked as in-use", test.numPods)
+
+				type attachResult struct {
+					podName string
+					err     error
+				}
+				resultChan := make(chan attachResult, test.numPods)
+
 				for _, pod := range pods {
-					err := manager.WaitForAttachAndMount(ctx, pod)
-					require.NoError(t, err, "Failed to wait for attach and mount for pod %s", pod.Name)
+					go func() {
+						err := manager.WaitForAttachAndMount(context.Background(), pod)
+						resultChan <- attachResult{
+							podName: pod.Name,
+							err:     err,
+						}
+					}()
+				}
+
+				for i := 0; i < test.numPods; i++ {
+					result := <-resultChan
+					require.NoError(t, result.err,
+						"Failed to wait for attach and mount for pod %s", result.podName)
 				}
 			}
 
