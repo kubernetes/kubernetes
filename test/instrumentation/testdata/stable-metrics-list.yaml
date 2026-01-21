@@ -208,6 +208,70 @@
   help: The count of disabled metrics.
   type: Counter
   stabilityLevel: BETA
+- name: desired_endpoint_slices
+  subsystem: endpoint_slice_controller
+  help: Number of EndpointSlices that would exist with perfect endpoint allocation
+  type: Gauge
+  stabilityLevel: BETA
+- name: endpoints_added_per_sync
+  subsystem: endpoint_slice_controller
+  help: Number of endpoints added on each Service sync
+  type: Histogram
+  stabilityLevel: BETA
+  buckets:
+  - 2
+  - 4
+  - 8
+  - 16
+  - 32
+  - 64
+  - 128
+  - 256
+  - 512
+  - 1024
+  - 2048
+  - 4096
+  - 8192
+  - 16384
+  - 32768
+- name: endpoints_desired
+  subsystem: endpoint_slice_controller
+  help: Number of endpoints desired
+  type: Gauge
+  stabilityLevel: BETA
+- name: endpoints_removed_per_sync
+  subsystem: endpoint_slice_controller
+  help: Number of endpoints removed on each Service sync
+  type: Histogram
+  stabilityLevel: BETA
+  buckets:
+  - 2
+  - 4
+  - 8
+  - 16
+  - 32
+  - 64
+  - 128
+  - 256
+  - 512
+  - 1024
+  - 2048
+  - 4096
+  - 8192
+  - 16384
+  - 32768
+- name: num_endpoint_slices
+  subsystem: endpoint_slice_controller
+  help: Number of EndpointSlices
+  type: Gauge
+  stabilityLevel: BETA
+- name: services_count_by_traffic_distribution
+  subsystem: endpoint_slice_controller
+  help: Number of Services using some specific trafficDistribution
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - traffic_distribution
 - name: hidden_metrics_total
   help: The count of hidden metrics.
   type: Counter
