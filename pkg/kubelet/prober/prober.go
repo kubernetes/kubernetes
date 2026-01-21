@@ -81,6 +81,11 @@ func (pb *prober) recordContainerEvent(ctx context.Context, pod *v1.Pod, contain
 
 // probe probes the container.
 func (pb *prober) probe(ctx context.Context, probeType probeType, pod *v1.Pod, status v1.PodStatus, container v1.Container, containerID kubecontainer.ContainerID) (results.Result, error) {
+	return pb.probeWithContext(ctx, probeType, pod, status, container, containerID, 0, 0)
+}
+
+// probeWithContext probes the container with additional context about failure counts.
+func (pb *prober) probeWithContext(ctx context.Context, probeType probeType, pod *v1.Pod, status v1.PodStatus, container v1.Container, containerID kubecontainer.ContainerID, currentFailureCount int, failureThreshold int32) (results.Result, error) {
 	var probeSpec *v1.Probe
 	switch probeType {
 	case readiness:
@@ -104,7 +109,16 @@ func (pb *prober) probe(ctx context.Context, probeType probeType, pod *v1.Pod, s
 	if err != nil {
 		// Handle probe error
 		logger.V(1).Error(err, "Probe errored", "probeType", probeType, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name, "probeResult", result)
-		pb.recordContainerEvent(ctx, pod, &container, v1.EventTypeWarning, events.ContainerUnhealthy, "%s probe errored and resulted in %s state: %s", probeType, result, err)
+
+		// For startup probes, only record warning events when the failure threshold is exceeded
+		if probeType == startup {
+			if currentFailureCount >= int(failureThreshold) {
+				pb.recordContainerEvent(ctx, pod, &container, v1.EventTypeWarning, events.ContainerUnhealthy, "%s probe errored after exceeding maximum startup duration: %s", probeType, err)
+			}
+		} else {
+			// For liveness and readiness probes, maintain existing behavior
+			pb.recordContainerEvent(ctx, pod, &container, v1.EventTypeWarning, events.ContainerUnhealthy, "%s probe errored and resulted in %s state: %s", probeType, result, err)
+		}
 		return results.Failure, err
 	}
 
@@ -120,7 +134,17 @@ func (pb *prober) probe(ctx context.Context, probeType probeType, pod *v1.Pod, s
 
 	case probe.Failure:
 		logger.V(1).Info("Probe failed", "probeType", probeType, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name, "probeResult", result, "output", output)
-		pb.recordContainerEvent(ctx, pod, &container, v1.EventTypeWarning, events.ContainerUnhealthy, "%s probe failed: %s", probeType, output)
+
+		// For startup probes, only record warning events when the failure threshold is exceeded
+		// This prevents premature warning events during the expected startup period
+		if probeType == startup {
+			if currentFailureCount >= int(failureThreshold) {
+				pb.recordContainerEvent(ctx, pod, &container, v1.EventTypeWarning, events.ContainerUnhealthy, "%s probe failed after exceeding maximum startup duration: %s", probeType, output)
+			}
+		} else {
+			// For liveness and readiness probes, maintain existing behavior
+			pb.recordContainerEvent(ctx, pod, &container, v1.EventTypeWarning, events.ContainerUnhealthy, "%s probe failed: %s", probeType, output)
+		}
 		return results.Failure, nil
 
 	case probe.Unknown:

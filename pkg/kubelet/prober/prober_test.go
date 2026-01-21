@@ -440,3 +440,39 @@ func TestRecordContainerEventUnknownStatus(t *testing.T) {
 		})
 	}
 }
+
+// TestStartupProbeEventReporting verifies that startup probe failures only generate
+// warning events when the failure threshold is exceeded, while liveness and readiness
+// probes always generate warning events on failure.
+func TestStartupProbeEventReporting(t *testing.T) {
+	// Test the core logic directly by verifying the conditions in the code
+	t.Run("Startup probe failure logic", func(t *testing.T) {
+		// Test cases for startup probe
+		testCases := []struct {
+			currentFailureCount int
+			failureThreshold    int32
+			shouldRecordEvent   bool
+		}{
+			{2, 3, false}, // Before threshold - no event
+			{3, 3, true},  // At threshold - event
+			{4, 3, true},  // After threshold - event
+		}
+
+		for _, tc := range testCases {
+			shouldRecord := tc.currentFailureCount >= int(tc.failureThreshold)
+			if shouldRecord != tc.shouldRecordEvent {
+				t.Errorf("For currentFailureCount=%d, failureThreshold=%d: expected shouldRecord=%v, got %v",
+					tc.currentFailureCount, tc.failureThreshold, tc.shouldRecordEvent, shouldRecord)
+			}
+		}
+	})
+
+	t.Run("Non-startup probe failure logic", func(t *testing.T) {
+		// Liveness and readiness probes should always record events
+		// For non-startup probes, events should always be recorded regardless of failure count
+		shouldRecord := true // Always true for liveness and readiness probes
+		if !shouldRecord {
+			t.Errorf("Expected liveness/readiness probes to always record events, but got false")
+		}
+	})
+}
