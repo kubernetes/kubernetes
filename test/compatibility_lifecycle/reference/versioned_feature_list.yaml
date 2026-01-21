@@ -1039,20 +1039,6 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.35"
-- name: MemoryManager
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: "1.21"
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: "1.22"
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: "1.32"
 - name: MemoryQoS
   versionedSpecs:
   - default: false
