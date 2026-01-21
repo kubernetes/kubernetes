@@ -256,6 +256,16 @@
   labels:
   - deprecated_version
   - stability_level
+- name: resourceclaim_controller_resource_claims
+  help: Number of ResourceClaims, categorized by allocation status, admin access,
+    and source. Source can be 'resource_claim_template' (created from a template),
+    'extended_resource' (extended resources), or empty (manually created by a user).
+  type: Custom
+  stabilityLevel: BETA
+  labels:
+  - allocated
+  - admin_access
+  - source
 - name: pod_scheduling_sli_duration_seconds
   subsystem: scheduler
   help: E2e latency for a pod being scheduled, from the time the pod enters the scheduling
