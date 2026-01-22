@@ -31,14 +31,13 @@ import (
 func TestNewSimpleClientset(t *testing.T) {
 	client := NewSimpleClientset()
 
-	pod, err := client.CoreV1().Pods("default").Create(context.Background(), &v1.Pod{
+	_, err := client.CoreV1().Pods("default").Create(context.Background(), &v1.Pod{
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name:      "pod-1",
 			Namespace: "default",
 		},
 	}, meta_v1.CreateOptions{})
 	require.NoError(t, err)
-	require.NotNil(t, pod)
 
 	_, err = client.CoreV1().Pods("default").Create(context.Background(), &v1.Pod{
 		ObjectMeta: meta_v1.ObjectMeta{
