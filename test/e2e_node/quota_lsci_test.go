@@ -19,7 +19,7 @@ package e2enode
 import (
 	"context"
 	"fmt"
-	"path/filepath"
+	"path"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -111,24 +111,16 @@ var _ = SIGDescribe("LocalStorageCapacityIsolationFSQuotaMonitoring", framework.
 })
 
 const (
-	writeConcealedPodCommand = `
-my $file = "%s.bin";
-open OUT, ">$file" || die "Cannot open $file: $!\n";
-unlink "$file" || die "Cannot unlink $file: $!\n";
-my $a = "a";
-foreach (1..20) { $a = "$a$a"; }
-foreach (1..%d) { syswrite(OUT, $a); }
-sleep 999999;`
+	writeConcealedPodCommand = `set -e; file="%s.bin"; exec 3>"${file}"; rm "${file}"; dd if=/dev/zero bs=1M count=%d >&3; sleep 999999`
 )
 
-// This is needed for testing eviction of pods using disk space in concealed files; the shell has no convenient
-// way of performing I/O to a concealed file, and the busybox image doesn't contain Perl.
+// This is needed for testing eviction of pods using disk space in concealed files
 func diskConcealingPod(name string, diskConsumedMB int, volumeSource *v1.VolumeSource, resources v1.ResourceRequirements) *v1.Pod {
-	path := ""
+	filePath := ""
 	volumeMounts := []v1.VolumeMount{}
 	volumes := []v1.Volume{}
 	if volumeSource != nil {
-		path = volumeMountPath
+		filePath = volumeMountPath
 		volumeMounts = []v1.VolumeMount{{MountPath: volumeMountPath, Name: volumeName}}
 		volumes = []v1.Volume{{Name: volumeName, VolumeSource: *volumeSource}}
 	}
@@ -139,12 +131,12 @@ func diskConcealingPod(name string, diskConsumedMB int, volumeSource *v1.VolumeS
 			RestartPolicy: v1.RestartPolicyNever,
 			Containers: []v1.Container{
 				{
-					Image: imageutils.GetE2EImage(imageutils.Perl),
+					Image: imageutils.GetE2EImage(imageutils.BusyBox),
 					Name:  fmt.Sprintf("%s-container", name),
 					Command: []string{
-						"perl",
-						"-e",
-						fmt.Sprintf(writeConcealedPodCommand, filepath.Join(path, "file"), diskConsumedMB),
+						"sh",
+						"-c",
+						fmt.Sprintf(writeConcealedPodCommand, path.Join(filePath, "file"), diskConsumedMB),
 					},
 					Resources:    resources,
 					VolumeMounts: volumeMounts,
