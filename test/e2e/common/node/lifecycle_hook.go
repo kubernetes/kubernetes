@@ -19,6 +19,7 @@ package node
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -41,8 +42,7 @@ import (
 
 var _ = SIGDescribe("Container Lifecycle Hook", func() {
 	f := framework.NewDefaultFramework("container-lifecycle-hook")
-	// FIXME: This test is being run in the privileged mode because of https://github.com/kubernetes/kubernetes/issues/133091
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	var podClient *e2epod.PodClient
 	const (
 		podCheckInterval     = 1 * time.Second
@@ -52,33 +52,36 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 	ginkgo.Context("when create a pod with lifecycle hook", func() {
 		var (
 			targetIP, targetURL, targetNode string
-
-			httpPorts = []v1.ContainerPort{
-				{
-					ContainerPort: 8080,
-					Protocol:      v1.ProtocolTCP,
-				},
-			}
-			httpsPorts = []v1.ContainerPort{
-				{
-					ContainerPort: 9090,
-					Protocol:      v1.ProtocolTCP,
-				},
-			}
-			httpsArgs = []string{
-				"netexec",
-				"--http-port", "9090",
-				"--udp-port", "9091",
-				"--tls-cert-file", "/localhost.crt",
-				"--tls-private-key-file", "/localhost.key",
-			}
 		)
 
+		// We test the probes by creating an HTTP server and looking at its logs
+		// to verify that it got hit with the expected probes. This is tricky
+		// though: when testing PostStart, the HTTP server can't be the container
+		// we're starting, because PostStart may run before the container starts.
+		// We can solve that by using a sidecar container, but that doesn't work
+		// for PreStop, because we can't reliably ensure that the sidecar stays
+		// around long enough after we Delete the pod for us to have a chance to
+		// read the logs.
+		//
+		// To make both cases work, we run a separate pod to do the logging, and
+		// then use a sidecar container in the test pod that can receive probes at
+		// the test pod's IP and handle them by making a request to the logging
+		// pod.
+		//
+		// (The Exec case is much simpler, since we can just have it curl the
+		// logging pod directly.)
 		podHandleHookRequest := e2epod.NewAgnhostPodFromContainers(
 			"", "pod-handle-http-request", nil,
-			e2epod.NewAgnhostContainer("container-handle-http-request", nil, httpPorts, "netexec"),
-			e2epod.NewAgnhostContainer("container-handle-https-request", nil, httpsPorts, httpsArgs...),
+			e2epod.NewAgnhostContainer("container-handle-http-request", nil, nil, "netexec"),
 		)
+		// netexecConnect takes a target and a request, and returns a netexec
+		// command that will connect to `target` and request `req`.
+		netexecConnect := func(target, req string) string {
+			return fmt.Sprintf("/dial?host=%s&port=8080&request=%s",
+				target,
+				url.QueryEscape(strings.TrimLeft(req, "/")),
+			)
+		}
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
@@ -98,22 +101,47 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 			}
 		})
 		testPodWithHook := func(ctx context.Context, podWithHook *v1.Pod) {
+			testContainer := podWithHook.Spec.Containers[0]
+			scheme := v1.URISchemeHTTP
+			if testContainer.Lifecycle.PostStart != nil && testContainer.Lifecycle.PostStart.HTTPGet != nil {
+				scheme = testContainer.Lifecycle.PostStart.HTTPGet.Scheme
+			} else if testContainer.Lifecycle.PreStop != nil && testContainer.Lifecycle.PreStop.HTTPGet != nil {
+				scheme = testContainer.Lifecycle.PreStop.HTTPGet.Scheme
+			}
+
+			ginkgo.By("add a sidecar to the test pod")
+			sidecarArgs := []string{
+				"netexec",
+				"--udp-port", "-1",
+			}
+			if scheme == v1.URISchemeHTTPS {
+				sidecarArgs = append(sidecarArgs,
+					"--tls-cert-file", "/localhost.crt",
+					"--tls-private-key-file", "/localhost.key",
+				)
+			}
+			sidecarContainer := e2epod.NewAgnhostContainer("container-redirect", nil, nil, sidecarArgs...)
+			sidecarContainer.RestartPolicy = ptr.To(v1.ContainerRestartPolicyAlways)
+			sidecarContainer.StartupProbe = &v1.Probe{
+				ProbeHandler: v1.ProbeHandler{
+					HTTPGet: &v1.HTTPGetAction{
+						Scheme: scheme,
+						Path:   "/echo?msg=startup",
+						Port:   intstr.FromInt32(8080),
+					},
+				},
+			}
+			podWithHook.Spec.InitContainers = append(
+				[]v1.Container{sidecarContainer},
+				podWithHook.Spec.InitContainers...,
+			)
+
 			ginkgo.By("create the pod with lifecycle hook")
 			podClient.CreateSync(ctx, podWithHook)
-			const (
-				defaultHandler = iota
-				httpsHandler
-			)
-			handlerContainer := defaultHandler
 			if podWithHook.Spec.Containers[0].Lifecycle.PostStart != nil {
 				ginkgo.By("check poststart hook")
-				if podWithHook.Spec.Containers[0].Lifecycle.PostStart.HTTPGet != nil {
-					if v1.URISchemeHTTPS == podWithHook.Spec.Containers[0].Lifecycle.PostStart.HTTPGet.Scheme {
-						handlerContainer = httpsHandler
-					}
-				}
 				gomega.Eventually(ctx, func(ctx context.Context) error {
-					return podClient.MatchContainerOutput(ctx, podHandleHookRequest.Name, podHandleHookRequest.Spec.Containers[handlerContainer].Name,
+					return podClient.MatchContainerOutput(ctx, podHandleHookRequest.Name, podHandleHookRequest.Spec.Containers[0].Name,
 						`GET /echo\?msg=poststart`)
 				}, postStartWaitTimeout, podCheckInterval).Should(gomega.BeNil())
 			}
@@ -121,13 +149,8 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 			podClient.DeleteSync(ctx, podWithHook.Name, *metav1.NewDeleteOptions(15), f.Timeouts.PodDelete)
 			if podWithHook.Spec.Containers[0].Lifecycle.PreStop != nil {
 				ginkgo.By("check prestop hook")
-				if podWithHook.Spec.Containers[0].Lifecycle.PreStop.HTTPGet != nil {
-					if v1.URISchemeHTTPS == podWithHook.Spec.Containers[0].Lifecycle.PreStop.HTTPGet.Scheme {
-						handlerContainer = httpsHandler
-					}
-				}
 				gomega.Eventually(ctx, func(ctx context.Context) error {
-					return podClient.MatchContainerOutput(ctx, podHandleHookRequest.Name, podHandleHookRequest.Spec.Containers[handlerContainer].Name,
+					return podClient.MatchContainerOutput(ctx, podHandleHookRequest.Name, podHandleHookRequest.Spec.Containers[0].Name,
 						`GET /echo\?msg=prestop`)
 				}, preStopWaitTimeout, podCheckInterval).Should(gomega.BeNil())
 			}
@@ -174,8 +197,7 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 			lifecycle := &v1.Lifecycle{
 				PostStart: &v1.LifecycleHandler{
 					HTTPGet: &v1.HTTPGetAction{
-						Path: "/echo?msg=poststart",
-						Host: targetIP,
+						Path: netexecConnect(targetIP, "/echo?msg=poststart"),
 						Port: intstr.FromInt32(8080),
 					},
 				},
@@ -197,9 +219,8 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 				PostStart: &v1.LifecycleHandler{
 					HTTPGet: &v1.HTTPGetAction{
 						Scheme: v1.URISchemeHTTPS,
-						Path:   "/echo?msg=poststart",
-						Host:   targetIP,
-						Port:   intstr.FromInt32(9090),
+						Path:   netexecConnect(targetIP, "/echo?msg=poststart"),
+						Port:   intstr.FromInt32(8080),
 					},
 				},
 			}
@@ -219,8 +240,7 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 			lifecycle := &v1.Lifecycle{
 				PreStop: &v1.LifecycleHandler{
 					HTTPGet: &v1.HTTPGetAction{
-						Path: "/echo?msg=prestop",
-						Host: targetIP,
+						Path: netexecConnect(targetIP, "/echo?msg=prestop"),
 						Port: intstr.FromInt32(8080),
 					},
 				},
@@ -242,9 +262,8 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 				PreStop: &v1.LifecycleHandler{
 					HTTPGet: &v1.HTTPGetAction{
 						Scheme: v1.URISchemeHTTPS,
-						Path:   "/echo?msg=prestop",
-						Host:   targetIP,
-						Port:   intstr.FromInt32(9090),
+						Path:   netexecConnect(targetIP, "/echo?msg=prestop"),
+						Port:   intstr.FromInt32(8080),
 					},
 				},
 			}
@@ -260,8 +279,7 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 
 var _ = SIGDescribe(framework.WithNodeConformance(), framework.WithFeatureGate(features.SidecarContainers), "Restartable Init Container Lifecycle Hook", func() {
 	f := framework.NewDefaultFramework("restartable-init-container-lifecycle-hook")
-	// FIXME: This test is being run in the privileged mode because of https://github.com/kubernetes/kubernetes/issues/133091
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	var podClient *e2epod.PodClient
 	const (
 		podCheckInterval     = 1 * time.Second
@@ -271,33 +289,19 @@ var _ = SIGDescribe(framework.WithNodeConformance(), framework.WithFeatureGate(f
 	ginkgo.Context("when create a pod with lifecycle hook", func() {
 		var (
 			targetIP, targetURL, targetNode string
-
-			httpPorts = []v1.ContainerPort{
-				{
-					ContainerPort: 8080,
-					Protocol:      v1.ProtocolTCP,
-				},
-			}
-			httpsPorts = []v1.ContainerPort{
-				{
-					ContainerPort: 9090,
-					Protocol:      v1.ProtocolTCP,
-				},
-			}
-			httpsArgs = []string{
-				"netexec",
-				"--http-port", "9090",
-				"--udp-port", "9091",
-				"--tls-cert-file", "/localhost.crt",
-				"--tls-private-key-file", "/localhost.key",
-			}
 		)
 
+		// See description above in the "Container Lifecycle Hook" tests
 		podHandleHookRequest := e2epod.NewAgnhostPodFromContainers(
 			"", "pod-handle-http-request", nil,
-			e2epod.NewAgnhostContainer("container-handle-http-request", nil, httpPorts, "netexec"),
-			e2epod.NewAgnhostContainer("container-handle-https-request", nil, httpsPorts, httpsArgs...),
+			e2epod.NewAgnhostContainer("container-handle-http-request", nil, nil, "netexec"),
 		)
+		netexecConnect := func(target, req string) string {
+			return fmt.Sprintf("/dial?host=%s&port=8080&request=%s",
+				target,
+				url.QueryEscape(strings.TrimLeft(req, "/")),
+			)
+		}
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
@@ -317,36 +321,56 @@ var _ = SIGDescribe(framework.WithNodeConformance(), framework.WithFeatureGate(f
 			}
 		})
 		testPodWithHook := func(ctx context.Context, podWithHook *v1.Pod) {
+			testContainer := podWithHook.Spec.InitContainers[0]
+			scheme := v1.URISchemeHTTP
+			if testContainer.Lifecycle.PostStart != nil && testContainer.Lifecycle.PostStart.HTTPGet != nil {
+				scheme = testContainer.Lifecycle.PostStart.HTTPGet.Scheme
+			} else if testContainer.Lifecycle.PreStop != nil && testContainer.Lifecycle.PreStop.HTTPGet != nil {
+				scheme = testContainer.Lifecycle.PreStop.HTTPGet.Scheme
+			}
+
+			ginkgo.By("add a sidecar to the test pod")
+			sidecarArgs := []string{
+				"netexec",
+				"--udp-port", "-1",
+			}
+			if scheme == v1.URISchemeHTTPS {
+				sidecarArgs = append(sidecarArgs,
+					"--tls-cert-file", "/localhost.crt",
+					"--tls-private-key-file", "/localhost.key",
+				)
+			}
+			sidecarContainer := e2epod.NewAgnhostContainer("container-redirect", nil, nil, sidecarArgs...)
+			sidecarContainer.RestartPolicy = ptr.To(v1.ContainerRestartPolicyAlways)
+			sidecarContainer.StartupProbe = &v1.Probe{
+				ProbeHandler: v1.ProbeHandler{
+					HTTPGet: &v1.HTTPGetAction{
+						Scheme: scheme,
+						Path:   "/echo?msg=startup",
+						Port:   intstr.FromInt32(8080),
+					},
+				},
+			}
+			podWithHook.Spec.InitContainers = append(
+				[]v1.Container{sidecarContainer},
+				podWithHook.Spec.InitContainers...,
+			)
+
 			ginkgo.By("create the pod with lifecycle hook")
 			podClient.CreateSync(ctx, podWithHook)
-			const (
-				defaultHandler = iota
-				httpsHandler
-			)
-			handlerContainer := defaultHandler
-			if podWithHook.Spec.InitContainers[0].Lifecycle.PostStart != nil {
+			if testContainer.Lifecycle.PostStart != nil {
 				ginkgo.By("check poststart hook")
-				if podWithHook.Spec.InitContainers[0].Lifecycle.PostStart.HTTPGet != nil {
-					if v1.URISchemeHTTPS == podWithHook.Spec.InitContainers[0].Lifecycle.PostStart.HTTPGet.Scheme {
-						handlerContainer = httpsHandler
-					}
-				}
 				gomega.Eventually(ctx, func(ctx context.Context) error {
-					return podClient.MatchContainerOutput(ctx, podHandleHookRequest.Name, podHandleHookRequest.Spec.Containers[handlerContainer].Name,
+					return podClient.MatchContainerOutput(ctx, podHandleHookRequest.Name, podHandleHookRequest.Spec.Containers[0].Name,
 						`GET /echo\?msg=poststart`)
 				}, postStartWaitTimeout, podCheckInterval).Should(gomega.BeNil())
 			}
 			ginkgo.By("delete the pod with lifecycle hook")
 			podClient.DeleteSync(ctx, podWithHook.Name, *metav1.NewDeleteOptions(15), f.Timeouts.PodDelete)
-			if podWithHook.Spec.InitContainers[0].Lifecycle.PreStop != nil {
+			if testContainer.Lifecycle.PreStop != nil {
 				ginkgo.By("check prestop hook")
-				if podWithHook.Spec.InitContainers[0].Lifecycle.PreStop.HTTPGet != nil {
-					if v1.URISchemeHTTPS == podWithHook.Spec.InitContainers[0].Lifecycle.PreStop.HTTPGet.Scheme {
-						handlerContainer = httpsHandler
-					}
-				}
 				gomega.Eventually(ctx, func(ctx context.Context) error {
-					return podClient.MatchContainerOutput(ctx, podHandleHookRequest.Name, podHandleHookRequest.Spec.Containers[handlerContainer].Name,
+					return podClient.MatchContainerOutput(ctx, podHandleHookRequest.Name, podHandleHookRequest.Spec.Containers[0].Name,
 						`GET /echo\?msg=prestop`)
 				}, preStopWaitTimeout, podCheckInterval).Should(gomega.BeNil())
 			}
@@ -408,8 +432,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), framework.WithFeatureGate(f
 			lifecycle := &v1.Lifecycle{
 				PostStart: &v1.LifecycleHandler{
 					HTTPGet: &v1.HTTPGetAction{
-						Path: "/echo?msg=poststart",
-						Host: targetIP,
+						Path: netexecConnect(targetIP, "/echo?msg=poststart"),
 						Port: intstr.FromInt32(8080),
 					},
 				},
@@ -436,9 +459,8 @@ var _ = SIGDescribe(framework.WithNodeConformance(), framework.WithFeatureGate(f
 				PostStart: &v1.LifecycleHandler{
 					HTTPGet: &v1.HTTPGetAction{
 						Scheme: v1.URISchemeHTTPS,
-						Path:   "/echo?msg=poststart",
-						Host:   targetIP,
-						Port:   intstr.FromInt32(9090),
+						Path:   netexecConnect(targetIP, "/echo?msg=poststart"),
+						Port:   intstr.FromInt32(8080),
 					},
 				},
 			}
@@ -463,8 +485,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), framework.WithFeatureGate(f
 			lifecycle := &v1.Lifecycle{
 				PreStop: &v1.LifecycleHandler{
 					HTTPGet: &v1.HTTPGetAction{
-						Path: "/echo?msg=prestop",
-						Host: targetIP,
+						Path: netexecConnect(targetIP, "/echo?msg=prestop"),
 						Port: intstr.FromInt32(8080),
 					},
 				},
@@ -491,9 +512,8 @@ var _ = SIGDescribe(framework.WithNodeConformance(), framework.WithFeatureGate(f
 				PreStop: &v1.LifecycleHandler{
 					HTTPGet: &v1.HTTPGetAction{
 						Scheme: v1.URISchemeHTTPS,
-						Path:   "/echo?msg=prestop",
-						Host:   targetIP,
-						Port:   intstr.FromInt32(9090),
+						Path:   netexecConnect(targetIP, "/echo?msg=prestop"),
+						Port:   intstr.FromInt32(8080),
 					},
 				},
 			}
