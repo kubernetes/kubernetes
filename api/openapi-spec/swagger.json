@@ -19121,7 +19121,15 @@
           "description": "Gang specifies that the pods in this group should be scheduled using all-or-nothing semantics."
         }
       },
-      "type": "object"
+      "type": "object",
+      "x-kubernetes-unions": [
+        {
+          "fields-to-discriminateBy": {
+            "basic": "Basic",
+            "gang": "Gang"
+          }
+        }
+      ]
     },
     "io.k8s.api.scheduling.v1alpha1.TypedLocalObjectReference": {
       "description": "TypedLocalObjectReference allows to reference typed object inside the same namespace.",
