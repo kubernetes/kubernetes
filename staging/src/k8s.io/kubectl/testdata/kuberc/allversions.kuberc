@@ -1,0 +1,34 @@
+---
+apiVersion: kubectl.config.k8s.io/v1beta1
+kind: Preference
+aliases:
+  - name: getn
+    command: get
+    prependArgs:
+    - namespace
+  - name: runx
+    command: run
+    appendArgs:
+      - --
+      - custom-arg
+defaults:
+  - command: v1beta1-apply
+    options:
+      - name: server-side
+        default: "true"
+  - command: v1beta1-delete
+    options:
+      - name: interactive
+        default: "true"
+---
+apiVersion: kubectl.config.k8s.io/v1alpha1
+kind: Preference
+overrides:
+  - command: v1alpha1-apply
+    flags:
+      - name: server-side
+        default: "true"
+  - command: v1alpha1-delete
+    flags:
+      - name: interactive
+        default: "true"

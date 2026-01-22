@@ -1,0 +1,25 @@
+linters:
+  settings:
+    custom:
+      sorted:
+        path: /path/to/sorted.so
+        description: Checks if feature gates are sorted alphabetically
+        original-url: k8s.io/kubernetes/hack/tools/golangci-lint/sorted
+        settings:
+          debug: false
+          # Specify files to check (will ignore default files)
+          files:
+            - path/to/feature_gates.go
+            - another/path/to/feature_gates.go
+
+run:
+  # These paths control which files golangci-lint will analyze
+  # This is separate from the sorted plugin's files setting
+  paths:
+    - staging/src/k8s.io/apiserver/pkg/features/kube_features.go
+    - pkg/features/kube_features.go
+    - staging/src/k8s.io/client-go/features/known_features.go
+    - staging/src/k8s.io/controller-manager/pkg/features/kube_features.go
+    - staging/src/k8s.io/apiextensions-apiserver/pkg/features/kube_features.go
+    - test/e2e/feature/feature.go
+    - test/e2e/environment/environment.go

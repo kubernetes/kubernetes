@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  generateName: anti-affinity-matching-pod-
+  labels:
+    color: green
+spec:
+  containers:
+  - image: registry.k8s.io/pause:3.10.1
+    name: pause
+    ports:
+    - containerPort: 80
+    resources:
+      limits:
+        cpu: 100m
+        memory: 500Mi
+      requests:
+        cpu: 100m
+        memory: 500Mi

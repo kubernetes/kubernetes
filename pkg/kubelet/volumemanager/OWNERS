@@ -1,0 +1,7 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+  - jingxu97
+  - sig-storage-approvers
+reviewers:
+  - sig-storage-reviewers

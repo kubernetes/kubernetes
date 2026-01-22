@@ -1,0 +1,6 @@
+{
+    "CN": "Client-CA",
+    "ca": {
+        "expiry": "876000h"
+    }
+}

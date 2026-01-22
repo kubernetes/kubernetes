@@ -1,0 +1,9 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+  - apelisse
+  - pwittrock
+reviewers:
+  - apelisse
+emeritus_approvers:
+  - mengqiy
