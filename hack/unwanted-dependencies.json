@@ -38,6 +38,7 @@
       "github.com/golang/mock": "unmaintained, archive mode",
       "github.com/golang/protobuf": "replace with google.golang.org/protobuf",
       "github.com/golang/groupcache": "unmaintained",
+      "github.com/google/btree": "unmaintained, archive mode",
       "github.com/google/gofuzz": "unmaintained, use sigs.k8s.io/randfill",
       "github.com/google/s2a-go": "cloud dependency, unstable",
       "github.com/google/shlex": "unmaintained, archive mode",
@@ -168,6 +169,10 @@
         "google.golang.org/protobuf",
         "sigs.k8s.io/apiserver-network-proxy/konnectivity-client"
       ],
+      "github.com/google/btree": [
+        "go.etcd.io/etcd/server/v3",
+        "k8s.io/apiserver"
+      ],
       "github.com/google/gofuzz": [
         "github.com/json-iterator/go"
       ],
@@ -259,6 +264,7 @@
       "github.com/davecgh/go-spew",
       "github.com/gogo/protobuf",
       "github.com/golang/protobuf",
+      "github.com/google/btree",
       "github.com/json-iterator/go",
       "github.com/mailru/easyjson",
       "github.com/modern-go/concurrent",
