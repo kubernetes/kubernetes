@@ -751,8 +751,11 @@ var _ = SIGDescribe("Security Context", func() {
 					RestartPolicy: v1.RestartPolicyNever,
 					Containers: []v1.Container{
 						{
-							Image: imageutils.GetE2EImage(imageutils.Nonewprivs),
-							Name:  podName,
+							Image: imageutils.GetE2EImage(imageutils.Agnhost),
+							Args: []string{
+								"nonewprivs",
+							},
+							Name: podName,
 							SecurityContext: &v1.SecurityContext{
 								AllowPrivilegeEscalation: allowPrivilegeEscalation,
 								RunAsUser:                &uid,

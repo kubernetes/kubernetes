@@ -83,14 +83,14 @@ dependencies:
 
   # agnhost - E2E test image
   - name: "agnhost"
-    version: 2.61
+    version: 2.62.0
     refPaths:
     - path: test/utils/image/manifest.go
-      match: configs\[Agnhost\] = Config{list\.PromoterE2eRegistry, "agnhost", "\d+\.\d+"}
+      match: configs\[Agnhost\] = Config{list\.PromoterE2eRegistry, "agnhost", "\d+\.\d+.\d+"}
     - path: test/images/kitten/BASEIMAGE
-      match: agnhost:\d+\.\d+-
+      match: agnhost:\d+\.\d+.\d+
     - path: test/images/nautilus/BASEIMAGE
-      match: agnhost:\d+\.\d+-
+      match: agnhost:\d+\.\d+.\d+
     - path: test/e2e/testing-manifests/kubectl/agnhost-primary-pod.yaml
       match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+
     - path: test/e2e/testing-manifests/serviceloadbalancer/netexecrc.yaml
