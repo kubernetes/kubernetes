@@ -53,7 +53,7 @@ type Struct struct {
 	// +k8s:optional
 	M1 *M1 `json:"m1"`
 
-	// +k8s:shadow=+k8s:unionMember
+	// +k8s:shadow(introducedVersion:"1.35")=+k8s:unionMember
 	// +k8s:optional
 	M2 *M2 `json:"m2"`
 
