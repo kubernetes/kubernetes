@@ -21,7 +21,7 @@ registry.k8s.io/e2e-test-images/nautilus
 registry.k8s.io/e2e-test-images/nginx
 registry.k8s.io/e2e-test-images/node-perf/npb-ep
 registry.k8s.io/e2e-test-images/node-perf/npb-is
-registry.k8s.io/e2e-test-images/node-perf/tf-wide-deep
+registry.k8s.io/e2e-test-images/node-perf/pytorch-wide-deep
 registry.k8s.io/e2e-test-images/nonewprivs
 registry.k8s.io/e2e-test-images/nonroot
 registry.k8s.io/e2e-test-images/perl
