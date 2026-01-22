@@ -235,6 +235,13 @@ linters:
       # jsontags: 'Port' must be capitalized for backward compatibility
       - text: 'jsontags: field DaemonEndpoint.Port json tag does not match'
         path: "staging/src/k8s.io/api/core/v1/types.go"
+      
+      # NonPointerStructs - Existing fields that are non-pointer structs but where the current rules are incorrect.
+      
+      # The PodGroup.Policy field is a union type, but is not marked up as a union, nor does nonpointerstructs understand unions today.
+      # Validation makes this require at least one of the fields within to be set.
+      - text: "nonpointerstructs: field PodGroup.Policy is a non-pointer struct with no required fields. It must be marked as optional."
+        path: "staging/src/k8s.io/api/scheduling/v1alpha1/types.go"
 
       - linters:
         - forbidigo
