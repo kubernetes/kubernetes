@@ -30,7 +30,13 @@ WORKDIR ./NPB3.3.1/NPB3.3-OMP
 RUN sed -i '1i#!/bin/sh' sys/print_header sys/print_instructions
 
 # Create build config based on the architecture and build the workload.
-RUN if [ $(arch) != "x86_64" ]; then \
+# arm64 requires special flags to avoid relocation overflow with large binaries:
+#   -mcmodel=large: use large code model for > 4GB address space
+#   -fno-PIE: disable position-independent executable (incompatible with large model)
+#   -mno-outline-atomics: inline atomics to avoid linker issues
+RUN if [ $(arch) = "aarch64" ]; then \
+    sed 's/-mcmodel=medium/-mcmodel=large -fno-PIE -mno-outline-atomics/g' config/NAS.samples/make.def.gcc_x86 > config/make.def; \
+elif [ $(arch) != "x86_64" ]; then \
     sed s/-mcmodel=medium//g config/NAS.samples/make.def.gcc_x86 > config/make.def; \
 else \
     cp config/NAS.samples/make.def.gcc_x86 config/make.def; \
