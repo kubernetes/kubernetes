@@ -113,7 +113,7 @@ dependencies:
   # Golang
   # TODO: this should really be eliminated and controlled by .go-version
   - name: "golang: upstream version"
-    version: 1.24.11
+    version: 1.24.12
     refPaths:
     - path: .go-version
     - path: build/build-image/cross/VERSION
