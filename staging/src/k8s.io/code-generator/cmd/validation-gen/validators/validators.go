@@ -230,6 +230,10 @@ type Context struct {
 	// Constants provides access to all constants of the type being
 	// validated.  Only set when Scope is ScopeType.
 	Constants []*Constant
+
+	// IsShadow indicates whether this validation is being extracted from a
+	// +k8s:shadow tag.
+	IsShadow bool
 }
 
 // Constant represents a constant value.
@@ -527,6 +531,9 @@ type FunctionGen struct {
 	// Comments holds optional comments that should be added to the generated
 	// code (without the leading "//").
 	Comments []string
+
+	// IsShadow indicates if the result should be marked as shadow.
+	IsShadow bool
 }
 
 // WithTypeArgs returns a derived FunctionGen with type arguments.
@@ -550,6 +557,12 @@ func (fg FunctionGen) WithComments(comments ...string) FunctionGen {
 // WithComment returns a new FunctionGen with a comment.
 func (fg FunctionGen) WithComment(comment string) FunctionGen {
 	return fg.WithComments(comment)
+}
+
+// WithShadow returns a new FunctionGen with IsShadow set to true.
+func (fg FunctionGen) WithShadow() FunctionGen {
+	fg.IsShadow = true
+	return fg
 }
 
 // Variable creates a VariableGen for a given variable name and init value.

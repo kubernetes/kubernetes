@@ -1419,6 +1419,9 @@ func emitCallsToValidators(c *generator.Context, validations []validators.Functi
 					toGolangSourceDataLiteral(sw, c, arg)
 				}
 				sw.Do(")", targs)
+				if v.IsShadow {
+					sw.Do(".MarkShadow()", nil)
+				}
 			}
 
 			// If validation is conditional, wrap the validation function with a conditions check.
@@ -1786,6 +1789,9 @@ func emitFunctionCall(sw *generator.SnippetWriter, c *generator.Context, v valid
 		toGolangSourceDataLiteral(sw, c, arg)
 	}
 	sw.Do(")", nil)
+	if v.IsShadow {
+		sw.Do(".MarkShadow()", nil)
+	}
 }
 
 // getLeafTypeAndPrefixes returns the "leaf value type" for a given type, as
