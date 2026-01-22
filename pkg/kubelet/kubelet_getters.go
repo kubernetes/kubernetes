@@ -286,9 +286,9 @@ func (kl *Kubelet) getRuntime() kubecontainer.Runtime {
 }
 
 // GetNode returns the node info for the configured node name of this Kubelet.
-func (kl *Kubelet) GetNode() (*v1.Node, error) {
+func (kl *Kubelet) GetNode(ctx context.Context) (*v1.Node, error) {
 	if kl.kubeClient == nil {
-		return kl.initialNode(context.TODO())
+		return kl.initialNode(ctx)
 	}
 	return kl.nodeLister.Get(string(kl.nodeName))
 }
@@ -298,11 +298,11 @@ func (kl *Kubelet) GetNode() (*v1.Node, error) {
 // Return kubelet's nodeInfo for this node, except on error or if in standalone mode,
 // in which case return a manufactured nodeInfo representing a node with no pods,
 // zero capacity, and the default labels.
-func (kl *Kubelet) getNodeAnyWay() (*v1.Node, error) {
-	if n, err := kl.GetNode(); err == nil {
+func (kl *Kubelet) getNodeAnyWay(ctx context.Context) (*v1.Node, error) {
+	if n, err := kl.GetNode(ctx); err == nil {
 		return n, nil
 	}
-	return kl.initialNode(context.TODO())
+	return kl.initialNode(ctx)
 }
 
 // GetNodeConfig returns the container manager node config.
@@ -317,8 +317,8 @@ func (kl *Kubelet) GetPodCgroupRoot() string {
 
 // getHostIPsAnyWay attempts to return the host IPs from kubelet's nodeInfo, or
 // the initialNode.
-func (kl *Kubelet) getHostIPsAnyWay() ([]net.IP, error) {
-	node, err := kl.getNodeAnyWay()
+func (kl *Kubelet) getHostIPsAnyWay(ctx context.Context) ([]net.IP, error) {
+	node, err := kl.getNodeAnyWay(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -467,8 +467,9 @@ func (kl *Kubelet) setCachedMachineInfo(info *cadvisorapiv1.MachineInfo) {
 }
 
 // getLastStableNodeAddresses returns the last observed node addresses.
-func (kl *Kubelet) getLastObservedNodeAddresses(logger klog.Logger) []v1.NodeAddress {
-	node, err := kl.GetNode()
+func (kl *Kubelet) getLastObservedNodeAddresses(ctx context.Context) []v1.NodeAddress {
+	logger := klog.FromContext(ctx)
+	node, err := kl.GetNode(ctx)
 	if err != nil || node == nil {
 		logger.V(4).Info("fail to obtain node from local cache", "node", kl.nodeName, "error", err)
 		return nil

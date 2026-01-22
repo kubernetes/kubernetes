@@ -28,9 +28,11 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestPodResourceLimitsDefaulting(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	tk := newTestKubelet(t, true)
 	defer tk.Cleanup()
 	tk.kubelet.nodeLister = &testNodeLister{
@@ -98,7 +100,7 @@ func TestPodResourceLimitsDefaulting(t *testing.T) {
 	as := assert.New(t)
 	for idx, tc := range cases {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.PodLevelResources, tc.podLevelResourcesEnabled)
-		actual, _, err := tk.kubelet.defaultPodLimitsForDownwardAPI(tc.pod, nil)
+		actual, _, err := tk.kubelet.defaultPodLimitsForDownwardAPI(tCtx, tc.pod, nil)
 		as.NoError(err, "failed to default pod limits: %v", err)
 		if !apiequality.Semantic.DeepEqual(tc.expected, actual) {
 			as.Fail("test case [%d] failed.  Expected: %+v, Got: %+v", idx, tc.expected, actual)

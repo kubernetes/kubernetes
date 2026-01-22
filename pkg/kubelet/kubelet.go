@@ -901,7 +901,7 @@ func NewMainKubelet(ctx context.Context,
 	if kubeDeps.TLSOptions != nil {
 		if kubeCfg.ServerTLSBootstrap && utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
 			klet.serverCertificateManager, err = kubeletcertificate.NewKubeletServerCertificateManager(klet.kubeClient, kubeCfg, klet.nodeName, func() []v1.NodeAddress {
-				return klet.getLastObservedNodeAddresses(logger)
+				return klet.getLastObservedNodeAddresses(ctx)
 			}, certDirectory)
 			if err != nil {
 				return nil, fmt.Errorf("failed to initialize certificate manager: %w", err)
@@ -1742,7 +1742,7 @@ func (kl *Kubelet) initializeRuntimeDependentModules(ctx context.Context) {
 	// ignore any errors, since if stats collection is not successful, the container manager will fail to start below.
 	kl.StatsProvider.GetCgroupStats("/", true)
 	// Start container manager.
-	node, err := kl.getNodeAnyWay()
+	node, err := kl.getNodeAnyWay(ctx)
 	if err != nil {
 		// Fail kubelet and rely on the babysitter to retry starting kubelet.
 		klog.ErrorS(err, "Kubelet failed to get node info")
@@ -3338,7 +3338,7 @@ func (kl *Kubelet) tryReconcileMirrorPods(ctx context.Context, staticPod, mirror
 		}
 	}
 	if mirrorPod == nil || deleted {
-		node, err := kl.GetNode()
+		node, err := kl.GetNode(ctx)
 		if err != nil {
 			klog.ErrorS(err, "No need to create a mirror pod, since failed to get node info from the cluster", "node", klog.KRef("", string(kl.nodeName)))
 		} else if node.DeletionTimestamp != nil {
@@ -3355,7 +3355,7 @@ func (kl *Kubelet) tryReconcileMirrorPods(ctx context.Context, staticPod, mirror
 // Ensure Mirror Pod for Static Pod exists as soon as node is registered.
 func (kl *Kubelet) fastStaticPodsRegistration(ctx context.Context) {
 	if err := wait.PollUntilContextCancel(ctx, 100*time.Millisecond, true, func(ctx context.Context) (bool, error) {
-		_, err := kl.GetNode()
+		_, err := kl.GetNode(ctx)
 		if err == nil {
 			return true, nil
 		}

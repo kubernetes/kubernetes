@@ -271,7 +271,7 @@ func (fk *fakeKubelet) GetPortForward(ctx context.Context, podName, podNamespace
 }
 
 // Unused functions
-func (*fakeKubelet) GetNode() (*v1.Node, error)                       { return nil, nil }
+func (*fakeKubelet) GetNode(context.Context) (*v1.Node, error)        { return nil, nil }
 func (*fakeKubelet) GetNodeConfig() cm.NodeConfig                     { return cm.NodeConfig{} }
 func (*fakeKubelet) GetPodCgroupRoot() string                         { return "" }
 func (*fakeKubelet) GetPodByCgroupfs(cgroupfs string) (*v1.Pod, bool) { return nil, false }
