@@ -76,6 +76,7 @@ type listMetadata struct {
 	// customUnique indicates that k8s:customUnique is set on this list.
 	// It disables generation of uniqueness validation for this list.
 	customUnique bool
+	shadow       bool
 }
 
 // makeListMapMatchFunc generates a function that compares two list-map
@@ -139,6 +140,9 @@ func (lttv listTypeTagValidator) GetValidations(context Context, tag codetags.Ta
 	if lm == nil {
 		lm = &listMetadata{}
 		lttv.byPath[context.Path.String()] = lm
+	}
+	if context.IsShadow {
+		lm.shadow = true
 	}
 	if lm.ownership != "" {
 		return Validations{}, fmt.Errorf("listType cannot be specified more than once")
@@ -453,6 +457,9 @@ func (lv listValidator) GetValidations(context Context) (Validations, error) {
 		comment := "lists with set semantics require unique values"
 		f := Function("listValidator", DefaultFlags, validateUnique, Identifier(matchArg)).
 			WithComment(comment)
+		if lm.shadow {
+			f = f.WithShadow()
+		}
 		result.AddFunction(f)
 	}
 	if lm.semantic == semanticMap {
@@ -465,6 +472,9 @@ func (lv listValidator) GetValidations(context Context) (Validations, error) {
 
 		f := Function("listValidator", DefaultFlags, validateUnique, matchArg).
 			WithComment(comment)
+		if lm.shadow {
+			f = f.WithShadow()
+		}
 		result.AddFunction(f)
 	}
 

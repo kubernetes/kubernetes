@@ -223,6 +223,9 @@ type union struct {
 	itemMembers map[string][]ListSelectorTerm
 	// isDeclarative indicates that the union is declarative.
 	isDeclarative bool
+
+	// isShadow indicates that the union validation should be marked as shadow.
+	isShadow bool
 }
 
 type unionMember struct {
@@ -330,6 +333,9 @@ func processUnionValidations(context Context, unions unions, varPrefix string,
 				if u.isDeclarative {
 					fn.Flags |= DeclarativeNative
 				}
+				if u.isShadow {
+					fn = fn.WithShadow()
+				}
 				result.Functions = append(result.Functions, fn)
 			} else {
 				supportVar := Variable(supportVarName, Function(tagName, DefaultFlags, newUnionMembership, getMemberArgs(u, context, false)...))
@@ -339,6 +345,9 @@ func processUnionValidations(context Context, unions unions, varPrefix string,
 				fn := Function(tagName, DefaultFlags, undiscriminatedValidator, extraArgs...)
 				if u.isDeclarative {
 					fn.Flags |= DeclarativeNative
+				}
+				if u.isShadow {
+					fn = fn.WithShadow()
 				}
 				result.Functions = append(result.Functions, fn)
 			}
@@ -418,6 +427,10 @@ func processDiscriminatorValidations(shared map[string]unions, context Context, 
 	unionArg, _ := tag.NamedArg("union") // optional
 	u := shared[context.ParentPath.String()].getOrCreate(unionArg.Value)
 
+	if context.IsShadow {
+		u.isShadow = true
+	}
+
 	var discriminatorFieldName string
 	if jsonAnnotation, ok := tags.LookupJSON(*context.Member); ok {
 		discriminatorFieldName = jsonAnnotation.Name
@@ -480,6 +493,10 @@ func processFieldMemberValidations(shared map[string]unions, context Context, ta
 	u := shared[context.ParentPath.String()].getOrCreate(unionArg.Value)
 	u.members = append(u.members, unionMember{fieldName, memberName})
 
+	if context.IsShadow {
+		u.isShadow = true
+	}
+
 	u.fieldMembers = append(u.fieldMembers, context.Member)
 
 	return nil
@@ -511,6 +528,10 @@ func processListMemberValidations(shared map[string]unions, context Context, tag
 	unionArg, _ := tag.NamedArg("union") // optional
 	u := shared[context.ParentPath.String()].getOrCreate(unionArg.Value)
 	u.members = append(u.members, unionMember{fieldName, memberName})
+
+	if context.IsShadow {
+		u.isShadow = true
+	}
 
 	if _, found := u.itemMembers[fieldName]; found {
 		return fmt.Errorf("list-item union member %q already exists", fieldName)
