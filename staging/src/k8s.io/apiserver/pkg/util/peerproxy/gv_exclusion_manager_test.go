@@ -168,7 +168,7 @@ func TestReapExpiredGVs(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mgr := NewGVExclusionManager(tt.gracePeriod, 50*time.Millisecond, &atomic.Value{}, &atomic.Pointer[func()]{})
 			mgr.recentlyDeletedGVs.Store(tt.deletedGVs)
-			mgr.reapExpiredGVs()
+			mgr.updateRecentlyDeletedGVs(nil)
 			result := mgr.loadRecentlyDeletedGVs()
 
 			for _, gv := range tt.wantReaped {
@@ -181,7 +181,7 @@ func TestReapExpiredGVs(t *testing.T) {
 }
 
 func TestDetectDiff(t *testing.T) {
-	mgr := NewGVExclusionManager(5*time.Minute, 1*time.Minute, &atomic.Value{}, &atomic.Pointer[func()]{})
+	_ = NewGVExclusionManager(5*time.Minute, 1*time.Minute, &atomic.Value{}, &atomic.Pointer[func()]{})
 
 	tests := []struct {
 		name string
@@ -241,9 +241,9 @@ func TestDetectDiff(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := mgr.diffGVs(tt.old, tt.new)
+			_, result := diffGVs(tt.old, tt.new)
 			if result != tt.want {
-				t.Errorf("detectDiff() = %v, want %v", result, tt.want)
+				t.Errorf("diffGVs() = %v, want %v", result, tt.want)
 			}
 		})
 	}
