@@ -71,6 +71,7 @@ Stable metrics observe strict API contracts and no labels can be added or remove
 	<li data-type="{{$metric.Type | ToLower}}"><label class="metric_detail">Type:</label> <span class="metric_type">{{- $metric.Type -}}</span></li>
 	{{if $metric.Labels }}<li class="metric_labels_varying"><label class="metric_detail">Labels:</label>{{range $label := $metric.Labels}}<span class="metric_label">{{- $label -}}</span>{{- end -}}</li>{{- end -}}
 	{{if $metric.ConstLabels }}<li class="metric_labels_constant"><label class="metric_detail">Const Labels:</label>{{range $key, $value := $metric.ConstLabels}}<span class="metric_label">{{$key}}:{{$value}}</span>{{- end -}}</li>{{- end -}}
+	{{if $metric.ComponentEndpoints }}<li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul>{{range $ce := $metric.ComponentEndpoints}}<li>{{$ce.Component}} ({{$ce.Endpoint}})</li>{{- end -}}</ul></li>{{- end -}}
 	{{if $metric.DeprecatedVersion }}<li class="metric_deprecated_version"><label class="metric_detail">Deprecated Versions:</label><span>{{- $metric.DeprecatedVersion -}}</span></li>{{- end -}}
 	</ul>
 	</div>{{end}}
@@ -90,6 +91,7 @@ Beta metrics observe a looser API contract than its stable counterparts. No labe
 	<li data-type="{{$metric.Type | ToLower}}"><label class="metric_detail">Type:</label> <span class="metric_type">{{- $metric.Type -}}</span></li>
 	{{if $metric.Labels }}<li class="metric_labels_varying"><label class="metric_detail">Labels:</label>{{range $label := $metric.Labels}}<span class="metric_label">{{- $label -}}</span>{{- end -}}</li>{{- end -}}
 	{{if $metric.ConstLabels }}<li class="metric_labels_constant"><label class="metric_detail">Const Labels:</label>{{range $key, $value := $metric.ConstLabels}}<span class="metric_label">{{$key}}:{{$value}}</span>{{- end -}}</li>{{- end -}}
+	{{if $metric.ComponentEndpoints }}<li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul>{{range $ce := $metric.ComponentEndpoints}}<li>{{$ce.Component}} ({{$ce.Endpoint}})</li>{{- end -}}</ul></li>{{- end -}}
 	{{if $metric.DeprecatedVersion }}<li class="metric_deprecated_version"><label class="metric_detail">Deprecated Versions:</label><span>{{- $metric.DeprecatedVersion -}}</span></li>{{- end -}}
 	</ul>
 	</div>{{end}}
@@ -109,6 +111,7 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li data-type="{{$metric.Type | ToLower}}"><label class="metric_detail">Type:</label> <span class="metric_type">{{- $metric.Type -}}</span></li>
 	{{if $metric.Labels }}<li class="metric_labels_varying"><label class="metric_detail">Labels:</label>{{range $label := $metric.Labels}}<span class="metric_label">{{- $label -}}</span>{{- end -}}</li>{{- end -}}
 	{{if $metric.ConstLabels }}<li class="metric_labels_constant"><label class="metric_detail">Const Labels:</label>{{range $key, $value := $metric.ConstLabels}}<span class="metric_label">{{$key}}:{{$value}}</span>{{- end -}}</li>{{- end -}}
+	{{if $metric.ComponentEndpoints }}<li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul>{{range $ce := $metric.ComponentEndpoints}}<li>{{$ce.Component}} ({{$ce.Endpoint}})</li>{{- end -}}</ul></li>{{- end -}}
 	{{if $metric.DeprecatedVersion }}<li class="metric_deprecated_version"><label class="metric_detail">Deprecated Versions:</label><span>{{- $metric.DeprecatedVersion -}}</span></li>{{- end -}}
 	</ul>
 	</div>{{end}}
