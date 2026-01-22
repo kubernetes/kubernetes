@@ -96,3 +96,10 @@
 # OptionalOrRequired - Existing fields that are marked as both optional and required (based on standard optional vs kubebuilder:validation:Required) and should not be fixed.
 - text: "field (PortStatus|IngressPortStatus)\\.Error must not be marked as both optional and required"
   path: "staging/src/k8s.io/api/(core/v1|extensions/v1beta1|networking/(v1|v1beta1))"
+
+# NonPointerStructs - Existing fields that are non-pointer structs but where the current rules are incorrect.
+
+# The PodGroup.Policy field is a union type, but is not marked up as a union, nor does nonpointerstructs understand unions today.
+# Validation makes this require at least one of the fields within to be set.
+- text: "nonpointerstructs: field PodGroup.Policy is a non-pointer struct with no required fields. It must be marked as optional."
+  path: "staging/src/k8s.io/api/scheduling/v1alpha1/types.go"
