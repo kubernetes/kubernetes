@@ -46,7 +46,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/kubelet/util/format"
 )
 
 // podStatusManagerStateFile is the file name where status manager stores its state
@@ -715,7 +714,7 @@ func (m *manager) canResizePod(logger klog.Logger, allocatedPods []*v1.Pod, pod 
 			m.resourceManager.CanAllocateExclusively(v1.ResourceCPU) &&
 			m.guaranteedPodResourceResizeRequired(pod, v1.ResourceCPU) {
 			msg := "Resize is infeasible for Guaranteed Pods with the current CPU Manager configuration"
-			logger.V(3).Info(msg, "pod", format.Pod(pod))
+			logger.V(3).Info(msg, "pod", klog.KObj(pod), "podUID", pod.UID)
 			metrics.PodInfeasibleResizes.WithLabelValues("guaranteed_pod_cpu_manager_static_policy").Inc()
 			return false, v1.PodReasonInfeasible, msg
 		}
@@ -723,7 +722,7 @@ func (m *manager) canResizePod(logger klog.Logger, allocatedPods []*v1.Pod, pod 
 			m.resourceManager.CanAllocateExclusively(v1.ResourceMemory) &&
 			m.guaranteedPodResourceResizeRequired(pod, v1.ResourceMemory) {
 			msg := "Resize is infeasible for Guaranteed Pods with the current Memory Manager configuration"
-			logger.V(3).Info(msg, "pod", format.Pod(pod))
+			logger.V(3).Info(msg, "pod", klog.KObj(pod), "podUID", pod.UID)
 			metrics.PodInfeasibleResizes.WithLabelValues("guaranteed_pod_memory_manager_static_policy").Inc()
 			return false, v1.PodReasonInfeasible, msg
 		}
