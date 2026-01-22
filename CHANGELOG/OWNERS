@@ -7,11 +7,11 @@ approvers:
   - release-engineering-approvers
   - release-managers
   - release-team-subproject-leads
-  - satyampsoni # 1.32 Release Notes Lead
+  - sayanchowdhury # 1.36 Docs Lead
 reviewers:
   - release-managers
   - release-team-subproject-leads
-  - satyampsoni # 1.32 Release Notes Lead
+  - sayanchowdhury # 1.36 Docs Lead
 labels:
   - sig/release
   - area/release-eng
