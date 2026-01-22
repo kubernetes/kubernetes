@@ -92,8 +92,10 @@ func TestFilterTerminatedContainerInfoAndAssembleByPodCgroupKey(t *testing.T) {
 		//ContainerInfo with no CPU/memory usage but has network usage for uncleaned cgroups, should not be filtered out
 		"/pod2-c222-zerocpumem-1": getContainerInfoWithZeroCpuMem(seedPastPod0Container0, pName2, namespace, cName222),
 	}
-	logger, _ := ktesting.NewTestContext(t)
-	filteredInfos, allInfos := filterTerminatedContainerInfoAndAssembleByPodCgroupKey(logger, infos)
+
+	tCtx := ktesting.Init(t)
+
+	filteredInfos, allInfos := filterTerminatedContainerInfoAndAssembleByPodCgroupKey(tCtx.Logger(), infos)
 	assert.Len(t, filteredInfos, 5)
 	assert.Len(t, allInfos, 11)
 	for _, c := range []string{"/pod0-i", "/pod0-c0"} {

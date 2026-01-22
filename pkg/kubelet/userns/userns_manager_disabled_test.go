@@ -33,7 +33,9 @@ import (
 // Test all public methods behave ok when the feature gate is disabled.
 
 func TestMakeUserNsManagerDisabled(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, false)
 
 	testUserNsPodsManager := &testUserNsPodsManager{}
@@ -42,7 +44,9 @@ func TestMakeUserNsManagerDisabled(t *testing.T) {
 }
 
 func TestReleaseDisabled(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, false)
 
 	testUserNsPodsManager := &testUserNsPodsManager{}
@@ -97,7 +101,9 @@ func TestGetOrCreateUserNamespaceMappingsDisabled(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			logger, _ := ktesting.NewTestContext(t)
+			tCtx := ktesting.Init(t)
+			logger := tCtx.Logger()
+
 			testUserNsPodsManager := &testUserNsPodsManager{}
 			m, err := MakeUserNsManager(logger, testUserNsPodsManager, nil)
 			require.NoError(t, err)
@@ -114,13 +120,13 @@ func TestGetOrCreateUserNamespaceMappingsDisabled(t *testing.T) {
 }
 
 func TestCleanupOrphanedPodUsernsAllocationsDisabled(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, false)
 
 	testUserNsPodsManager := &testUserNsPodsManager{}
-	m, err := MakeUserNsManager(logger, testUserNsPodsManager, nil)
+	m, err := MakeUserNsManager(tCtx.Logger(), testUserNsPodsManager, nil)
 	require.NoError(t, err)
 
-	err = m.CleanupOrphanedPodUsernsAllocations(ctx, nil, nil)
+	err = m.CleanupOrphanedPodUsernsAllocations(tCtx, nil, nil)
 	assert.NoError(t, err)
 }

@@ -122,7 +122,7 @@ func TestContainerCalculateAffinity(t *testing.T) {
 		},
 	}
 
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
 
 	for _, tc := range tcases {
 		ctnScope := &containerScope{
@@ -133,7 +133,7 @@ func TestContainerCalculateAffinity(t *testing.T) {
 			},
 		}
 
-		ctnScope.calculateAffinity(logger, &v1.Pod{}, &v1.Container{})
+		ctnScope.calculateAffinity(tCtx.Logger(), &v1.Pod{}, &v1.Container{})
 		actual := ctnScope.policy.(*mockPolicy).ph
 		if !reflect.DeepEqual(tc.expected, actual) {
 			t.Errorf("Test Case: %s", tc.name)
@@ -257,7 +257,7 @@ func TestContainerAccumulateProvidersHints(t *testing.T) {
 		},
 	}
 
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
 
 	for _, tc := range tcases {
 		ctnScope := containerScope{
@@ -265,7 +265,7 @@ func TestContainerAccumulateProvidersHints(t *testing.T) {
 				hintProviders: tc.hp,
 			},
 		}
-		actual := ctnScope.accumulateProvidersHints(logger, &v1.Pod{}, &v1.Container{})
+		actual := ctnScope.accumulateProvidersHints(tCtx.Logger(), &v1.Pod{}, &v1.Container{})
 		if !reflect.DeepEqual(actual, tc.expected) {
 			t.Errorf("Test Case %s: Expected NUMANodeAffinity in result to be %v, got %v", tc.name, tc.expected, actual)
 		}

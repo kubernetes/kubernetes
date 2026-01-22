@@ -80,6 +80,9 @@ func (m *testRESTMapper) Reset() {
 }
 
 func TestGarbageCollectorConstruction(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	config := &restclient.Config{}
 	tweakableRM := meta.NewDefaultRESTMapper(nil)
 	rm := &testRESTMapper{meta.MultiRESTMapper{tweakableRM, testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)}}
@@ -103,7 +106,7 @@ func TestGarbageCollectorConstruction(t *testing.T) {
 	// construction will not fail.
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
-	logger, tCtx := ktesting.NewTestContext(t)
+
 	gc, err := NewGarbageCollector(tCtx, client, metadataClient, rm, map[schema.GroupResource]struct{}{},
 		informerfactory.NewInformerFactory(sharedInformers, metadataInformers), alwaysStarted)
 	if err != nil {
@@ -213,7 +216,8 @@ type garbageCollector struct {
 }
 
 func setupGC(t *testing.T, config *restclient.Config) garbageCollector {
-	_, ctx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	metadataClient, err := metadata.NewForConfig(config)
 	if err != nil {
 		t.Fatal(err)
@@ -223,7 +227,7 @@ func setupGC(t *testing.T, config *restclient.Config) garbageCollector {
 	sharedInformers := informers.NewSharedInformerFactory(client, 0)
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
-	gc, err := NewGarbageCollector(ctx, client, metadataClient, &testRESTMapper{testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)}, ignoredResources, sharedInformers, alwaysStarted)
+	gc, err := NewGarbageCollector(tCtx, client, metadataClient, &testRESTMapper{testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)}, ignoredResources, sharedInformers, alwaysStarted)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -415,7 +419,8 @@ func TestProcessEvent(t *testing.T) {
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
 	for _, scenario := range testScenarios {
-		logger, _ := ktesting.NewTestContext(t)
+		tCtx := ktesting.Init(t)
+		logger := tCtx.Logger()
 
 		dependencyGraphBuilder := &GraphBuilder{
 			informersStarted: alwaysStarted,
@@ -448,7 +453,8 @@ func BenchmarkReferencesDiffs(t *testing.B) {
 // TestDependentsRace relies on golang's data race detector to check if there is
 // data race among in the dependents field.
 func TestDependentsRace(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
 
 	gc := setupGC(t, &restclient.Config{})
 	defer close(gc.stop)
@@ -683,7 +689,8 @@ func TestUnblockOwnerReference(t *testing.T) {
 }
 
 func TestOrphanDependentsFailure(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
 
 	testHandler := &fakeActionHandler{
 		response: map[string]FakeResponse{
@@ -801,7 +808,9 @@ func TestGetDeletableResources(t *testing.T) {
 		},
 	}
 
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	for name, test := range tests {
 		t.Logf("testing %q", name)
 		client := &fakeServerResources{
@@ -919,7 +928,9 @@ func TestGarbageCollectorSync(t *testing.T) {
 	var wg sync.WaitGroup
 	defer wg.Wait()
 
-	logger, tCtx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	defer tCtx.Cancel("test has completed")
 
 	alwaysStarted := make(chan struct{})
@@ -2456,6 +2467,8 @@ func TestConflictingData(t *testing.T) {
 	close(alwaysStarted)
 	for _, scenario := range testScenarios {
 		t.Run(scenario.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			logger := tCtx.Logger()
 
 			absentOwnerCache := NewReferenceCache(100)
 
@@ -2510,8 +2523,6 @@ func TestConflictingData(t *testing.T) {
 					absentOwnerCache: absentOwnerCache,
 				},
 			}
-
-			logger, _ := ktesting.NewTestContext(t)
 
 			ctx := stepContext{
 				t:               t,

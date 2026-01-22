@@ -114,8 +114,9 @@ func TestSchedulingGates(t *testing.T) {
 			testutils.SyncSchedulerInformerFactory(testCtx)
 
 			if testCtx.Scheduler.APIDispatcher != nil {
-				logger, _ := ktesting.NewTestContext(t)
-				testCtx.Scheduler.APIDispatcher.Run(logger)
+				tCtx := ktesting.Init(t)
+
+				testCtx.Scheduler.APIDispatcher.Run(tCtx.Logger())
 				defer testCtx.Scheduler.APIDispatcher.Close()
 			}
 

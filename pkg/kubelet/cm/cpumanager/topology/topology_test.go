@@ -823,8 +823,9 @@ func Test_Discover(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			logger, _ := ktesting.NewTestContext(t)
-			got, err := Discover(logger, &tt.machineInfo)
+			tCtx := ktesting.Init(t)
+
+			got, err := Discover(tCtx.Logger(), &tt.machineInfo)
 			if err != nil {
 				if tt.wantErr {
 					t.Logf("Discover() expected error = %v", err)

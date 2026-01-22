@@ -146,7 +146,7 @@ func TestRotateShutsDownConnections(t *testing.T) {
 	// This test fails if you comment out the t.closeAllConns() call in
 	// transport.go and don't close connections on a rotate.
 
-	logger, tCtx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
 
 	stop := make(chan struct{})
 	defer close(stop)
@@ -193,7 +193,7 @@ func TestRotateShutsDownConnections(t *testing.T) {
 	}
 
 	// Check for a new cert every 10 milliseconds
-	if _, err := updateTransport(logger, stop, 10*time.Millisecond, c, m, 0); err != nil {
+	if _, err := updateTransport(tCtx.Logger(), stop, 10*time.Millisecond, c, m, 0); err != nil {
 		t.Fatal(err)
 	}
 

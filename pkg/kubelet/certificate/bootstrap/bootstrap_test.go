@@ -273,10 +273,11 @@ users:
 		},
 	}
 
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			certConfig, clientConfig, err := LoadClientConfig(logger, test.kubeconfigPath, test.bootstrapPath, test.certDir)
+			certConfig, clientConfig, err := LoadClientConfig(tCtx.Logger(), test.kubeconfigPath, test.bootstrapPath, test.certDir)
 			if err != nil {
 				t.Fatal(err)
 			}

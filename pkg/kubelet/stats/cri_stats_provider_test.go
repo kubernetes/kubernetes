@@ -351,7 +351,8 @@ func TestCRIListPodStats(t *testing.T) {
 }
 
 func TestListPodStatsStrictlyFromCRI(t *testing.T) {
-	logger, tCtx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletPSI, true)
 	if runtime.GOOS == "windows" {
 		// TODO: remove skip once the failing test has been fixed.
@@ -483,7 +484,7 @@ func TestListPodStatsStrictlyFromCRI(t *testing.T) {
 		fakeContainerStatsProvider{},
 	)
 
-	cadvisorInfos, err := getCadvisorContainerInfo(logger, mockCadvisor)
+	cadvisorInfos, err := getCadvisorContainerInfo(tCtx.Logger(), mockCadvisor)
 	if err != nil {
 		t.Errorf("failed to get container info from cadvisor: %v", err)
 	}
@@ -1513,7 +1514,9 @@ func TestGetContainerUsageNanoCores(t *testing.T) {
 			expected: nil,
 		},
 	}
-	logger, _ := ktesting.NewTestContext(t)
+
+	tCtx := ktesting.Init(t)
+
 	for _, test := range tests {
 		provider := &criStatsProvider{cpuUsageCache: test.cpuUsageCache}
 		// Before the update, the cached value should be nil
@@ -1521,7 +1524,7 @@ func TestGetContainerUsageNanoCores(t *testing.T) {
 		assert.Nil(t, cached)
 
 		// Update the cache and get the latest value.
-		real := provider.getAndUpdateContainerUsageNanoCores(logger, test.stats)
+		real := provider.getAndUpdateContainerUsageNanoCores(tCtx.Logger(), test.stats)
 		assert.Equal(t, test.expected, real, test.desc)
 
 		// After the update, the cached value should be up-to-date

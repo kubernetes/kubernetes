@@ -492,7 +492,9 @@ func TestGetSystemReservedMemory(t *testing.T) {
 }
 
 func TestRemoveStaleState(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	machineInfo := returnMachineInfo()
 	testCases := []testMemoryManager{
 		{
@@ -932,7 +934,9 @@ func TestRemoveStaleState(t *testing.T) {
 }
 
 func TestAddContainer(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	machineInfo := returnMachineInfo()
 	reserved := systemReservedMemory{
 		0: map[v1.ResourceName]uint64{
@@ -1436,7 +1440,9 @@ func TestAddContainer(t *testing.T) {
 }
 
 func TestRemoveContainer(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	machineInfo := returnMachineInfo()
 	reserved := systemReservedMemory{
 		0: map[v1.ResourceName]uint64{
@@ -1915,7 +1921,9 @@ func getPolicyNameForOs() policyType {
 }
 
 func TestNewManager(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	machineInfo := returnMachineInfo()
 	expectedReserved := systemReservedMemory{
 		0: map[v1.ResourceName]uint64{
@@ -2037,7 +2045,9 @@ func TestNewManager(t *testing.T) {
 }
 
 func TestGetTopologyHints(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	testCases := []testMemoryManager{
 		{
 			description: "Successful hint generation",
@@ -2183,7 +2193,9 @@ func TestGetTopologyHints(t *testing.T) {
 }
 
 func TestAllocateAndAddPodWithInitContainers(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	testCases := []testMemoryManager{
 		{
 			description: "should remove init containers from the state file, once app container started",

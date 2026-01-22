@@ -432,7 +432,7 @@ func TestTokenCreation(t *testing.T) {
 
 	for k, tc := range testcases {
 		t.Run(k, func(t *testing.T) {
-			logger, ctx := ktesting.NewTestContext(t)
+			tCtx := ktesting.Init(t)
 
 			// Re-seed to reset name generation
 			utilrand.Seed(1)
@@ -447,7 +447,7 @@ func TestTokenCreation(t *testing.T) {
 			secretInformer := informers.Core().V1().Secrets().Informer()
 			secrets := secretInformer.GetStore()
 			serviceAccounts := informers.Core().V1().ServiceAccounts().Informer().GetStore()
-			controller, err := NewTokensController(logger, informers.Core().V1().ServiceAccounts(), informers.Core().V1().Secrets(), client, TokensControllerOptions{TokenGenerator: generator, RootCA: []byte("CA Data"), MaxRetries: tc.MaxRetries})
+			controller, err := NewTokensController(tCtx.Logger(), informers.Core().V1().ServiceAccounts(), informers.Core().V1().Secrets(), client, TokensControllerOptions{TokenGenerator: generator, RootCA: []byte("CA Data"), MaxRetries: tc.MaxRetries})
 			if err != nil {
 				t.Fatalf("error creating Tokens controller: %v", err)
 			}
@@ -490,10 +490,10 @@ func TestTokenCreation(t *testing.T) {
 
 			for {
 				if controller.syncServiceAccountQueue.Len() > 0 {
-					controller.syncServiceAccount(ctx)
+					controller.syncServiceAccount(tCtx)
 				}
 				if controller.syncSecretQueue.Len() > 0 {
-					controller.syncSecret(ctx)
+					controller.syncSecret(tCtx)
 				}
 
 				// The queues still have things to work on

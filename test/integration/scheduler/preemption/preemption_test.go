@@ -1335,7 +1335,9 @@ func TestAsyncPreemption(t *testing.T) {
 					t.Fatalf("the preemption plugin should be initialized")
 				}
 
-				logger, _ := ktesting.NewTestContext(t)
+				tCtx := ktesting.Init(t)
+				logger := tCtx.Logger()
+
 				if testCtx.Scheduler.APIDispatcher != nil {
 					testCtx.Scheduler.APIDispatcher.Run(logger)
 					defer testCtx.Scheduler.APIDispatcher.Close()

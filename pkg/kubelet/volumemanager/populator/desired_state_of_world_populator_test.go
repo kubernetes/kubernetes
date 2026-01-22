@@ -262,7 +262,9 @@ type mutablePodManager interface {
 }
 
 func TestFindAndAddNewPods_FindAndRemoveDeletedPods(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	dswp, fakePodState, pod, expectedVolumeName, _ := prepareDSWPWithPodPV(t)
 	podName := util.GetUniquePodName(pod)
 
@@ -323,7 +325,9 @@ func TestFindAndAddNewPods_FindAndRemoveDeletedPods(t *testing.T) {
 }
 
 func TestFindAndRemoveDeletedPodsWithActualState(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	dswp, fakePodState, pod, expectedVolumeName, _ := prepareDSWPWithPodPV(t)
 	fakeASW := dswp.actualStateOfWorld
 	podName := util.GetUniquePodName(pod)
@@ -387,7 +391,7 @@ func TestFindAndRemoveDeletedPodsWithActualState(t *testing.T) {
 }
 
 func TestFindAndRemoveDeletedPodsWithUncertain(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
 	dswp, fakePodState, pod, expectedVolumeName, pv := prepareDSWPWithPodPV(t)
 	podName := util.GetUniquePodName(pod)
 
@@ -419,7 +423,7 @@ func TestFindAndRemoveDeletedPodsWithUncertain(t *testing.T) {
 	}
 
 	// the pod state now lists the pod as removed, so here findAndRemoveDeletedPods() will remove the pod and volumes it is mounted
-	dswp.findAndRemoveDeletedPods(logger)
+	dswp.findAndRemoveDeletedPods(tCtx.Logger())
 	if dswp.pods.processedPods[podName] {
 		t.Fatalf("Failed to remove pods from desired state of world since they no longer exist")
 	}
@@ -520,7 +524,7 @@ func prepareDSWPWithPodPV(t *testing.T) (*desiredStateOfWorldPopulator, *fakePod
 }
 
 func TestFindAndRemoveNonattachableVolumes(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
 	// create dswp
 	mode := v1.PersistentVolumeFilesystem
 	pv := &v1.PersistentVolume{
@@ -563,7 +567,6 @@ func TestFindAndRemoveNonattachableVolumes(t *testing.T) {
 
 	generatedVolumeName := "fake-plugin/" + pod.Spec.Volumes[0].Name
 
-	tCtx := ktesting.Init(t)
 	dswp.findAndAddNewPods(tCtx)
 
 	if !dswp.pods.processedPods[podName] {
@@ -587,7 +590,7 @@ func TestFindAndRemoveNonattachableVolumes(t *testing.T) {
 	verifyVolumeExistsInVolumesToMount(
 		t, v1.UniqueVolumeName(generatedVolumeName), false /* expectReportedInUse */, fakesDSW)
 
-	dswp.findAndRemoveDeletedPods(logger)
+	dswp.findAndRemoveDeletedPods(tCtx.Logger())
 	// After the volume plugin changes to nonattachable, the corresponding volume attachable field should change.
 	volumesToMount := fakesDSW.GetVolumesToMount()
 	for _, volume := range volumesToMount {
@@ -625,7 +628,8 @@ func TestEphemeralVolumeOwnerCheck(t *testing.T) {
 }
 
 func TestFindAndAddNewPods_FindAndRemoveDeletedPods_Valid_Block_VolumeDevices(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	// create dswp
 	mode := v1.PersistentVolumeBlock
 	pv := &v1.PersistentVolume{
@@ -666,7 +670,6 @@ func TestFindAndAddNewPods_FindAndRemoveDeletedPods_Valid_Block_VolumeDevices(t 
 
 	generatedVolumeName := "fake-plugin/" + pod.Spec.Volumes[0].Name
 
-	tCtx := ktesting.Init(t)
 	dswp.findAndAddNewPods(tCtx)
 
 	if !dswp.pods.processedPods[podName] {
@@ -703,7 +706,7 @@ func TestFindAndAddNewPods_FindAndRemoveDeletedPods_Valid_Block_VolumeDevices(t 
 	fakePodState.removed = map[kubetypes.UID]struct{}{pod.UID: {}}
 
 	//pod is added to fakePodManager but pod state knows the pod is removed, so here findAndRemoveDeletedPods() will remove the pod and volumes it is mounted
-	dswp.findAndRemoveDeletedPods(logger)
+	dswp.findAndRemoveDeletedPods(tCtx.Logger())
 	if dswp.pods.processedPods[podName] {
 		t.Fatalf("Failed to remove pods from desired state of world since they no longer exist")
 	}
@@ -734,7 +737,8 @@ func TestFindAndAddNewPods_FindAndRemoveDeletedPods_Valid_Block_VolumeDevices(t 
 }
 
 func TestCreateVolumeSpec_Valid_File_VolumeMounts(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	// create dswp
 	mode := v1.PersistentVolumeFilesystem
 	pv := &v1.PersistentVolume{
@@ -773,7 +777,7 @@ func TestCreateVolumeSpec_Valid_File_VolumeMounts(t *testing.T) {
 	fakePodManager.AddPod(pod)
 	mountsMap, devicesMap, _ := util.GetPodVolumeNames(pod, false /* collectSELinuxOptions */)
 	_, volumeSpec, _, err :=
-		dswp.createVolumeSpec(ctx, pod.Spec.Volumes[0], pod, mountsMap, devicesMap)
+		dswp.createVolumeSpec(tCtx, pod.Spec.Volumes[0], pod, mountsMap, devicesMap)
 
 	// Assert
 	if volumeSpec == nil || err != nil {
@@ -782,7 +786,8 @@ func TestCreateVolumeSpec_Valid_File_VolumeMounts(t *testing.T) {
 }
 
 func TestCreateVolumeSpec_Valid_Nil_VolumeMounts(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	// create dswp
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
@@ -820,7 +825,7 @@ func TestCreateVolumeSpec_Valid_Nil_VolumeMounts(t *testing.T) {
 	fakePodManager.AddPod(pod)
 	mountsMap, devicesMap, _ := util.GetPodVolumeNames(pod, false /* collectSELinuxOptions */)
 	_, volumeSpec, _, err :=
-		dswp.createVolumeSpec(ctx, pod.Spec.Volumes[0], pod, mountsMap, devicesMap)
+		dswp.createVolumeSpec(tCtx, pod.Spec.Volumes[0], pod, mountsMap, devicesMap)
 
 	// Assert
 	if volumeSpec == nil || err != nil {
@@ -829,7 +834,8 @@ func TestCreateVolumeSpec_Valid_Nil_VolumeMounts(t *testing.T) {
 }
 
 func TestCreateVolumeSpec_Valid_Block_VolumeDevices(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	// create dswp
 	mode := v1.PersistentVolumeBlock
 	pv := &v1.PersistentVolume{
@@ -867,7 +873,7 @@ func TestCreateVolumeSpec_Valid_Block_VolumeDevices(t *testing.T) {
 	fakePodManager.AddPod(pod)
 	mountsMap, devicesMap, _ := util.GetPodVolumeNames(pod, false /* collectSELinuxOptions */)
 	_, volumeSpec, _, err :=
-		dswp.createVolumeSpec(ctx, pod.Spec.Volumes[0], pod, mountsMap, devicesMap)
+		dswp.createVolumeSpec(tCtx, pod.Spec.Volumes[0], pod, mountsMap, devicesMap)
 
 	// Assert
 	if volumeSpec == nil || err != nil {
@@ -876,7 +882,8 @@ func TestCreateVolumeSpec_Valid_Block_VolumeDevices(t *testing.T) {
 }
 
 func TestCreateVolumeSpec_Invalid_File_VolumeDevices(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	// create dswp
 	mode := v1.PersistentVolumeFilesystem
 	pv := &v1.PersistentVolume{
@@ -914,7 +921,7 @@ func TestCreateVolumeSpec_Invalid_File_VolumeDevices(t *testing.T) {
 	fakePodManager.AddPod(pod)
 	mountsMap, devicesMap, _ := util.GetPodVolumeNames(pod, false /* collectSELinuxOptions */)
 	_, volumeSpec, _, err :=
-		dswp.createVolumeSpec(ctx, pod.Spec.Volumes[0], pod, mountsMap, devicesMap)
+		dswp.createVolumeSpec(tCtx, pod.Spec.Volumes[0], pod, mountsMap, devicesMap)
 
 	// Assert
 	if volumeSpec != nil || err == nil {
@@ -924,6 +931,7 @@ func TestCreateVolumeSpec_Invalid_File_VolumeDevices(t *testing.T) {
 
 func TestCreateVolumeSpec_Invalid_Block_VolumeMounts(t *testing.T) {
 	tCtx := ktesting.Init(t)
+
 	// create dswp
 	mode := v1.PersistentVolumeBlock
 	pv := &v1.PersistentVolume{
@@ -1386,9 +1394,10 @@ func volumeCapacity(size int) v1.ResourceList {
 }
 
 func reconcileASW(asw cache.ActualStateOfWorld, dsw cache.DesiredStateOfWorld, t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	for _, volumeToMount := range dsw.GetVolumesToMount() {
-		err := asw.MarkVolumeAsAttached(logger, volumeToMount.VolumeName, volumeToMount.VolumeSpec, "", "")
+		err := asw.MarkVolumeAsAttached(tCtx.Logger(), volumeToMount.VolumeName, volumeToMount.VolumeSpec, "", "")
 		if err != nil {
 			t.Fatalf("Unexpected error when MarkVolumeAsAttached: %v", err)
 		}

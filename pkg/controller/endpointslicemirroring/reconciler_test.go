@@ -1315,9 +1315,11 @@ func fetchEndpointSlices(t *testing.T, client *fake.Clientset, namespace string)
 }
 
 func reconcileHelper(t *testing.T, r *reconciler, endpoints *corev1.Endpoints, existingSlices []*discovery.EndpointSlice) {
+	tCtx := ktesting.Init(t)
+
 	t.Helper()
-	logger, _ := ktesting.NewTestContext(t)
-	err := r.reconcile(logger, endpoints, existingSlices)
+	
+	err := r.reconcile(tCtx.Logger(), endpoints, existingSlices)
 	if err != nil {
 		t.Fatalf("Expected no error reconciling Endpoint Slices, got: %v", err)
 	}

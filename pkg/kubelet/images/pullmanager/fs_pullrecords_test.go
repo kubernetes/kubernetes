@@ -27,7 +27,8 @@ import (
 )
 
 func TestNewFSPullRecordsAccessor(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	tests := []struct {
 		name            string
 		initRoot        bool
@@ -159,7 +160,7 @@ func TestNewFSPullRecordsAccessor(t *testing.T) {
 				}
 			}
 
-			_, err := NewFSPullRecordsAccessor(logger, kubeletDir)
+			_, err := NewFSPullRecordsAccessor(tCtx.Logger(), kubeletDir)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewFSPullRecordsAccessor() error = %v, wantErr %v", err, tt.wantErr)
 				return

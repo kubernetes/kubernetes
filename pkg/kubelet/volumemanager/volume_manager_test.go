@@ -57,7 +57,6 @@ const (
 )
 
 func TestGetMountedVolumesForPodAndGetVolumesInUse(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
 	tests := []struct {
 		name            string
 		pvMode, podMode v1.PersistentVolumeMode
@@ -118,7 +117,7 @@ func TestGetMountedVolumesForPodAndGetVolumesInUse(t *testing.T) {
 				tCtx.Done(),
 				manager)
 
-			err = manager.WaitForAttachAndMount(ctx, pod)
+			err = manager.WaitForAttachAndMount(tCtx, pod)
 			if err != nil && !test.expectError {
 				t.Errorf("Expected success: %v", err)
 			}
@@ -151,7 +150,8 @@ func TestGetMountedVolumesForPodAndGetVolumesInUse(t *testing.T) {
 }
 
 func TestWaitForAttachAndMountError(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	tmpDir, err := utiltesting.MkTmpdir("volumeManagerTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
@@ -232,14 +232,13 @@ func TestWaitForAttachAndMountError(t *testing.T) {
 
 	manager := newTestVolumeManager(t, tmpDir, podManager, kubeClient, nil)
 
-	tCtx := ktesting.Init(t)
 	defer tCtx.Cancel("test has completed")
 	sourcesReady := config.NewSourcesReady(func(_ sets.Set[string]) bool { return true })
 	go manager.Run(tCtx, sourcesReady)
 
 	podManager.SetPods([]*v1.Pod{pod})
 
-	err = manager.WaitForAttachAndMount(ctx, pod)
+	err = manager.WaitForAttachAndMount(tCtx, pod)
 	if err == nil {
 		t.Errorf("Expected error, got none")
 	}
@@ -389,7 +388,6 @@ func TestInitialPendingVolumesForPodAndGetVolumesInUse(t *testing.T) {
 }
 
 func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
 	tmpDir, err := utiltesting.MkTmpdir("volumeManagerTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
@@ -451,6 +449,7 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 
 		tCtx := ktesting.Init(t)
 		defer tCtx.Cancel("test has completed")
+
 		sourcesReady := config.NewSourcesReady(func(_ sets.Set[string]) bool { return true })
 		go manager.Run(tCtx, sourcesReady)
 
@@ -462,7 +461,7 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 			tCtx.Done(),
 			manager)
 
-		err = manager.WaitForAttachAndMount(ctx, pod)
+		err = manager.WaitForAttachAndMount(tCtx, pod)
 		if err != nil {
 			t.Errorf("Expected success: %v", err)
 			continue

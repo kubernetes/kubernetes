@@ -43,7 +43,8 @@ func assertStateEqual(t *testing.T, restoredState, expectedState State) {
 }
 
 func TestCheckpointStateRestore(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	testCases := []struct {
 		description       string
 		checkpointContent string
@@ -133,7 +134,7 @@ func TestCheckpointStateRestore(t *testing.T) {
 				assert.NoError(t, cpm.CreateCheckpoint(testingCheckpoint, checkpoint), "could not create testing checkpoint")
 			}
 
-			restoredState, err := NewCheckpointState(logger, testingDir, testingCheckpoint, "static")
+			restoredState, err := NewCheckpointState(tCtx.Logger(), testingDir, testingCheckpoint, "static")
 			if strings.TrimSpace(tc.expectedError) != "" {
 				assert.Error(t, err)
 				assert.ErrorContains(t, err, "could not restore state from checkpoint: "+tc.expectedError)
@@ -147,7 +148,9 @@ func TestCheckpointStateRestore(t *testing.T) {
 }
 
 func TestCheckpointStateStore(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	expectedState := &stateMemory{
 		assignments: ContainerMemoryAssignments{
 			"pod": map[string][]Block{
@@ -202,7 +205,8 @@ func TestCheckpointStateStore(t *testing.T) {
 }
 
 func TestCheckpointStateHelpers(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	testCases := []struct {
 		description  string
 		machineState NUMANodeMap
@@ -310,7 +314,7 @@ func TestCheckpointStateHelpers(t *testing.T) {
 			// ensure there is no previous checkpoint
 			assert.NoError(t, cpm.RemoveCheckpoint(testingCheckpoint), "could not remove testing checkpoint")
 
-			state, err := NewCheckpointState(logger, testingDir, testingCheckpoint, "static")
+			state, err := NewCheckpointState(tCtx.Logger(), testingDir, testingCheckpoint, "static")
 			assert.NoError(t, err, "could not create testing checkpoint manager")
 
 			state.SetMachineState(tc.machineState)
@@ -330,7 +334,8 @@ func TestCheckpointStateHelpers(t *testing.T) {
 }
 
 func TestCheckpointStateClear(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	testCases := []struct {
 		description  string
 		machineState NUMANodeMap
@@ -374,7 +379,7 @@ func TestCheckpointStateClear(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			state, err := NewCheckpointState(logger, testingDir, testingCheckpoint, "static")
+			state, err := NewCheckpointState(tCtx.Logger(), testingDir, testingCheckpoint, "static")
 			assert.NoError(t, err, "could not create testing checkpoint manager")
 
 			state.SetMachineState(tc.machineState)

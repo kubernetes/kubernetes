@@ -395,7 +395,9 @@ func TestGetContainerSpec(t *testing.T) {
 }
 
 func TestShouldContainerBeRestarted(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			UID:       "12345678",
@@ -548,7 +550,8 @@ func TestHasPrivilegedContainer(t *testing.T) {
 }
 
 func TestMakePortMappings(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	port := func(name string, protocol v1.Protocol, containerPort, hostPort int32, ip string) v1.ContainerPort {
 		return v1.ContainerPort{
 			Name:          name,
@@ -638,7 +641,7 @@ func TestMakePortMappings(t *testing.T) {
 	}
 
 	for i, tt := range tests {
-		actual := MakePortMappings(logger, tt.container)
+		actual := MakePortMappings(tCtx.Logger(), tt.container)
 		assert.Equal(t, tt.expectedPortMappings, actual, "[%d]", i)
 	}
 }

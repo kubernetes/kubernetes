@@ -1848,7 +1848,8 @@ func TestGetScaleSubresourceAsTableForAllBuiltins(t *testing.T) {
 			groupVersion, _ := schema.ParseGroupVersion(resourceList.GroupVersion)
 
 			t.Run(resourceName, func(t *testing.T) {
-				_, ctx := ktesting.NewTestContext(t)
+				tCtx := ktesting.Init(t)
+
 				scaleResourceObjName := fmt.Sprintf("%s.%s", resourceName, resourceList.GroupVersion)
 				obj, ok := scaleResources[scaleResourceObjName]
 				if !ok {
@@ -1871,7 +1872,7 @@ func TestGetScaleSubresourceAsTableForAllBuiltins(t *testing.T) {
 				err = client.Post().
 					NamespaceIfScoped(testNamespace, resource.Namespaced).Resource(resourceName).
 					VersionedParams(&metav1.CreateOptions{}, metav1.ParameterCodec).
-					Body(obj).Do(ctx).Error()
+					Body(obj).Do(tCtx).Error()
 				if err != nil {
 					t.Fatalf("failed to create object: %v", err)
 				}
@@ -1885,7 +1886,7 @@ func TestGetScaleSubresourceAsTableForAllBuiltins(t *testing.T) {
 					SetHeader("Accept", "application/json;as=Table;g=meta.k8s.io;v=v1").
 					Name(metaAccessor.GetName()).
 					SubResource("scale").
-					Do(ctx)
+					Do(tCtx)
 				resObj, err := res.Get()
 				if err != nil {
 					t.Fatalf("failed to retrieve object from response: %v", err)

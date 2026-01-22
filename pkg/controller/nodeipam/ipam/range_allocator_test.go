@@ -509,7 +509,7 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 	}
 
 	// test function
-	_, tCtx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
 	testFunc := func(tc testCase) {
 		fakeNodeInformer := test.FakeNodeInformer(tc.fakeNodeHandler)
 		nodeList, _ := tc.fakeNodeHandler.List(tCtx, metav1.ListOptions{})
@@ -610,7 +610,7 @@ func TestAllocateOrOccupyCIDRFailure(t *testing.T) {
 			},
 		},
 	}
-	_, tCtx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
 	testFunc := func(tc testCase) {
 		// Initialize the range allocator.
 		allocator, err := NewCIDRRangeAllocator(tCtx, tc.fakeNodeHandler, test.FakeNodeInformer(tc.fakeNodeHandler), tc.allocatorParams, nil)
@@ -755,7 +755,7 @@ func TestReleaseCIDRSuccess(t *testing.T) {
 			},
 		},
 	}
-	logger, tCtx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
 	testFunc := func(tc releaseTestCase) {
 		// Initialize the range allocator.
 		allocator, _ := NewCIDRRangeAllocator(tCtx, tc.fakeNodeHandler, test.FakeNodeInformer(tc.fakeNodeHandler), tc.allocatorParams, nil)
@@ -807,7 +807,7 @@ func TestReleaseCIDRSuccess(t *testing.T) {
 				},
 			}
 			nodeToRelease.Spec.PodCIDRs = cidrToRelease
-			err = allocator.ReleaseCIDR(logger, &nodeToRelease)
+			err = allocator.ReleaseCIDR(tCtx.Logger(), &nodeToRelease)
 			if err != nil {
 				t.Fatalf("%v: unexpected error in ReleaseCIDR: %v", tc.description, err)
 			}
@@ -908,7 +908,7 @@ func TestNodeDeletionReleaseCIDR(t *testing.T) {
 				Existing:  tc.existingNodes,
 				Clientset: fake.NewSimpleClientset(),
 			}
-			_, tCtx := ktesting.NewTestContext(t)
+			tCtx := ktesting.Init(t)
 
 			fakeNodeInformer := test.FakeNodeInformer(fakeNodeHandler)
 			nodeList, err := fakeNodeHandler.List(tCtx, metav1.ListOptions{})

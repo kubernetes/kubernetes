@@ -38,7 +38,8 @@ import (
 )
 
 func TestCleanupLeftovers(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	ipt := iptablestest.NewFake()
 	ipts := map[v1.IPFamily]utiliptables.Interface{
 		v1.IPv4Protocol: ipt,
@@ -78,7 +79,7 @@ func TestCleanupLeftovers(t *testing.T) {
 		t.Fatalf("Unexpected error setting up iptables state: %v", err)
 	}
 
-	fp := NewFakeProxier(ctx, ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
+	fp := NewFakeProxier(tCtx, ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcNodePort := 3001
@@ -117,7 +118,7 @@ func TestCleanupLeftovers(t *testing.T) {
 	_ = fp.syncProxyRules()
 
 	// test cleanup left over
-	encounteredError := cleanupLeftovers(ctx, ipvs, ipts, ipset)
+	encounteredError := cleanupLeftovers(tCtx, ipvs, ipts, ipset)
 	if encounteredError {
 		t.Errorf("Cleanup leftovers failed")
 	}

@@ -21,8 +21,6 @@ import (
 	"fmt"
 	"testing"
 
-	"k8s.io/klog/v2"
-
 	// Initialize command line parameters.
 	_ "k8s.io/component-base/logs/testinit"
 )
@@ -45,7 +43,7 @@ func SetDefaultVerbosity(v int) {
 
 // NewTestContext is a replacement for ktesting.NewTestContext
 // which returns a more versatile context.
-func NewTestContext(tb testing.TB) (klog.Logger, TContext) {
-	tCtx := Init(tb)
-	return tCtx.Logger(), tCtx
+// Prefer directly using ktesting.Init.
+func NewTestContext(tb testing.TB) TContext {
+	return Init(tb)
 }

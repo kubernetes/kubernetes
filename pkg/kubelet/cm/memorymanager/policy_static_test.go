@@ -149,7 +149,9 @@ type testStaticPolicy struct {
 }
 
 func initTests(t *testing.T, testCase *testStaticPolicy, hint *topologymanager.TopologyHint, initContainersReusableMemory reusableMemory) (Policy, state.State, error) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	manager := topologymanager.NewFakeManager()
 	if hint != nil {
 		manager = topologymanager.NewFakeManagerWithHint(hint)
@@ -228,7 +230,9 @@ func TestStaticPolicyName(t *testing.T) {
 }
 
 func TestStaticPolicyStart(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	testCases := []testStaticPolicy{
 		{
 			description: "should fail, if machine state is empty, but it has memory assignments",
@@ -1192,7 +1196,9 @@ func TestStaticPolicyStart(t *testing.T) {
 }
 
 func TestStaticPolicyAllocate(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	testCases := []testStaticPolicy{
 		{
 			description:         "should do nothing for non-guaranteed pods",
@@ -2112,7 +2118,9 @@ func TestStaticPolicyAllocate(t *testing.T) {
 }
 
 func TestStaticPolicyAllocateWithInitContainers(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	testCases := []testStaticPolicy{
 		{
 			description: "should re-use init containers memory, init containers requests 1Gi and 2Gi, apps containers 3Gi and 4Gi",
@@ -2841,7 +2849,9 @@ func TestStaticPolicyAllocateWithInitContainers(t *testing.T) {
 }
 
 func TestStaticPolicyAllocateWithRestartableInitContainers(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	testCases := []testStaticPolicy{
 		{
 			description: "should do nothing once containers already exist under the state file",
@@ -3179,7 +3189,9 @@ func TestStaticPolicyAllocateWithRestartableInitContainers(t *testing.T) {
 }
 
 func TestStaticPolicyRemoveContainer(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	testCases := []testStaticPolicy{
 		{
 			description:         "should do nothing when the container does not exist under the state",
@@ -3437,7 +3449,9 @@ func TestStaticPolicyRemoveContainer(t *testing.T) {
 }
 
 func TestStaticPolicyGetTopologyHints(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	testCases := []testStaticPolicy{
 		{
 			description: "should not provide topology hints for non-guaranteed pods",
@@ -3836,7 +3850,9 @@ func TestStaticPolicyGetTopologyHints(t *testing.T) {
 }
 
 func TestStaticPolicyGetPodTopologyHints(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	testCases := []testStaticPolicy{
 		{
 			description: "should not provide pod topology hints for guaranteed pod with pod level resources",

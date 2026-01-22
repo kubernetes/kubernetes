@@ -1274,7 +1274,7 @@ func (p *singleNumaNodePolicy) mergeTestCases(numaNodes []int) []policyMergeTest
 }
 
 func testPolicyMerge(policy Policy, tcases []policyMergeTestCase, t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
 
 	for _, tc := range tcases {
 		var providersHints []map[string][]TopologyHint
@@ -1283,7 +1283,7 @@ func testPolicyMerge(policy Policy, tcases []policyMergeTestCase, t *testing.T) 
 			providersHints = append(providersHints, hints)
 		}
 
-		actual, _ := policy.Merge(logger, providersHints)
+		actual, _ := policy.Merge(tCtx.Logger(), providersHints)
 		if !reflect.DeepEqual(actual, tc.expected) {
 			t.Errorf("%v: Expected Topology Hint to be %v, got %v:", tc.name, tc.expected, actual)
 		}

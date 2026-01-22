@@ -262,8 +262,9 @@ func Test_createRequestsAndMappings_requests(t *testing.T) {
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			logger, _ := ktesting.NewTestContext(t)
-			gotDeviceRequests, _ := createRequestsAndMappings(tc.pod, tc.extendedResources, logger, tc.cache)
+			tCtx := ktesting.Init(t)
+
+			gotDeviceRequests, _ := createRequestsAndMappings(tc.pod, tc.extendedResources, tCtx.Logger(), tc.cache)
 			if len(tc.wantDeviceRequests) != len(gotDeviceRequests) {
 				t.Fatalf("different length, want %#v, len=%v, got %#v, len=%v", tc.wantDeviceRequests, len(tc.wantDeviceRequests), gotDeviceRequests, len(gotDeviceRequests))
 			}
@@ -535,8 +536,9 @@ func Test_createRequestsAndMappings_mappings(t *testing.T) {
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			logger, _ := ktesting.NewTestContext(t)
-			_, gotReqMappings := createRequestsAndMappings(tc.pod, tc.extnededResources, logger, tc.deviceClassMapping)
+			tCtx := ktesting.Init(t)
+
+			_, gotReqMappings := createRequestsAndMappings(tc.pod, tc.extnededResources, tCtx.Logger(), tc.deviceClassMapping)
 			if len(tc.wantReqMappings) != len(gotReqMappings) {
 				t.Fatalf("different length, want %#v, got %#v", tc.wantReqMappings, gotReqMappings)
 			}

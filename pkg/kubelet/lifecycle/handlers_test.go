@@ -78,7 +78,8 @@ func (f podStatusProviderFunc) GetPodStatus(_ context.Context, uid types.UID, na
 }
 
 func TestRunHandlerExec(t *testing.T) {
-	_, tCtx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	fakeCommandRunner := fakeContainerCommandRunner{}
 	handlerRunner := NewHandlerRunner(&fakeHTTP{}, &fakeCommandRunner, nil, nil)
 
@@ -124,7 +125,8 @@ func (f *fakeHTTP) Do(req *http.Request) (*http.Response, error) {
 }
 
 func TestRunHandlerHttp(t *testing.T) {
-	_, tCtx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	fakeHTTPGetter := fakeHTTP{}
 	fakePodStatusProvider := stubPodStatusProvider("127.0.0.1")
 	handlerRunner := NewHandlerRunner(&fakeHTTPGetter, &fakeContainerCommandRunner{}, fakePodStatusProvider, nil)
@@ -160,7 +162,8 @@ func TestRunHandlerHttp(t *testing.T) {
 }
 
 func TestRunHandlerHttpWithHeaders(t *testing.T) {
-	_, tCtx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	fakeHTTPDoer := fakeHTTP{}
 	fakePodStatusProvider := stubPodStatusProvider("127.0.0.1")
 
@@ -202,7 +205,8 @@ func TestRunHandlerHttpWithHeaders(t *testing.T) {
 }
 
 func TestRunHandlerHttps(t *testing.T) {
-	_, tCtx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	fakeHTTPDoer := fakeHTTP{}
 	fakePodStatusProvider := stubPodStatusProvider("127.0.0.1")
 	handlerRunner := NewHandlerRunner(&fakeHTTPDoer, &fakeContainerCommandRunner{}, fakePodStatusProvider, nil)
@@ -284,7 +288,8 @@ func TestRunHandlerHTTPPort(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
-			_, tCtx := ktesting.NewTestContext(t)
+			tCtx := ktesting.Init(t)
+
 			fakeHTTPDoer := fakeHTTP{}
 			handlerRunner := NewHandlerRunner(&fakeHTTPDoer, &fakeContainerCommandRunner{}, fakePodStatusProvider, nil)
 
@@ -555,7 +560,8 @@ func TestRunHTTPHandler(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
-			_, tCtx := ktesting.NewTestContext(t)
+			tCtx := ktesting.Init(t)
+
 			fakePodStatusProvider := stubPodStatusProvider(tt.PodIP)
 
 			container.Lifecycle.PostStart.HTTPGet = tt.HTTPGet
@@ -586,7 +592,8 @@ func TestRunHTTPHandler(t *testing.T) {
 }
 
 func TestRunHandlerNil(t *testing.T) {
-	_, tCtx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	handlerRunner := NewHandlerRunner(&fakeHTTP{}, &fakeContainerCommandRunner{}, nil, nil)
 	containerID := kubecontainer.ContainerID{Type: "test", ID: "abc1234"}
 	podName := "podFoo"
@@ -610,7 +617,8 @@ func TestRunHandlerNil(t *testing.T) {
 }
 
 func TestRunHandlerExecFailure(t *testing.T) {
-	_, tCtx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	expectedErr := fmt.Errorf("invalid command")
 	fakeCommandRunner := fakeContainerCommandRunner{Err: expectedErr, Msg: expectedErr.Error()}
 	handlerRunner := NewHandlerRunner(&fakeHTTP{}, &fakeCommandRunner, nil, nil)
@@ -645,7 +653,8 @@ func TestRunHandlerExecFailure(t *testing.T) {
 }
 
 func TestRunHandlerHttpFailure(t *testing.T) {
-	_, tCtx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	expectedErr := fmt.Errorf("fake http error")
 	expectedResp := http.Response{
 		Body: io.NopCloser(strings.NewReader(expectedErr.Error())),
@@ -688,7 +697,7 @@ func TestRunHandlerHttpFailure(t *testing.T) {
 }
 
 func TestRunHandlerHttpsFailureFallback(t *testing.T) {
-	_, tCtx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
 
 	// Since prometheus' gatherer is global, other tests may have updated metrics already, so
 	// we need to reset them prior running this test.
@@ -822,7 +831,8 @@ func TestRunSleepHandler(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, tCtx := ktesting.NewTestContext(t)
+			tCtx := ktesting.Init(t)
+
 			pod.Spec.Containers[0].Lifecycle.PreStop.Sleep = &v1.SleepAction{Seconds: tt.sleepSeconds}
 			ctx, cancel := context.WithTimeout(tCtx, time.Duration(tt.terminationGracePeriodSeconds)*time.Second)
 			defer cancel()

@@ -194,7 +194,8 @@ func (a *recordingPullRecordsAccessor) DeleteImagePulledRecord(logger klog.Logge
 }
 
 func TestNewCachedPullRecordsAccessor(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	manyPullIntents := generateTestPullIntents(51)
 	slices.SortFunc(manyPullIntents, pullIntentsCmp)
 
@@ -299,7 +300,7 @@ func TestNewCachedPullRecordsAccessor(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotAccessor := NewCachedPullRecordsAccessor(logger, tt.delegate, 50, 100, 10)
+			gotAccessor := NewCachedPullRecordsAccessor(tCtx.Logger(), tt.delegate, 50, 100, 10)
 			gotMeteredAccessor, ok := gotAccessor.(*meteringRecordsAccessor)
 			if !ok {
 				t.Fatalf("the tested accessor must be a metered records accessor, got %T", gotAccessor)
@@ -629,7 +630,8 @@ func Test_cachedPullRecordsAccessor_ImagePullIntentExists(t *testing.T) {
 }
 
 func Test_cachedPullRecordsAccessor_WriteImagePullIntent(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	justEnoughIntents := generateTestPullIntents(100)
 
 	tests := []struct {
@@ -735,7 +737,7 @@ func Test_cachedPullRecordsAccessor_WriteImagePullIntent(t *testing.T) {
 			}
 			c.intents.authoritative.Store(tt.initAuthoritative)
 
-			if err := c.WriteImagePullIntent(logger, tt.inputImage); !cmpErrorStrings(err, tt.wantErr) {
+			if err := c.WriteImagePullIntent(tCtx.Logger(), tt.inputImage); !cmpErrorStrings(err, tt.wantErr) {
 				t.Errorf("cachedPullRecordsAccessor.WriteImagePullIntent() error = %v, wantErr %v", err, tt.wantErr)
 			}
 
@@ -755,7 +757,8 @@ func Test_cachedPullRecordsAccessor_WriteImagePullIntent(t *testing.T) {
 }
 
 func Test_cachedPullRecordsAccessor_WriteImagePulledRecord(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	justEnoughPulledRecords := generateTestPulledRecords(100)
 
 	tests := []struct {
@@ -903,7 +906,7 @@ func Test_cachedPullRecordsAccessor_WriteImagePulledRecord(t *testing.T) {
 			}
 			c.pulledRecords.authoritative.Store(tt.initAuthoritative)
 
-			if err := c.WriteImagePulledRecord(logger, tt.inputRecord); !cmpErrorStrings(err, tt.wantErr) {
+			if err := c.WriteImagePulledRecord(tCtx.Logger(), tt.inputRecord); !cmpErrorStrings(err, tt.wantErr) {
 				t.Errorf("cachedPullRecordsAccessor.WriteImagePulledRecord() error = %v, wantErr %v", err, tt.wantErr)
 			}
 
@@ -923,7 +926,8 @@ func Test_cachedPullRecordsAccessor_WriteImagePulledRecord(t *testing.T) {
 }
 
 func Test_cachedPullRecordsAccessor_DeleteImagePullIntent(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	tests := []struct {
 		name         string
 		delegate     *testPullRecordsAccessor
@@ -966,7 +970,7 @@ func Test_cachedPullRecordsAccessor_DeleteImagePullIntent(t *testing.T) {
 				}
 				c.intents.authoritative.Store(initAuthoritative)
 
-				if err := c.DeleteImagePullIntent(logger, tt.inputImage); !cmpErrorStrings(err, tt.wantErr) {
+				if err := c.DeleteImagePullIntent(tCtx.Logger(), tt.inputImage); !cmpErrorStrings(err, tt.wantErr) {
 					t.Errorf("cachedPullRecordsAccessor.DeleteImagePullIntent() error = %v, wantErr %v", err, tt.wantErr)
 				}
 
@@ -992,7 +996,8 @@ func Test_cachedPullRecordsAccessor_DeleteImagePullIntent(t *testing.T) {
 }
 
 func Test_cachedPullRecordsAccessor_DeleteImagePulledRecord(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	tests := []struct {
 		name              string
 		delegate          *testPullRecordsAccessor
@@ -1035,7 +1040,7 @@ func Test_cachedPullRecordsAccessor_DeleteImagePulledRecord(t *testing.T) {
 				}
 				c.pulledRecords.authoritative.Store(initAuthoritative)
 
-				if err := c.DeleteImagePulledRecord(logger, tt.imageRef); !cmpErrorStrings(err, tt.wantErr) {
+				if err := c.DeleteImagePulledRecord(tCtx.Logger(), tt.imageRef); !cmpErrorStrings(err, tt.wantErr) {
 					t.Errorf("cachedPullRecordsAccessor.DeleteImagePulledRecord() error = %v, wantErr %v", err, tt.wantErr)
 				}
 

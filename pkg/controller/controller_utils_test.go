@@ -174,7 +174,9 @@ func newReplicaSet(name string, replicas int, rsUuid types.UID) *apps.ReplicaSet
 }
 
 func TestControllerExpectations(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	ttl := 30 * time.Second
 	e, fakeClock := NewFakeControllerExpectationsLookup(ttl)
 	// In practice we can't really have add and delete expectations since we only either create or
@@ -257,7 +259,9 @@ func TestControllerExpectations(t *testing.T) {
 }
 
 func TestUIDExpectations(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	uidExp := NewUIDTrackingControllerExpectations(NewControllerExpectations())
 	type test struct {
 		name        string
@@ -557,7 +561,8 @@ func TestClaimedPodFiltering(t *testing.T) {
 }
 
 func TestActivePodFiltering(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	type podData struct {
 		podName  string
 		podPhase v1.PodPhase
@@ -597,7 +602,7 @@ func TestActivePodFiltering(t *testing.T) {
 			for i := range podList.Items {
 				podPointers = append(podPointers, &podList.Items[i])
 			}
-			got := FilterActivePods(logger, podPointers)
+			got := FilterActivePods(tCtx.Logger(), podPointers)
 			gotNames := sets.NewString()
 			for _, pod := range got {
 				gotNames.Insert(pod.Name)

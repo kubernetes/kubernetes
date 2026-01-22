@@ -212,7 +212,8 @@ func newTestKubeletWithImageList(
 	excludeAdmitHandlers bool,
 	enableResizing bool,
 ) *TestKubelet {
-	logger, tCtx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
 
 	fakeRuntime := &containertest.FakeRuntime{
 		ImageList: imageList,
@@ -1662,7 +1663,8 @@ func TestNetworkErrorsWithoutHostNetwork(t *testing.T) {
 }
 
 func TestFilterOutInactivePods(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -1690,7 +1692,7 @@ func TestFilterOutInactivePods(t *testing.T) {
 
 	// pod that is running but has been rejected by admission is excluded
 	pods[5].Status.Phase = v1.PodRunning
-	kubelet.statusManager.SetPodStatus(logger, pods[5], v1.PodStatus{Phase: v1.PodFailed})
+	kubelet.statusManager.SetPodStatus(tCtx.Logger(), pods[5], v1.PodStatus{Phase: v1.PodFailed})
 
 	// pod that is running according to the api but is known terminated is excluded
 	pods[6].Status.Phase = v1.PodRunning
@@ -1827,7 +1829,8 @@ func TestCheckpointContainer(t *testing.T) {
 }
 
 func TestSyncPodsSetStatusToFailedForPodsThatRunTooLong(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	fakeRuntime := testKubelet.fakeRuntime
@@ -1868,7 +1871,7 @@ func TestSyncPodsSetStatusToFailedForPodsThatRunTooLong(t *testing.T) {
 	}
 
 	// Let the pod worker sets the status to fail after this sync.
-	kubelet.HandlePodUpdates(logger, pods)
+	kubelet.HandlePodUpdates(tCtx.Logger(), pods)
 	status, found := kubelet.statusManager.GetPodStatus(pods[0].UID)
 	assert.True(t, found, "expected to found status for pod %q", pods[0].UID)
 	assert.Equal(t, v1.PodFailed, status.Phase)
@@ -1877,7 +1880,8 @@ func TestSyncPodsSetStatusToFailedForPodsThatRunTooLong(t *testing.T) {
 }
 
 func TestSyncPodsDoesNotSetPodsThatDidNotRunTooLongToFailed(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	fakeRuntime := testKubelet.fakeRuntime
@@ -1919,7 +1923,7 @@ func TestSyncPodsDoesNotSetPodsThatDidNotRunTooLongToFailed(t *testing.T) {
 	}
 
 	kubelet.podManager.SetPods(pods)
-	kubelet.HandlePodUpdates(logger, pods)
+	kubelet.HandlePodUpdates(tCtx.Logger(), pods)
 	status, found := kubelet.statusManager.GetPodStatus(pods[0].UID)
 	assert.True(t, found, "expected to found status for pod %q", pods[0].UID)
 	assert.NotEqual(t, v1.PodFailed, status.Phase)
@@ -1981,7 +1985,9 @@ func syncAndVerifyPodDir(t *testing.T, testKubelet *TestKubelet, pods []*v1.Pod,
 }
 
 func TestDoesNotDeletePodDirsForTerminatedPods(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
@@ -3939,7 +3945,8 @@ func TestSyncPodWithErrorsDuringInPlacePodResize(t *testing.T) {
 }
 
 func TestHandlePodUpdates_RecordContainerRequestedResizes(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	metrics.Register()
 	metrics.ContainerRequestedResizes.Reset()
 
@@ -4521,7 +4528,7 @@ func TestHandlePodUpdates_RecordContainerRequestedResizes(t *testing.T) {
 
 			kubelet.podManager.AddPod(initialPod)
 			require.NoError(t, kubelet.allocationManager.SetAllocatedResources(initialPod))
-			kubelet.HandlePodUpdates(logger, []*v1.Pod{updatedPod})
+			kubelet.HandlePodUpdates(tCtx.Logger(), []*v1.Pod{updatedPod})
 
 			tc.updateExpectedFunc(&expectedMetrics)
 
@@ -4718,7 +4725,8 @@ func TestHandlePodReconcile_RetryPendingResizes(t *testing.T) {
 }
 
 func TestSyncPodNodeDeclaredFeaturesUpdate(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	cpu1000m := resource.MustParse("1")
 	mem1000M := resource.MustParse("1Gi")
 	cpu2000m := resource.MustParse("2")
@@ -4862,7 +4870,7 @@ func TestSyncPodNodeDeclaredFeaturesUpdate(t *testing.T) {
 			}
 
 			kubelet.statusManager.SetPodStatus(klog.TODO(), tc.newPod, v1.PodStatus{Phase: v1.PodRunning})
-			kubelet.HandlePodUpdates(logger, []*v1.Pod{tc.newPod})
+			kubelet.HandlePodUpdates(tCtx.Logger(), []*v1.Pod{tc.newPod})
 			if tc.expectEvent {
 				select {
 				case event := <-recorder.Events:

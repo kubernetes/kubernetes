@@ -65,12 +65,14 @@ func TestGetConntrackMax(t *testing.T) {
 	}
 
 	for i, tc := range testCases {
+		tCtx := ktesting.Init(t)
+
 		cfg := proxyconfigapi.KubeProxyConntrackConfiguration{
 			Min:        ptr.To(tc.min),
 			MaxPerCore: ptr.To(tc.maxPerCore),
 		}
-		_, ctx := ktesting.NewTestContext(t)
-		x, e := getConntrackMax(ctx, &cfg)
+
+		x, e := getConntrackMax(tCtx, &cfg)
 		if e != nil {
 			if tc.err == "" {
 				t.Errorf("[%d] unexpected error: %v", i, e)
@@ -115,7 +117,8 @@ func (fc *fakeConntracker) SetUDPStreamTimeout(ctx context.Context, seconds int)
 }
 
 func TestSetupConntrack(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	tests := []struct {
 		name         string
 		config       proxyconfigapi.KubeProxyConntrackConfiguration
@@ -226,7 +229,7 @@ func TestSetupConntrack(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			fc := &fakeConntracker{err: test.conntrackErr}
-			err := setSysctls(ctx, fc, &test.config)
+			err := setSysctls(tCtx, fc, &test.config)
 			if test.wantErr && err == nil {
 				t.Errorf("Test %q: Expected error, got nil", test.name)
 			}

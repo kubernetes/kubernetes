@@ -206,8 +206,9 @@ func TestCleanup(t *testing.T) {
 	//   skip its own helper functions. That's okay, normally
 	//   ktesting should not be installed as logging backend like this.
 	// - klog.Infof messages are printed with an extra newline.
-	logger, _ := ktesting.NewTestContext(t)
-	klog.SetLogger(logger)
+	tCtx := ktesting.Init(t)
+
+	klog.SetLogger(tCtx.Logger())
 
 	apiServer := testapiserver.StartAPITestServer(t)
 

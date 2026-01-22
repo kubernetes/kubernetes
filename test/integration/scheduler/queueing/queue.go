@@ -2703,6 +2703,8 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 // TestCoreResourceEnqueue verify Pods failed by in-tree default plugins can be
 // moved properly upon their registered events.
 func RunTestCoreResourceEnqueue(t *testing.T, tt *CoreResourceEnqueueTestCase) {
+	tCtx := ktesting.Init(t)
+
 	t.Helper()
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	if tt.EnableDRAExtendedResource {
@@ -2731,7 +2733,6 @@ func RunTestCoreResourceEnqueue(t *testing.T, tt *CoreResourceEnqueueTestCase) {
 			features.GangScheduling:  true,
 		})
 	}
-	logger, _ := ktesting.NewTestContext(t)
 
 	opts := []scheduler.Option{scheduler.WithPodInitialBackoffSeconds(0), scheduler.WithPodMaxBackoffSeconds(0)}
 	if tt.EnablePlugins != nil {
@@ -2771,7 +2772,7 @@ func RunTestCoreResourceEnqueue(t *testing.T, tt *CoreResourceEnqueueTestCase) {
 	)
 	testutils.SyncSchedulerInformerFactory(testCtx)
 
-	testCtx.Scheduler.SchedulingQueue.Run(logger)
+	testCtx.Scheduler.SchedulingQueue.Run(tCtx.Logger())
 	defer testCtx.Scheduler.SchedulingQueue.Close()
 
 	cs, ns, ctx := testCtx.ClientSet, testCtx.NS.Name, testCtx.Ctx

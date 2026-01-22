@@ -1211,11 +1211,12 @@ func TestNodeInfoRemovePod(t *testing.T) {
 
 	for i, test := range tests {
 		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
-			logger, _ := ktesting.NewTestContext(t)
+			tCtx := ktesting.Init(t)
+
 			ni := fakeNodeInfo(pods...)
 
 			gen := ni.Generation
-			err := ni.RemovePod(logger, test.pod)
+			err := ni.RemovePod(tCtx.Logger(), test.pod)
 			if err != nil {
 				if test.errExpected {
 					expectedErrorMsg := fmt.Errorf("no corresponding pod %s in pods of node %s", test.pod.Name, ni.Node().Name)

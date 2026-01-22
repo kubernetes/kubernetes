@@ -107,8 +107,9 @@ func TestWarningsForJobSpec(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
-			warnings := WarningsForJobSpec(ctx, nil, tc.spec, nil)
+			tCtx := ktesting.Init(t)
+
+			warnings := WarningsForJobSpec(tCtx, nil, tc.spec, nil)
 			if len(warnings) != tc.wantWarningsCount {
 				t.Errorf("Got %d warnings, want %d.\nWarnings: %v", len(warnings), tc.wantWarningsCount, warnings)
 			}

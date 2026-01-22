@@ -2526,6 +2526,8 @@ func TestApplyNoExecuteTaints(t *testing.T) {
 // TestApplyNoExecuteTaintsToUnreachableNode ensures a NoExecute taint is applied to node that hasn't posted the
 // node status for a period greater than nodeMonitorGracePeriod.
 func TestApplyNoExecuteTaintsToUnreachableNode(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
 	// TODO: Remove skip once https://github.com/kubernetes/kubernetes/pull/114607 merges.
 	if goruntime.GOOS == "windows" {
 		t.Skip("Skipping test on Windows.")
@@ -2586,9 +2588,9 @@ func TestApplyNoExecuteTaintsToUnreachableNode(t *testing.T) {
 		},
 		Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
 	}
-	_, ctx := ktesting.NewTestContext(t)
+
 	nodeController, _ := newNodeLifecycleControllerFromClient(
-		ctx,
+		tCtx,
 		fakeNodeHandler,
 		testRateLimiterQPS,
 		testRateLimiterQPS,
@@ -2605,11 +2607,11 @@ func TestApplyNoExecuteTaintsToUnreachableNode(t *testing.T) {
 	if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if err := nodeController.monitorNodeHealth(ctx); err != nil {
+	if err := nodeController.monitorNodeHealth(tCtx); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	nodeController.doNoExecuteTaintingPass(ctx)
-	node0, err := fakeNodeHandler.Get(ctx, "node0", metav1.GetOptions{})
+	nodeController.doNoExecuteTaintingPass(tCtx)
+	node0, err := fakeNodeHandler.Get(tCtx, "node0", metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("Can't get current node0...")
 		return
@@ -2617,7 +2619,7 @@ func TestApplyNoExecuteTaintsToUnreachableNode(t *testing.T) {
 	if len(node0.Spec.Taints) > 0 {
 		t.Errorf("Got unexpected taints %v", node0.Spec.Taints)
 	}
-	node1, err := fakeNodeHandler.Get(ctx, "node1", metav1.GetOptions{})
+	node1, err := fakeNodeHandler.Get(tCtx, "node1", metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("Can't get current node1...")
 		return
@@ -2639,7 +2641,7 @@ func TestApplyNoExecuteTaintsToUnreachableNode(t *testing.T) {
 			},
 		},
 	}
-	_, err = fakeNodeHandler.UpdateStatus(ctx, node1, metav1.UpdateOptions{})
+	_, err = fakeNodeHandler.UpdateStatus(tCtx, node1, metav1.UpdateOptions{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 		return
@@ -2648,15 +2650,15 @@ func TestApplyNoExecuteTaintsToUnreachableNode(t *testing.T) {
 	if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if err := nodeController.monitorNodeHealth(ctx); err != nil {
+	if err := nodeController.monitorNodeHealth(tCtx); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	nodeController.doNoExecuteTaintingPass(ctx)
+	nodeController.doNoExecuteTaintingPass(tCtx)
 
-	node0, err = fakeNodeHandler.Get(ctx, "node0", metav1.GetOptions{})
+	node0, err = fakeNodeHandler.Get(tCtx, "node0", metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("Can't get current node0...")
 		return
@@ -2664,7 +2666,7 @@ func TestApplyNoExecuteTaintsToUnreachableNode(t *testing.T) {
 	if !taintutils.TaintExists(node0.Spec.Taints, UnreachableTaintTemplate) {
 		t.Errorf("Can't find taint %v in %v", UnreachableTaintTemplate, node0.Spec.Taints)
 	}
-	node1, err = fakeNodeHandler.Get(ctx, "node1", metav1.GetOptions{})
+	node1, err = fakeNodeHandler.Get(tCtx, "node1", metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("Can't get current node1...")
 		return
@@ -2684,7 +2686,7 @@ func TestApplyNoExecuteTaintsToUnreachableNode(t *testing.T) {
 			},
 		},
 	}
-	_, err = fakeNodeHandler.UpdateStatus(ctx, node0, metav1.UpdateOptions{})
+	_, err = fakeNodeHandler.UpdateStatus(tCtx, node0, metav1.UpdateOptions{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 		return
@@ -2692,12 +2694,12 @@ func TestApplyNoExecuteTaintsToUnreachableNode(t *testing.T) {
 	if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if err := nodeController.monitorNodeHealth(ctx); err != nil {
+	if err := nodeController.monitorNodeHealth(tCtx); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	nodeController.doNoExecuteTaintingPass(ctx)
+	nodeController.doNoExecuteTaintingPass(tCtx)
 
-	node0, err = fakeNodeHandler.Get(ctx, "node0", metav1.GetOptions{})
+	node0, err = fakeNodeHandler.Get(tCtx, "node0", metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("Can't get current node0...")
 		return

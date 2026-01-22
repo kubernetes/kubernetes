@@ -1082,10 +1082,11 @@ dra_operations_duration_seconds_count{is_error="false",operation_name="PrepareRe
 // - first claim already prepared by a previous pod
 // - second claim is new and needs to be prepared
 func TestPrepareResourcesWithPreparedAndNewClaim(t *testing.T) {
-	logger, tCtx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	fakeKubeClient := fake.NewClientset()
 
-	manager, err := NewManager(logger, fakeKubeClient, t.TempDir())
+	manager, err := NewManager(tCtx.Logger(), fakeKubeClient, t.TempDir())
 	require.NoError(t, err)
 	manager.initDRAPluginManager(tCtx, getFakeNode, time.Second)
 

@@ -41,7 +41,8 @@ import (
 )
 
 func TestMakeMounts(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	bTrue := true
 	propagationHostToContainer := v1.MountPropagationHostToContainer
 	propagationBidirectional := v1.MountPropagationBidirectional
@@ -461,7 +462,7 @@ func TestMakeMounts(t *testing.T) {
 					},
 				}
 
-				mounts, _, err := makeMounts(logger, &pod, "/pod", &tc.container, "fakepodname", "", []string{""}, tc.podVolumes, fhu, fsp, nil, tc.supportsRRO, tc.imageVolumes)
+				mounts, _, err := makeMounts(tCtx.Logger(), &pod, "/pod", &tc.container, "fakepodname", "", []string{""}, tc.podVolumes, fhu, fsp, nil, tc.supportsRRO, tc.imageVolumes)
 
 				// validate only the error if we expect an error
 				if tc.expectErr {
@@ -483,7 +484,8 @@ func TestMakeMounts(t *testing.T) {
 }
 
 func TestMakeMountsEtcHostsFile(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	testPod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:   "test-ns",
@@ -561,7 +563,7 @@ func TestMakeMountsEtcHostsFile(t *testing.T) {
 				tt.containerFn(container)
 			}
 
-			mounts, _, err := makeMounts(logger, pod, t.TempDir(), container, "fakepodname", "fakedomain", tt.podIPs, tt.podVolumes, fhu, fsp, nil, false, nil)
+			mounts, _, err := makeMounts(tCtx.Logger(), pod, t.TempDir(), container, "fakepodname", "fakedomain", tt.podIPs, tt.podVolumes, fhu, fsp, nil, false, nil)
 
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -582,7 +584,8 @@ func TestMakeMountsEtcHostsFile(t *testing.T) {
 }
 
 func TestMakeBlockVolumes(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -698,7 +701,7 @@ func TestMakeBlockVolumes(t *testing.T) {
 				},
 			}
 			blkutil := volumetest.NewBlockVolumePathHandler()
-			blkVolumes, err := kubelet.makeBlockVolumes(logger, &pod, &tc.container, tc.podVolumes, blkutil)
+			blkVolumes, err := kubelet.makeBlockVolumes(tCtx.Logger(), &pod, &tc.container, tc.podVolumes, blkutil)
 			// validate only the error if we expect an error
 			if tc.expectErr {
 				if err == nil || err.Error() != tc.expectedErrMsg {

@@ -103,11 +103,11 @@ func TestPolicyNoneMerge(t *testing.T) {
 		},
 	}
 
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
 
 	for _, tc := range tcases {
 		policy := NewNonePolicy()
-		result, admit := policy.Merge(logger, tc.providersHints)
+		result, admit := policy.Merge(tCtx.Logger(), tc.providersHints)
 		if !result.IsEqual(tc.expectedHint) || admit != tc.expectedAdmit {
 			t.Errorf("Test Case: %s: Expected merge hint to be %v, got %v", tc.name, tc.expectedHint, result)
 		}

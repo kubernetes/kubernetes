@@ -130,17 +130,17 @@ func TestNewTopologyManagerOptions(t *testing.T) {
 		},
 	}
 
+	tCtx := ktesting.Init(t)
+
 	setTopologyManagerOptionsDuringTest(t, betaOptions, fancyBetaOption)
 	setTopologyManagerOptionsDuringTest(t, alphaOptions, fancyAlphaOption)
-
-	logger, _ := ktesting.NewTestContext(t)
 
 	for _, tcase := range testCases {
 		t.Run(tcase.description, func(t *testing.T) {
 			if tcase.featureGate != "" {
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, tcase.featureGate, tcase.featureGateEnable)
 			}
-			opts, err := NewPolicyOptions(logger, tcase.policyOptions)
+			opts, err := NewPolicyOptions(tCtx.Logger(), tcase.policyOptions)
 			if tcase.expectedErr != nil {
 				if err == nil {
 					t.Errorf("expected error %v, got no error", tcase.expectedErr)

@@ -247,12 +247,14 @@ func TestAddHintProvider(t *testing.T) {
 			},
 		},
 	}
+	tCtx := ktesting.Init(t)
+
 	mngr := manager{}
 	mngr.scope = NewContainerScope(NewNonePolicy())
-	logger, _ := ktesting.NewTestContext(t)
+
 	for _, tc := range tcases {
 		for _, hp := range tc.hp {
-			mngr.AddHintProvider(logger, hp)
+			mngr.AddHintProvider(tCtx.Logger(), hp)
 		}
 		if len(tc.hp) != len(mngr.scope.(*containerScope).hintProviders) {
 			t.Errorf("error")

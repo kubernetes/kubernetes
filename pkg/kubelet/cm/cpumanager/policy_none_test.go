@@ -35,7 +35,9 @@ func TestNonePolicyName(t *testing.T) {
 }
 
 func TestNonePolicyAllocate(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	policy := &nonePolicy{}
 
 	st := &mockState{
@@ -53,7 +55,9 @@ func TestNonePolicyAllocate(t *testing.T) {
 }
 
 func TestNonePolicyRemove(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	policy := &nonePolicy{}
 
 	st := &mockState{

@@ -246,7 +246,9 @@ func TestImageStatsWithError(t *testing.T) {
 }
 
 func TestPullWithSecrets(t *testing.T) {
-	logger, tCtx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	// auth value is equivalent to: "username":"passed-user","password":"passed-password"
 	dockerCfg := map[string]map[string]string{"index.docker.io/v1/": {"email": "passed-email", "auth": "cGFzc2VkLXVzZXI6cGFzc2VkLXBhc3N3b3Jk"}}
 	dockercfgContent, err := json.Marshal(dockerCfg)
@@ -359,7 +361,8 @@ func TestPullWithSecrets(t *testing.T) {
 }
 
 func TestPullWithSecretsWithError(t *testing.T) {
-	logger, tCtx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
 
 	dockerCfg := map[string]map[string]map[string]string{
 		"auths": {

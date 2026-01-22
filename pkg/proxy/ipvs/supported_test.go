@@ -27,7 +27,8 @@ import (
 )
 
 func TestCanUseIPVSProxier(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	testCases := []struct {
 		name         string
 		scheduler    string
@@ -77,7 +78,7 @@ func TestCanUseIPVSProxier(t *testing.T) {
 	for _, tc := range testCases {
 		ipvs := &fakeIpvs{tc.ipvsErr, false}
 		versioner := &fakeIPSetVersioner{version: tc.ipsetVersion, err: tc.ipsetErr}
-		err := CanUseIPVSProxier(ctx, ipvs, versioner, tc.scheduler)
+		err := CanUseIPVSProxier(tCtx, ipvs, versioner, tc.scheduler)
 		if (err == nil) != tc.ok {
 			t.Errorf("Case [%s], expect %v, got err: %v", tc.name, tc.ok, err)
 		}

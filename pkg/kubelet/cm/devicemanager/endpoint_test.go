@@ -76,7 +76,8 @@ func esocketName() string {
 }
 
 func TestNewEndpoint(t *testing.T) {
-	logger, tCtx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	socket := filepath.Join(os.TempDir(), esocketName())
 
 	devs := []*pluginapi.Device{
@@ -85,13 +86,14 @@ func TestNewEndpoint(t *testing.T) {
 
 	p, e := esetup(tCtx, t, devs, socket, "mock", func(logger klog.Logger, n string, d []*pluginapi.Device) {})
 	defer func() {
-		err := ecleanup(logger, p, e)
+		err := ecleanup(tCtx.Logger(), p, e)
 		require.NoError(t, err)
 	}()
 }
 
 func TestRun(t *testing.T) {
-	logger, tCtx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	socket := filepath.Join(os.TempDir(), esocketName())
 
 	devs := []*pluginapi.Device{
@@ -143,7 +145,7 @@ func TestRun(t *testing.T) {
 
 	p, e := esetup(tCtx, t, devs, socket, "mock", callback)
 	defer func() {
-		err := ecleanup(logger, p, e)
+		err := ecleanup(tCtx.Logger(), p, e)
 		require.NoError(t, err)
 	}()
 
@@ -160,7 +162,8 @@ func TestRun(t *testing.T) {
 }
 
 func TestAllocate(t *testing.T) {
-	logger, tCtx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	socket := filepath.Join(os.TempDir(), esocketName())
 	devs := []*pluginapi.Device{
 		{ID: "ADeviceId", Health: pluginapi.Healthy},
@@ -172,7 +175,7 @@ func TestAllocate(t *testing.T) {
 		callbackChan <- callbackCount
 	})
 	defer func() {
-		err := ecleanup(logger, p, e)
+		err := ecleanup(tCtx.Logger(), p, e)
 		require.NoError(t, err)
 	}()
 
@@ -217,7 +220,8 @@ func TestAllocate(t *testing.T) {
 }
 
 func TestGetPreferredAllocation(t *testing.T) {
-	logger, tCtx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	socket := filepath.Join(os.TempDir(), esocketName())
 	callbackCount := 0
 	callbackChan := make(chan int)
@@ -226,7 +230,7 @@ func TestGetPreferredAllocation(t *testing.T) {
 		callbackChan <- callbackCount
 	})
 	defer func() {
-		err := ecleanup(logger, p, e)
+		err := ecleanup(tCtx.Logger(), p, e)
 		require.NoError(t, err)
 	}()
 

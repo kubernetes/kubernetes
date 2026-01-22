@@ -423,8 +423,8 @@ func Test_getLocalDetectors(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			logger, _ := ktesting.NewTestContext(t)
-			r := getLocalDetectors(logger, c.primaryIPFamily, c.config, c.nodePodCIDRs)
+			tCtx := ktesting.Init(t)
+			r := getLocalDetectors(tCtx.Logger(), c.primaryIPFamily, c.config, c.nodePodCIDRs)
 			if !reflect.DeepEqual(r, c.expected) {
 				t.Errorf("Unexpected detect-local implementation, expected: %q, got: %q", c.expected, r)
 			}
@@ -512,7 +512,7 @@ detectLocalMode: "BridgeInterface"`)
 	}
 
 	for _, tc := range testCases {
-		_, ctx := ktesting.NewTestContext(t)
+		tCtx := ktesting.Init(t)
 		file, tempDir, err := setUp()
 		if err != nil {
 			t.Fatalf("unexpected error when setting up environment: %v", err)
@@ -528,7 +528,7 @@ detectLocalMode: "BridgeInterface"`)
 
 		errCh := make(chan error, 1)
 		go func() {
-			errCh <- opt.runLoop(ctx)
+			errCh <- opt.runLoop(tCtx)
 		}()
 
 		if tc.append {

@@ -122,7 +122,7 @@ func TestPodCalculateAffinity(t *testing.T) {
 		},
 	}
 
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
 
 	for _, tc := range tcases {
 		podScope := &podScope{
@@ -133,7 +133,7 @@ func TestPodCalculateAffinity(t *testing.T) {
 			},
 		}
 
-		podScope.calculateAffinity(logger, &v1.Pod{})
+		podScope.calculateAffinity(tCtx.Logger(), &v1.Pod{})
 		actual := podScope.policy.(*mockPolicy).ph
 		if !reflect.DeepEqual(tc.expected, actual) {
 			t.Errorf("Test Case: %s", tc.name)
@@ -257,7 +257,7 @@ func TestPodAccumulateProvidersHints(t *testing.T) {
 		},
 	}
 
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
 
 	for _, tc := range tcases {
 		pScope := podScope{
@@ -265,7 +265,7 @@ func TestPodAccumulateProvidersHints(t *testing.T) {
 				hintProviders: tc.hp,
 			},
 		}
-		actual := pScope.accumulateProvidersHints(logger, &v1.Pod{})
+		actual := pScope.accumulateProvidersHints(tCtx.Logger(), &v1.Pod{})
 		if !reflect.DeepEqual(actual, tc.expected) {
 			t.Errorf("Test Case %s: Expected NUMANodeAffinity in result to be %v, got %v", tc.name, tc.expected, actual)
 		}

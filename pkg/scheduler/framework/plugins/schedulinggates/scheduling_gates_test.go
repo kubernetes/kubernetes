@@ -49,13 +49,14 @@ func TestPreEnqueue(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
-			p, err := New(ctx, nil, nil, feature.Features{})
+			tCtx := ktesting.Init(t)
+
+			p, err := New(tCtx, nil, nil, feature.Features{})
 			if err != nil {
 				t.Fatalf("Creating plugin: %v", err)
 			}
 
-			got := p.(fwk.PreEnqueuePlugin).PreEnqueue(ctx, tt.pod)
+			got := p.(fwk.PreEnqueuePlugin).PreEnqueue(tCtx, tt.pod)
 			if diff := cmp.Diff(tt.want, got); diff != "" {
 				t.Errorf("unexpected status (-want, +got):\n%s", diff)
 			}
@@ -98,12 +99,13 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			logger, ctx := ktesting.NewTestContext(t)
-			p, err := New(ctx, nil, nil, feature.Features{})
+			tCtx := ktesting.Init(t)
+
+			p, err := New(tCtx, nil, nil, feature.Features{})
 			if err != nil {
 				t.Fatalf("Creating plugin: %v", err)
 			}
-			actualHint, err := p.(*SchedulingGates).isSchedulableAfterUpdatePodSchedulingGatesEliminated(logger, tc.pod, tc.oldObj, tc.newObj)
+			actualHint, err := p.(*SchedulingGates).isSchedulableAfterUpdatePodSchedulingGatesEliminated(tCtx.Logger(), tc.pod, tc.oldObj, tc.newObj)
 			if tc.expectedErr {
 				require.Error(t, err)
 				return

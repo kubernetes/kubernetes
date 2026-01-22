@@ -38,9 +38,10 @@ import (
 )
 
 func TestURLErrorNotExistNoUpdate(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	ch := make(chan sourceUpdate)
-	NewSourceURL(logger, "http://localhost:49575/_not_found_", http.Header{}, "localhost", time.Millisecond, ch)
+	NewSourceURL(tCtx.Logger(), "http://localhost:49575/_not_found_", http.Header{}, "localhost", time.Millisecond, ch)
 	select {
 	case got := <-ch:
 		t.Errorf("Expected no update, Got %#v", got)
@@ -49,17 +50,19 @@ func TestURLErrorNotExistNoUpdate(t *testing.T) {
 }
 
 func TestExtractFromHttpBadness(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	ch := make(chan sourceUpdate, 1)
 	c := sourceURL{"http://localhost:49575/_not_found_", http.Header{}, "other", ch, nil, 0, http.DefaultClient}
-	if err := c.extractFromURL(logger); err == nil {
+	if err := c.extractFromURL(tCtx.Logger()); err == nil {
 		t.Errorf("Expected error")
 	}
 	expectEmptyChannel(t, ch)
 }
 
 func TestExtractInvalidPods(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	var testCases = []struct {
 		desc string
 		pod  *v1.Pod
@@ -122,14 +125,15 @@ func TestExtractInvalidPods(t *testing.T) {
 		defer testServer.Close()
 		ch := make(chan sourceUpdate, 1)
 		c := sourceURL{testServer.URL, http.Header{}, "localhost", ch, nil, 0, http.DefaultClient}
-		if err := c.extractFromURL(logger); err == nil {
+		if err := c.extractFromURL(tCtx.Logger()); err == nil {
 			t.Errorf("%s: Expected error", testCase.desc)
 		}
 	}
 }
 
 func TestExtractPodsFromHTTP(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	nodeName := "different-value"
 
 	grace := int64(30)
@@ -304,7 +308,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 		defer testServer.Close()
 		ch := make(chan sourceUpdate, 1)
 		c := sourceURL{testServer.URL, http.Header{}, types.NodeName(nodeName), ch, nil, 0, http.DefaultClient}
-		if err := c.extractFromURL(logger); err != nil {
+		if err := c.extractFromURL(tCtx.Logger()); err != nil {
 			t.Errorf("%s: Unexpected error: %v", testCase.desc, err)
 			continue
 		}
@@ -327,6 +331,8 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 }
 
 func TestURLWithHeader(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "v1",
@@ -353,12 +359,11 @@ func TestURLWithHeader(t *testing.T) {
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
 
-	logger, _ := ktesting.NewTestContext(t)
 	ch := make(chan sourceUpdate, 1)
 	header := make(http.Header)
 	header.Set("Metadata-Flavor", "Google")
 	c := sourceURL{testServer.URL, header, "localhost", ch, nil, 0, http.DefaultClient}
-	if err := c.extractFromURL(logger); err != nil {
+	if err := c.extractFromURL(tCtx.Logger()); err != nil {
 		t.Fatalf("Unexpected error extracting from URL: %v", err)
 	}
 	update := <-ch

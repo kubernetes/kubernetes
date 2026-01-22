@@ -56,14 +56,16 @@ func TestNodeName(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+
 			nodeInfo := framework.NewNodeInfo()
 			nodeInfo.SetNode(test.node)
-			_, ctx := ktesting.NewTestContext(t)
-			p, err := New(ctx, nil, nil, feature.Features{})
+
+			p, err := New(tCtx, nil, nil, feature.Features{})
 			if err != nil {
 				t.Fatalf("creating plugin: %v", err)
 			}
-			gotStatus := p.(fwk.FilterPlugin).Filter(ctx, nil, test.pod, nodeInfo)
+			gotStatus := p.(fwk.FilterPlugin).Filter(tCtx, nil, test.pod, nodeInfo)
 			if diff := cmp.Diff(test.wantStatus, gotStatus); diff != "" {
 				t.Errorf("status does not match (-want,+got):\n%s", diff)
 			}

@@ -81,12 +81,14 @@ func TestNewHealthChecker(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+
 			mockClient := &mockWatchdogClient{
 				enabledVal: tt.mockEnabled,
 				enabledErr: tt.mockErr,
 			}
-			logger, _ := ktesting.NewTestContext(t)
-			_, err := NewHealthChecker(logger, WithWatchdogClient(mockClient))
+
+			_, err := NewHealthChecker(tCtx.Logger(), WithWatchdogClient(mockClient))
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewHealthChecker() error = %v, wantErr %v", err, tt.wantErr)
 			}

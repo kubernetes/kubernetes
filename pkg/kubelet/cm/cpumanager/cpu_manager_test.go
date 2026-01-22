@@ -290,7 +290,8 @@ func TestCPUManagerAdd(t *testing.T) {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsCPUAndMemoryAffinity, true)
 	}
 
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
 
 	testPolicy, _ := NewStaticPolicy(
 		logger,
@@ -562,7 +563,9 @@ func TestCPUManagerAddWithInitContainers(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		logger, _ := ktesting.NewTestContext(t)
+		tCtx := ktesting.Init(t)
+		logger := tCtx.Logger()
+
 		policy, _ := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, cpuset.New(), topologymanager.NewFakeManager(), nil)
 
 		mockState := &mockState{
@@ -726,7 +729,9 @@ func TestCPUManagerGenerate(t *testing.T) {
 			}
 			defer os.RemoveAll(sDir)
 
-			logger, _ := ktesting.NewTestContext(t)
+			tCtx := ktesting.Init(t)
+			logger := tCtx.Logger()
+
 			mgr, err := NewManager(logger, testCase.cpuPolicyName, nil, 5*time.Second, machineInfo, cpuset.New(), testCase.nodeAllocatableReservation, sDir, topologymanager.NewFakeManager())
 			if testCase.expectedError != nil {
 				if !strings.Contains(err.Error(), testCase.expectedError.Error()) {
@@ -754,7 +759,9 @@ func TestCPUManagerRemove(t *testing.T) {
 	containerID := "fakeID"
 	containerMap := containermap.NewContainerMap()
 
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	mgr := &manager{
 		policy: &mockPolicy{
 			err: nil,
@@ -799,7 +806,8 @@ func TestReconcileState(t *testing.T) {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsCPUAndMemoryAffinity, true)
 	}
 
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
 
 	testPolicy, _ := NewStaticPolicy(
 		logger,
@@ -1256,7 +1264,9 @@ func TestReconcileState(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		logger, _ := ktesting.NewTestContext(t)
+		tCtx := ktesting.Init(t)
+		logger := tCtx.Logger()
+
 		mgr := &manager{
 			policy: testCase.policy,
 			state: &mockState{
@@ -1330,7 +1340,9 @@ func TestCPUManagerAddWithResvList(t *testing.T) {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsCPUAndMemoryAffinity, true)
 	}
 
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	testPolicy, _ := NewStaticPolicy(
 		logger,
 		&topology.CPUTopology{
@@ -1463,7 +1475,9 @@ func TestCPUManagerHandlePolicyOptions(t *testing.T) {
 			}
 			defer os.RemoveAll(sDir)
 
-			logger, _ := ktesting.NewTestContext(t)
+			tCtx := ktesting.Init(t)
+			logger := tCtx.Logger()
+
 			_, err = NewManager(logger, testCase.cpuPolicyName, testCase.cpuPolicyOptions, 5*time.Second, machineInfo, cpuset.New(), nodeAllocatableReservation, sDir, topologymanager.NewFakeManager())
 			if err == nil {
 				t.Errorf("Expected error, but NewManager succeeded")
@@ -1477,7 +1491,9 @@ func TestCPUManagerHandlePolicyOptions(t *testing.T) {
 }
 
 func TestCPUManagerGetAllocatableCPUs(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	if runtime.GOOS == "windows" {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsCPUAndMemoryAffinity, true)
 	}

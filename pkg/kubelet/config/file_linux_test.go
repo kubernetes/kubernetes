@@ -43,19 +43,21 @@ import (
 )
 
 func TestExtractFromNonExistentFile(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	ch := make(chan sourceUpdate, 1)
 	lw := newSourceFile("/some/fake/file", "localhost", time.Millisecond, ch)
-	err := lw.doWatch(logger)
+	err := lw.doWatch(tCtx.Logger())
 	if err == nil {
 		t.Errorf("Expected error")
 	}
 }
 
 func TestUpdateOnNonExistentFile(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	ch := make(chan sourceUpdate)
-	NewSourceFile(logger, "random_non_existent_path", "localhost", time.Millisecond, ch)
+	NewSourceFile(tCtx.Logger(), "random_non_existent_path", "localhost", time.Millisecond, ch)
 	select {
 	case update := <-ch:
 		expected := createSourceUpdate() // Expect empty update.
@@ -69,7 +71,8 @@ func TestUpdateOnNonExistentFile(t *testing.T) {
 }
 
 func TestReadPodsFromFileExistAlready(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	hostname := types.NodeName("random-test-hostname")
 	var testCases = getTestCases(hostname)
 
@@ -83,7 +86,7 @@ func TestReadPodsFromFileExistAlready(t *testing.T) {
 			file := testCase.writeToFile(dirName, "test_pod_manifest", t)
 
 			ch := make(chan sourceUpdate)
-			NewSourceFile(logger, file, hostname, time.Millisecond, ch)
+			NewSourceFile(tCtx.Logger(), file, hostname, time.Millisecond, ch)
 			select {
 			case update := <-ch:
 				for _, pod := range update.Pods {
@@ -229,7 +232,9 @@ func createSymbolicLink(link, target, name string, t *testing.T) string {
 }
 
 func watchFileAdded(watchDir bool, symlink bool, t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	hostname := types.NodeName("random-test-hostname")
 	var testCases = getTestCases(hostname)
 
@@ -283,7 +288,9 @@ func watchFileAdded(watchDir bool, symlink bool, t *testing.T) {
 }
 
 func watchFileChanged(watchDir bool, symlink bool, period time.Duration, t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	hostname := types.NodeName("random-test-hostname")
 	var testCases = getTestCases(hostname)
 

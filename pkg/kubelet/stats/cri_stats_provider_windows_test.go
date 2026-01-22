@@ -424,7 +424,8 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 			skipped: true,
 		},
 	}
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// TODO: Remove skip once https://github.com/kubernetes/kubernetes/issues/116692 is fixed.
@@ -437,7 +438,7 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 				},
 				clock: fakeClock,
 			}
-			got, err := p.listContainerNetworkStats(logger)
+			got, err := p.listContainerNetworkStats(tCtx.Logger())
 			if (err != nil) != tt.wantErr {
 				t.Errorf("listContainerNetworkStats() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -524,8 +525,9 @@ func Test_criStatsProvider_makeWinContainerStats(t *testing.T) {
 		Uid:       "sb0-uid",
 	}
 
-	logger, _ := ktesting.NewTestContext(t)
-	got, err := p.makeWinContainerStats(logger, inputStats, inputContainer, inputRootFsInfo, make(map[string]*cadvisorapiv2.FsInfo), inputPodSandboxMetadata)
+	tCtx := ktesting.Init(t)
+
+	got, err := p.makeWinContainerStats(tCtx.Logger(), inputStats, inputContainer, inputRootFsInfo, make(map[string]*cadvisorapiv2.FsInfo), inputPodSandboxMetadata)
 
 	expected := &statsapi.ContainerStats{
 		Name:      "c0",

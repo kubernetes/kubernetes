@@ -40,8 +40,9 @@ func TestDefaultBinder(t *testing.T) {
 			testCtx := testutil.InitTestSchedulerWithOptions(t, testutil.InitTestAPIServer(t, "", nil), 0)
 			testutil.SyncSchedulerInformerFactory(testCtx)
 			if testCtx.Scheduler.APIDispatcher != nil {
-				logger, _ := ktesting.NewTestContext(t)
-				testCtx.Scheduler.APIDispatcher.Run(logger)
+				tCtx := ktesting.Init(t)
+
+				testCtx.Scheduler.APIDispatcher.Run(tCtx.Logger())
 				defer testCtx.Scheduler.APIDispatcher.Close()
 			}
 

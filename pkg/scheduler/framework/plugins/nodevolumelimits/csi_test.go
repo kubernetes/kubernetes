@@ -650,13 +650,14 @@ func TestCSILimits(t *testing.T) {
 				randomVolumeIDPrefix: rand.String(32),
 				translator:           csiTranslator,
 			}
-			_, ctx := ktesting.NewTestContext(t)
-			_, gotPreFilterStatus := p.PreFilter(ctx, nil, test.newPod, nil)
+			tCtx := ktesting.Init(t)
+
+			_, gotPreFilterStatus := p.PreFilter(tCtx, nil, test.newPod, nil)
 			if diff := cmp.Diff(test.wantPreFilterStatus, gotPreFilterStatus, statusCmpOpts...); diff != "" {
 				t.Errorf("PreFilter status does not match (-want, +got):\n%s", diff)
 			}
 			if gotPreFilterStatus.Code() != fwk.Skip {
-				gotStatus := p.Filter(ctx, nil, test.newPod, node)
+				gotStatus := p.Filter(tCtx, nil, test.newPod, node)
 				if diff := cmp.Diff(test.wantStatus, gotStatus, statusCmpOpts...); diff != "" {
 					t.Errorf("Filter status does not match (-want, +got):\n%s", diff)
 				}
@@ -718,8 +719,9 @@ func TestCSILimitsQHint(t *testing.T) {
 				randomVolumeIDPrefix: rand.String(32),
 				translator:           csitrans.New(),
 			}
-			logger, _ := ktesting.NewTestContext(t)
-			qhint, err := p.isSchedulableAfterPodDeleted(logger, test.newPod, test.deletedPod, nil)
+			tCtx := ktesting.Init(t)
+
+			qhint, err := p.isSchedulableAfterPodDeleted(tCtx.Logger(), test.newPod, test.deletedPod, nil)
 			if err != nil {
 				t.Errorf("isSchedulableAfterPodDeleted failed: %v", err)
 			}
@@ -794,9 +796,9 @@ func TestCSILimitsAddedPVCQHint(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.test, func(t *testing.T) {
 			p := &CSILimits{}
-			logger, _ := ktesting.NewTestContext(t)
+			tCtx := ktesting.Init(t)
 
-			qhint, err := p.isSchedulableAfterPVCAdded(logger, test.newPod, nil, test.addedPvc)
+			qhint, err := p.isSchedulableAfterPVCAdded(tCtx.Logger(), test.newPod, nil, test.addedPvc)
 			if err != nil {
 				t.Errorf("isSchedulableAfterPVCAdded failed: %v", err)
 			}
@@ -967,9 +969,9 @@ func TestCSILimitsDeletedVolumeAttachmentQHint(t *testing.T) {
 				pvcLister:  pvcList,
 				translator: csitrans.New(),
 			}
-			logger, _ := ktesting.NewTestContext(t)
+			tCtx := ktesting.Init(t)
 
-			qhint, err := p.isSchedulableAfterVolumeAttachmentDeleted(logger, test.newPod, test.deletedVA, nil)
+			qhint, err := p.isSchedulableAfterVolumeAttachmentDeleted(tCtx.Logger(), test.newPod, test.deletedVA, nil)
 			if err != nil {
 				t.Errorf("isSchedulableAfterVolumeAttachmentDeleted failed: %v", err)
 			}
@@ -985,7 +987,7 @@ func TestCSILimitsAfterCSINodeUpdatedQHint(t *testing.T) {
 	testPod := st.MakePod().Name("test-pod").Namespace("ns1").
 		PVC("csi-ebs.csi.aws.com-0").Obj()
 
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
 
 	tests := []struct {
 		name       string
@@ -1063,7 +1065,7 @@ func TestCSILimitsAfterCSINodeUpdatedQHint(t *testing.T) {
 					Drivers: tt.newDrivers,
 				},
 			}
-			qhint, err := p.isSchedulableAfterCSINodeUpdated(logger, testPod, oldCSINode, newCSINode)
+			qhint, err := p.isSchedulableAfterCSINodeUpdated(tCtx.Logger(), testPod, oldCSINode, newCSINode)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -1343,13 +1345,13 @@ func TestVolumeLimitScalingGate(t *testing.T) {
 				translator:               csiTranslator,
 			}
 
-			_, ctx := ktesting.NewTestContext(t)
+			tCtx := ktesting.Init(t)
 			// Ensure PreFilter doesn't skip
-			_, preStatus := p.PreFilter(ctx, nil, newPod, nil)
+			_, preStatus := p.PreFilter(tCtx, nil, newPod, nil)
 			if preStatus.Code() == fwk.Skip {
 				t.Fatalf("unexpected PreFilter Skip")
 			}
-			gotStatus := p.Filter(ctx, nil, newPod, node)
+			gotStatus := p.Filter(tCtx, nil, newPod, node)
 
 			if diff := cmp.Diff(tt.wantStatus, gotStatus, statusCmpOpts...); diff != "" {
 				t.Errorf("Filter status does not match (-want, +got):\n%s", diff)

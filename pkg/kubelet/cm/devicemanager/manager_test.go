@@ -96,18 +96,21 @@ func tmpSocketDir() (socketDir, socketName, pluginSocketName string, err error) 
 }
 
 func TestNewManagerImpl(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	socketDir, socketName, _, err := tmpSocketDir()
 	topologyStore := topologymanager.NewFakeManager()
 	require.NoError(t, err)
 	defer os.RemoveAll(socketDir)
-	_, err = newManagerImpl(logger, socketName, nil, topologyStore)
+	_, err = newManagerImpl(tCtx.Logger(), socketName, nil, topologyStore)
 	require.NoError(t, err)
 	os.RemoveAll(socketDir)
 }
 
 func TestNewManagerImplStart(t *testing.T) {
-	logger, tCtx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	socketDir, socketName, pluginSocketName, err := tmpSocketDir()
 	require.NoError(t, err)
 	defer os.RemoveAll(socketDir)
@@ -120,12 +123,13 @@ func TestNewManagerImplStart(t *testing.T) {
 }
 
 func TestNewManagerImplStartProbeMode(t *testing.T) {
-	logger, tCtx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	socketDir, socketName, pluginSocketName, err := tmpSocketDir()
 	require.NoError(t, err)
 	defer os.RemoveAll(socketDir)
 	m, _, p, _ := setupInProbeMode(tCtx, t, []*pluginapi.Device{}, func(_ klog.Logger, n string, d []*pluginapi.Device) {}, socketName, pluginSocketName)
-	err = cleanup(logger, m, p)
+	err = cleanup(tCtx.Logger(), m, p)
 	require.NoError(t, err)
 }
 
@@ -133,7 +137,9 @@ func TestNewManagerImplStartProbeMode(t *testing.T) {
 // making sure that after registration, devices are correctly updated and if a re-registration
 // happens, we will NOT delete devices; and no orphaned devices left.
 func TestDevicePluginReRegistration(t *testing.T) {
-	logger, tCtx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	// TODO: Remove skip once https://github.com/kubernetes/kubernetes/pull/115269 merges.
 	if goruntime.GOOS == "windows" {
 		t.Skip("Skipping test on Windows.")
@@ -215,7 +221,9 @@ func TestDevicePluginReRegistration(t *testing.T) {
 // While testing above scenario, plugin discovery and registration will be done using
 // Kubelet probe based mechanism
 func TestDevicePluginReRegistrationProbeMode(t *testing.T) {
-	logger, tCtx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	// TODO: Remove skip once https://github.com/kubernetes/kubernetes/pull/115269 merges.
 	if goruntime.GOOS == "windows" {
 		t.Skip("Skipping test on Windows.")
@@ -362,7 +370,9 @@ func cleanup(logger klog.Logger, m Manager, p *plugin.Stub) error {
 }
 
 func TestUpdateCapacityAllocatable(t *testing.T) {
-	logger, tCtx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	socketDir, socketName, _, err := tmpSocketDir()
 	topologyStore := topologymanager.NewFakeManager()
 	require.NoError(t, err)
@@ -506,7 +516,9 @@ func TestUpdateCapacityAllocatable(t *testing.T) {
 }
 
 func TestGetAllocatableDevicesMultipleResources(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	socketDir, socketName, _, err := tmpSocketDir()
 	topologyStore := topologymanager.NewFakeManager()
 	require.NoError(t, err)
@@ -548,7 +560,9 @@ func TestGetAllocatableDevicesMultipleResources(t *testing.T) {
 }
 
 func TestGetAllocatableDevicesHealthTransition(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	socketDir, socketName, _, err := tmpSocketDir()
 	topologyStore := topologymanager.NewFakeManager()
 	require.NoError(t, err)
@@ -693,7 +707,9 @@ func (b *containerAllocateResponseBuilder) Build() *pluginapi.ContainerAllocateR
 }
 
 func TestCheckpoint(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	resourceName1 := "domain1.com/resource1"
 	resourceName2 := "domain2.com/resource2"
 	resourceName3 := "domain2.com/resource3"
@@ -1702,7 +1718,8 @@ func TestDevicePreStartContainer(t *testing.T) {
 }
 
 func TestResetExtendedResource(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	as := assert.New(t)
 	tmpDir, err := os.MkdirTemp("", "checkpoint")
 	as.NoError(err)
@@ -1730,7 +1747,7 @@ func TestResetExtendedResource(t *testing.T) {
 	testManager.healthyDevices[extendedResourceName] = sets.New[string]()
 	testManager.healthyDevices[extendedResourceName].Insert("dev1")
 	// checkpoint is present, indicating node hasn't been recreated
-	err = testManager.writeCheckpoint(logger)
+	err = testManager.writeCheckpoint(tCtx.Logger())
 	require.NoError(t, err)
 
 	as.False(testManager.ShouldResetExtendedResourceCapacity())
@@ -1809,7 +1826,9 @@ func makeDevice(devOnNUMA checkpoint.DevicesPerNUMA, topology bool) map[string]*
 }
 
 func TestGetTopologyHintsWithUpdates(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	socketDir, socketName, _, err := tmpSocketDir()
 	defer os.RemoveAll(socketDir)
 	require.NoError(t, err)
@@ -1892,7 +1911,8 @@ func TestGetTopologyHintsWithUpdates(t *testing.T) {
 	}
 }
 func TestUpdateAllocatedResourcesStatus(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	podUID := "test-pod-uid"
 	containerName := "test-container"
 	resourceName := "test-resource"
@@ -1931,7 +1951,7 @@ func TestUpdateAllocatedResourcesStatus(t *testing.T) {
 		),
 	)
 
-	testManager.genericDeviceUpdateCallback(logger, resourceName, []*pluginapi.Device{
+	testManager.genericDeviceUpdateCallback(tCtx.Logger(), resourceName, []*pluginapi.Device{
 		{ID: "dev1", Health: pluginapi.Healthy},
 		{ID: "dev2", Health: pluginapi.Unhealthy},
 	})
@@ -1996,7 +2016,9 @@ func sortContainerStatuses(statuses []v1.ContainerStatus) {
 }
 
 func TestFeatureGateResourceHealthStatus(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	tmpDir, err := os.MkdirTemp("", "checkpoint")
 	require.NoError(t, err, "err should be nil")
 	defer func() {
@@ -2143,7 +2165,9 @@ func TestAdmitPodWithDRAResources(t *testing.T) {
 // devices from that endpoint as unhealthy. It ensures that the healthyDevices
 // and unhealthyDevices maps are in sync with the plugin endpoint info.
 func TestEndpointSyncOnDisconnect(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	socketDir, socketName, _, err := tmpSocketDir()
 	require.NoError(t, err)
 	defer func() {

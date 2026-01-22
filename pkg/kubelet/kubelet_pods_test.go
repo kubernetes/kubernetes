@@ -396,7 +396,8 @@ func buildService(name, namespace, clusterIP, protocol string, port int) *v1.Ser
 }
 
 func TestMakeEnvironmentVariables(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	trueVal := true
 	services := []*v1.Service{
 		buildService("kubernetes", metav1.NamespaceDefault, "1.2.3.1", "TCP", 8081),
@@ -2036,7 +2037,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 				testPod.Annotations[kubetypes.ConfigSourceAnnotationKey] = "file"
 			}
 
-			result, err := kl.makeEnvironmentVariables(logger, testPod, tc.container, podIP, tc.podIPs, kubecontainer.VolumeMap{})
+			result, err := kl.makeEnvironmentVariables(tCtx.Logger(), testPod, tc.container, podIP, tc.podIPs, kubecontainer.VolumeMap{})
 			select {
 			case e := <-fakeRecorder.Events:
 				assert.Equal(t, tc.expectedEvent, e)
@@ -2206,7 +2207,8 @@ func withRestartCount(status v1.ContainerStatus, restartCount int32) v1.Containe
 }
 
 func TestPodPhaseWithRestartAlways(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	desiredState := v1.PodSpec{
 		NodeName: "machine",
 		Containers: []v1.Container{
@@ -2341,13 +2343,14 @@ func TestPodPhaseWithRestartAlways(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		status := getPhase(logger, test.pod, test.pod.Status.ContainerStatuses, test.podIsTerminal, false)
+		status := getPhase(tCtx.Logger(), test.pod, test.pod.Status.ContainerStatuses, test.podIsTerminal, false)
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
 
 func TestPodPhaseWithRestartAlwaysInitContainers(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	desiredState := v1.PodSpec{
 		NodeName: "machine",
 		InitContainers: []v1.Container{
@@ -2446,13 +2449,14 @@ func TestPodPhaseWithRestartAlwaysInitContainers(t *testing.T) {
 	for _, test := range tests {
 		statusInfo := test.pod.Status.InitContainerStatuses
 		statusInfo = append(statusInfo, test.pod.Status.ContainerStatuses...)
-		status := getPhase(logger, test.pod, statusInfo, false, false)
+		status := getPhase(tCtx.Logger(), test.pod, statusInfo, false, false)
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
 
 func TestPodPhaseWithRestartAlwaysRestartableInitContainers(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	desiredState := v1.PodSpec{
 		NodeName: "machine",
 		InitContainers: []v1.Container{
@@ -2690,13 +2694,14 @@ func TestPodPhaseWithRestartAlwaysRestartableInitContainers(t *testing.T) {
 	for _, test := range tests {
 		statusInfo := test.pod.Status.InitContainerStatuses
 		statusInfo = append(statusInfo, test.pod.Status.ContainerStatuses...)
-		status := getPhase(logger, test.pod, statusInfo, test.podIsTerminal, test.podHasInitialized)
+		status := getPhase(tCtx.Logger(), test.pod, statusInfo, test.podIsTerminal, test.podHasInitialized)
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
 
 func TestPodPhaseWithRestartAlwaysAndPodHasRun(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	desiredState := v1.PodSpec{
 		NodeName: "machine",
 		InitContainers: []v1.Container{
@@ -2804,13 +2809,14 @@ func TestPodPhaseWithRestartAlwaysAndPodHasRun(t *testing.T) {
 	for _, test := range tests {
 		statusInfo := test.pod.Status.InitContainerStatuses
 		statusInfo = append(statusInfo, test.pod.Status.ContainerStatuses...)
-		status := getPhase(logger, test.pod, statusInfo, false, test.podHasInitialized)
+		status := getPhase(tCtx.Logger(), test.pod, statusInfo, false, test.podHasInitialized)
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
 
 func TestPodPhaseWithRestartNever(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	desiredState := v1.PodSpec{
 		NodeName: "machine",
 		Containers: []v1.Container{
@@ -2905,13 +2911,14 @@ func TestPodPhaseWithRestartNever(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		status := getPhase(logger, test.pod, test.pod.Status.ContainerStatuses, false, false)
+		status := getPhase(tCtx.Logger(), test.pod, test.pod.Status.ContainerStatuses, false, false)
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
 
 func TestPodPhaseWithRestartNeverInitContainers(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	desiredState := v1.PodSpec{
 		NodeName: "machine",
 		InitContainers: []v1.Container{
@@ -3010,13 +3017,14 @@ func TestPodPhaseWithRestartNeverInitContainers(t *testing.T) {
 	for _, test := range tests {
 		statusInfo := test.pod.Status.InitContainerStatuses
 		statusInfo = append(statusInfo, test.pod.Status.ContainerStatuses...)
-		status := getPhase(logger, test.pod, statusInfo, false, false)
+		status := getPhase(tCtx.Logger(), test.pod, statusInfo, false, false)
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
 
 func TestPodPhaseWithRestartNeverRestartableInitContainers(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	desiredState := v1.PodSpec{
 		NodeName: "machine",
 		InitContainers: []v1.Container{
@@ -3223,13 +3231,14 @@ func TestPodPhaseWithRestartNeverRestartableInitContainers(t *testing.T) {
 	for _, test := range tests {
 		statusInfo := test.pod.Status.InitContainerStatuses
 		statusInfo = append(statusInfo, test.pod.Status.ContainerStatuses...)
-		status := getPhase(logger, test.pod, statusInfo, false, test.podHasInitialized)
+		status := getPhase(tCtx.Logger(), test.pod, statusInfo, false, test.podHasInitialized)
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
 
 func TestPodPhaseWithRestartOnFailure(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	desiredState := v1.PodSpec{
 		NodeName: "machine",
 		Containers: []v1.Container{
@@ -3337,13 +3346,14 @@ func TestPodPhaseWithRestartOnFailure(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		status := getPhase(logger, test.pod, test.pod.Status.ContainerStatuses, false, false)
+		status := getPhase(tCtx.Logger(), test.pod, test.pod.Status.ContainerStatuses, false, false)
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
 
 func TestPodPhaseWithContainerRestartPolicy(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	var (
 		containerRestartPolicyAlways    = v1.ContainerRestartPolicyAlways
 		containerRestartPolicyOnFailure = v1.ContainerRestartPolicyOnFailure
@@ -3468,14 +3478,15 @@ func TestPodPhaseWithContainerRestartPolicy(t *testing.T) {
 					ContainerStatuses: tc.statuses,
 				},
 			}
-			phase := getPhase(logger, pod, tc.statuses, tc.podIsTerminal, true)
+			phase := getPhase(tCtx.Logger(), pod, tc.statuses, tc.podIsTerminal, true)
 			assert.Equal(t, tc.expectedPhase, phase)
 		})
 	}
 }
 
 func TestPodPhaseWithContainerRestartPolicyInitContainers(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	var (
 		containerRestartPolicyAlways    = v1.ContainerRestartPolicyAlways
 		containerRestartPolicyOnFailure = v1.ContainerRestartPolicyOnFailure
@@ -3542,14 +3553,15 @@ func TestPodPhaseWithContainerRestartPolicyInitContainers(t *testing.T) {
 					ContainerStatuses: tc.statuses,
 				},
 			}
-			phase := getPhase(logger, pod, tc.statuses, tc.podIsTerminal, true)
+			phase := getPhase(tCtx.Logger(), pod, tc.statuses, tc.podIsTerminal, true)
 			assert.Equal(t, tc.expectedPhase, phase)
 		})
 	}
 }
 
 func TestPodPhaseWithRestartAllContainers(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 		features.ContainerRestartRules:                true,
 		features.NodeDeclaredFeatures:                 true,
@@ -3794,7 +3806,7 @@ func TestPodPhaseWithRestartAllContainers(t *testing.T) {
 					ContainerStatuses: tc.statuses,
 				},
 			}
-			phase := getPhase(logger, pod, tc.statuses, false, true)
+			phase := getPhase(tCtx.Logger(), pod, tc.statuses, false, true)
 			assert.Equal(t, tc.expectedPhase, phase)
 		})
 	}
@@ -4857,12 +4869,13 @@ func Test_generateAPIPodStatus(t *testing.T) {
 	for _, test := range tests {
 		for _, enablePodReadyToStartContainersCondition := range []bool{false, true} {
 			t.Run(test.name, func(t *testing.T) {
-				logger, tCtx := ktesting.NewTestContext(t)
+				tCtx := ktesting.Init(t)
+
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodReadyToStartContainersCondition, enablePodReadyToStartContainersCondition)
 				testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 				defer testKubelet.Cleanup()
 				kl := testKubelet.kubelet
-				kl.statusManager.SetPodStatus(logger, test.pod, test.previousStatus)
+				kl.statusManager.SetPodStatus(tCtx.Logger(), test.pod, test.previousStatus)
 				for _, name := range test.unreadyContainer {
 					kl.readinessManager.Set(kubecontainer.BuildContainerID("", findContainerStatusByName(test.expected, name).ContainerID), results.Failure, test.pod)
 				}
@@ -4979,13 +4992,13 @@ func Test_generateAPIPodStatusForInPlaceVPAEnabled(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			logger, tCtx := ktesting.NewTestContext(t)
+			tCtx := ktesting.Init(t)
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 			defer testKubelet.Cleanup()
 			kl := testKubelet.kubelet
 
 			oldStatus := test.pod.Status
-			kl.statusManager.SetPodStatus(logger, test.pod, oldStatus)
+			kl.statusManager.SetPodStatus(tCtx.Logger(), test.pod, oldStatus)
 			actual := kl.generateAPIPodStatus(tCtx, test.pod, &testKubecontainerPodStatus /* criStatus */, false /* test.isPodTerminal */)
 			for _, c := range actual.Conditions {
 				if c.Type == v1.PodResizePending || c.Type == v1.PodResizeInProgress {
@@ -5154,7 +5167,8 @@ func TestGetPortForward(t *testing.T) {
 }
 
 func TestTruncatePodHostname(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	for c, test := range map[string]struct {
 		input  string
 		output string
@@ -5177,7 +5191,7 @@ func TestTruncatePodHostname(t *testing.T) {
 		},
 	} {
 		t.Logf("TestCase: %q", c)
-		output, err := truncatePodHostnameIfNeeded(logger, "test-pod", test.input)
+		output, err := truncatePodHostnameIfNeeded(tCtx.Logger(), "test-pod", test.input)
 		assert.NoError(t, err)
 		assert.Equal(t, test.output, output)
 	}
@@ -7516,7 +7530,8 @@ func testMetric(t *testing.T, metricName string, expectedMetric string) {
 }
 
 func TestGetNonExistentImagePullSecret(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	secrets := make([]*v1.Secret, 0)
 	fakeRecorder := record.NewFakeRecorder(1)
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
@@ -7539,7 +7554,7 @@ func TestGetNonExistentImagePullSecret(t *testing.T) {
 		},
 	}
 
-	pullSecrets := testKubelet.kubelet.getPullSecretsForPod(logger, testPod)
+	pullSecrets := testKubelet.kubelet.getPullSecretsForPod(tCtx.Logger(), testPod)
 	assert.Empty(t, pullSecrets)
 
 	assert.Len(t, fakeRecorder.Events, 1)
@@ -7770,7 +7785,8 @@ func (tvm *testVolumeMounter) GetPath() string {
 }
 
 func TestMakeEnvironmentVariablesWithFileKeyRef(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	// Create a temporary directory for test files
 	tmpDir, err := os.MkdirTemp("", "filekeyref-test")
 	require.NoError(t, err)
@@ -8126,7 +8142,7 @@ func TestMakeEnvironmentVariablesWithFileKeyRef(t *testing.T) {
 				},
 			}
 
-			envs, err := kl.makeEnvironmentVariables(logger, pod, tc.container, "192.168.1.1", []string{"192.168.1.1"}, tc.podVolumes)
+			envs, err := kl.makeEnvironmentVariables(tCtx.Logger(), pod, tc.container, "192.168.1.1", []string{"192.168.1.1"}, tc.podVolumes)
 
 			if tc.expectedError {
 				require.Error(t, err)
@@ -8153,7 +8169,8 @@ func (e Envs) Swap(i, j int)      { e[i], e[j] = e[j], e[i] }
 func (e Envs) Less(i, j int) bool { return e[i].Name < e[j].Name }
 
 func TestGeneratePodHostNameAndDomain(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	kubelet := &Kubelet{}
 	kubelet.dnsConfigurer = &dns.Configurer{
 		ClusterDomain: "cluster.local",
@@ -8287,7 +8304,7 @@ func TestGeneratePodHostNameAndDomain(t *testing.T) {
 				},
 			}
 
-			hostname, domain, err := kubelet.GeneratePodHostNameAndDomain(logger, pod)
+			hostname, domain, err := kubelet.GeneratePodHostNameAndDomain(tCtx.Logger(), pod)
 			if tc.expectError {
 				if err == nil {
 					t.Errorf("expected an error but got none")

@@ -600,7 +600,7 @@ func TestLazyInformerManager_ensureManagerSet(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			logger, loggerCtx := ktesting.NewTestContext(t)
+			tCtx := ktesting.Init(t)
 
 			fakeDisc := fakeDiscovery{
 				err:         tt.injectError,
@@ -620,8 +620,8 @@ func TestLazyInformerManager_ensureManagerSet(t *testing.T) {
 				managerLock:       sync.RWMutex{},
 				client:            NewFakeClientset(fakeDisc),
 				cacheSize:         128,
-				contextWithLogger: loggerCtx,
-				logger:            logger,
+				contextWithLogger: tCtx,
+				logger:            tCtx.Logger(),
 			}
 			if err := m.ensureManagerSet(); tt.wantError != (err != nil) {
 				t.Errorf("expected error: %t, got %v", tt.wantError, err)

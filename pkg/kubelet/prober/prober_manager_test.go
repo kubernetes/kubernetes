@@ -563,7 +563,9 @@ func (m *manager) extractedReadinessHandling(logger klog.Logger) {
 }
 
 func TestUpdateReadiness(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	testPod := getTestPod()
 	setTestProbe(testPod, readiness, v1.Probe{})
 	m := newTestManager()
@@ -584,7 +586,7 @@ func TestUpdateReadiness(t *testing.T) {
 
 	m.statusManager.SetPodStatus(logger, testPod, getTestRunningStatus())
 
-	m.AddPod(ctx, testPod)
+	m.AddPod(tCtx, testPod)
 	probePaths := []probeKey{{testPodUID, testContainerName, readiness}}
 	if err := expectProbes(m, probePaths); err != nil {
 		t.Error(err)

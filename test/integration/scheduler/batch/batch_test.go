@@ -496,7 +496,7 @@ type batchGetter interface {
 }
 
 func runScenario(t *testing.T, tt *scenario, batch bool) ([]*v1.Pod, []bool) {
-	_, tCtx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
 
 	cfg, err := newDefaultComponentConfig()
 	if err != nil {

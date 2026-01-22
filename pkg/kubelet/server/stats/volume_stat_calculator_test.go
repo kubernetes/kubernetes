@@ -105,7 +105,8 @@ var (
 )
 
 func TestPVCRef(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	// Setup mock stats provider
 	mockStats := statstest.NewMockProvider(t)
 	volumes := map[string]volume.Volume{vol0: &fakeVolume{}, vol1: &fakeVolume{}, vol3: &fakeVolume{}}
@@ -120,7 +121,7 @@ func TestPVCRef(t *testing.T) {
 
 	// Calculate stats for pod
 	statsCalculator := newVolumeStatCalculator(mockStats, time.Minute, fakePod, &fakeEventRecorder)
-	statsCalculator.calcAndStoreStats(logger)
+	statsCalculator.calcAndStoreStats(tCtx.Logger())
 	vs, _ := statsCalculator.GetLatest()
 
 	assert.Len(t, append(vs.EphemeralVolumes, vs.PersistentVolumes...), 4)
@@ -163,7 +164,8 @@ func TestPVCRef(t *testing.T) {
 }
 
 func TestNormalVolumeEvent(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	mockStats := statstest.NewMockProvider(t)
 
 	volumes := map[string]volume.Volume{vol0: &fakeVolume{}, vol1: &fakeVolume{}}
@@ -178,7 +180,7 @@ func TestNormalVolumeEvent(t *testing.T) {
 
 	// Calculate stats for pod
 	statsCalculator := newVolumeStatCalculator(mockStats, time.Minute, fakePod, &fakeEventRecorder)
-	statsCalculator.calcAndStoreStats(logger)
+	statsCalculator.calcAndStoreStats(tCtx.Logger())
 
 	event, err := WatchEvent(eventStore)
 	assert.Error(t, err)
@@ -186,7 +188,8 @@ func TestNormalVolumeEvent(t *testing.T) {
 }
 
 func TestAbnormalVolumeEvent(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeHealth, true)
 
 	// Setup mock stats provider
@@ -207,7 +210,7 @@ func TestAbnormalVolumeEvent(t *testing.T) {
 		volumeCondition.Abnormal = true
 	}
 	statsCalculator := newVolumeStatCalculator(mockStats, time.Minute, fakePod, &fakeEventRecorder)
-	statsCalculator.calcAndStoreStats(logger)
+	statsCalculator.calcAndStoreStats(tCtx.Logger())
 
 	event, err := WatchEvent(eventStore)
 	assert.NoError(t, err)

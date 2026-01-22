@@ -1398,7 +1398,7 @@ func BenchmarkTestFitScore(b *testing.B) {
 
 	for _, test := range tests {
 		b.Run(test.name, func(b *testing.B) {
-			_, ctx := ktesting.NewTestContext(b)
+			tCtx := ktesting.Init(b)
 			existingPods := []*v1.Pod{
 				st.MakePod().Node("node1").Req(map[v1.ResourceName]string{"cpu": "2000", "memory": "4000"}).Obj(),
 			}
@@ -1407,7 +1407,7 @@ func BenchmarkTestFitScore(b *testing.B) {
 			}
 			state := framework.NewCycleState()
 			var nodeResourcesFunc = runtime.FactoryAdapter(plfeature.Features{}, NewFit)
-			pl := plugintesting.SetupPlugin(ctx, b, nodeResourcesFunc, &test.nodeResourcesFitArgs, cache.NewSnapshot(existingPods, nodes))
+			pl := plugintesting.SetupPlugin(tCtx, b, nodeResourcesFunc, &test.nodeResourcesFitArgs, cache.NewSnapshot(existingPods, nodes))
 			p := pl.(*Fit)
 			nodeInfo, err := p.handle.SnapshotSharedLister().NodeInfos().Get(nodes[0].Name)
 			if err != nil {
@@ -1418,7 +1418,7 @@ func BenchmarkTestFitScore(b *testing.B) {
 
 			requestedPod := st.MakePod().Req(map[v1.ResourceName]string{"cpu": "1000", "memory": "2000"}).Obj()
 			for i := 0; i < b.N; i++ {
-				_, status := p.Score(ctx, state, requestedPod, nodeInfo)
+				_, status := p.Score(tCtx, state, requestedPod, nodeInfo)
 				if !status.IsSuccess() {
 					b.Errorf("unexpected status: %v", status)
 				}
@@ -1481,8 +1481,8 @@ func TestEventsToRegister(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			fp := &Fit{enableInPlacePodVerticalScaling: test.enableInPlacePodVerticalScaling, enableSchedulingQueueHint: test.enableSchedulingQueueHint, enableDRAExtendedResource: test.enableDRAExtendedResource}
-			_, ctx := ktesting.NewTestContext(t)
-			actualClusterEvents, err := fp.EventsToRegister(ctx)
+			tCtx := ktesting.Init(t)
+			actualClusterEvents, err := fp.EventsToRegister(tCtx)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1597,14 +1597,15 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			logger, ctx := ktesting.NewTestContext(t)
-			p, err := NewFit(ctx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, nil, plfeature.Features{
+			tCtx := ktesting.Init(t)
+
+			p, err := NewFit(tCtx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, nil, plfeature.Features{
 				EnableInPlacePodVerticalScaling: tc.enableInPlacePodVerticalScaling,
 			})
 			if err != nil {
 				t.Fatal(err)
 			}
-			actualHint, err := p.(*Fit).isSchedulableAfterPodEvent(logger, tc.pod, tc.oldObj, tc.newObj)
+			actualHint, err := p.(*Fit).isSchedulableAfterPodEvent(tCtx.Logger(), tc.pod, tc.oldObj, tc.newObj)
 			if tc.expectedErr {
 				require.Error(t, err)
 				return
@@ -1727,12 +1728,12 @@ func Test_isSchedulableAfterNodeChange(t *testing.T) {
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			logger, ctx := ktesting.NewTestContext(t)
-			p, err := NewFit(ctx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, nil, plfeature.Features{})
+			tCtx := ktesting.Init(t)
+			p, err := NewFit(tCtx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, nil, plfeature.Features{})
 			if err != nil {
 				t.Fatal(err)
 			}
-			actualHint, err := p.(*Fit).isSchedulableAfterNodeChange(logger, tc.pod, tc.oldObj, tc.newObj)
+			actualHint, err := p.(*Fit).isSchedulableAfterNodeChange(tCtx.Logger(), tc.pod, tc.oldObj, tc.newObj)
 			if tc.expectedErr {
 				require.Error(t, err)
 				return
@@ -1876,12 +1877,12 @@ func Test_isSchedulableAfterDeviceClassChange(t *testing.T) {
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			logger, ctx := ktesting.NewTestContext(t)
-			p, err := NewFit(ctx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, nil, plfeature.Features{})
+			tCtx := ktesting.Init(t)
+			p, err := NewFit(tCtx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, nil, plfeature.Features{})
 			if err != nil {
 				t.Fatal(err)
 			}
-			actualHint, err := p.(*Fit).isSchedulableAfterDeviceClassEvent(logger, tc.pod, tc.oldObj, tc.newObj)
+			actualHint, err := p.(*Fit).isSchedulableAfterDeviceClassEvent(tCtx.Logger(), tc.pod, tc.oldObj, tc.newObj)
 			if tc.expectedErr {
 				require.Error(t, err)
 				return
@@ -2235,10 +2236,10 @@ func TestFitSignPod(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
+			tCtx := ktesting.Init(t)
 
-			fh, _ := runtime.NewFramework(ctx, nil, nil)
-			p, err := NewFit(ctx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, fh, plfeature.Features{
+			fh, _ := runtime.NewFramework(tCtx, nil, nil)
+			p, err := NewFit(tCtx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, fh, plfeature.Features{
 				EnableDRAExtendedResource: test.enableDRAExtendedResource,
 			})
 			if err != nil {
@@ -2246,7 +2247,7 @@ func TestFitSignPod(t *testing.T) {
 			}
 
 			fit := p.(*Fit)
-			fragments, status := fit.SignPod(ctx, test.pod)
+			fragments, status := fit.SignPod(tCtx, test.pod)
 
 			if status.Code() != test.expectedStatusCode {
 				t.Errorf("unexpected status code, want: %v, got: %v, message: %v", test.expectedStatusCode, status.Code(), status.Message())

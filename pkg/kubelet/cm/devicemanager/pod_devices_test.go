@@ -158,7 +158,8 @@ func expectResourceDeviceInstances(t *testing.T, resp ResourceDeviceInstances, e
 }
 
 func TestDeviceRunContainerOptions(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	const (
 		podUID        = "pod"
 		containerName = "container"
@@ -241,7 +242,7 @@ func TestDeviceRunContainerOptions(t *testing.T) {
 					response,
 				)
 			}
-			opts := podDevices.deviceRunContainerOptions(logger, podUID, containerName)
+			opts := podDevices.deviceRunContainerOptions(tCtx.Logger(), podUID, containerName)
 
 			// The exact ordering of the options depends on the order of the resources in the map.
 			// We therefore use `ElementsMatch` instead of `Equal` on the member slices.

@@ -210,6 +210,8 @@ func TestCheckpointStateRestore(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+
 			// ensure there is no previous checkpoint
 			cpm.RemoveCheckpoint(testingCheckpoint)
 
@@ -220,8 +222,7 @@ func TestCheckpointStateRestore(t *testing.T) {
 				require.NoErrorf(t, err, "could not create testing checkpoint: %v", err)
 			}
 
-			logger, _ := ktesting.NewTestContext(t)
-			restoredState, err := NewCheckpointState(logger, testingDir, testingCheckpoint, tc.policyName, tc.initialContainers)
+			restoredState, err := NewCheckpointState(tCtx.Logger(), testingDir, testingCheckpoint, tc.policyName, tc.initialContainers)
 			if strings.TrimSpace(tc.expectedError) == "" {
 				require.NoError(t, err)
 			} else {
@@ -275,7 +276,9 @@ func TestCheckpointStateStore(t *testing.T) {
 			// ensure there is no previous checkpoint
 			cpm.RemoveCheckpoint(testingCheckpoint)
 
-			logger, _ := ktesting.NewTestContext(t)
+			tCtx := ktesting.Init(t)
+			logger := tCtx.Logger()
+
 			cs1, err := NewCheckpointState(logger, testingDir, testingCheckpoint, "none", nil)
 			if err != nil {
 				t.Fatalf("could not create testing checkpointState instance: %v", err)
@@ -346,11 +349,12 @@ func TestCheckpointStateHelpers(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+
 			// ensure there is no previous checkpoint
 			cpm.RemoveCheckpoint(testingCheckpoint)
 
-			logger, _ := ktesting.NewTestContext(t)
-			state, err := NewCheckpointState(logger, testingDir, testingCheckpoint, "none", nil)
+			state, err := NewCheckpointState(tCtx.Logger(), testingDir, testingCheckpoint, "none", nil)
 			if err != nil {
 				t.Fatalf("could not create testing checkpointState instance: %v", err)
 			}
@@ -392,6 +396,8 @@ func TestCheckpointStateClear(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+
 			// create temp dir
 			testingDir, err := os.MkdirTemp("", "cpumanager_state_test")
 			if err != nil {
@@ -399,8 +405,7 @@ func TestCheckpointStateClear(t *testing.T) {
 			}
 			defer os.RemoveAll(testingDir)
 
-			logger, _ := ktesting.NewTestContext(t)
-			state, err := NewCheckpointState(logger, testingDir, testingCheckpoint, "none", nil)
+			state, err := NewCheckpointState(tCtx.Logger(), testingDir, testingCheckpoint, "none", nil)
 			if err != nil {
 				t.Fatalf("could not create testing checkpointState instance: %v", err)
 			}

@@ -751,9 +751,10 @@ func TestFileBasedImagePullManager_MustAttemptImagePull(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+
 			encoder, decoder, err := createKubeletConfigSchemeEncoderDecoder()
 			require.NoError(t, err)
-			_, tCtx := ktesting.NewTestContext(t)
 
 			testDir := t.TempDir()
 			pullingDir := filepath.Join(testDir, "pulling")
@@ -825,7 +826,8 @@ func (a *testWriteCountingFSPullRecordsAccessor) WriteImagePulledRecord(logger k
 }
 
 func TestFileBasedImagePullManager_RecordPullIntent(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	tests := []struct {
 		name         string
 		inputImage   string
@@ -871,7 +873,7 @@ func TestFileBasedImagePullManager_RecordPullIntent(t *testing.T) {
 				f.intentCounters.Store(tt.inputImage, tt.startCounter)
 			}
 
-			_ = f.RecordPullIntent(logger, tt.inputImage)
+			_ = f.RecordPullIntent(tCtx.Logger(), tt.inputImage)
 
 			expectFilename := filepath.Join(pullingDir, tt.wantFile)
 			require.FileExists(t, expectFilename)
@@ -1151,7 +1153,8 @@ func TestFileBasedImagePullManager_RecordImagePulled(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, tCtx := ktesting.NewTestContext(t)
+			tCtx := ktesting.Init(t)
+
 			encoder, decoder, err := createKubeletConfigSchemeEncoderDecoder()
 			require.NoError(t, err)
 
@@ -1441,7 +1444,8 @@ func TestFileBasedImagePullManager_PruneUnknownRecords(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, tCtx := ktesting.NewTestContext(t)
+			tCtx := ktesting.Init(t)
+
 			encoder, decoder, err := createKubeletConfigSchemeEncoderDecoder()
 			require.NoError(t, err)
 

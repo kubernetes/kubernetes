@@ -82,8 +82,9 @@ func TestCustomMetrics(t *testing.T) {
 			},
 		},
 	}
-	logger, _ := ktesting.NewTestContext(t)
-	assert.Contains(t, cadvisorInfoToUserDefinedMetrics(logger, &cInfo),
+	tCtx := ktesting.Init(t)
+
+	assert.Contains(t, cadvisorInfoToUserDefinedMetrics(tCtx.Logger(), &cInfo),
 		statsapi.UserDefinedMetric{
 			UserDefinedMetricDescriptor: statsapi.UserDefinedMetricDescriptor{
 				Name:  "qos",

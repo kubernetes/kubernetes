@@ -67,7 +67,7 @@ func TestWatchRestartsIfTimeoutNotReached(t *testing.T) {
 	// Has to be longer than 5 seconds
 	timeout := 30 * time.Second
 
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
 
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--min-request-timeout=7"}, framework.SharedEtcd())
 	defer server.TearDownFn()
@@ -202,7 +202,7 @@ func TestWatchRestartsIfTimeoutNotReached(t *testing.T) {
 				// since the watcher is driven by an informer it is crucial to start producing only after the informer has synced
 				// otherwise we might not get all expected events since the informer LIST (or watchelist) and only then WATCHES
 				// all events received during the initial LIST (or watchlist) will be seen as a single event (to most recent version of an obj)
-				_, informer, w, done := watchtools.NewIndexerInformerWatcherWithLogger(logger, lw, &corev1.Secret{})
+				_, informer, w, done := watchtools.NewIndexerInformerWatcherWithLogger(tCtx.Logger(), lw, &corev1.Secret{})
 				cache.WaitForCacheSync(context.TODO().Done(), informer.HasSynced)
 				return w, nil, func() { <-done }
 			},

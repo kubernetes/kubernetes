@@ -206,7 +206,8 @@ func TestNewNodeManager(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
+			tCtx := ktesting.Init(t)
+
 			client := clientsetfake.NewClientset()
 
 			// call the node update functions in go routine, we add 15ms sleep in between
@@ -216,13 +217,13 @@ func TestNewNodeManager(t *testing.T) {
 				time.Sleep(100 * time.Millisecond)
 
 				for _, update := range tc.nodeUpdates {
-					update(ctx, client)
+					update(tCtx, client)
 					// wait for 15 ms for 10ms poll interval to finish
 					time.Sleep(15 * time.Millisecond)
 				}
 			}()
 			// initialize the node manager with 10ms poll interval and 1s poll timeout
-			nodeManager, err := newNodeManager(ctx, client, time.Second, testNodeName, tc.watchPodCIDRs, func(i int) {}, 10*time.Millisecond, time.Second, time.Second)
+			nodeManager, err := newNodeManager(tCtx, client, time.Second, testNodeName, tc.watchPodCIDRs, func(i int) {}, 10*time.Millisecond, time.Second, time.Second)
 			if len(tc.expectedError) > 0 {
 				require.Nil(t, nodeManager)
 				require.ErrorContains(t, err, tc.expectedError)
@@ -279,20 +280,21 @@ func TestNodeManagerOnNodeChange(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
+			tCtx := ktesting.Init(t)
+
 			var exitCode *int
 			exitFunc := func(code int) {
 				exitCode = &code
 			}
 
 			client := clientsetfake.NewClientset()
-			_, err := client.CoreV1().Nodes().Create(ctx, makeNode(
+			_, err := client.CoreV1().Nodes().Create(tCtx, makeNode(
 				tweakNodeIPs(tc.initialNodeIPs...),
 				tweakPodCIDRs(tc.initialPodCIDRs...),
 			), metav1.CreateOptions{})
 			require.NoError(t, err)
 
-			nodeManager, err := newNodeManager(ctx, client, 30*time.Second, testNodeName, tc.watchPodCIDRs, exitFunc, 10*time.Millisecond, time.Second, time.Second)
+			nodeManager, err := newNodeManager(tCtx, client, 30*time.Second, testNodeName, tc.watchPodCIDRs, exitFunc, 10*time.Millisecond, time.Second, time.Second)
 			require.NoError(t, err)
 
 			nodeManager.OnNodeChange(makeNode(tweakNodeIPs(tc.updatedNodeIPs...), tweakPodCIDRs(tc.updatedPodCIDRs...)))
@@ -302,14 +304,15 @@ func TestNodeManagerOnNodeChange(t *testing.T) {
 }
 
 func TestNodeManagerOnNodeDelete(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	var exitCode *int
 	exitFunc := func(code int) {
 		exitCode = &code
 	}
 	client := clientsetfake.NewClientset()
-	_, _ = client.CoreV1().Nodes().Create(ctx, makeNode(tweakNodeIPs("192.168.1.1")), metav1.CreateOptions{})
-	nodeManager, err := newNodeManager(ctx, client, 30*time.Second, testNodeName, false, exitFunc, 10*time.Millisecond, time.Second, time.Second)
+	_, _ = client.CoreV1().Nodes().Create(tCtx, makeNode(tweakNodeIPs("192.168.1.1")), metav1.CreateOptions{})
+	nodeManager, err := newNodeManager(tCtx, client, 30*time.Second, testNodeName, false, exitFunc, 10*time.Millisecond, time.Second, time.Second)
 	require.NoError(t, err)
 
 	nodeManager.OnNodeDelete(makeNode())
@@ -319,15 +322,15 @@ func TestNodeManagerOnNodeDelete(t *testing.T) {
 }
 
 func TestNodeManagerNode(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
 
 	client := clientsetfake.NewClientset()
-	_, _ = client.CoreV1().Nodes().Create(ctx, makeNode(
+	_, _ = client.CoreV1().Nodes().Create(tCtx, makeNode(
 		tweakNodeIPs("192.168.1.1"),
 		tweakResourceVersion("1")),
 		metav1.CreateOptions{})
 
-	nodeManager, err := newNodeManager(ctx, client, 30*time.Second, testNodeName, false, func(i int) {}, time.Nanosecond, time.Nanosecond, time.Nanosecond)
+	nodeManager, err := newNodeManager(tCtx, client, 30*time.Second, testNodeName, false, func(i int) {}, time.Nanosecond, time.Nanosecond, time.Nanosecond)
 	require.NoError(t, err)
 	require.Equal(t, "1", nodeManager.Node().ResourceVersion)
 

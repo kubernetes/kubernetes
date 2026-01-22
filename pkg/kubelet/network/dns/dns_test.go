@@ -225,8 +225,9 @@ func TestFormDNSSearchFitsLimits(t *testing.T) {
 
 	for i, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
-			logger, _ := ktesting.NewTestContext(t)
-			dnsSearch := configurer.formDNSSearchFitsLimits(logger, tc.hostNames, pod)
+			tCtx := ktesting.Init(t)
+
+			dnsSearch := configurer.formDNSSearchFitsLimits(tCtx.Logger(), tc.hostNames, pod)
 			assert.EqualValues(t, tc.resultSearch, dnsSearch, "test [%d]", i)
 			for _, expectedEvent := range tc.events {
 				expected := fmt.Sprintf("%s %s %s", v1.EventTypeWarning, "DNSConfigForming", expectedEvent)
@@ -285,8 +286,9 @@ func TestFormDNSNameserversFitsLimits(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		logger, _ := ktesting.NewTestContext(t)
-		appliedNameservers := configurer.formDNSNameserversFitsLimits(logger, tc.nameservers, pod)
+		tCtx := ktesting.Init(t)
+
+		appliedNameservers := configurer.formDNSNameserversFitsLimits(tCtx.Logger(), tc.nameservers, pod)
 		assert.EqualValues(t, tc.expectedNameserver, appliedNameservers, tc.desc)
 		event := fetchEvent(recorder)
 		if tc.expectedEvent && len(event) == 0 {

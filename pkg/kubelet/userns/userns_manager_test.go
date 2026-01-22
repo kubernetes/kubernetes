@@ -94,7 +94,9 @@ func (m *testUserNsPodsManager) GetMaxPods() int {
 }
 
 func TestUserNsManagerAllocate(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)
 
 	customUserNsLength := uint32(1048576)
@@ -177,7 +179,9 @@ func TestUserNsManagerAllocate(t *testing.T) {
 }
 
 func TestMakeUserNsManager(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)
 
 	cases := []struct {
@@ -232,7 +236,9 @@ func TestMakeUserNsManager(t *testing.T) {
 }
 
 func TestUserNsManagerParseUserNsFile(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)
 
 	cases := []struct {
@@ -385,7 +391,9 @@ func TestGetOrCreateUserNamespaceMappings(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			logger, _ := ktesting.NewTestContext(t)
+			tCtx := ktesting.Init(t)
+			logger := tCtx.Logger()
+
 			// These tests will create the userns file, so use an existing podDir.
 			testUserNsPodsManager := &testUserNsPodsManager{
 				podDir: t.TempDir(),
@@ -407,7 +415,9 @@ func TestGetOrCreateUserNamespaceMappings(t *testing.T) {
 }
 
 func TestCleanupOrphanedPodUsernsAllocations(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)
 
 	cases := []struct {
@@ -473,7 +483,7 @@ func TestCleanupOrphanedPodUsernsAllocations(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			err = m.CleanupOrphanedPodUsernsAllocations(ctx, tc.pods, tc.runningPods)
+			err = m.CleanupOrphanedPodUsernsAllocations(tCtx, tc.pods, tc.runningPods)
 			require.NoError(t, err)
 
 			for _, pod := range tc.podSetAfterCleanup {
@@ -498,7 +508,9 @@ func (m *failingUserNsPodsManager) ListPodsFromDisk() ([]types.UID, error) {
 }
 
 func TestMakeUserNsManagerFailsListPod(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)
 
 	testUserNsPodsManager := &failingUserNsPodsManager{}
@@ -508,7 +520,9 @@ func TestMakeUserNsManagerFailsListPod(t *testing.T) {
 }
 
 func TestRecordBounds(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)
 
 	// Allow exactly for 1 pod

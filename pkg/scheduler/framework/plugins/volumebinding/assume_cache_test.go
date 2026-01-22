@@ -24,7 +24,9 @@ import (
 )
 
 func TestPVAssumeCache(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	informer := &testInformer{
 		indexer: cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{}),
 		t:       t,

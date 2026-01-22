@@ -225,8 +225,9 @@ func Test_detectNodeIPs(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
-			primaryFamily, ips := detectNodeIPs(ctx, c.rawNodeIPs, c.bindAddress)
+			tCtx := ktesting.Init(t)
+
+			primaryFamily, ips := detectNodeIPs(tCtx, c.rawNodeIPs, c.bindAddress)
 			if primaryFamily != c.expectedFamily {
 				t.Errorf("Expected family %q got %q", c.expectedFamily, primaryFamily)
 			}

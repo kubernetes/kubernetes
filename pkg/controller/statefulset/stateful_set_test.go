@@ -50,10 +50,11 @@ var parentKind = apps.SchemeGroupVersion.WithKind("StatefulSet")
 func alwaysReady() bool { return true }
 
 func TestStatefulSetControllerCreates(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
 	set := newStatefulSet(3)
-	logger, ctx := ktesting.NewTestContext(t)
-	ssc, spc, om, _ := newFakeStatefulSetController(ctx, set)
-	if err := scaleUpStatefulSetController(logger, set, ssc, spc, om); err != nil {
+	ssc, spc, om, _ := newFakeStatefulSetController(tCtx, set)
+	if err := scaleUpStatefulSetController(tCtx.Logger(), set, ssc, spc, om); err != nil {
 		t.Errorf("Failed to turn up StatefulSet : %s", err)
 	}
 	if obj, _, err := om.setsIndexer.Get(set); err != nil {
@@ -67,9 +68,11 @@ func TestStatefulSetControllerCreates(t *testing.T) {
 }
 
 func TestStatefulSetControllerDeletes(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	set := newStatefulSet(3)
-	logger, ctx := ktesting.NewTestContext(t)
-	ssc, spc, om, _ := newFakeStatefulSetController(ctx, set)
+	ssc, spc, om, _ := newFakeStatefulSetController(tCtx, set)
 	if err := scaleUpStatefulSetController(logger, set, ssc, spc, om); err != nil {
 		t.Errorf("Failed to turn up StatefulSet : %s", err)
 	}
@@ -96,9 +99,11 @@ func TestStatefulSetControllerDeletes(t *testing.T) {
 }
 
 func TestStatefulSetControllerRespectsTermination(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	set := newStatefulSet(3)
-	logger, ctx := ktesting.NewTestContext(t)
-	ssc, spc, om, _ := newFakeStatefulSetController(ctx, set)
+	ssc, spc, om, _ := newFakeStatefulSetController(tCtx, set)
 	if err := scaleUpStatefulSetController(logger, set, ssc, spc, om); err != nil {
 		t.Errorf("Failed to turn up StatefulSet : %s", err)
 	}
@@ -118,7 +123,7 @@ func TestStatefulSetControllerRespectsTermination(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	ssc.syncStatefulSet(ctx, set, pods)
+	ssc.syncStatefulSet(tCtx, set, pods)
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		t.Error(err)
@@ -148,9 +153,11 @@ func TestStatefulSetControllerRespectsTermination(t *testing.T) {
 }
 
 func TestStatefulSetControllerBlocksScaling(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	set := newStatefulSet(3)
-	ssc, spc, om, _ := newFakeStatefulSetController(ctx, set)
+	ssc, spc, om, _ := newFakeStatefulSetController(tCtx, set)
 	if err := scaleUpStatefulSetController(logger, set, ssc, spc, om); err != nil {
 		t.Errorf("Failed to turn up StatefulSet : %s", err)
 	}
@@ -196,15 +203,16 @@ func TestStatefulSetControllerBlocksScaling(t *testing.T) {
 }
 
 func TestStatefulSetControllerDeletionTimestamp(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	set := newStatefulSet(3)
 	set.DeletionTimestamp = new(metav1.Time)
-	ssc, _, om, _ := newFakeStatefulSetController(ctx, set)
+	ssc, _, om, _ := newFakeStatefulSetController(tCtx, set)
 
 	om.setsIndexer.Add(set)
 
 	// Force a sync. It should not try to create any Pods.
-	ssc.enqueueStatefulSet(logger, set)
+	ssc.enqueueStatefulSet(tCtx.Logger(), set)
 	fakeWorker(ssc)
 
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
@@ -221,11 +229,12 @@ func TestStatefulSetControllerDeletionTimestamp(t *testing.T) {
 }
 
 func TestStatefulSetControllerDeletionTimestampRace(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	set := newStatefulSet(3)
 	// The bare client says it IS deleted.
 	set.DeletionTimestamp = new(metav1.Time)
-	ssc, _, om, ssh := newFakeStatefulSetController(ctx, set)
+	ssc, _, om, ssh := newFakeStatefulSetController(tCtx, set)
 
 	// The lister (cache) says it's NOT deleted.
 	set2 := *set
@@ -248,7 +257,7 @@ func TestStatefulSetControllerDeletionTimestampRace(t *testing.T) {
 	}
 
 	// Force a sync. It should not try to create any Pods.
-	ssc.enqueueStatefulSet(logger, set)
+	ssc.enqueueStatefulSet(tCtx.Logger(), set)
 	fakeWorker(ssc)
 
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
@@ -286,8 +295,10 @@ func TestStatefulSetControllerDeletionTimestampRace(t *testing.T) {
 }
 
 func TestStatefulSetControllerAddPod(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
-	ssc, _, om, _ := newFakeStatefulSetController(ctx)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
+	ssc, _, om, _ := newFakeStatefulSetController(tCtx)
 	set1 := newStatefulSet(3)
 	set2 := newStatefulSet(3)
 	pod1 := newStatefulSetPod(set1, 0)
@@ -315,8 +326,9 @@ func TestStatefulSetControllerAddPod(t *testing.T) {
 }
 
 func TestStatefulSetControllerAddPodOrphan(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
-	ssc, _, om, _ := newFakeStatefulSetController(ctx)
+	tCtx := ktesting.Init(t)
+
+	ssc, _, om, _ := newFakeStatefulSetController(tCtx)
 	set1 := newStatefulSet(3)
 	set2 := newStatefulSet(3)
 	set2.Name = "foo2"
@@ -330,18 +342,19 @@ func TestStatefulSetControllerAddPodOrphan(t *testing.T) {
 
 	// Make pod an orphan. Expect matching sets to be queued.
 	pod.OwnerReferences = nil
-	ssc.addPod(logger, pod)
+	ssc.addPod(tCtx.Logger(), pod)
 	if got, want := ssc.queue.Len(), 2; got != want {
 		t.Errorf("queue.Len() = %v, want %v", got, want)
 	}
 }
 
 func TestStatefulSetControllerAddPodNoSet(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
-	ssc, _, _, _ := newFakeStatefulSetController(ctx)
+	tCtx := ktesting.Init(t)
+
+	ssc, _, _, _ := newFakeStatefulSetController(tCtx)
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 0)
-	ssc.addPod(logger, pod)
+	ssc.addPod(tCtx.Logger(), pod)
 	ssc.queue.ShutDown()
 	key, _ := ssc.queue.Get()
 	if key != "" {
@@ -350,8 +363,10 @@ func TestStatefulSetControllerAddPodNoSet(t *testing.T) {
 }
 
 func TestStatefulSetControllerUpdatePod(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
-	ssc, _, om, _ := newFakeStatefulSetController(ctx)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
+	ssc, _, om, _ := newFakeStatefulSetController(tCtx)
 	set1 := newStatefulSet(3)
 	set2 := newStatefulSet(3)
 	set2.Name = "foo2"
@@ -382,13 +397,14 @@ func TestStatefulSetControllerUpdatePod(t *testing.T) {
 }
 
 func TestStatefulSetControllerUpdatePodWithNoSet(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
-	ssc, _, _, _ := newFakeStatefulSetController(ctx)
+	tCtx := ktesting.Init(t)
+
+	ssc, _, _, _ := newFakeStatefulSetController(tCtx)
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 0)
 	prev := *pod
 	fakeResourceVersion(pod)
-	ssc.updatePod(logger, &prev, pod)
+	ssc.updatePod(tCtx.Logger(), &prev, pod)
 	ssc.queue.ShutDown()
 	key, _ := ssc.queue.Get()
 	if key != "" {
@@ -397,12 +413,13 @@ func TestStatefulSetControllerUpdatePodWithNoSet(t *testing.T) {
 }
 
 func TestStatefulSetControllerUpdatePodWithSameVersion(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
-	ssc, _, om, _ := newFakeStatefulSetController(ctx)
+	tCtx := ktesting.Init(t)
+
+	ssc, _, om, _ := newFakeStatefulSetController(tCtx)
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 0)
 	om.setsIndexer.Add(set)
-	ssc.updatePod(logger, pod, pod)
+	ssc.updatePod(tCtx.Logger(), pod, pod)
 	ssc.queue.ShutDown()
 	key, _ := ssc.queue.Get()
 	if key != "" {
@@ -411,8 +428,9 @@ func TestStatefulSetControllerUpdatePodWithSameVersion(t *testing.T) {
 }
 
 func TestStatefulSetControllerUpdatePodOrphanWithNewLabels(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
-	ssc, _, om, _ := newFakeStatefulSetController(ctx)
+	tCtx := ktesting.Init(t)
+
+	ssc, _, om, _ := newFakeStatefulSetController(tCtx)
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 0)
 	pod.OwnerReferences = nil
@@ -423,15 +441,16 @@ func TestStatefulSetControllerUpdatePodOrphanWithNewLabels(t *testing.T) {
 	clone := *pod
 	clone.Labels = map[string]string{"foo2": "bar2"}
 	fakeResourceVersion(&clone)
-	ssc.updatePod(logger, &clone, pod)
+	ssc.updatePod(tCtx.Logger(), &clone, pod)
 	if got, want := ssc.queue.Len(), 2; got != want {
 		t.Errorf("queue.Len() = %v, want %v", got, want)
 	}
 }
 
 func TestStatefulSetControllerUpdatePodChangeControllerRef(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
-	ssc, _, om, _ := newFakeStatefulSetController(ctx)
+	tCtx := ktesting.Init(t)
+
+	ssc, _, om, _ := newFakeStatefulSetController(tCtx)
 	set := newStatefulSet(3)
 	set2 := newStatefulSet(3)
 	set2.Name = "foo2"
@@ -442,15 +461,16 @@ func TestStatefulSetControllerUpdatePodChangeControllerRef(t *testing.T) {
 	clone := *pod
 	clone.OwnerReferences = pod2.OwnerReferences
 	fakeResourceVersion(&clone)
-	ssc.updatePod(logger, &clone, pod)
+	ssc.updatePod(tCtx.Logger(), &clone, pod)
 	if got, want := ssc.queue.Len(), 2; got != want {
 		t.Errorf("queue.Len() = %v, want %v", got, want)
 	}
 }
 
 func TestStatefulSetControllerUpdatePodRelease(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
-	ssc, _, om, _ := newFakeStatefulSetController(ctx)
+	tCtx := ktesting.Init(t)
+
+	ssc, _, om, _ := newFakeStatefulSetController(tCtx)
 	set := newStatefulSet(3)
 	set2 := newStatefulSet(3)
 	set2.Name = "foo2"
@@ -460,15 +480,17 @@ func TestStatefulSetControllerUpdatePodRelease(t *testing.T) {
 	clone := *pod
 	clone.OwnerReferences = nil
 	fakeResourceVersion(&clone)
-	ssc.updatePod(logger, pod, &clone)
+	ssc.updatePod(tCtx.Logger(), pod, &clone)
 	if got, want := ssc.queue.Len(), 2; got != want {
 		t.Errorf("queue.Len() = %v, want %v", got, want)
 	}
 }
 
 func TestStatefulSetControllerDeletePod(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
-	ssc, _, om, _ := newFakeStatefulSetController(ctx)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
+	ssc, _, om, _ := newFakeStatefulSetController(tCtx)
 	set1 := newStatefulSet(3)
 	set2 := newStatefulSet(3)
 	set2.Name = "foo2"
@@ -495,8 +517,9 @@ func TestStatefulSetControllerDeletePod(t *testing.T) {
 }
 
 func TestStatefulSetControllerDeletePodOrphan(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
-	ssc, _, om, _ := newFakeStatefulSetController(ctx)
+	tCtx := ktesting.Init(t)
+
+	ssc, _, om, _ := newFakeStatefulSetController(tCtx)
 	set1 := newStatefulSet(3)
 	set2 := newStatefulSet(3)
 	set2.Name = "foo2"
@@ -505,21 +528,22 @@ func TestStatefulSetControllerDeletePodOrphan(t *testing.T) {
 	om.setsIndexer.Add(set2)
 
 	pod1.OwnerReferences = nil
-	ssc.deletePod(logger, pod1)
+	ssc.deletePod(tCtx.Logger(), pod1)
 	if got, want := ssc.queue.Len(), 0; got != want {
 		t.Errorf("queue.Len() = %v, want %v", got, want)
 	}
 }
 
 func TestStatefulSetControllerDeletePodTombstone(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
-	ssc, _, om, _ := newFakeStatefulSetController(ctx)
+	tCtx := ktesting.Init(t)
+
+	ssc, _, om, _ := newFakeStatefulSetController(tCtx)
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 0)
 	om.setsIndexer.Add(set)
 	tombstoneKey, _ := controller.KeyFunc(pod)
 	tombstone := cache.DeletedFinalStateUnknown{Key: tombstoneKey, Obj: pod}
-	ssc.deletePod(logger, tombstone)
+	ssc.deletePod(tCtx.Logger(), tombstone)
 	key, done := ssc.queue.Get()
 	if key == "" || done {
 		t.Error("failed to enqueue StatefulSet")
@@ -529,8 +553,9 @@ func TestStatefulSetControllerDeletePodTombstone(t *testing.T) {
 }
 
 func TestStatefulSetControllerGetStatefulSetsForPod(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
-	ssc, _, om, _ := newFakeStatefulSetController(ctx)
+	tCtx := ktesting.Init(t)
+
+	ssc, _, om, _ := newFakeStatefulSetController(tCtx)
 	set1 := newStatefulSet(3)
 	set2 := newStatefulSet(3)
 	set2.Name = "foo2"
@@ -538,13 +563,15 @@ func TestStatefulSetControllerGetStatefulSetsForPod(t *testing.T) {
 	om.setsIndexer.Add(set1)
 	om.setsIndexer.Add(set2)
 	om.podsIndexer.Add(pod)
-	sets := ssc.getStatefulSetsForPod(logger, pod)
+	sets := ssc.getStatefulSetsForPod(tCtx.Logger(), pod)
 	if got, want := len(sets), 2; got != want {
 		t.Errorf("len(sets) = %v, want %v", got, want)
 	}
 }
 
 func TestGetPodsForStatefulSetAdopt(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
 	set := newStatefulSet(5)
 	pod1 := newStatefulSetPod(set, 1)
 	// pod2 is an orphan with matching labels and name.
@@ -559,8 +586,7 @@ func TestGetPodsForStatefulSetAdopt(t *testing.T) {
 	pod4.OwnerReferences = nil
 	pod4.Name = "x" + pod4.Name
 
-	_, ctx := ktesting.NewTestContext(t)
-	ssc, _, om, _ := newFakeStatefulSetController(ctx, set, pod1, pod2, pod3, pod4)
+	ssc, _, om, _ := newFakeStatefulSetController(tCtx, set, pod1, pod2, pod3, pod4)
 
 	om.podsIndexer.Add(pod1)
 	om.podsIndexer.Add(pod2)
@@ -586,6 +612,8 @@ func TestGetPodsForStatefulSetAdopt(t *testing.T) {
 }
 
 func TestAdoptOrphanRevisions(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
 	ss1 := newStatefulSetWithLabels(3, "ss1", types.UID("ss1"), map[string]string{"foo": "bar"})
 	ss1.Status.CollisionCount = new(int32)
 	ss1Rev1, err := history.NewControllerRevision(ss1, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 1, ss1.Status.CollisionCount)
@@ -602,8 +630,7 @@ func TestAdoptOrphanRevisions(t *testing.T) {
 	ss1Rev2.Namespace = ss1.Namespace
 	ss1Rev2.OwnerReferences = []metav1.OwnerReference{}
 
-	_, ctx := ktesting.NewTestContext(t)
-	ssc, _, om, _ := newFakeStatefulSetController(ctx, ss1, ss1Rev1, ss1Rev2)
+	ssc, _, om, _ := newFakeStatefulSetController(tCtx, ss1, ss1Rev1, ss1Rev2)
 
 	om.revisionsIndexer.Add(ss1Rev1)
 	om.revisionsIndexer.Add(ss1Rev2)
@@ -629,9 +656,10 @@ func TestAdoptOrphanRevisions(t *testing.T) {
 }
 
 func TestGetPodsForStatefulSetRelease(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	set := newStatefulSet(3)
-	ssc, _, om, _ := newFakeStatefulSetController(ctx, set)
+	ssc, _, om, _ := newFakeStatefulSetController(tCtx, set)
 	pod1 := newStatefulSetPod(set, 1)
 	// pod2 is owned but has wrong name.
 	pod2 := newStatefulSetPod(set, 2)
@@ -670,12 +698,14 @@ func TestGetPodsForStatefulSetRelease(t *testing.T) {
 
 func TestOrphanedPodsWithPVCDeletePolicy(t *testing.T) {
 	testFn := func(t *testing.T, scaledownPolicy, deletionPolicy apps.PersistentVolumeClaimRetentionPolicyType) {
+		tCtx := ktesting.Init(t)
+		logger := tCtx.Logger()
+
 		set := newStatefulSet(4)
 		*set.Spec.Replicas = 2
 		set.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled = scaledownPolicy
 		set.Spec.PersistentVolumeClaimRetentionPolicy.WhenDeleted = deletionPolicy
-		logger, ctx := ktesting.NewTestContext(t)
-		ssc, _, om, _ := newFakeStatefulSetController(ctx, set)
+		ssc, _, om, _ := newFakeStatefulSetController(tCtx, set)
 		om.setsIndexer.Add(set)
 
 		pods := []*v1.Pod{}
@@ -812,13 +842,15 @@ func TestStaleOwnerRefOnScaleup(t *testing.T) {
 			WhenDeleted: apps.DeletePersistentVolumeClaimRetentionPolicyType,
 		},
 	} {
+		tCtx := ktesting.Init(t)
+		logger := tCtx.Logger()
+
 		onPolicy := func(msg string, args ...interface{}) string {
 			return fmt.Sprintf(fmt.Sprintf("(%s) %s", policy, msg), args...)
 		}
 		set := newStatefulSet(3)
 		set.Spec.PersistentVolumeClaimRetentionPolicy = policy
-		logger, ctx := ktesting.NewTestContext(t)
-		ssc, spc, om, _ := newFakeStatefulSetController(ctx, set)
+		ssc, spc, om, _ := newFakeStatefulSetController(tCtx, set)
 		if err := scaleUpStatefulSetController(logger, set, ssc, spc, om); err != nil {
 			t.Error(onPolicy("Failed to turn up StatefulSet : %s", err))
 		}
@@ -911,11 +943,11 @@ func TestStaleOwnerRefOnScaleup(t *testing.T) {
 }
 
 func TestStatefulSetAvailabilityCheck(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
 
 	set := setMinReadySeconds(newStatefulSet(4), int32(5)) // 5 seconds
 	set = setupPodManagementPolicy(apps.ParallelPodManagement, set)
-	ssc, _, om, _ := newFakeStatefulSetController(ctx, set)
+	ssc, _, om, _ := newFakeStatefulSetController(tCtx, set)
 	if err := om.setsIndexer.Add(set); err != nil {
 		t.Fatalf("could not add set to the cache: %v", err)
 	}
@@ -939,7 +971,7 @@ func TestStatefulSetAvailabilityCheck(t *testing.T) {
 			t.Fatalf("%d: %v", i, err)
 		}
 	}
-	err := ssc.syncStatefulSet(ctx, set, pods)
+	err := ssc.syncStatefulSet(tCtx, set, pods)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -963,7 +995,7 @@ func TestStatefulSetAvailabilityCheck(t *testing.T) {
 	}
 
 	// RS should be re-queued after 700ms to recompute .status.availableReplicas (200ms extra for the test).
-	ktesting.Eventually(ctx, func(tCtx ktesting.TContext) int {
+	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) int {
 		return ssc.queue.Len()
 	}).WithTimeout(900*time.Millisecond).
 		WithPolling(10*time.Millisecond).

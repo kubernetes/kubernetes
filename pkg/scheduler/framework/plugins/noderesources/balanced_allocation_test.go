@@ -471,9 +471,9 @@ func TestBalancedAllocationSignPod(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
+			tCtx := ktesting.Init(t)
 
-			p, err := NewBalancedAllocation(ctx, &config.NodeResourcesBalancedAllocationArgs{}, nil, feature.Features{
+			p, err := NewBalancedAllocation(tCtx, &config.NodeResourcesBalancedAllocationArgs{}, nil, feature.Features{
 				EnableDRAExtendedResource: test.enableDRAExtendedResource,
 			})
 			if err != nil {
@@ -481,7 +481,7 @@ func TestBalancedAllocationSignPod(t *testing.T) {
 			}
 
 			ba := p.(*BalancedAllocation)
-			fragments, status := ba.SignPod(ctx, test.pod)
+			fragments, status := ba.SignPod(tCtx, test.pod)
 
 			if status.Code() != test.expectedStatusCode {
 				t.Errorf("unexpected status code, want: %v, got: %v, message: %v", test.expectedStatusCode, status.Code(), status.Message())

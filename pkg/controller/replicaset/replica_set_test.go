@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/onsi/gomega"
 	"math/rand"
 	"net/http/httptest"
 	"net/url"
@@ -30,6 +29,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/onsi/gomega"
 
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -219,7 +220,8 @@ func validateSyncReplicaSet(fakePodControl *controller.FakePodControl, expectedC
 }
 
 func TestSyncReplicaSetDoesNothing(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	fakePodControl := controller.FakePodControl{}
 	stopCh := make(chan struct{})
@@ -233,7 +235,7 @@ func TestSyncReplicaSetDoesNothing(t *testing.T) {
 	newPodList(informers.Core().V1().Pods().Informer().GetIndexer(), 2, v1.PodRunning, labelMap, rsSpec, "pod")
 
 	manager.podControl = &fakePodControl
-	manager.syncReplicaSet(ctx, GetKey(rsSpec, t))
+	manager.syncReplicaSet(tCtx, GetKey(rsSpec, t))
 	err := validateSyncReplicaSet(&fakePodControl, 0, 0, 0)
 	if err != nil {
 		t.Fatal(err)
@@ -241,7 +243,8 @@ func TestSyncReplicaSetDoesNothing(t *testing.T) {
 }
 
 func TestDeleteFinalStateUnknown(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	fakePodControl := controller.FakePodControl{}
 	stopCh := make(chan struct{})
@@ -261,9 +264,9 @@ func TestDeleteFinalStateUnknown(t *testing.T) {
 	rsSpec := newReplicaSet(1, labelMap)
 	informers.Apps().V1().ReplicaSets().Informer().GetIndexer().Add(rsSpec)
 	pods := newPodList(nil, 1, v1.PodRunning, labelMap, rsSpec, "pod")
-	manager.deletePod(logger, cache.DeletedFinalStateUnknown{Key: "foo", Obj: &pods.Items[0]})
+	manager.deletePod(tCtx.Logger(), cache.DeletedFinalStateUnknown{Key: "foo", Obj: &pods.Items[0]})
 
-	go manager.worker(ctx)
+	go manager.worker(tCtx)
 
 	expected := GetKey(rsSpec, t)
 	select {
@@ -279,7 +282,8 @@ func TestDeleteFinalStateUnknown(t *testing.T) {
 // Tell the rs to create 100 replicas, but simulate a limit (like a quota limit)
 // of 10, and verify that the rs doesn't make 100 create calls per sync pass
 func TestSyncReplicaSetCreateFailures(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	fakePodControl := controller.FakePodControl{}
 	fakePodControl.CreateLimit = 10
 
@@ -293,7 +297,7 @@ func TestSyncReplicaSetCreateFailures(t *testing.T) {
 	informers.Apps().V1().ReplicaSets().Informer().GetIndexer().Add(rs)
 
 	manager.podControl = &fakePodControl
-	manager.syncReplicaSet(ctx, GetKey(rs, t))
+	manager.syncReplicaSet(tCtx, GetKey(rs, t))
 	err := validateSyncReplicaSet(&fakePodControl, fakePodControl.CreateLimit, 0, 0)
 	if err != nil {
 		t.Fatal(err)
@@ -308,8 +312,9 @@ func TestSyncReplicaSetCreateFailures(t *testing.T) {
 }
 
 func TestSyncReplicaSetDormancy(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
 	// Setup a test server so we can lie about the current state of pods
-	logger, ctx := ktesting.NewTestContext(t)
 	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:    200,
 		ResponseBody:  "{}",
@@ -337,7 +342,7 @@ func TestSyncReplicaSetDormancy(t *testing.T) {
 	rsSpec.Status.ReadyReplicas = 1
 	rsSpec.Status.AvailableReplicas = 1
 	rsSpec.Status.TerminatingReplicas = ptr.To[int32](0)
-	manager.syncReplicaSet(ctx, GetKey(rsSpec, t))
+	manager.syncReplicaSet(tCtx, GetKey(rsSpec, t))
 	err := validateSyncReplicaSet(&fakePodControl, 1, 0, 0)
 	if err != nil {
 		t.Fatal(err)
@@ -348,7 +353,7 @@ func TestSyncReplicaSetDormancy(t *testing.T) {
 	rsSpec.Status.ReadyReplicas = 0
 	rsSpec.Status.AvailableReplicas = 0
 	fakePodControl.Clear()
-	manager.syncReplicaSet(ctx, GetKey(rsSpec, t))
+	manager.syncReplicaSet(tCtx, GetKey(rsSpec, t))
 	err = validateSyncReplicaSet(&fakePodControl, 0, 0, 0)
 	if err != nil {
 		t.Fatal(err)
@@ -362,14 +367,14 @@ func TestSyncReplicaSetDormancy(t *testing.T) {
 
 	// Lowering expectations should lead to a sync that creates a replica, however the
 	// fakePodControl error will prevent this, leaving expectations at 0, 0
-	manager.expectations.CreationObserved(logger, rsKey)
+	manager.expectations.CreationObserved(tCtx.Logger(), rsKey)
 	rsSpec.Status.Replicas = 1
 	rsSpec.Status.ReadyReplicas = 1
 	rsSpec.Status.AvailableReplicas = 1
 	fakePodControl.Clear()
 	fakePodControl.Err = fmt.Errorf("fake Error")
 
-	manager.syncReplicaSet(ctx, GetKey(rsSpec, t))
+	manager.syncReplicaSet(tCtx, GetKey(rsSpec, t))
 	err = validateSyncReplicaSet(&fakePodControl, 1, 0, 0)
 	if err != nil {
 		t.Fatal(err)
@@ -378,7 +383,7 @@ func TestSyncReplicaSetDormancy(t *testing.T) {
 	// This replica should not need a Lowering of expectations, since the previous create failed
 	fakePodControl.Clear()
 	fakePodControl.Err = nil
-	manager.syncReplicaSet(ctx, GetKey(rsSpec, t))
+	manager.syncReplicaSet(tCtx, GetKey(rsSpec, t))
 	err = validateSyncReplicaSet(&fakePodControl, 1, 0, 0)
 	if err != nil {
 		t.Fatal(err)
@@ -390,6 +395,8 @@ func TestSyncReplicaSetDormancy(t *testing.T) {
 }
 
 func TestGetReplicaSetsWithSameController(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
 	someRS := newReplicaSet(1, map[string]string{"foo": "bar"})
 	someRS.Name = "rs1"
 	relatedRS := newReplicaSet(1, map[string]string{"foo": "baz"})
@@ -402,8 +409,6 @@ func TestGetReplicaSetsWithSameController(t *testing.T) {
 	pendingDeletionRS.ObjectMeta.OwnerReferences[0].UID = "789"
 	now := metav1.Now()
 	pendingDeletionRS.DeletionTimestamp = &now
-	logger, _ := ktesting.NewTestContext(t)
-
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	manager, informers := testNewReplicaSetControllerFromClient(t, clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}}), stopCh, BurstReplicas)
@@ -436,7 +441,7 @@ func TestGetReplicaSetsWithSameController(t *testing.T) {
 		for _, r := range c.rss {
 			informers.Apps().V1().ReplicaSets().Informer().GetIndexer().Add(r)
 		}
-		actualRSs := manager.getReplicaSetsWithSameController(logger, c.rs)
+		actualRSs := manager.getReplicaSetsWithSameController(tCtx.Logger(), c.rs)
 		var actualRSNames, expectedRSNames []string
 		for _, r := range actualRSs {
 			actualRSNames = append(actualRSNames, r.Name)
@@ -453,10 +458,11 @@ func TestGetReplicaSetsWithSameController(t *testing.T) {
 }
 
 func BenchmarkGetReplicaSetsWithSameController(b *testing.B) {
+	tCtx := ktesting.Init(b)
+
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	controller, informers := testNewReplicaSetControllerFromClient(b, clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}}), stopCh, BurstReplicas)
-	logger, _ := ktesting.NewTestContext(b)
 
 	targetRS := newReplicaSet(1, map[string]string{"foo": "bar"})
 	targetRS.Name = "rs1"
@@ -476,7 +482,7 @@ func BenchmarkGetReplicaSetsWithSameController(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		gotRSs := controller.getReplicaSetsWithSameController(logger, targetRS)
+		gotRSs := controller.getReplicaSetsWithSameController(tCtx.Logger(), targetRS)
 		if len(gotRSs) != 2 {
 			b.Errorf("Incorrect ReplicaSets number, expected 2, got: %d", len(gotRSs))
 		}
@@ -550,6 +556,9 @@ func TestPodControllerLookup(t *testing.T) {
 }
 
 func TestRelatedPodsLookup(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	someRS := newReplicaSet(1, map[string]string{"foo": "bar"})
 	someRS.Name = "foo1"
 	relatedRS := newReplicaSet(1, map[string]string{"foo": "baz"})
@@ -566,8 +575,6 @@ func TestRelatedPodsLookup(t *testing.T) {
 	pod2 := newPod("pod2", someRS, v1.PodRunning, nil, true)
 	pod3 := newPod("pod3", relatedRS, v1.PodRunning, nil, true)
 	pod4 := newPod("pod4", unrelatedRS, v1.PodRunning, nil, true)
-	logger, _ := ktesting.NewTestContext(t)
-
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	manager, informers := testNewReplicaSetControllerFromClient(t, clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}}), stopCh, BurstReplicas)
@@ -625,14 +632,15 @@ func TestRelatedPodsLookup(t *testing.T) {
 }
 
 func TestWatchControllers(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	fakeWatch := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger})
 	client := fake.NewSimpleClientset()
 	client.PrependWatchReactor("replicasets", core.DefaultWatchReactor(fakeWatch, nil))
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	informers := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
-	tCtx := ktesting.Init(t)
 	manager := NewReplicaSetController(
 		tCtx,
 		informers.Apps().V1().ReplicaSets(),
@@ -676,7 +684,9 @@ func TestWatchControllers(t *testing.T) {
 }
 
 func TestWatchPods(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	client := fake.NewSimpleClientset()
 
 	fakeWatch := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger})
@@ -713,8 +723,8 @@ func TestWatchPods(t *testing.T) {
 
 	// Start only the pod watcher and the workqueue, send a watch event,
 	// and make sure it hits the sync method for the right ReplicaSet.
-	go informers.Core().V1().Pods().Informer().RunWithContext(ctx)
-	go manager.Run(ctx, 1)
+	go informers.Core().V1().Pods().Informer().RunWithContext(tCtx)
+	go manager.Run(tCtx, 1)
 
 	pods := newPodList(nil, 1, v1.PodRunning, labelMap, testRSSpec, "pod")
 	testPod := pods.Items[0]
@@ -729,7 +739,9 @@ func TestWatchPods(t *testing.T) {
 }
 
 func TestUpdatePods(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	manager, informers := testNewReplicaSetControllerFromClient(t, fake.NewSimpleClientset(), stopCh, BurstReplicas)
@@ -749,7 +761,7 @@ func TestUpdatePods(t *testing.T) {
 		return nil
 	}
 
-	go wait.UntilWithContext(ctx, manager.worker, 10*time.Millisecond)
+	go wait.UntilWithContext(tCtx, manager.worker, 10*time.Millisecond)
 
 	// Put 2 ReplicaSets and one pod into the informers
 	labelMap1 := map[string]string{"foo": "bar"}
@@ -855,7 +867,8 @@ func TestUpdatePods(t *testing.T) {
 }
 
 func TestControllerUpdateRequeue(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	// This server should force a requeue of the controller because it fails to update status.Replicas.
 	labelMap := map[string]string{"foo": "bar"}
 	rs := newReplicaSet(1, labelMap)
@@ -881,7 +894,7 @@ func TestControllerUpdateRequeue(t *testing.T) {
 	// Enqueue once. Then process it. Disable rate-limiting for this.
 	manager.queue = workqueue.NewTypedRateLimitingQueue(workqueue.NewTypedMaxOfRateLimiter[string]())
 	manager.enqueueRS(rs)
-	manager.processNextWorkItem(ctx)
+	manager.processNextWorkItem(tCtx)
 	// It should have been requeued.
 	if got, want := manager.queue.Len(), 1; got != want {
 		t.Errorf("queue.Len() = %v, want %v", got, want)
@@ -889,6 +902,9 @@ func TestControllerUpdateRequeue(t *testing.T) {
 }
 
 func TestControllerUpdateStatusWithFailure(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	rs := newReplicaSet(1, map[string]string{"foo": "bar"})
 	fakeClient := &fake.Clientset{}
 	fakeClient.AddReactor("get", "replicasets", func(action core.Action) (bool, runtime.Object, error) { return true, rs, nil })
@@ -898,7 +914,7 @@ func TestControllerUpdateStatusWithFailure(t *testing.T) {
 	fakeRSClient := fakeClient.AppsV1().ReplicaSets("default")
 	numReplicas := int32(10)
 	newStatus := apps.ReplicaSetStatus{Replicas: numReplicas}
-	logger, _ := ktesting.NewTestContext(t)
+
 	_, err := updateReplicaSetStatus(logger, fakeRSClient, rs, newStatus, DefaultReplicaSetControllerFeatures())
 	if err == nil {
 		t.Errorf("Expected update err")
@@ -939,7 +955,9 @@ func TestControllerUpdateStatusWithFailure(t *testing.T) {
 
 // TODO: This test is too hairy for a unittest. It should be moved to an E2E suite.
 func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int) {
-	logger, ctx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	labelMap := map[string]string{"foo": "bar"}
 	rsSpec := newReplicaSet(numReplicas, labelMap)
 	client := fake.NewSimpleClientset(rsSpec)
@@ -966,7 +984,7 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 		informers.Apps().V1().ReplicaSets().Informer().GetIndexer().Add(rsSpec)
 
 		for i := 0; i < numReplicas; i += burstReplicas {
-			manager.syncReplicaSet(ctx, GetKey(rsSpec, t))
+			manager.syncReplicaSet(tCtx, GetKey(rsSpec, t))
 
 			// The store accrues active pods. It's also used by the ReplicaSet to determine how many
 			// replicas to create.
@@ -1045,7 +1063,7 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 
 			// Check that the ReplicaSet didn't take any action for all the above pods
 			fakePodControl.Clear()
-			manager.syncReplicaSet(ctx, GetKey(rsSpec, t))
+			manager.syncReplicaSet(tCtx, GetKey(rsSpec, t))
 			err := validateSyncReplicaSet(&fakePodControl, 0, 0, 0)
 			if err != nil {
 				t.Fatal(err)
@@ -1110,7 +1128,8 @@ func (fe FakeRSExpectations) SatisfiedExpectations(logger klog.Logger, controlle
 // TestRSSyncExpectations tests that a pod cannot sneak in between counting active pods
 // and checking expectations.
 func TestRSSyncExpectations(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	fakePodControl := controller.FakePodControl{}
 	stopCh := make(chan struct{})
@@ -1133,7 +1152,7 @@ func TestRSSyncExpectations(t *testing.T) {
 			informers.Core().V1().Pods().Informer().GetIndexer().Add(&postExpectationsPod)
 		},
 	})
-	manager.syncReplicaSet(ctx, GetKey(rsSpec, t))
+	manager.syncReplicaSet(tCtx, GetKey(rsSpec, t))
 	err := validateSyncReplicaSet(&fakePodControl, 0, 0, 0)
 	if err != nil {
 		t.Fatal(err)
@@ -1141,7 +1160,8 @@ func TestRSSyncExpectations(t *testing.T) {
 }
 
 func TestDeleteControllerAndExpectations(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	rs := newReplicaSet(1, map[string]string{"foo": "bar"})
 	client := fake.NewSimpleClientset(rs)
 	stopCh := make(chan struct{})
@@ -1154,7 +1174,7 @@ func TestDeleteControllerAndExpectations(t *testing.T) {
 	manager.podControl = &fakePodControl
 
 	// This should set expectations for the ReplicaSet
-	manager.syncReplicaSet(ctx, GetKey(rs, t))
+	manager.syncReplicaSet(tCtx, GetKey(rs, t))
 	err := validateSyncReplicaSet(&fakePodControl, 1, 0, 0)
 	if err != nil {
 		t.Fatal(err)
@@ -1174,8 +1194,8 @@ func TestDeleteControllerAndExpectations(t *testing.T) {
 		t.Errorf("No expectations found for ReplicaSet")
 	}
 	informers.Apps().V1().ReplicaSets().Informer().GetIndexer().Delete(rs)
-	manager.deleteRS(logger, rs)
-	manager.syncReplicaSet(ctx, GetKey(rs, t))
+	manager.deleteRS(tCtx.Logger(), rs)
+	manager.syncReplicaSet(tCtx, GetKey(rs, t))
 
 	_, exists, err = manager.expectations.GetExpectations(rsKey)
 	if err != nil {
@@ -1188,7 +1208,7 @@ func TestDeleteControllerAndExpectations(t *testing.T) {
 	// This should have no effect, since we've deleted the ReplicaSet.
 	podExp.Add(-1, 0)
 	informers.Core().V1().Pods().Informer().GetIndexer().Replace(make([]interface{}, 0), "0")
-	manager.syncReplicaSet(ctx, GetKey(rs, t))
+	manager.syncReplicaSet(tCtx, GetKey(rs, t))
 	err = validateSyncReplicaSet(&fakePodControl, 0, 0, 0)
 	if err != nil {
 		t.Fatal(err)
@@ -1196,13 +1216,15 @@ func TestDeleteControllerAndExpectations(t *testing.T) {
 }
 
 func TestExpectationsOnRecreate(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	client := fake.NewSimpleClientset()
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
 	f := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
-	tCtx := ktesting.Init(t)
-	logger := tCtx.Logger()
+
 	manager := NewReplicaSetController(
 		tCtx,
 		f.Apps().V1().ReplicaSets(),
@@ -1366,7 +1388,9 @@ func shuffle(controllers []*apps.ReplicaSet) []*apps.ReplicaSet {
 }
 
 func TestOverlappingRSs(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	labelMap := map[string]string{"foo": "bar"}
 
@@ -1410,7 +1434,9 @@ func TestOverlappingRSs(t *testing.T) {
 }
 
 func TestDeletionTimestamp(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	c := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	labelMap := map[string]string{"foo": "bar"}
 	stopCh := make(chan struct{})
@@ -1517,7 +1543,8 @@ func setupManagerWithGCEnabled(t *testing.T, stopCh chan struct{}, objs ...runti
 }
 
 func TestDoNotPatchPodWithOtherControlRef(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	labelMap := map[string]string{"foo": "bar"}
 	rs := newReplicaSet(2, labelMap)
 	stopCh := make(chan struct{})
@@ -1530,7 +1557,7 @@ func TestDoNotPatchPodWithOtherControlRef(t *testing.T) {
 	pod := newPod("pod", rs, v1.PodRunning, nil, true)
 	pod.OwnerReferences = []metav1.OwnerReference{otherControllerReference}
 	informers.Core().V1().Pods().Informer().GetIndexer().Add(pod)
-	err := manager.syncReplicaSet(ctx, GetKey(rs, t))
+	err := manager.syncReplicaSet(tCtx, GetKey(rs, t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1542,7 +1569,8 @@ func TestDoNotPatchPodWithOtherControlRef(t *testing.T) {
 }
 
 func TestPatchPodFails(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	labelMap := map[string]string{"foo": "bar"}
 	rs := newReplicaSet(2, labelMap)
 	stopCh := make(chan struct{})
@@ -1557,7 +1585,7 @@ func TestPatchPodFails(t *testing.T) {
 	// control of the pods and requeue to try again.
 	fakePodControl.Err = fmt.Errorf("fake Error")
 	rsKey := GetKey(rs, t)
-	err := processSync(ctx, manager, rsKey)
+	err := processSync(tCtx, manager, rsKey)
 	if err == nil || !strings.Contains(err.Error(), "fake Error") {
 		t.Errorf("expected fake Error, got %+v", err)
 	}
@@ -1576,7 +1604,8 @@ func TestPatchPodFails(t *testing.T) {
 // RS controller shouldn't adopt or create more pods if the rc is about to be
 // deleted.
 func TestDoNotAdoptOrCreateIfBeingDeleted(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	labelMap := map[string]string{"foo": "bar"}
 	rs := newReplicaSet(2, labelMap)
 	now := metav1.Now()
@@ -1589,7 +1618,7 @@ func TestDoNotAdoptOrCreateIfBeingDeleted(t *testing.T) {
 	informers.Core().V1().Pods().Informer().GetIndexer().Add(pod1)
 
 	// no patch, no create
-	err := manager.syncReplicaSet(ctx, GetKey(rs, t))
+	err := manager.syncReplicaSet(tCtx, GetKey(rs, t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1600,7 +1629,8 @@ func TestDoNotAdoptOrCreateIfBeingDeleted(t *testing.T) {
 }
 
 func TestDoNotAdoptOrCreateIfBeingDeletedRace(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	labelMap := map[string]string{"foo": "bar"}
 	// Bare client says it IS deleted.
 	rs := newReplicaSet(2, labelMap)
@@ -1619,7 +1649,7 @@ func TestDoNotAdoptOrCreateIfBeingDeletedRace(t *testing.T) {
 	informers.Core().V1().Pods().Informer().GetIndexer().Add(pod1)
 
 	// sync should abort.
-	err := manager.syncReplicaSet(ctx, GetKey(rs, t))
+	err := manager.syncReplicaSet(tCtx, GetKey(rs, t))
 	if err == nil {
 		t.Error("syncReplicaSet() err = nil, expected non-nil")
 	}
@@ -1631,7 +1661,7 @@ func TestDoNotAdoptOrCreateIfBeingDeletedRace(t *testing.T) {
 }
 
 func TestReplicaSetAvailabilityCheck(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
 
 	labelMap := map[string]string{"foo": "bar"}
 	rs := newReplicaSet(4, labelMap)
@@ -1665,7 +1695,7 @@ func TestReplicaSetAvailabilityCheck(t *testing.T) {
 	fakePodControl := controller.FakePodControl{}
 	manager.podControl = &fakePodControl
 
-	err := manager.syncReplicaSet(ctx, GetKey(rs, t))
+	err := manager.syncReplicaSet(tCtx, GetKey(rs, t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1703,7 +1733,7 @@ func TestReplicaSetAvailabilityCheck(t *testing.T) {
 	}
 
 	// RS should be re-queued after 700ms to recompute .status.availableReplicas (200ms extra for the test).
-	ktesting.Eventually(ctx, func(tCtx ktesting.TContext) int {
+	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) int {
 		return manager.queue.Len()
 	}).WithTimeout(900*time.Millisecond).
 		WithPolling(10*time.Millisecond).

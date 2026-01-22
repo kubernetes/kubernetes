@@ -36,7 +36,9 @@ import (
 )
 
 func TestFSPullRecordsMetrics(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	tempDir := t.TempDir()
 	legacyregistry.Reset()
 	defer legacyregistry.Reset()
@@ -173,20 +175,20 @@ func TestFSPullRecordsMetrics(t *testing.T) {
 }
 
 func TestMustAttemptPullMetrics(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
 
 	tempDir := t.TempDir()
 	pulledDir := filepath.Join(tempDir, "image_manager", "pulled")
 	legacyregistry.Reset()
 	defer legacyregistry.Reset()
 
-	fsAccessor, err := NewFSPullRecordsAccessor(logger, tempDir)
+	fsAccessor, err := NewFSPullRecordsAccessor(tCtx.Logger(), tempDir)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	fakeRuntime := &containertest.FakeRuntime{}
-	imageManager, err := NewImagePullManager(ctx,
+	imageManager, err := NewImagePullManager(tCtx,
 		fsAccessor,
 		&NeverVerifyAllowlistedImages{absoluteURLs: sets.New("docker.io/testing/policyexempt")},
 		fakeRuntime,
@@ -202,37 +204,37 @@ func TestMustAttemptPullMetrics(t *testing.T) {
 	})
 
 	expectedMetrics := make(map[string]int)
-	testMustAttemptImagePull(t, true, imageManager, ctx, "docker.io/testing/broken", "testbrokenrecord", nil)
+	testMustAttemptImagePull(t, true, imageManager, tCtx, "docker.io/testing/broken", "testbrokenrecord", nil)
 	expectedMetrics[string(checkResultError)]++
 	cmpMustAttemptPullMetrics(t, expectedMetrics)
 
-	testMustAttemptImagePull(t, true, imageManager, ctx, "docker.io/testing/broken", "testbrokenrecord", nil)
-	testMustAttemptImagePull(t, true, imageManager, ctx, "docker.io/testing/broken", "testbrokenrecord", nil)
+	testMustAttemptImagePull(t, true, imageManager, tCtx, "docker.io/testing/broken", "testbrokenrecord", nil)
+	testMustAttemptImagePull(t, true, imageManager, tCtx, "docker.io/testing/broken", "testbrokenrecord", nil)
 	expectedMetrics[string(checkResultError)] += 2
 
-	testMustAttemptImagePull(t, false, imageManager, ctx, "docker.io/testing/test", "testimage-anonpull", nil)
+	testMustAttemptImagePull(t, false, imageManager, tCtx, "docker.io/testing/test", "testimage-anonpull", nil)
 	expectedMetrics[string(checkResultCredentialRecordFound)]++
 	cmpMustAttemptPullMetrics(t, expectedMetrics)
 
-	testMustAttemptImagePull(t, false, imageManager, ctx, "docker.io/testing/test", "testimage-anonpull", nil)
-	testMustAttemptImagePull(t, false, imageManager, ctx, "docker.io/testing/test", "testimage-anonpull", nil)
-	testMustAttemptImagePull(t, false, imageManager, ctx, "docker.io/testing/test", "testimage-anonpull", nil)
+	testMustAttemptImagePull(t, false, imageManager, tCtx, "docker.io/testing/test", "testimage-anonpull", nil)
+	testMustAttemptImagePull(t, false, imageManager, tCtx, "docker.io/testing/test", "testimage-anonpull", nil)
+	testMustAttemptImagePull(t, false, imageManager, tCtx, "docker.io/testing/test", "testimage-anonpull", nil)
 	expectedMetrics[string(checkResultCredentialRecordFound)] += 3
 	cmpMustAttemptPullMetrics(t, expectedMetrics)
 
-	testMustAttemptImagePull(t, false, imageManager, ctx, "docker.io/testing/policyexempt", "policyallowed", nil)
+	testMustAttemptImagePull(t, false, imageManager, tCtx, "docker.io/testing/policyexempt", "policyallowed", nil)
 	expectedMetrics[string(checkResultCredentialPolicyAllowed)]++
 	cmpMustAttemptPullMetrics(t, expectedMetrics)
 
-	testMustAttemptImagePull(t, false, imageManager, ctx, "docker.io/testing/policyexempt", "policyallowed", nil)
+	testMustAttemptImagePull(t, false, imageManager, tCtx, "docker.io/testing/policyexempt", "policyallowed", nil)
 	expectedMetrics[string(checkResultCredentialPolicyAllowed)]++
 	cmpMustAttemptPullMetrics(t, expectedMetrics)
 
-	testMustAttemptImagePull(t, true, imageManager, ctx, "docker.io/testing/norecords", "somewhatunknown", nil)
+	testMustAttemptImagePull(t, true, imageManager, tCtx, "docker.io/testing/norecords", "somewhatunknown", nil)
 	expectedMetrics[string(checkResultMustAuthenticate)]++
 	cmpMustAttemptPullMetrics(t, expectedMetrics)
 
-	testMustAttemptImagePull(t, false, imageManager, ctx, "docker.io/testing/test", "testimageref",
+	testMustAttemptImagePull(t, false, imageManager, tCtx, "docker.io/testing/test", "testimageref",
 		func() ([]kubeletconfig.ImagePullSecret, *kubeletconfig.ImagePullServiceAccount, error) {
 			return []kubeletconfig.ImagePullSecret{
 				{UID: "testsecretuid", Namespace: "default", Name: "pull-secret", CredentialHash: "testsecrethash"},
