@@ -30,22 +30,29 @@ const (
 	TypeCustom               = "Custom"
 )
 
+// ComponentEndpoint represents a component and the endpoint where a metric is exposed.
+type ComponentEndpoint struct {
+	Component string `yaml:"component" json:"component"`
+	Endpoint  string `yaml:"endpoint" json:"endpoint"`
+}
+
 // Metric represents a parsed Kubernetes metric definition.
 type Metric struct {
-	Name              string              `yaml:"name" json:"name"`
-	Subsystem         string              `yaml:"subsystem,omitempty" json:"subsystem,omitempty"`
-	Namespace         string              `yaml:"namespace,omitempty" json:"namespace,omitempty"`
-	Help              string              `yaml:"help,omitempty" json:"help,omitempty"`
-	Type              string              `yaml:"type,omitempty" json:"type,omitempty"`
-	DeprecatedVersion string              `yaml:"deprecatedVersion,omitempty" json:"deprecatedVersion,omitempty"`
-	StabilityLevel    string              `yaml:"stabilityLevel,omitempty" json:"stabilityLevel,omitempty"`
-	Labels            []string            `yaml:"labels,omitempty" json:"labels,omitempty"`
-	Buckets           []float64           `yaml:"buckets,omitempty" json:"buckets,omitempty"`
-	Objectives        map[float64]float64 `yaml:"objectives,omitempty" json:"objectives,omitempty"`
-	AgeBuckets        uint32              `yaml:"ageBuckets,omitempty" json:"ageBuckets,omitempty"`
-	BufCap            uint32              `yaml:"bufCap,omitempty" json:"bufCap,omitempty"`
-	MaxAge            int64               `yaml:"maxAge,omitempty" json:"maxAge,omitempty"`
-	ConstLabels       map[string]string   `yaml:"constLabels,omitempty" json:"constLabels,omitempty"`
+	Name               string              `yaml:"name" json:"name"`
+	Subsystem          string              `yaml:"subsystem,omitempty" json:"subsystem,omitempty"`
+	Namespace          string              `yaml:"namespace,omitempty" json:"namespace,omitempty"`
+	Help               string              `yaml:"help,omitempty" json:"help,omitempty"`
+	Type               string              `yaml:"type,omitempty" json:"type,omitempty"`
+	DeprecatedVersion  string              `yaml:"deprecatedVersion,omitempty" json:"deprecatedVersion,omitempty"`
+	StabilityLevel     string              `yaml:"stabilityLevel,omitempty" json:"stabilityLevel,omitempty"`
+	Labels             []string            `yaml:"labels,omitempty" json:"labels,omitempty"`
+	Buckets            []float64           `yaml:"buckets,omitempty" json:"buckets,omitempty"`
+	Objectives         map[float64]float64 `yaml:"objectives,omitempty" json:"objectives,omitempty"`
+	AgeBuckets         uint32              `yaml:"ageBuckets,omitempty" json:"ageBuckets,omitempty"`
+	BufCap             uint32              `yaml:"bufCap,omitempty" json:"bufCap,omitempty"`
+	MaxAge             int64               `yaml:"maxAge,omitempty" json:"maxAge,omitempty"`
+	ConstLabels        map[string]string   `yaml:"constLabels,omitempty" json:"constLabels,omitempty"`
+	ComponentEndpoints []ComponentEndpoint `yaml:"componentEndpoints,omitempty" json:"componentEndpoints,omitempty"`
 }
 
 // BuildFQName returns the fully qualified metric name.

@@ -46,6 +46,7 @@ var (
 	// env configs
 	GOOS                  string = findGOOS()
 	ALL_STABILITY_CLASSES bool
+	ENDPOINT_MAPPINGS     string
 )
 
 func findGOOS() string {
@@ -63,11 +64,24 @@ func findGOOS() string {
 func main() {
 
 	flag.BoolVar(&ALL_STABILITY_CLASSES, "allstabilityclasses", false, "use this flag to enable all stability classes")
+	flag.StringVar(&ENDPOINT_MAPPINGS, "endpoint-mappings", "", "path to endpoint mappings configuration file")
 	flag.Parse()
 	if len(flag.Args()) < 1 {
 		fmt.Fprintf(os.Stderr, "USAGE: %s <DIR or FILE or '-'> [...]\n", os.Args[0])
 		os.Exit(64)
 	}
+
+	// Load endpoint mappings configuration if provided
+	var endpointConfig *endpointMappingConfig
+	if ENDPOINT_MAPPINGS != "" {
+		var err error
+		endpointConfig, err = loadEndpointMappingConfig(ENDPOINT_MAPPINGS)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to load endpoint mappings: %s\n", err)
+			os.Exit(1)
+		}
+	}
+
 	stableMetricNames := map[string]struct{}{}
 	stableMetrics := []metric.Metric{}
 	errors := []error{}
@@ -78,7 +92,7 @@ func main() {
 			addStdin = true
 			continue
 		}
-		ms, es := searchPathForStableMetrics(arg)
+		ms, es := searchPathForStableMetrics(arg, endpointConfig)
 		for _, m := range ms {
 			fqName := m.BuildFQName()
 			if _, ok := stableMetricNames[fqName]; !ok {
@@ -93,7 +107,7 @@ func main() {
 		scanner.Split(bufio.ScanLines)
 		for scanner.Scan() {
 			arg := scanner.Text()
-			ms, es := searchPathForStableMetrics(arg)
+			ms, es := searchPathForStableMetrics(arg, endpointConfig)
 			stableMetrics = append(stableMetrics, ms...)
 			errors = append(errors, es...)
 		}
@@ -124,7 +138,7 @@ func main() {
 	fmt.Print(string(data))
 }
 
-func searchPathForStableMetrics(path string) ([]metric.Metric, []error) {
+func searchPathForStableMetrics(path string, endpointConfig *endpointMappingConfig) ([]metric.Metric, []error) {
 	metrics := []metric.Metric{}
 	errors := []error{}
 	err := filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
@@ -134,7 +148,7 @@ func searchPathForStableMetrics(path string) ([]metric.Metric, []error) {
 		if !strings.HasSuffix(path, ".go") {
 			return nil
 		}
-		ms, es := searchFileForStableMetrics(path, nil)
+		ms, es := searchFileForStableMetrics(path, nil, endpointConfig)
 		errors = append(errors, es...)
 		metrics = append(metrics, ms...)
 		return nil
@@ -146,7 +160,7 @@ func searchPathForStableMetrics(path string) ([]metric.Metric, []error) {
 }
 
 // Pass either only filename of existing file or src including source code in any format and a filename that it comes from
-func searchFileForStableMetrics(filename string, src interface{}) ([]metric.Metric, []error) {
+func searchFileForStableMetrics(filename string, src interface{}, endpointConfig *endpointMappingConfig) ([]metric.Metric, []error) {
 	fileset := token.NewFileSet()
 	tree, err := parser.ParseFile(fileset, filename, src, parser.AllErrors)
 	if err != nil {
@@ -169,6 +183,17 @@ func searchFileForStableMetrics(filename string, src interface{}) ([]metric.Metr
 	stableMetricsFunctionCalls, errors := findStableMetricDeclaration(tree, metricsImportName)
 	metrics, es := decodeMetricCalls(stableMetricsFunctionCalls, metricsImportName, variables)
 	errors = append(errors, es...)
+
+	// Attach component/endpoint information if config is provided
+	if endpointConfig != nil {
+		ces := endpointConfig.inferComponentEndpoints(filename)
+		if len(ces) > 0 {
+			for i := range metrics {
+				metrics[i].ComponentEndpoints = ces
+			}
+		}
+	}
+
 	return metrics, addFileInformationToErrors(errors, fileset)
 }
 

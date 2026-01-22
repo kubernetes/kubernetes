@@ -108,7 +108,7 @@ var _ = NewCounter(
 `},
 	} {
 		t.Run(test.testName, func(t *testing.T) {
-			metrics, errors := searchFileForStableMetrics(fakeFilename, test.src)
+			metrics, errors := searchFileForStableMetrics(fakeFilename, test.src, nil)
 			if len(metrics) != 0 {
 				t.Errorf("Didn't expect any stable metrics found, got: %d", len(metrics))
 			}
@@ -475,7 +475,7 @@ var _ = compbasemetrics.NewCounter(
 `},
 	} {
 		t.Run(test.testName, func(t *testing.T) {
-			metrics, errors := searchFileForStableMetrics(fakeFilename, test.src)
+			metrics, errors := searchFileForStableMetrics(fakeFilename, test.src, nil)
 			if len(errors) != 0 {
 				t.Errorf("Unexpected errors: %s", errors)
 			}
@@ -677,7 +677,7 @@ var _ = metrics.NewHistogram(
 `},
 	} {
 		t.Run(test.testName, func(t *testing.T) {
-			_, errors := searchFileForStableMetrics(fakeFilename, test.src)
+			_, errors := searchFileForStableMetrics(fakeFilename, test.src, nil)
 			if len(errors) != 1 {
 				t.Errorf("Unexpected number of errors, got %d, want 1", len(errors))
 			}
