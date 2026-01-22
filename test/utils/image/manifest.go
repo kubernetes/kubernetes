@@ -187,8 +187,6 @@ const (
 	NodePerfNpbIs
 	// NodePerfPytorchWideDeep image
 	NodePerfPytorchWideDeep
-	// Nonewprivs image
-	Nonewprivs
 	// NonRoot runs with a default user of 1234
 	NonRoot
 	// Pause - when these values are updated, also update cmd/kubelet/app/options/container_runtime.go
@@ -209,8 +207,8 @@ const (
 func initImageConfigs(list RegistryList) (map[ImageID]Config, map[ImageID]Config) {
 	configs := map[ImageID]Config{}
 	configs[AgnhostPrev] = Config{list.PromoterE2eRegistry, "agnhost", "2.55"}
-	configs[Agnhost] = Config{list.PromoterE2eRegistry, "agnhost", "2.61"}
-	configs[AgnhostPrivate] = Config{list.PrivateRegistry, "agnhost", "2.6"}
+	configs[Agnhost] = Config{list.PromoterE2eRegistry, "agnhost", "2.62.0"}
+	configs[AgnhostPrivate] = Config{list.PrivateRegistry, "agnhost", "2.62.0"}
 	configs[APIServer] = Config{list.PromoterE2eRegistry, "sample-apiserver", "1.29.2"}
 	configs[AppArmorLoader] = Config{list.PromoterE2eRegistry, "apparmor-loader", "1.4"}
 	configs[BusyBox] = Config{list.PromoterE2eRegistry, "busybox", "1.37.0-1"}
@@ -227,7 +225,6 @@ func initImageConfigs(list RegistryList) (map[ImageID]Config, map[ImageID]Config
 	configs[NodePerfNpbEp] = Config{list.PromoterE2eRegistry, "node-perf/npb-ep", "1.2"}
 	configs[NodePerfNpbIs] = Config{list.PromoterE2eRegistry, "node-perf/npb-is", "1.2"}
 	configs[NodePerfPytorchWideDeep] = Config{list.PromoterE2eRegistry, "node-perf/pytorch-wide-deep", "1.0.0"}
-	configs[Nonewprivs] = Config{list.PromoterE2eRegistry, "nonewprivs", "1.3"}
 	configs[NonRoot] = Config{list.PromoterE2eRegistry, "nonroot", "1.4"}
 	// Pause - when these values are updated, also update cmd/kubelet/app/options/container_runtime.go
 	configs[Pause] = Config{list.GcRegistry, "pause", "3.10.1"}
