@@ -24,6 +24,11 @@ ADD http://www.nas.nasa.gov/assets/npb/NPB3.4.3.tar.gz .
 RUN tar xzf NPB3.4.3.tar.gz && chmod -R a+rX NPB3.4.3
 
 WORKDIR ./NPB3.4.3/NPB3.4-OMP
+
+# Add missing shebangs to shell scripts - required for cross-build with QEMU emulation
+# Without shebangs, dash (default /bin/sh on Debian) fails to execute these scripts via make
+RUN sed -i '1i#!/bin/sh' sys/print_header sys/print_instructions
+
 RUN if [ $(arch) != "x86_64" ]; then \
     sed s/-mcmodel=medium//g config/NAS.samples/make.def_gcc > config/make.def; \
 else \
