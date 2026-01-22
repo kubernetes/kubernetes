@@ -178,7 +178,10 @@ loop:
 
 func setup(t *testing.T) (context.Context, chan interface{}, chan interface{}, OperationExecutor) {
 	tCtx := ktesting.Init(t)
-	ch, quit := make(chan interface{}), make(chan interface{})
+	// Use buffered channel to prevent goroutine leak.
+	// If time.After fires before ch receive, the goroutine sending to ch would block forever.
+	// Buffer size accommodates maximum concurrent operations.
+	ch, quit := make(chan interface{}, numPluginsToRegister*2), make(chan interface{})
 	return tCtx, ch, quit, NewOperationExecutor(newFakeOperationGenerator(ch, quit))
 }
 
