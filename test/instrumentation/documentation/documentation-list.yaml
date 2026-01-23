@@ -4651,7 +4651,7 @@
   labels:
   - group
   - resource
-- name: etcd_bookmark_counts
+- name: etcd_bookmark_total
   help: Number of etcd bookmarks (progress notify events) split by kind.
   type: Counter
   stabilityLevel: ALPHA

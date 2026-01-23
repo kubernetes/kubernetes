@@ -118,7 +118,7 @@ var (
 	)
 	etcdBookmarkCounts = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
-			Name:           "etcd_bookmark_counts",
+			Name:           "etcd_bookmark_total",
 			Help:           "Number of etcd bookmarks (progress notify events) split by kind.",
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
