@@ -596,39 +596,6 @@
   help: Number of PersistentVolumeClaim creation requests
   type: Counter
   stabilityLevel: ALPHA
-- name: kubelet_credential_provider_config_info
-  help: Information about the last applied credential provider configuration with
-    hash as label
-  type: Custom
-  stabilityLevel: ALPHA
-  labels:
-  - hash
-- name: credential_provider_plugin_duration
-  subsystem: kubelet
-  help: Duration of execution in seconds for credential provider plugin
-  type: Histogram
-  stabilityLevel: ALPHA
-  labels:
-  - plugin_name
-  buckets:
-  - 0.005
-  - 0.01
-  - 0.025
-  - 0.05
-  - 0.1
-  - 0.25
-  - 0.5
-  - 1
-  - 2.5
-  - 5
-  - 10
-- name: credential_provider_plugin_errors_total
-  subsystem: kubelet
-  help: Number of errors from credential provider plugin
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - plugin_name
 - name: pv_collector_bound_pv_count
   help: Gauge measuring number of persistent volume currently bound
   type: Custom
@@ -811,6 +778,39 @@
     If serving certificate is invalid or unused, the value will be +INF.
   type: Gauge
   stabilityLevel: ALPHA
+- name: kubelet_credential_provider_config_info
+  help: Information about the last applied credential provider configuration with
+    hash as label
+  type: Custom
+  stabilityLevel: ALPHA
+  labels:
+  - hash
+- name: credential_provider_plugin_duration
+  subsystem: kubelet
+  help: Duration of execution in seconds for credential provider plugin
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - plugin_name
+  buckets:
+  - 0.005
+  - 0.01
+  - 0.025
+  - 0.05
+  - 0.1
+  - 0.25
+  - 0.5
+  - 1
+  - 2.5
+  - 5
+  - 10
+- name: credential_provider_plugin_errors_total
+  subsystem: kubelet
+  help: Number of errors from credential provider plugin
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - plugin_name
 - name: server_expiration_renew_errors
   subsystem: kubelet
   help: Counter of certificate renewal errors.
@@ -4653,7 +4653,7 @@
   - resource
 - name: etcd_bookmark_counts
   help: Number of etcd bookmarks (progress notify events) split by kind.
-  type: Gauge
+  type: Counter
   stabilityLevel: ALPHA
   labels:
   - group
