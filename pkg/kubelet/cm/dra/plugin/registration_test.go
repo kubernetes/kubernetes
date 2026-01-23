@@ -17,6 +17,7 @@ limitations under the License.
 package plugin
 
 import (
+	"context"
 	"path"
 	"sort"
 	"strings"
@@ -47,7 +48,7 @@ const (
 	pluginB  = "pluginB"
 )
 
-func getFakeNode() (*v1.Node, error) {
+func getFakeNode(context.Context) (*v1.Node, error) {
 	return &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}, nil
 }
 

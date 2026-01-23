@@ -220,7 +220,8 @@ func (kvh *kubeletVolumeHost) GetMounter() mount.Interface {
 }
 
 func (kvh *kubeletVolumeHost) GetNodeAllocatable() (v1.ResourceList, error) {
-	node, err := kvh.kubelet.getNodeAnyWay()
+	// TODO: Pass proper context when VolumeHost interface methods support context parameters
+	node, err := kvh.kubelet.getNodeAnyWay(context.TODO())
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving node: %v", err)
 	}
@@ -266,7 +267,8 @@ func (kvh *kubeletVolumeHost) GetPodCertificateCredentialBundle(ctx context.Cont
 }
 
 func (kvh *kubeletVolumeHost) GetNodeLabels() (map[string]string, error) {
-	node, err := kvh.kubelet.GetNode()
+	// TODO: Pass proper context when VolumeHost interface methods support context parameters
+	node, err := kvh.kubelet.GetNode(context.TODO())
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving node: %v", err)
 	}
@@ -274,7 +276,8 @@ func (kvh *kubeletVolumeHost) GetNodeLabels() (map[string]string, error) {
 }
 
 func (kvh *kubeletVolumeHost) GetAttachedVolumesFromNodeStatus() (map[v1.UniqueVolumeName]string, error) {
-	node, err := kvh.kubelet.GetNode()
+	// TODO: Pass proper context when VolumeHost interface methods support context parameters
+	node, err := kvh.kubelet.GetNode(context.TODO())
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving node: %v", err)
 	}

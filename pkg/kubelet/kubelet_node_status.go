@@ -388,7 +388,7 @@ func (kl *Kubelet) fastNodeStatusUpdate(ctx context.Context, timeout bool) (comp
 		return true
 	}
 
-	originalNode, err := kl.GetNode()
+	originalNode, err := kl.GetNode(ctx)
 	if err != nil {
 		logger.Error(err, "Error getting the current node from lister")
 		return false

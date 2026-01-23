@@ -74,7 +74,7 @@ const defaultWipingDelay = 30 * time.Second
 type ActivePodsFunc func() []*v1.Pod
 
 // GetNodeFunc is a function that returns the node object using the kubelet's node lister.
-type GetNodeFunc func() (*v1.Node, error)
+type GetNodeFunc func(context.Context) (*v1.Node, error)
 
 // Manager is responsible for managing ResourceClaims.
 // It ensures that they are prepared before starting pods

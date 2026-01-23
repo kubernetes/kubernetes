@@ -79,7 +79,7 @@ type Provider interface {
 	// namespace.
 	GetPodByName(namespace, name string) (*v1.Pod, bool)
 	// GetNode returns the spec of the local node.
-	GetNode() (*v1.Node, error)
+	GetNode(context.Context) (*v1.Node, error)
 	// GetNodeConfig returns the configuration of the local node.
 	GetNodeConfig() cm.NodeConfig
 	// ListVolumesForPod returns the stats of the volume used by the pod with
