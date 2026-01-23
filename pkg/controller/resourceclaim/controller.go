@@ -897,8 +897,11 @@ func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) err
 			continue
 		}
 
+		// We don't know how to check this entry, so we just keep it to avoid
+		// accidentally removing a reservation for a non-pod consumer that we
+		// don't support yet.
 		// TODO: support generic object lookup
-		return fmt.Errorf("unsupported ReservedFor entry: %v", reservedFor)
+		valid = append(valid, reservedFor)
 	}
 
 	builtinControllerFinalizer := slices.Index(claim.Finalizers, resourceapi.Finalizer)
