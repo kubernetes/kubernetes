@@ -17,6 +17,7 @@ limitations under the License.
 package ktesting
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"testing"
@@ -45,7 +46,7 @@ func SetDefaultVerbosity(v int) {
 
 // NewTestContext is a replacement for ktesting.NewTestContext
 // which returns a more versatile context.
-func NewTestContext(tb testing.TB) (klog.Logger, TContext) {
+func NewTestContext(tb testing.TB) (klog.Logger, context.Context) {
 	tCtx := Init(tb)
 	return tCtx.Logger(), tCtx
 }
