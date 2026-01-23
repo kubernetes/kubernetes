@@ -868,11 +868,11 @@ func (ev *Evaluator) EarlyNominate(ctx context.Context, state fwk.CycleState, po
 				return nil, fwk.AsStatus(err)
 			}
 			nodeInfo.AddPodInfo(podInfo)
-			status := ev.Handler.RunFilterPlugins(ctx, state, pod, nodeInfo)
-			if status.IsSuccess() {
-				logger.V(2).Info("Early nominated the pod on the node with preempting pods", "pod", klog.KObj(pod), "node", nodeName)
-				return framework.NewPostFilterResultWithNominatedNode(nodeName), fwk.NewStatus(fwk.Success)
-			}
+		}
+		status := ev.Handler.RunFilterPlugins(ctx, state, pod, nodeInfo)
+		if status.IsSuccess() {
+			logger.V(2).Info("Early nominated the pod on the node with preempting pods", "pod", klog.KObj(pod), "node", nodeName)
+			return framework.NewPostFilterResultWithNominatedNode(nodeName), fwk.NewStatus(fwk.Success)
 		}
 		return nil, fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("Cannot early nominate the pod on the node with preempting pods %q", nodeName))
 	}
