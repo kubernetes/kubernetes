@@ -51,7 +51,7 @@ const (
 
 type UsernsManager struct {
 	used    *allocator.AllocationBitmap
-	usedBy  map[types.UID]uint32 // Map pod.UID to range used
+	usedBy  map[types.UID]idMapping // Map pod.UID to range used
 	removed int
 
 	off int
@@ -167,7 +167,7 @@ func MakeUserNsManager(logger klog.Logger, kl userNsPodsManager, idsPerPod *int6
 
 	m := UsernsManager{
 		used:         allocator.NewAllocationMap(len, "user namespaces"),
-		usedBy:       make(map[types.UID]uint32),
+		usedBy:       make(map[types.UID]idMapping),
 		kl:           kl,
 		off:          off,
 		len:          len,
@@ -233,41 +233,51 @@ func (m *UsernsManager) allocateOne(logger klog.Logger, pod types.UID) (firstID 
 	logger.V(5).Info("new pod user namespace allocation", "podUID", pod)
 
 	firstID = uint32((firstZero + m.off)) * m.userNsLength
-	m.usedBy[pod] = firstID
+	m.usedBy[pod] = idMapping{
+		HostId:      firstID,
+		ContainerId: 0,
+		Length:      m.userNsLength,
+	}
 	return firstID, m.userNsLength, nil
 }
 
 // record stores the user namespace [from; from+length] to the specified pod.
 func (m *UsernsManager) record(logger klog.Logger, pod types.UID, from, length uint32) (err error) {
-	if length != m.userNsLength {
-		return fmt.Errorf("wrong user namespace length %v", length)
+	if length == 0 {
+		return fmt.Errorf("invalid user namespace length 0")
 	}
-	if from%m.userNsLength != 0 {
-		return fmt.Errorf("wrong user namespace offset specified %v", from)
-	}
-	prevFrom, found := m.usedBy[pod]
-	if found && prevFrom != from {
+	prev, found := m.usedBy[pod]
+	if found && (prev.HostId != from || prev.Length != length) {
 		return fmt.Errorf("different user namespace range already used by pod %q", pod)
 	}
-	index := int(from/m.userNsLength) - m.off
-	if index < 0 || index >= m.len {
-		return fmt.Errorf("id %v is out of range", from)
-	}
-	// if the pod wasn't found then verify the range is free.
-	if !found && m.used.Has(index) {
-		return fmt.Errorf("range picked for pod %q already taken", pod)
-	}
-	// The pod is already registered, nothing to do.
-	if found && prevFrom == from {
-		return nil
+
+	// We mark all blocks that overlap with the range [from, from+length)
+	firstBlock := int(from/m.userNsLength) - m.off
+	lastBlock := int((from+length-1)/m.userNsLength) - m.off
+
+	if firstBlock < 0 || lastBlock >= m.len {
+		// If the range is outside what we manage, we don't record it in the bitmap
+		// but we still record it in usedBy so we know what pod is using it.
+		// This can happen if the Kubelet configuration changed.
+		logger.V(5).Info("pod user namespace range is outside Kubelet assigned IDs", "podUID", pod, "from", from, "length", length)
+	} else {
+		for i := firstBlock; i <= lastBlock; i++ {
+			if m.used.Has(i) && !found {
+				logger.V(5).Info("range block already marked as used, overlapping with another pod", "podUID", pod, "block", i)
+			}
+			m.used.Allocate(i)
+		}
 	}
 
-	logger.V(5).Info("new pod user namespace allocation", "podUID", pod)
+	if !found {
+		logger.V(5).Info("new pod user namespace allocation recorded", "podUID", pod, "from", from, "length", length)
+		m.usedBy[pod] = idMapping{
+			HostId:      from,
+			ContainerId: 0,
+			Length:      length,
+		}
+	}
 
-	// "from" is a ID (UID/GID), set the corresponding userns of size
-	// userNsLength in the bit-array.
-	m.used.Allocate(index)
-	m.usedBy[pod] = from
 	return nil
 }
 
@@ -310,14 +320,38 @@ func (m *UsernsManager) releaseWithLock(logger klog.Logger, pod types.UID) {
 	_ = os.Remove(filepath.Join(m.kl.GetPodDir(pod), mappingsFile))
 
 	if m.removed%mapReInitializeThreshold == 0 {
-		n := make(map[types.UID]uint32)
+		n := make(map[types.UID]idMapping)
 		for k, v := range m.usedBy {
 			n[k] = v
 		}
 		m.usedBy = n
 		m.removed = 0
 	}
-	_ = m.used.Release(int(v/m.userNsLength) - m.off)
+
+	firstBlock := int(v.HostId/m.userNsLength) - m.off
+	lastBlock := int((v.HostId+v.Length-1)/m.userNsLength) - m.off
+
+	for i := firstBlock; i <= lastBlock; i++ {
+		if i < 0 || i >= m.len {
+			continue
+		}
+		// Only release the block if no other pod is using it.
+		// This handles the case where multiple old pods with small ranges
+		// were recorded into a single new large block.
+		inUse := false
+		for uid, mapping := range m.usedBy {
+			podFirstBlock := int(mapping.HostId/m.userNsLength) - m.off
+			podLastBlock := int((mapping.HostId+mapping.Length-1)/m.userNsLength) - m.off
+			if i >= podFirstBlock && i <= podLastBlock {
+				logger.V(5).Info("block still in use by another pod", "block", i, "otherPodUID", uid)
+				inUse = true
+				break
+			}
+		}
+		if !inUse {
+			_ = m.used.Release(i)
+		}
+	}
 }
 
 func (m *UsernsManager) parseUserNsFileAndRecord(logger klog.Logger, pod types.UID, content []byte) (userNs userNamespace, err error) {
