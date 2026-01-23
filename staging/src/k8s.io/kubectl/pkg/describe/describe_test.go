@@ -7523,7 +7523,7 @@ func TestDescribeReplicaSet(t *testing.T) {
 			for _, pod := range testCase.pods {
 				objects = append(objects, &pod)
 			}
-			fake := fake.NewSimpleClientset(objects...)
+			fake := fake.NewClientset(objects...)
 			c := &describeClient{T: t, Namespace: "foo", Interface: fake}
 			d := ReplicaSetDescriber{c}
 			out, err := d.Describe(testCase.replicaSet.Namespace, testCase.replicaSet.Name, DescriberSettings{ShowEvents: true})
