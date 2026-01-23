@@ -4643,6 +4643,13 @@
   labels:
   - group
   - resource
+- name: etcd_bookmark_counts
+  help: Number of etcd bookmarks (progress notify events) split by kind.
+  type: Gauge
+  stabilityLevel: ALPHA
+  labels:
+  - group
+  - resource
 - name: etcd_lease_object_counts
   help: Number of objects attached to a single etcd lease.
   type: Histogram
@@ -4771,13 +4778,6 @@
   subsystem: apiserver
   help: Number of etcd events received split by kind.
   type: Counter
-  stabilityLevel: BETA
-  labels:
-  - group
-  - resource
-- name: etcd_bookmark_counts
-  help: Number of etcd bookmarks (progress notify events) split by kind.
-  type: Gauge
   stabilityLevel: BETA
   labels:
   - group

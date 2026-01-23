@@ -216,13 +216,6 @@
   help: The count of disabled metrics.
   type: Counter
   stabilityLevel: BETA
-- name: etcd_bookmark_counts
-  help: Number of etcd bookmarks (progress notify events) split by kind.
-  type: Gauge
-  stabilityLevel: BETA
-  labels:
-  - group
-  - resource
 - name: hidden_metrics_total
   help: The count of hidden metrics.
   type: Counter
