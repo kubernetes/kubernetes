@@ -18,7 +18,6 @@ package dra
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/onsi/gomega"
 	"github.com/stretchr/testify/require"
@@ -37,6 +36,9 @@ func testPartitionableDevices(tCtx ktesting.TContext, enabled bool) {
 	}
 }
 
+// testDisabled verifies that creating ResourceSlices with node selection
+// perDeviceNodeSelection fails when the Partitinable Devices feature is
+// disabled.
 func testDisabled(tCtx ktesting.TContext) {
 	namespace := createTestNamespace(tCtx, nil)
 	_, driverName := createTestClass(tCtx, namespace)
@@ -46,6 +48,11 @@ func testDisabled(tCtx ktesting.TContext) {
 	require.Error(tCtx, err, "slice should have become invalid after dropping PartitionableDevices")
 }
 
+// testPerDeviceNodeSelection verifies that pods are scheduled
+// on the correct nodes when they are allocated devices that
+// speficy node selection using the perDeviceNodeSelection field
+// that was introduced as part of the Partitionable Devices
+// feature.
 func testPerDeviceNodeSelection(tCtx ktesting.TContext) {
 	namespace := createTestNamespace(tCtx, nil)
 	class, driverName := createTestClass(tCtx, namespace)
@@ -55,7 +62,7 @@ func testPerDeviceNodeSelection(tCtx ktesting.TContext) {
 
 	slice := st.MakeResourceSliceWithPerDeviceNodeSelection("slice", driverName)
 	for _, node := range nodes.Items {
-		slice.Device(fmt.Sprintf("device-for-%s", node.Name), node.Name)
+		slice.Device(fmt.Sprintf("device-for-%s", st.NodeName(node.Name)), node.Name)
 	}
 	createSlice(tCtx, slice.Obj())
 
@@ -76,7 +83,9 @@ func testPerDeviceNodeSelection(tCtx ktesting.TContext) {
 		createdPod := createPod(tCtx, namespace, fmt.Sprintf("-%d", i), pod, claim)
 
 		scheduledPod := waitForPodScheduled(tCtx, namespace, createdPod.Name)
-		allocatedClaim := waitForClaimAllocatedToDevice(tCtx, namespace, createdClaim.Name, time.Second)
+		allocatedClaim, err := tCtx.Client().ResourceV1().ResourceClaims(namespace).Get(tCtx, createdClaim.Name, metav1.GetOptions{})
+		tCtx.ExpectNoError(err, fmt.Sprintf("get claim %q", createdClaim.Name))
+		tCtx.Expect(allocatedClaim).To(gomega.HaveField("Status.Allocation", gomega.Not(gomega.BeNil())), "Claim should have been allocated.")
 
 		nodeName := scheduledPod.Spec.NodeName
 		expectedAllocatedDevice := fmt.Sprintf("device-for-%s", nodeName)
@@ -84,6 +93,9 @@ func testPerDeviceNodeSelection(tCtx ktesting.TContext) {
 	}
 }
 
+// testPartitionableDevicesWithMultiHostDevice verifies that multiple pods sharing
+// a ResourceClaim that is assigned a multi-host devices gets scheduled correctly
+// on the nodes selected by the node selector on the device.
 func testPartitionableDevicesWithMultiHostDevice(tCtx ktesting.TContext) {
 	namespace := createTestNamespace(tCtx, nil)
 	class, driverName := createTestClass(tCtx, namespace)
@@ -93,7 +105,7 @@ func testPartitionableDevicesWithMultiHostDevice(tCtx ktesting.TContext) {
 
 	minNodeCount := 4
 	if nodeCount := len(nodes.Items); nodeCount < minNodeCount {
-		tCtx.Skipf("found only %d nodes, need at least %d", nodeCount, minNodeCount)
+		tCtx.Errorf("found only %d nodes, need at least %d", nodeCount, minNodeCount)
 	}
 
 	deviceNodes := []string{

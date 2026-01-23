@@ -1363,6 +1363,8 @@ func (wrapper *ResourceSliceWrapper) Devices(names ...string) *ResourceSliceWrap
 	return wrapper
 }
 
+type NodeName string
+
 // Device extends the devices field of the inner object.
 // The device must have a name and may have arbitrary additional fields.
 func (wrapper *ResourceSliceWrapper) Device(name string, otherFields ...any) *ResourceSliceWrapper {
@@ -1375,8 +1377,9 @@ func (wrapper *ResourceSliceWrapper) Device(name string, otherFields ...any) *Re
 			device.Capacity = typedField
 		case resourceapi.DeviceTaint:
 			device.Taints = append(device.Taints, typedField)
-		case string:
-			device.NodeName = &typedField
+		case NodeName:
+			nodeName := string(typedField)
+			device.NodeName = &nodeName
 		case *v1.NodeSelector:
 			device.NodeSelector = typedField
 		default:
