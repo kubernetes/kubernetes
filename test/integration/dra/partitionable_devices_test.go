@@ -62,7 +62,7 @@ func testPerDeviceNodeSelection(tCtx ktesting.TContext) {
 
 	slice := st.MakeResourceSliceWithPerDeviceNodeSelection("slice", driverName)
 	for _, node := range nodes.Items {
-		slice.Device(fmt.Sprintf("device-for-%s", st.NodeName(node.Name)), node.Name)
+		slice.Device(fmt.Sprintf("device-for-%s", node.Name), st.NodeName(node.Name))
 	}
 	createSlice(tCtx, slice.Obj())
 
@@ -83,6 +83,7 @@ func testPerDeviceNodeSelection(tCtx ktesting.TContext) {
 		createdPod := createPod(tCtx, namespace, fmt.Sprintf("-%d", i), pod, claim)
 
 		scheduledPod := waitForPodScheduled(tCtx, namespace, createdPod.Name)
+
 		allocatedClaim, err := tCtx.Client().ResourceV1().ResourceClaims(namespace).Get(tCtx, createdClaim.Name, metav1.GetOptions{})
 		tCtx.ExpectNoError(err, fmt.Sprintf("get claim %q", createdClaim.Name))
 		tCtx.Expect(allocatedClaim).To(gomega.HaveField("Status.Allocation", gomega.Not(gomega.BeNil())), "Claim should have been allocated.")
