@@ -24,6 +24,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apimachinery/pkg/util/version"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -77,6 +78,9 @@ func TestValidateScaleForDeclarative(t *testing.T) {
 					// We only need to test both gate enabled and disabled together, because
 					// 1) the DeclarativeValidationTakeover won't take effect if DeclarativeValidation is disabled.
 					// 2) the validation output, when only DeclarativeValidation is enabled, is the same as when both gates are disabled.
+					if !gateVal {
+						featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+					}
 					featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 						features.DeclarativeValidation:         gateVal,
 						features.DeclarativeValidationTakeover: gateVal,
