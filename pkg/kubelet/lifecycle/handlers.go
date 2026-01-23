@@ -94,7 +94,7 @@ func (hr *handlerRunner) Run(ctx context.Context, containerID kubecontainer.Cont
 		}
 		return msg, err
 	case handler.Sleep != nil:
-		err := hr.runSleepHandler(ctx, containerID, pod, handler.Sleep.Seconds)
+		err := hr.runSleepHandler(ctx, containerID, container.Name, pod, handler.Sleep.Seconds)
 		var msg string
 		if err != nil {
 			msg = fmt.Sprintf("Sleep lifecycle hook (%d) for Container %q in Pod %q failed - error: %v", handler.Sleep.Seconds, container.Name, format.Pod(pod), err)
@@ -109,7 +109,7 @@ func (hr *handlerRunner) Run(ctx context.Context, containerID kubecontainer.Cont
 	}
 }
 
-func (hr *handlerRunner) runSleepHandler(ctx context.Context, containerID kubecontainer.ContainerID, pod *v1.Pod, seconds int64) error {
+func (hr *handlerRunner) runSleepHandler(ctx context.Context, containerID kubecontainer.ContainerID, containerName string, pod *v1.Pod, seconds int64) error {
 	logger := klog.FromContext(ctx)
 	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLifecycleSleepAction) {
 		return nil
@@ -139,18 +139,11 @@ func (hr *handlerRunner) runSleepHandler(ctx context.Context, containerID kubeco
 				continue
 			}
 
-			// Find the container in the status
-			for _, containerStatus := range status.ContainerStatuses {
-				if containerStatus.ID == containerID {
-					// Check if container has exited (state is Exited or Unknown)
-					if containerStatus.State == kubecontainer.ContainerStateExited ||
-						containerStatus.State == kubecontainer.ContainerStateUnknown {
-						logger.V(2).Info("Container exited during sleep hook, terminating sleep early",
-							"pod", klog.KObj(pod), "containerID", containerID.String(), "containerState", containerStatus.State)
-						return nil
-					}
-					break
-				}
+			containerStatus := status.FindContainerStatusByName(containerName)
+			if containerStatus != nil && containerStatus.State == kubecontainer.ContainerStateExited {
+				logger.V(2).Info("Container exited during sleep hook, terminating sleep early",
+					"pod", klog.KObj(pod), "containerID", containerID.String(), "containerState", containerStatus.State)
+				return nil
 			}
 		}
 	}
