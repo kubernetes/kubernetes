@@ -49,11 +49,12 @@ import (
 // registerWithAPIServer registers the node with the cluster master. It is safe
 // to call multiple times, but not concurrently (kl.registrationCompleted is
 // not locked).
-func (kl *Kubelet) registerWithAPIServer() {
+func (kl *Kubelet) registerWithAPIServer(ctx context.Context) {
 	if kl.registrationCompleted {
 		return
 	}
 
+	logger := klog.FromContext(ctx)
 	kl.nodeStartupLatencyTracker.RecordAttemptRegisterNode()
 
 	step := 100 * time.Millisecond
@@ -65,16 +66,16 @@ func (kl *Kubelet) registerWithAPIServer() {
 			step = 7 * time.Second
 		}
 
-		node, err := kl.initialNode(context.TODO())
+		node, err := kl.initialNode(ctx)
 		if err != nil {
-			klog.ErrorS(err, "Unable to construct v1.Node object for kubelet")
+			logger.Error(err, "Unable to construct v1.Node object for kubelet")
 			continue
 		}
 
-		klog.InfoS("Attempting to register node", "node", klog.KObj(node))
-		registered := kl.tryRegisterWithAPIServer(node)
+		logger.Info("Attempting to register node", "node", klog.KObj(node))
+		registered := kl.tryRegisterWithAPIServer(ctx, node)
 		if registered {
-			klog.InfoS("Successfully registered node", "node", klog.KObj(node))
+			logger.Info("Successfully registered node", "node", klog.KObj(node))
 			kl.registrationCompleted = true
 			return
 		}
@@ -86,8 +87,9 @@ func (kl *Kubelet) registerWithAPIServer() {
 // successful.  If a node with the same name already exists, it reconciles the
 // value of the annotation for controller-managed attach-detach of attachable
 // persistent volumes for the node.
-func (kl *Kubelet) tryRegisterWithAPIServer(node *v1.Node) bool {
-	_, err := kl.kubeClient.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
+func (kl *Kubelet) tryRegisterWithAPIServer(ctx context.Context, node *v1.Node) bool {
+	logger := klog.FromContext(ctx)
+	_, err := kl.kubeClient.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{})
 	if err == nil {
 		kl.nodeStartupLatencyTracker.RecordRegisteredNewNode()
 		return true
@@ -99,39 +101,39 @@ func (kl *Kubelet) tryRegisterWithAPIServer(node *v1.Node) bool {
 	case apierrors.IsForbidden(err):
 		// Creating nodes is forbidden, but node may still exist, attempt to get the node.
 		if utilfeature.DefaultFeatureGate.Enabled(features.KubeletRegistrationGetOnExistsOnly) {
-			klog.ErrorS(err, "Unable to register node with API server, reason is forbidden", "node", klog.KObj(node))
+			logger.Error(err, "Unable to register node with API server, reason is forbidden", "node", klog.KObj(node))
 			return false
 		}
 	default:
-		klog.ErrorS(err, "Unable to register node with API server", "node", klog.KObj(node))
+		logger.Error(err, "Unable to register node with API server", "node", klog.KObj(node))
 		return false
 	}
 
-	existingNode, err := kl.kubeClient.CoreV1().Nodes().Get(context.TODO(), string(kl.nodeName), metav1.GetOptions{})
+	existingNode, err := kl.kubeClient.CoreV1().Nodes().Get(ctx, string(kl.nodeName), metav1.GetOptions{})
 	if err != nil {
-		klog.ErrorS(err, "Unable to register node with API server, error getting existing node", "node", klog.KObj(node))
+		logger.Error(err, "Unable to register node with API server, error getting existing node", "node", klog.KObj(node))
 		return false
 	}
 
 	if existingNode == nil {
-		klog.InfoS("Unable to register node with API server, no node instance returned", "node", klog.KObj(node))
+		logger.Info("Unable to register node with API server, no node instance returned", "node", klog.KObj(node))
 		return false
 	}
 
 	originalNode := existingNode.DeepCopy()
 
-	klog.InfoS("Node was previously registered", "node", klog.KObj(node))
+	logger.Info("Node was previously registered", "node", klog.KObj(node))
 
 	// Edge case: the node was previously registered; reconcile
 	// the value of the controller-managed attach-detach
 	// annotation.
-	requiresUpdate := kl.reconcileCMADAnnotationWithExistingNode(node, existingNode)
+	requiresUpdate := kl.reconcileCMADAnnotationWithExistingNode(ctx, node, existingNode)
 	requiresUpdate = kl.updateDefaultLabels(node, existingNode) || requiresUpdate
-	requiresUpdate = kl.reconcileExtendedResource(node, existingNode) || requiresUpdate
-	requiresUpdate = kl.reconcileHugePageResource(node, existingNode) || requiresUpdate
+	requiresUpdate = kl.reconcileExtendedResource(ctx, node, existingNode) || requiresUpdate
+	requiresUpdate = kl.reconcileHugePageResource(ctx, node, existingNode) || requiresUpdate
 	if requiresUpdate {
 		if _, _, err := nodeutil.PatchNodeStatus(kl.kubeClient.CoreV1(), types.NodeName(kl.nodeName), originalNode, existingNode); err != nil {
-			klog.ErrorS(err, "Unable to reconcile node with API server,error updating node", "node", klog.KObj(node))
+			logger.Error(err, "Unable to reconcile node with API server,error updating node", "node", klog.KObj(node))
 			return false
 		}
 	}
@@ -140,7 +142,8 @@ func (kl *Kubelet) tryRegisterWithAPIServer(node *v1.Node) bool {
 }
 
 // reconcileHugePageResource will update huge page capacity for each page size and remove huge page sizes no longer supported
-func (kl *Kubelet) reconcileHugePageResource(initialNode, existingNode *v1.Node) bool {
+func (kl *Kubelet) reconcileHugePageResource(ctx context.Context, initialNode, existingNode *v1.Node) bool {
+	logger := klog.FromContext(ctx)
 	requiresUpdate := updateDefaultResources(initialNode, existingNode)
 	supportedHugePageResources := sets.Set[string]{}
 
@@ -179,7 +182,7 @@ func (kl *Kubelet) reconcileHugePageResource(initialNode, existingNode *v1.Node)
 		if !supportedHugePageResources.Has(string(resourceName)) {
 			delete(existingNode.Status.Capacity, resourceName)
 			delete(existingNode.Status.Allocatable, resourceName)
-			klog.InfoS("Removing huge page resource which is no longer supported", "resourceName", resourceName)
+			logger.Info("Removing huge page resource which is no longer supported", "resourceName", resourceName)
 			requiresUpdate = true
 		}
 	}
@@ -187,13 +190,14 @@ func (kl *Kubelet) reconcileHugePageResource(initialNode, existingNode *v1.Node)
 }
 
 // Zeros out extended resource capacity during reconciliation.
-func (kl *Kubelet) reconcileExtendedResource(initialNode, node *v1.Node) bool {
+func (kl *Kubelet) reconcileExtendedResource(ctx context.Context, initialNode, node *v1.Node) bool {
+	logger := klog.FromContext(ctx)
 	requiresUpdate := updateDefaultResources(initialNode, node)
 	// Check with the device manager to see if node has been recreated, in which case extended resources should be zeroed until they are available
 	if kl.containerManager.ShouldResetExtendedResourceCapacity() {
 		for k := range node.Status.Capacity {
 			if v1helper.IsExtendedResourceName(k) {
-				klog.InfoS("Zero out resource capacity in existing node", "resourceName", k, "node", klog.KObj(node))
+				logger.Info("Zero out resource capacity in existing node", "resourceName", k, "node", klog.KObj(node))
 				node.Status.Capacity[k] = *resource.NewQuantity(int64(0), resource.DecimalSI)
 				node.Status.Allocatable[k] = *resource.NewQuantity(int64(0), resource.DecimalSI)
 				requiresUpdate = true
@@ -269,7 +273,8 @@ func (kl *Kubelet) updateDefaultLabels(initialNode, existingNode *v1.Node) bool 
 // reconcileCMADAnnotationWithExistingNode reconciles the controller-managed
 // attach-detach annotation on a new node and the existing node, returning
 // whether the existing node must be updated.
-func (kl *Kubelet) reconcileCMADAnnotationWithExistingNode(node, existingNode *v1.Node) bool {
+func (kl *Kubelet) reconcileCMADAnnotationWithExistingNode(ctx context.Context, node, existingNode *v1.Node) bool {
+	logger := klog.FromContext(ctx)
 	var (
 		existingCMAAnnotation    = existingNode.Annotations[volutil.ControllerManagedAttachAnnotation]
 		newCMAAnnotation, newSet = node.Annotations[volutil.ControllerManagedAttachAnnotation]
@@ -283,10 +288,10 @@ func (kl *Kubelet) reconcileCMADAnnotationWithExistingNode(node, existingNode *v
 	// not have the same value, update the existing node with
 	// the correct value of the annotation.
 	if !newSet {
-		klog.InfoS("Controller attach-detach setting changed to false; updating existing Node")
+		logger.Info("Controller attach-detach setting changed to false; updating existing Node")
 		delete(existingNode.Annotations, volutil.ControllerManagedAttachAnnotation)
 	} else {
-		klog.InfoS("Controller attach-detach setting changed to true; updating existing Node")
+		logger.Info("Controller attach-detach setting changed to true; updating existing Node")
 		if existingNode.Annotations == nil {
 			existingNode.Annotations = make(map[string]string)
 		}
@@ -299,6 +304,7 @@ func (kl *Kubelet) reconcileCMADAnnotationWithExistingNode(node, existingNode *v
 // initialNode constructs the initial v1.Node for this Kubelet, incorporating node
 // labels, information from the cloud provider, and Kubelet configuration.
 func (kl *Kubelet) initialNode(ctx context.Context) (*v1.Node, error) {
+	logger := klog.FromContext(ctx)
 	node := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: string(kl.nodeName),
@@ -340,16 +346,16 @@ func (kl *Kubelet) initialNode(ctx context.Context) (*v1.Node, error) {
 			node.Annotations = make(map[string]string)
 		}
 
-		klog.V(2).InfoS("Setting node annotation to enable volume controller attach/detach")
+		logger.V(2).Info("Setting node annotation to enable volume controller attach/detach")
 		node.Annotations[volutil.ControllerManagedAttachAnnotation] = "true"
 	} else {
-		klog.V(2).InfoS("Controller attach/detach is disabled for this node; Kubelet will attach and detach volumes")
+		logger.V(2).Info("Controller attach/detach is disabled for this node; Kubelet will attach and detach volumes")
 	}
 
 	// @question: should this be place after the call to the cloud provider? which also applies labels
 	for k, v := range kl.nodeLabels {
 		if cv, found := node.ObjectMeta.Labels[k]; found {
-			klog.InfoS("the node label will overwrite default setting", "labelKey", k, "labelValue", v, "default", cv)
+			logger.Info("the node label will overwrite default setting", "labelKey", k, "labelValue", v, "default", cv)
 		}
 		node.ObjectMeta.Labels[k] = v
 	}
@@ -425,7 +431,7 @@ func (kl *Kubelet) fastNodeStatusUpdate(ctx context.Context, timeout bool) (comp
 		return false
 	}
 
-	klog.InfoS("Fast updating node status as it just became ready")
+	logger.Info("Fast updating node status as it just became ready")
 	if _, err := kl.patchNodeStatus(originalNode, node); err != nil {
 		// The originalNode is probably stale, but we know that the current state of kubelet would turn
 		// the node to be ready. Retry using syncNodeStatus() which fetches from the apiserver.
@@ -433,7 +439,7 @@ func (kl *Kubelet) fastNodeStatusUpdate(ctx context.Context, timeout bool) (comp
 
 		// The reversed kl.syncNodeStatusMux.Unlock/Lock() below to allow kl.syncNodeStatus() execution.
 		kl.syncNodeStatusMux.Unlock()
-		kl.syncNodeStatus()
+		kl.syncNodeStatus(ctx)
 		// This lock action is unnecessary if we add a flag to check in the defer before unlocking it,
 		// but having it here makes the logic a bit easier to read.
 		kl.syncNodeStatusMux.Lock()
@@ -446,33 +452,34 @@ func (kl *Kubelet) fastNodeStatusUpdate(ctx context.Context, timeout bool) (comp
 // syncNodeStatus should be called periodically from a goroutine.
 // It synchronizes node status to master if there is any change or enough time
 // passed from the last sync, registering the kubelet first if necessary.
-func (kl *Kubelet) syncNodeStatus() {
+func (kl *Kubelet) syncNodeStatus(ctx context.Context) {
 	kl.syncNodeStatusMux.Lock()
 	defer kl.syncNodeStatusMux.Unlock()
-	ctx := context.Background()
+	logger := klog.FromContext(ctx)
 
 	if kl.kubeClient == nil || kl.heartbeatClient == nil {
 		return
 	}
 	if kl.registerNode {
 		// This will exit immediately if it doesn't need to do anything.
-		kl.registerWithAPIServer()
+		kl.registerWithAPIServer(ctx)
 	}
 	if err := kl.updateNodeStatus(ctx); err != nil {
-		klog.ErrorS(err, "Unable to update node status")
+		logger.Error(err, "Unable to update node status")
 	}
 }
 
 // updateNodeStatus updates node status to master with retries if there is any
 // change or enough time passed from the last sync.
 func (kl *Kubelet) updateNodeStatus(ctx context.Context) error {
-	klog.V(5).InfoS("Updating node status")
+	logger := klog.FromContext(ctx)
+	logger.V(5).Info("Updating node status")
 	for i := 0; i < nodeStatusUpdateRetry; i++ {
 		if err := kl.tryUpdateNodeStatus(ctx, i); err != nil {
 			if i > 0 && kl.onRepeatedHeartbeatFailure != nil {
 				kl.onRepeatedHeartbeatFailure()
 			}
-			klog.ErrorS(err, "Error updating node status, will retry")
+			logger.Error(err, "Error updating node status, will retry")
 		} else {
 			return nil
 		}
@@ -545,6 +552,7 @@ func (kl *Kubelet) calculateDelay() time.Duration {
 // It returns the updated node object and a bool indicating if anything has been changed.
 func (kl *Kubelet) updateNode(ctx context.Context, originalNode *v1.Node) (*v1.Node, bool) {
 	node := originalNode.DeepCopy()
+	logger := klog.FromContext(ctx)
 
 	podCIDRChanged := false
 	if len(node.Spec.PodCIDRs) != 0 {
@@ -554,7 +562,7 @@ func (kl *Kubelet) updateNode(ctx context.Context, originalNode *v1.Node) (*v1.N
 		var err error
 		podCIDRs := strings.Join(node.Spec.PodCIDRs, ",")
 		if podCIDRChanged, err = kl.updatePodCIDR(ctx, podCIDRs); err != nil {
-			klog.ErrorS(err, "Error updating pod CIDR")
+			logger.Error(err, "Error updating pod CIDR")
 		}
 	}
 
@@ -630,8 +638,9 @@ func (kl *Kubelet) markVolumesFromNode(node *v1.Node) {
 
 // recordNodeStatusEvent records an event of the given type with the given
 // message for the node.
-func (kl *Kubelet) recordNodeStatusEvent(eventType, event string) {
-	klog.V(2).InfoS("Recording event message for node", "node", klog.KRef("", string(kl.nodeName)), "event", event)
+func (kl *Kubelet) recordNodeStatusEvent(ctx context.Context, eventType, event string) {
+	logger := klog.FromContext(ctx)
+	logger.V(2).Info("Recording event message for node", "node", klog.KRef("", string(kl.nodeName)), "event", event)
 	kl.recorder.Eventf(kl.nodeRef, eventType, event, "Node %s status is now: %s", kl.nodeName, event)
 }
 
@@ -646,9 +655,9 @@ func (kl *Kubelet) recordNodeSchedulableEvent(ctx context.Context, node *v1.Node
 	defer kl.lastNodeUnschedulableLock.Unlock()
 	if kl.lastNodeUnschedulable != node.Spec.Unschedulable {
 		if node.Spec.Unschedulable {
-			kl.recordNodeStatusEvent(v1.EventTypeNormal, events.NodeNotSchedulable)
+			kl.recordNodeStatusEvent(ctx, v1.EventTypeNormal, events.NodeNotSchedulable)
 		} else {
-			kl.recordNodeStatusEvent(v1.EventTypeNormal, events.NodeSchedulable)
+			kl.recordNodeStatusEvent(ctx, v1.EventTypeNormal, events.NodeSchedulable)
 		}
 		kl.lastNodeUnschedulable = node.Spec.Unschedulable
 	}
@@ -660,10 +669,11 @@ func (kl *Kubelet) recordNodeSchedulableEvent(ctx context.Context, node *v1.Node
 // TODO(madhusudancs): Simplify the logic for setting node conditions and
 // refactor the node status condition code out to a different file.
 func (kl *Kubelet) setNodeStatus(ctx context.Context, node *v1.Node) {
+	logger := klog.FromContext(ctx)
 	for i, f := range kl.setNodeStatusFuncs {
-		klog.V(5).InfoS("Setting node status condition code", "position", i, "node", klog.KObj(node))
+		logger.V(5).Info("Setting node status condition code", "position", i, "node", klog.KObj(node))
 		if err := f(ctx, node); err != nil {
-			klog.ErrorS(err, "Failed to set some node status fields", "node", klog.KObj(node))
+			logger.Error(err, "Failed to set some node status fields", "node", klog.KObj(node))
 		}
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.NodeDeclaredFeatures) && kl.nodeDeclaredFeatures != nil {

@@ -1371,10 +1371,11 @@ func TestRegisterWithApiServer(t *testing.T) {
 		MemoryCapacity: 1024,
 	}
 	kubelet.setCachedMachineInfo(machineInfo)
+	tCtx := ktesting.Init(t)
 
 	done := make(chan struct{})
 	go func() {
-		kubelet.registerWithAPIServer()
+		kubelet.registerWithAPIServer(tCtx)
 		done <- struct{}{}
 	}()
 	select {
@@ -1552,7 +1553,8 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 			})
 			addNotImplatedReaction(kubeClient)
 
-			result := kubelet.tryRegisterWithAPIServer(tc.newNode)
+			tCtx := ktesting.Init(t)
+			result := kubelet.tryRegisterWithAPIServer(tCtx, tc.newNode)
 			require.Equal(t, tc.expectedResult, result, "test [%s]", tc.name)
 
 			actions := kubeClient.Actions()
@@ -2452,8 +2454,9 @@ func TestReconcileHugePageResource(t *testing.T) {
 		t.Run(tc.name, func(T *testing.T) {
 			defer testKubelet.Cleanup()
 			kubelet := testKubelet.kubelet
+			tCtx := ktesting.Init(T)
 
-			needsUpdate := kubelet.reconcileHugePageResource(tc.initialNode, tc.existingNode)
+			needsUpdate := kubelet.reconcileHugePageResource(tCtx, tc.initialNode, tc.existingNode)
 			assert.Equal(t, tc.needsUpdate, needsUpdate, tc.name)
 			assert.Equal(t, tc.expectedNode, tc.existingNode, tc.name)
 		})
@@ -2640,8 +2643,9 @@ func TestReconcileExtendedResource(t *testing.T) {
 	for _, tc := range cases {
 		defer testKubelet.Cleanup()
 		kubelet := testKubelet.kubelet
+		tCtx := ktesting.Init(t)
 
-		needsUpdate := kubelet.reconcileExtendedResource(tc.initialNode, tc.existingNode)
+		needsUpdate := kubelet.reconcileExtendedResource(tCtx, tc.initialNode, tc.existingNode)
 		assert.Equal(t, tc.needsUpdate, needsUpdate, tc.name)
 		assert.Equal(t, tc.expectedNode, tc.existingNode, tc.name)
 	}
@@ -2773,7 +2777,8 @@ func TestRegisterWithApiServerWithTaint(t *testing.T) {
 	kubelet.registrationCompleted = false
 
 	// Register node to apiserver.
-	kubelet.registerWithAPIServer()
+	tCtx := ktesting.Init(t)
+	kubelet.registerWithAPIServer(tCtx)
 
 	// Check the unschedulable taint.
 	got := gotNode.(*v1.Node)

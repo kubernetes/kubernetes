@@ -20,6 +20,7 @@ limitations under the License.
 package nodeshutdown
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -55,7 +56,7 @@ type managerImpl struct {
 	nodeRef  *v1.ObjectReference
 
 	getPods        eviction.ActivePodsFunc
-	syncNodeStatus func()
+	syncNodeStatus func(context.Context)
 
 	nodeShuttingDownMutex sync.Mutex
 	nodeShuttingDownNow   bool
@@ -63,6 +64,7 @@ type managerImpl struct {
 
 	enableMetrics bool
 	storage       storage
+	syncCtx       context.Context
 }
 
 // NewManager returns a new node shutdown manager.
@@ -135,8 +137,10 @@ func (m *managerImpl) setMetrics() {
 }
 
 // Start starts the node shutdown manager and will start watching the node for shutdown events.
-func (m *managerImpl) Start() error {
+func (m *managerImpl) Start(ctx context.Context) error {
 	m.logger.V(1).Info("Shutdown manager get started")
+
+	m.syncCtx = klog.NewContext(ctx, m.logger)
 
 	_, err := m.start()
 
@@ -246,7 +250,11 @@ func (m *managerImpl) ProcessShutdownEvent() error {
 	m.nodeShuttingDownNow = true
 	m.nodeShuttingDownMutex.Unlock()
 
-	go m.syncNodeStatus()
+	ctx := m.syncCtx
+	if ctx == nil {
+		ctx = klog.NewContext(context.Background(), m.logger)
+	}
+	go m.syncNodeStatus(ctx)
 
 	m.logger.V(1).Info("Shutdown manager processing preshutdown event")
 	activePods := m.getPods()

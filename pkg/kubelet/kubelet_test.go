@@ -406,7 +406,7 @@ func newTestKubeletWithImageList(
 		NodeRef:                         nodeRef,
 		GetPodsFunc:                     kubelet.podManager.GetPods,
 		KillPodFunc:                     killPodNow(kubelet.podWorkers, fakeRecorder),
-		SyncNodeStatusFunc:              func() {},
+		SyncNodeStatusFunc:              func(context.Context) {},
 		ShutdownGracePeriodRequested:    0,
 		ShutdownGracePeriodCriticalPods: 0,
 	})
@@ -3095,11 +3095,12 @@ func TestSyncLabels(t *testing.T) {
 			defer testKubelet.Cleanup()
 			kl := testKubelet.kubelet
 			kubeClient := testKubelet.fakeKubeClient
+			tCtx := ktesting.Init(t)
 
 			test.existingNode.Name = string(kl.nodeName)
 
 			kl.nodeLister = testNodeLister{nodes: []*v1.Node{test.existingNode}}
-			go func() { kl.syncNodeStatus() }()
+			go func() { kl.syncNodeStatus(tCtx) }()
 
 			err := retryWithExponentialBackOff(
 				100*time.Millisecond,

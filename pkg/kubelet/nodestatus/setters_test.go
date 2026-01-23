@@ -1342,7 +1342,7 @@ func TestReadyCondition(t *testing.T) {
 				return tc.nodeShutdownManagerErrors
 			}
 			events := []testEvent{}
-			recordEventFunc := func(eventType, event string) {
+			recordEventFunc := func(ctx context.Context, eventType, event string) {
 				events = append(events, testEvent{
 					eventType: eventType,
 					event:     event,
@@ -1461,7 +1461,7 @@ func TestMemoryPressureCondition(t *testing.T) {
 		t.Run(tc.desc, func(t *testing.T) {
 			ctx := ktesting.Init(t)
 			events := []testEvent{}
-			recordEventFunc := func(eventType, event string) {
+			recordEventFunc := func(ctx context.Context, eventType, event string) {
 				events = append(events, testEvent{
 					eventType: eventType,
 					event:     event,
@@ -1583,7 +1583,7 @@ func TestPIDPressureCondition(t *testing.T) {
 		t.Run(tc.desc, func(t *testing.T) {
 			ctx := ktesting.Init(t)
 			events := []testEvent{}
-			recordEventFunc := func(eventType, event string) {
+			recordEventFunc := func(ctx context.Context, eventType, event string) {
 				events = append(events, testEvent{
 					eventType: eventType,
 					event:     event,
@@ -1705,7 +1705,7 @@ func TestDiskPressureCondition(t *testing.T) {
 		t.Run(tc.desc, func(t *testing.T) {
 			ctx := ktesting.Init(t)
 			events := []testEvent{}
-			recordEventFunc := func(eventType, event string) {
+			recordEventFunc := func(ctx context.Context, eventType, event string) {
 				events = append(events, testEvent{
 					eventType: eventType,
 					event:     event,
