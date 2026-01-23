@@ -15,7 +15,6 @@
 OS ?= linux
 ARCH ?= amd64
 TARGET ?= $(CURDIR)
-GOARM = 7
 GOLANG_VERSION ?= latest
 SRC_DIR = $(notdir $(shell pwd))
 KUBE_CROSS_VERSION ?= $(shell cat ../../../build/build-image/cross/VERSION)
@@ -32,6 +31,6 @@ bin:
 			cd /go/src/k8s.io/sample-apiserver && \
 			git checkout tags/v0.33.7 && \
 			go mod tidy && \
-			GO111MODULE=on CGO_ENABLED=0 GOARM=${GOARM} GOOS=${OS} GOARCH=${ARCH} go build -o ${TARGET}/sample-apiserver ."
+			GO111MODULE=on CGO_ENABLED=0 GOOS=${OS} GOARCH=${ARCH} go build -o ${TARGET}/sample-apiserver ."
 
 .PHONY: bin

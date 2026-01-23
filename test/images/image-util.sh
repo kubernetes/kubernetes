@@ -259,18 +259,15 @@ build_and_push() {
 }
 
 # This function is for building the go code
+# shellcheck disable=SC2153
 bin() {
-  local arch_prefix=""
-  if [[ "${ARCH:-}" == "arm" ]]; then
-    arch_prefix="GOARM=${GOARM:-7}"
-  fi
   for SRC in "$@";
   do
   docker run --rm -v "${TARGET}:${TARGET}:Z" -v "${KUBE_ROOT}":/go/src/k8s.io/kubernetes:Z \
         golang:"${GOLANG_VERSION}" \
         /bin/bash -c "\
                 cd /go/src/k8s.io/kubernetes/test/images/${SRC_DIR} && \
-                CGO_ENABLED=0 ${arch_prefix} GOOS=${OS} GOARCH=${ARCH} go build -a -installsuffix cgo --ldflags \"-w ${LD_FLAGS:-}\" -o ${TARGET}/${SRC} ./$(dirname "${SRC}")"
+                CGO_ENABLED=0 GOOS=${OS} GOARCH=${ARCH} go build -a -installsuffix cgo --ldflags \"-w ${LD_FLAGS:-}\" -o ${TARGET}/${SRC} ./$(dirname "${SRC}")"
   done
 }
 
