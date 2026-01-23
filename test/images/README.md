@@ -12,12 +12,12 @@ new images, test the changes made, promote the newly built staging images.
 ## Prerequisites
 
 In order to build the docker test images, a Linux node is required. The node will require `make`,
-`docker (version 19.03.0 or newer)`, and ``docker buildx``, which will be used to build multiarch
+`docker`, and ``docker buildx``, which will be used to build multiarch
 images, as well as Windows images. In order to properly build multi-arch and Windows images, some
 initialization is required (in CI this is done in [cloudbuild.yaml](cloudbuild.yaml)):
 
 ```shell
-docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+docker run --privileged --rm tonistiigi/binfmt --install all
 docker buildx create --name img-builder --use
 docker buildx inspect --bootstrap
 ```
@@ -37,7 +37,7 @@ last known stable version.
 
 Most tests used in E2E testing suite use the `agnhost` image. It contains several subcommands with
 different [functionalities](agnhost/README.md) used to validate different Kubernetes behaviors. If
-a new functionality needs testing, consider adding an `agnhost` subcommand for it first, before
+a new functionality needs testing, add it as an `agnhost` subcommand first, before
 creating an entirely separate test image.
 
 The general process of making updates to the images is as follows:
