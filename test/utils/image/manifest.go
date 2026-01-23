@@ -217,25 +217,25 @@ func initImageConfigs(list RegistryList) (map[ImageID]Config, map[ImageID]Config
 	configs[DistrolessIptables] = Config{list.BuildImageRegistry, "distroless-iptables", "v0.8.6"}
 	configs[Etcd] = Config{list.GcEtcdRegistry, "etcd", "3.6.7-0"}
 	configs[InvalidRegistryImage] = Config{list.InvalidRegistry, "alpine", "3.1"}
-	configs[IpcUtils] = Config{list.PromoterE2eRegistry, "ipc-utils", "1.3"}
+	configs[IpcUtils] = Config{list.PromoterE2eRegistry, "ipc-utils", "1.4"}
 	configs[GlibcDnsTesting] = Config{list.PromoterE2eRegistry, "glibc-dns-testing", "2.0.0"}
-	configs[Kitten] = Config{list.PromoterE2eRegistry, "kitten", "1.7"}
-	configs[Nautilus] = Config{list.PromoterE2eRegistry, "nautilus", "1.7"}
+	configs[Kitten] = Config{list.PromoterE2eRegistry, "kitten", "1.8"}
+	configs[Nautilus] = Config{list.PromoterE2eRegistry, "nautilus", "1.8"}
 	configs[NFSProvisioner] = Config{list.SigStorageRegistry, "nfs-provisioner", "v4.0.8"}
-	configs[Nginx] = Config{list.PromoterE2eRegistry, "nginx", "1.14-4"}
-	configs[NginxNew] = Config{list.PromoterE2eRegistry, "nginx", "1.15-4"}
-	configs[NodePerfNpbEp] = Config{list.PromoterE2eRegistry, "node-perf/npb-ep", "1.2"}
-	configs[NodePerfNpbIs] = Config{list.PromoterE2eRegistry, "node-perf/npb-is", "1.2"}
+	configs[Nginx] = Config{list.PromoterE2eRegistry, "nginx", "1.15-4"}
+	configs[NginxNew] = Config{list.PromoterE2eRegistry, "nginx", "1.27-0"}
+	configs[NodePerfNpbEp] = Config{list.PromoterE2eRegistry, "node-perf/npb-ep", "1.6.0"}
+	configs[NodePerfNpbIs] = Config{list.PromoterE2eRegistry, "node-perf/npb-is", "1.7.0"}
 	configs[NodePerfPytorchWideDeep] = Config{list.PromoterE2eRegistry, "node-perf/pytorch-wide-deep", "1.0.0"}
-	configs[Nonewprivs] = Config{list.PromoterE2eRegistry, "nonewprivs", "1.3"}
-	configs[NonRoot] = Config{list.PromoterE2eRegistry, "nonroot", "1.4"}
+	configs[Nonewprivs] = Config{list.PromoterE2eRegistry, "nonewprivs", "1.4"}
+	configs[NonRoot] = Config{list.PromoterE2eRegistry, "nonroot", "1.5"}
 	// Pause - when these values are updated, also update cmd/kubelet/app/options/container_runtime.go
 	configs[Pause] = Config{list.GcRegistry, "pause", "3.10.1"}
 	configs[Perl] = Config{list.PromoterE2eRegistry, "perl", "5.26"}
 	configs[RegressionIssue74839] = Config{list.PromoterE2eRegistry, "regression-issue-74839", "1.4"}
-	configs[ResourceConsumer] = Config{list.PromoterE2eRegistry, "resource-consumer", "1.13"}
-	configs[VolumeNFSServer] = Config{list.PromoterE2eRegistry, "volume/nfs", "1.4"}
-	configs[VolumeISCSIServer] = Config{list.PromoterE2eRegistry, "volume/iscsi", "2.6"}
+	configs[ResourceConsumer] = Config{list.PromoterE2eRegistry, "resource-consumer", "1.14"}
+	configs[VolumeNFSServer] = Config{list.PromoterE2eRegistry, "volume/nfs", "1.6.0"}
+	configs[VolumeISCSIServer] = Config{list.PromoterE2eRegistry, "volume/iscsi", "2.7"}
 
 	// This adds more config entries. Those have no pre-defined ImageID number,
 	// but will be used via ReplaceRegistryInImageURL when deploying
