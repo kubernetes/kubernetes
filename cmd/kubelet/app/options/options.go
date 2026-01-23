@@ -89,6 +89,7 @@ type KubeletFlags struct {
 	// KubeletDropinConfigDirectory is the path to a directory containing drop-in configuration files that override settings from defaults and the --config file.
 	// The path may be absolute or relative; relative paths are under the Kubelet's current working directory.
 	// Drop-in files must have a '.conf' suffix and are processed in lexical order. Only '.conf' files are loaded; all other files are ignored.
+	// All .conf files in the directory and its subdirectories are processed in lexical order.
 	KubeletDropinConfigDirectory string
 
 	// WindowsService should be set to true if kubelet is running as a service on Windows.
@@ -278,7 +279,7 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 	f.addOSFlags(fs)
 
 	fs.StringVar(&f.KubeletConfigFile, "config", f.KubeletConfigFile, "The Kubelet will load its initial configuration from this file. The path may be absolute or relative; relative paths start at the Kubelet's current working directory. Omit this flag to use the built-in default configuration values. Command-line flags override configuration from this file.")
-	fs.StringVar(&f.KubeletDropinConfigDirectory, "config-dir", "", "Path to a directory containing drop-in configuration files that override settings from defaults and the --config file. The path may be absolute or relative; relative paths start at the Kubelet's current working directory. Drop-in files must have a '.conf' suffix (e.g., '99-kubelet-address.conf') and are processed in lexical order. Only '.conf' files are loaded; all other files are ignored. [default='']")
+	fs.StringVar(&f.KubeletDropinConfigDirectory, "config-dir", "", "Path to a directory containing drop-in configuration files that override settings from defaults and the --config file. The path may be absolute or relative; relative paths start at the Kubelet's current working directory. Drop-in files must have a '.conf' suffix (e.g., '99-kubelet-address.conf') and are processed in lexical order. Only '.conf' files are loaded; all other files are ignored. All .conf files in the directory and its subdirectories are processed in lexical order. [default='']")
 	fs.StringVar(&f.KubeConfig, "kubeconfig", f.KubeConfig, "Path to a kubeconfig file, specifying how to connect to the API server. Providing --kubeconfig enables API server mode, omitting --kubeconfig enables standalone mode.")
 
 	fs.StringVar(&f.BootstrapKubeconfig, "bootstrap-kubeconfig", f.BootstrapKubeconfig, "Path to a kubeconfig file that will be used to get client certificate for kubelet. "+
