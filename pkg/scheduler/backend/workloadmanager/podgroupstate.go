@@ -48,8 +48,8 @@ func newPodGroupKey(namespace string, workloadRef *v1.WorkloadReference) podGrou
 	}
 }
 
-// podGroupInfo holds the runtime state of a pod group.
-type podGroupInfo struct {
+// podGroupState holds the runtime state of a pod group.
+type podGroupState struct {
 	lock sync.RWMutex
 	// allPods tracks all pods belonging to the group that are known to the scheduler.
 	allPods map[types.UID]*v1.Pod
@@ -66,8 +66,8 @@ type podGroupInfo struct {
 	schedulingDeadline *time.Time
 }
 
-func newPodGroupInfo() *podGroupInfo {
-	return &podGroupInfo{
+func newPodGroupState() *podGroupState {
+	return &podGroupState{
 		allPods:         make(map[types.UID]*v1.Pod),
 		unscheduledPods: sets.New[types.UID](),
 		assumedPods:     sets.New[types.UID](),
@@ -77,7 +77,7 @@ func newPodGroupInfo() *podGroupInfo {
 
 // addPod adds the pod to this group.
 // Depending on the NodeName, it can insert the pod to assignedPods set.
-func (pgs *podGroupInfo) addPod(pod *v1.Pod) {
+func (pgs *podGroupState) addPod(pod *v1.Pod) {
 	pgs.lock.Lock()
 	defer pgs.lock.Unlock()
 
@@ -91,7 +91,7 @@ func (pgs *podGroupInfo) addPod(pod *v1.Pod) {
 
 // updatePod updates the pod in this group.
 // In case of binding, it moves the pod to assignedPods.
-func (pgs *podGroupInfo) updatePod(oldPod, newPod *v1.Pod) {
+func (pgs *podGroupState) updatePod(oldPod, newPod *v1.Pod) {
 	pgs.lock.Lock()
 	defer pgs.lock.Unlock()
 
@@ -105,7 +105,7 @@ func (pgs *podGroupInfo) updatePod(oldPod, newPod *v1.Pod) {
 }
 
 // deletePod completely deletes the pod from this group.
-func (pgs *podGroupInfo) deletePod(podUID types.UID) {
+func (pgs *podGroupState) deletePod(podUID types.UID) {
 	pgs.lock.Lock()
 	defer pgs.lock.Unlock()
 
@@ -116,7 +116,7 @@ func (pgs *podGroupInfo) deletePod(podUID types.UID) {
 }
 
 // empty returns true when the group is empty.
-func (pgs *podGroupInfo) empty() bool {
+func (pgs *podGroupState) empty() bool {
 	pgs.lock.Lock()
 	defer pgs.lock.Unlock()
 
@@ -124,7 +124,7 @@ func (pgs *podGroupInfo) empty() bool {
 }
 
 // AllPods returns the UIDs of all pods known to the scheduler for this group.
-func (pgs *podGroupInfo) AllPods() sets.Set[types.UID] {
+func (pgs *podGroupState) AllPods() sets.Set[types.UID] {
 	pgs.lock.RLock()
 	defer pgs.lock.RUnlock()
 
@@ -134,7 +134,7 @@ func (pgs *podGroupInfo) AllPods() sets.Set[types.UID] {
 // UnscheduledPods returns all pods that are unscheduled for this group,
 // i.e., are neither assumed nor assigned.
 // The returned map type corresponds to the argument of the PodActivator.Activate method.
-func (pgs *podGroupInfo) UnscheduledPods() map[string]*v1.Pod {
+func (pgs *podGroupState) UnscheduledPods() map[string]*v1.Pod {
 	pgs.lock.RLock()
 	defer pgs.lock.RUnlock()
 
@@ -148,7 +148,7 @@ func (pgs *podGroupInfo) UnscheduledPods() map[string]*v1.Pod {
 
 // AssumedPods returns the UIDs of all pods for this group in the assumed state,
 // i.e., passed the Reserve gate.
-func (pgs *podGroupInfo) AssumedPods() sets.Set[types.UID] {
+func (pgs *podGroupState) AssumedPods() sets.Set[types.UID] {
 	pgs.lock.RLock()
 	defer pgs.lock.RUnlock()
 
@@ -156,7 +156,7 @@ func (pgs *podGroupInfo) AssumedPods() sets.Set[types.UID] {
 }
 
 // AssignedPods returns the UIDs of all pods already assigned (bound) for this group.
-func (pgs *podGroupInfo) AssignedPods() sets.Set[types.UID] {
+func (pgs *podGroupState) AssignedPods() sets.Set[types.UID] {
 	pgs.lock.RLock()
 	defer pgs.lock.RUnlock()
 
@@ -165,7 +165,7 @@ func (pgs *podGroupInfo) AssignedPods() sets.Set[types.UID] {
 
 // SchedulingTimeout returns the remaining time until the pod group scheduling times out.
 // A new deadline is created if one doesn't exist, or if the previous one has expired.
-func (pgs *podGroupInfo) SchedulingTimeout() time.Duration {
+func (pgs *podGroupState) SchedulingTimeout() time.Duration {
 	pgs.lock.Lock()
 	defer pgs.lock.Unlock()
 
@@ -179,7 +179,7 @@ func (pgs *podGroupInfo) SchedulingTimeout() time.Duration {
 }
 
 // AssumePod marks a pod as having reached the Reserve stage.
-func (pgs *podGroupInfo) AssumePod(podUID types.UID) {
+func (pgs *podGroupState) AssumePod(podUID types.UID) {
 	pgs.lock.Lock()
 	defer pgs.lock.Unlock()
 
@@ -188,7 +188,7 @@ func (pgs *podGroupInfo) AssumePod(podUID types.UID) {
 }
 
 // ForgetPod removes a pod from the assumed state.
-func (pgs *podGroupInfo) ForgetPod(podUID types.UID) {
+func (pgs *podGroupState) ForgetPod(podUID types.UID) {
 	pgs.lock.Lock()
 	defer pgs.lock.Unlock()
 

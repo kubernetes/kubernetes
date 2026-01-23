@@ -25,41 +25,41 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-func TestPodGroupInfo_AssumeForget(t *testing.T) {
-	pgi := newPodGroupInfo()
+func TestPodGroupState_AssumeForget(t *testing.T) {
+	pgs := newPodGroupState()
 	pod := st.MakePod().Namespace("ns1").Name("p1").UID("p1").
 		WorkloadRef(&v1.WorkloadReference{Name: "w1", PodGroup: "pg1"}).Obj()
 
-	pgi.addPod(pod)
-	if pgi.AssumedPods().Has(pod.UID) {
+	pgs.addPod(pod)
+	if pgs.AssumedPods().Has(pod.UID) {
 		t.Fatal("AssumedPods should be initially empty")
 	}
-	if !pgi.unscheduledPods.Has(pod.UID) {
+	if !pgs.unscheduledPods.Has(pod.UID) {
 		t.Fatal("Pod should be initially in UnscheduledPods")
 	}
 
-	pgi.AssumePod(pod.UID)
-	if !pgi.AssumedPods().Has(pod.UID) {
+	pgs.AssumePod(pod.UID)
+	if !pgs.AssumedPods().Has(pod.UID) {
 		t.Fatal("Pod should be in AssumedPods after AssumePod")
 	}
-	if pgi.unscheduledPods.Has(pod.UID) {
+	if pgs.unscheduledPods.Has(pod.UID) {
 		t.Fatal("UnscheduledPods should be empty after AssumePod")
 	}
 
-	pgi.ForgetPod(pod.UID)
-	if pgi.AssumedPods().Has(pod.UID) {
+	pgs.ForgetPod(pod.UID)
+	if pgs.AssumedPods().Has(pod.UID) {
 		t.Fatal("Pod should not be in AssumedPods after ForgetPod")
 	}
-	if !pgi.unscheduledPods.Has(pod.UID) {
+	if !pgs.unscheduledPods.Has(pod.UID) {
 		t.Fatal("Pod should be in UnscheduledPods after ForgetPod")
 	}
 }
 
-func TestPodGroupInfo_SchedulingTimeout(t *testing.T) {
-	pgi := newPodGroupInfo()
+func TestPodGroupState_SchedulingTimeout(t *testing.T) {
+	pgs := newPodGroupState()
 
-	timeout := pgi.SchedulingTimeout()
-	if pgi.schedulingDeadline == nil {
+	timeout := pgs.SchedulingTimeout()
+	if pgs.schedulingDeadline == nil {
 		t.Fatal("Scheduling deadline should be set after SchedulingTimeout call, but is nil")
 	}
 	if timeout <= 0 {
@@ -70,10 +70,10 @@ func TestPodGroupInfo_SchedulingTimeout(t *testing.T) {
 	// especially when testing on Windows machines with lower resolution.
 	time.Sleep(10 * time.Millisecond)
 
-	deadline := *pgi.schedulingDeadline
-	newTimeout := pgi.SchedulingTimeout()
-	if !deadline.Equal(*pgi.schedulingDeadline) {
-		t.Errorf("Previous deadline should not be changed: previous: %v, current: %v", deadline, *pgi.schedulingDeadline)
+	deadline := *pgs.schedulingDeadline
+	newTimeout := pgs.SchedulingTimeout()
+	if !deadline.Equal(*pgs.schedulingDeadline) {
+		t.Errorf("Previous deadline should not be changed: previous: %v, current: %v", deadline, *pgs.schedulingDeadline)
 	}
 	if newTimeout >= timeout {
 		t.Errorf("Expected lower timeout duration: previous: %v, current: %v", timeout, newTimeout)
@@ -83,9 +83,9 @@ func TestPodGroupInfo_SchedulingTimeout(t *testing.T) {
 	// especially when testing on Windows machines with lower resolution.
 	time.Sleep(10 * time.Millisecond)
 
-	pgi.schedulingDeadline = ptr.To(time.Now().Add(-1 * time.Second))
-	newTimeout = pgi.SchedulingTimeout()
-	if deadline.Equal(*pgi.schedulingDeadline) {
+	pgs.schedulingDeadline = ptr.To(time.Now().Add(-1 * time.Second))
+	newTimeout = pgs.SchedulingTimeout()
+	if deadline.Equal(*pgs.schedulingDeadline) {
 		t.Error("Deadline should be reset after it has expired, but it wasn't")
 	}
 	if newTimeout <= 0 {
