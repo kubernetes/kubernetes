@@ -143,6 +143,11 @@ var numericFormatSchema *spec.Schema = &spec.Schema{
 					Format: "int32",
 				},
 			},
+			"unrelated": {
+				SchemaProps: spec.SchemaProps{
+					Type: spec.StringOrArray{"string"},
+				},
+			},
 		},
 	},
 }
@@ -155,6 +160,15 @@ func TestNumericFormatRatcheting(t *testing.T) {
 		"intThirtyTwo": int64(math.MaxInt32 + 1),
 	}, map[string]interface{}{
 		"intThirtyTwo": int64(math.MaxInt32 + 1),
+	}, validation.WithRatcheting(nil)).IsValid())
+
+	// Ratcheting should allow existing invalid value if other fields change
+	assert.True(t, validator.ValidateUpdate(map[string]interface{}{
+		"intThirtyTwo": int64(math.MaxInt32 + 1),
+		"unrelated":    "changed",
+	}, map[string]interface{}{
+		"intThirtyTwo": int64(math.MaxInt32 + 1),
+		"unrelated":    "original",
 	}, validation.WithRatcheting(nil)).IsValid())
 
 	// Should fail if value changes to another invalid value
