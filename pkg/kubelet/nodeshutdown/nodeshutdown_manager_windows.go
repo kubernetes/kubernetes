@@ -20,6 +20,7 @@ limitations under the License.
 package nodeshutdown
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -55,7 +56,7 @@ type managerImpl struct {
 	nodeRef  *v1.ObjectReference
 
 	getPods        eviction.ActivePodsFunc
-	syncNodeStatus func()
+	syncNodeStatus func(context.Context)
 
 	nodeShuttingDownMutex sync.Mutex
 	nodeShuttingDownNow   bool
@@ -246,7 +247,10 @@ func (m *managerImpl) ProcessShutdownEvent() error {
 	m.nodeShuttingDownNow = true
 	m.nodeShuttingDownMutex.Unlock()
 
-	go m.syncNodeStatus()
+	// ProcessShutdownEvent is invoked by the Windows service handler without an upper-level context.
+	// Use Background to avoid cancellation propagation while preserving structured logging.
+	nodeStatusCtx := klog.NewContext(context.Background(), m.logger)
+	go m.syncNodeStatus(nodeStatusCtx)
 
 	m.logger.V(1).Info("Shutdown manager processing preshutdown event")
 	activePods := m.getPods()

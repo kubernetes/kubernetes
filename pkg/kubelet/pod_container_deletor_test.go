@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/klog/v2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -79,7 +80,7 @@ func TestGetContainersToDeleteInPodWithFilter(t *testing.T) {
 	}
 
 	for _, test := range testCases {
-		candidates := getContainersToDeleteInPod("4", &pod, test.containersToKeep)
+		candidates := getContainersToDeleteInPod("4", &pod, test.containersToKeep, klog.Background())
 		if !reflect.DeepEqual(candidates, test.expectedContainersToDelete) {
 			t.Errorf("expected %v got %v", test.expectedContainersToDelete, candidates)
 		}
@@ -141,7 +142,7 @@ func TestGetContainersToDeleteInPod(t *testing.T) {
 	}
 
 	for _, test := range testCases {
-		candidates := getContainersToDeleteInPod("", &pod, test.containersToKeep)
+		candidates := getContainersToDeleteInPod("", &pod, test.containersToKeep, klog.Background())
 		if !reflect.DeepEqual(candidates, test.expectedContainersToDelete) {
 			t.Errorf("expected %v got %v", test.expectedContainersToDelete, candidates)
 		}
@@ -195,7 +196,7 @@ func TestGetContainersToDeleteInPodWithNoMatch(t *testing.T) {
 	}
 
 	for _, test := range testCases {
-		candidates := getContainersToDeleteInPod(test.filterID, &pod, len(pod.ContainerStatuses))
+		candidates := getContainersToDeleteInPod(test.filterID, &pod, len(pod.ContainerStatuses), klog.Background())
 		if !reflect.DeepEqual(candidates, test.expectedContainersToDelete) {
 			t.Errorf("expected %v got %v", test.expectedContainersToDelete, candidates)
 		}

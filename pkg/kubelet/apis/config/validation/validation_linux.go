@@ -23,6 +23,7 @@ import (
 	"math"
 
 	libcontainercgroups "github.com/opencontainers/cgroups"
+	"k8s.io/klog/v2"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/utils/ptr"
 )
@@ -30,7 +31,7 @@ import (
 const userNsUnitLength = 65536
 
 // validateKubeletOSConfiguration validates os specific kubelet configuration and returns an error if it is invalid.
-func validateKubeletOSConfiguration(kc *kubeletconfig.KubeletConfiguration) error {
+func validateKubeletOSConfiguration(logger klog.Logger, kc *kubeletconfig.KubeletConfiguration) error {
 	isCgroup1 := !libcontainercgroups.IsCgroup2UnifiedMode()
 	if kc.FailCgroupV1 && isCgroup1 {
 		return fmt.Errorf("kubelet is configured to not run on a host using cgroup v1. cgroup v1 support is unsupported and will be removed in a future release")

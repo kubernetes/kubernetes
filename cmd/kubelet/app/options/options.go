@@ -31,6 +31,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cliflag "k8s.io/component-base/cli/flag"
 	logsapi "k8s.io/component-base/logs/api/v1"
+	"k8s.io/klog/v2"
 	"k8s.io/kubelet/config/v1beta1"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
 	"k8s.io/kubernetes/pkg/cluster/ports"
@@ -243,9 +244,9 @@ func NewKubeletServer() (*KubeletServer, error) {
 }
 
 // ValidateKubeletServer validates configuration of KubeletServer and returns an error if the input configuration is invalid.
-func ValidateKubeletServer(s *KubeletServer) error {
+func ValidateKubeletServer(logger klog.Logger, s *KubeletServer) error {
 	// please add any KubeletConfiguration validation to the kubeletconfigvalidation.ValidateKubeletConfiguration function
-	if err := kubeletconfigvalidation.ValidateKubeletConfiguration(&s.KubeletConfiguration, utilfeature.DefaultFeatureGate); err != nil {
+	if err := kubeletconfigvalidation.ValidateKubeletConfiguration(logger, &s.KubeletConfiguration, utilfeature.DefaultFeatureGate); err != nil {
 		return err
 	}
 	if err := ValidateKubeletFlags(&s.KubeletFlags); err != nil {

@@ -406,7 +406,7 @@ func newTestKubeletWithImageList(
 		NodeRef:                         nodeRef,
 		GetPodsFunc:                     kubelet.podManager.GetPods,
 		KillPodFunc:                     killPodNow(kubelet.podWorkers, fakeRecorder),
-		SyncNodeStatusFunc:              func() {},
+		SyncNodeStatusFunc:              func(context.Context) {},
 		ShutdownGracePeriodRequested:    0,
 		ShutdownGracePeriodCriticalPods: 0,
 	})
@@ -779,6 +779,7 @@ func TestVolumeAttachLimitExceededCleanup(t *testing.T) {
 		kl, kl.recorder, kl.workQueue,
 		kl.resyncInterval, backOffPeriod,
 		kl.podCache, kl.allocationManager,
+		klog.FromContext(ctx),
 	)
 
 	kl.volumeManager = kubeletvolume.NewFakeVolumeManager(nil, 0, nil, true /* volumeAttachLimitExceededError  */)
@@ -3100,6 +3101,7 @@ func TestSyncLabels(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			ctx := ktesting.Init(t)
 			testKubelet := newTestKubelet(t, false)
 			defer testKubelet.Cleanup()
 			kl := testKubelet.kubelet
@@ -3108,7 +3110,7 @@ func TestSyncLabels(t *testing.T) {
 			test.existingNode.Name = string(kl.nodeName)
 
 			kl.nodeLister = testNodeLister{nodes: []*v1.Node{test.existingNode}}
-			go func() { kl.syncNodeStatus() }()
+			go func() { kl.syncNodeStatus(ctx) }()
 
 			err := retryWithExponentialBackOff(
 				100*time.Millisecond,

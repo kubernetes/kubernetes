@@ -731,6 +731,7 @@ func NewMainKubelet(ctx context.Context,
 		backOffPeriod,
 		klet.podCache,
 		klet.allocationManager,
+		klog.FromContext(ctx),
 	)
 
 	var singleProcessOOMKill *bool
@@ -887,7 +888,7 @@ func NewMainKubelet(ctx context.Context,
 		return nil, err
 	}
 	klet.containerGC = containerGC
-	klet.containerDeletor = newPodContainerDeletor(klet.containerRuntime, max(containerGCPolicy.MaxPerPodContainer, minDeadContainerInPod))
+	klet.containerDeletor = newPodContainerDeletor(klet.containerRuntime, max(containerGCPolicy.MaxPerPodContainer, minDeadContainerInPod), logger)
 
 	// setup imageManager
 	imageManager, err := images.NewImageGCManager(klet.containerRuntime, klet.StatsProvider, postImageGCHooks, kubeDeps.Recorder, nodeRef, imageGCPolicy, kubeDeps.TracerProvider)
@@ -1852,7 +1853,8 @@ func (kl *Kubelet) Run(ctx context.Context, updates <-chan kubetypes.PodUpdate) 
 			// Call updateRuntimeUp once before syncNodeStatus to make sure kubelet had already checked runtime state
 			// otherwise when restart kubelet, syncNodeStatus will report node notReady in first report period
 			kl.updateRuntimeUp(ctx)
-			wait.JitterUntil(kl.syncNodeStatus, kl.nodeStatusUpdateFrequency, 0.04, true, wait.NeverStop)
+			nodeStatusCtx := klog.NewContext(context.Background(), logger)
+			wait.JitterUntil(func() { kl.syncNodeStatus(nodeStatusCtx) }, kl.nodeStatusUpdateFrequency, 0.04, true, wait.NeverStop)
 		}()
 
 		go kl.fastStatusUpdateOnce()
