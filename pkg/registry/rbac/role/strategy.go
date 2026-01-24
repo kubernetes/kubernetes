@@ -19,6 +19,7 @@ package role
 import (
 	"context"
 
+	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -71,7 +72,9 @@ func (strategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 // Validate validates a new Role. Validation must check for a correct signature.
 func (strategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	role := obj.(*rbac.Role)
-	return validation.ValidateRole(role)
+	allErrs := validation.ValidateRole(role)
+
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, role, nil, allErrs, operation.Create)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -84,7 +87,11 @@ func (strategy) Canonicalize(obj runtime.Object) {
 
 // ValidateUpdate is the default update validation for an end user.
 func (strategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidateRoleUpdate(obj.(*rbac.Role), old.(*rbac.Role))
+	newObj := obj.(*rbac.Role)
+	oldObj := old.(*rbac.Role)
+	errs := validation.ValidateRoleUpdate(newObj, oldObj)
+
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newObj, oldObj, errs, operation.Update)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
