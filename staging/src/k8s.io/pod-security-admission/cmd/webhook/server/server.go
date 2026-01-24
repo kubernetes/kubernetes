@@ -54,7 +54,7 @@ import (
 
 const maxRequestSize = int64(3 * 1024 * 1024)
 
-// NewSchedulerCommand creates a *cobra.Command object with default parameters and registryOptions
+// NewServerCommand creates a *cobra.Command object with default parameters and registryOptions
 func NewServerCommand() *cobra.Command {
 	opts := options.NewOptions()
 
