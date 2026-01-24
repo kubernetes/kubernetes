@@ -159,6 +159,10 @@ type PortMapKey string
 
 // NewPortMapKey generates a PortMapKey from endpoint ports.
 func NewPortMapKey(endpointPorts []discovery.EndpointPort) PortMapKey {
+	// Normalize nil to empty slice so they hash the same.
+	if endpointPorts == nil {
+		endpointPorts = []discovery.EndpointPort{}
+	}
 	sort.Sort(portsInOrder(endpointPorts))
 	return PortMapKey(deepHashObjectToString(endpointPorts))
 }

@@ -948,3 +948,15 @@ func TestDeepObjectPointer(t *testing.T) {
 		}
 	}
 }
+
+func TestNewPortMapKey_NilVsEmptySlice(t *testing.T) {
+	var nilPorts []discovery.EndpointPort
+	emptyPorts := []discovery.EndpointPort{}
+
+	nilKey := NewPortMapKey(nilPorts)
+	emptyKey := NewPortMapKey(emptyPorts)
+
+	if nilKey != emptyKey {
+		t.Errorf("NewPortMapKey should return the same key for nil and empty slice, got nil=%q empty=%q", nilKey, emptyKey)
+	}
+}
