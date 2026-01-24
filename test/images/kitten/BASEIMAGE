@@ -1,5 +1,4 @@
 linux/amd64=REGISTRY/agnhost:2.61-linux-amd64
-linux/arm=REGISTRY/agnhost:2.61-linux-arm
 linux/arm64=REGISTRY/agnhost:2.61-linux-arm64
 linux/ppc64le=REGISTRY/agnhost:2.61-linux-ppc64le
 linux/s390x=REGISTRY/agnhost:2.61-linux-s390x
