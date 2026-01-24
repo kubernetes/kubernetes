@@ -92,7 +92,7 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(ctx context.Context
 		Annotations: newPodAnnotations(pod),
 	}
 
-	dnsConfig, err := m.runtimeHelper.GetPodDNS(pod)
+	dnsConfig, err := m.runtimeHelper.GetPodDNS(ctx, pod)
 	if err != nil {
 		return nil, err
 	}
