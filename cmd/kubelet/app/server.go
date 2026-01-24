@@ -1333,7 +1333,7 @@ func createAndInitKubelet(
 
 	k.BirthCry()
 
-	k.StartGarbageCollection()
+	k.StartGarbageCollection(ctx)
 
 	return k, nil
 }

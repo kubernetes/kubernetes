@@ -285,7 +285,7 @@ func newTestKubeletWithImageList(
 		},
 	}
 	kubelet.recorder = fakeRecorder
-	if err := kubelet.setupDataDirs(); err != nil {
+	if err := kubelet.setupDataDirs(tCtx); err != nil {
 		t.Fatalf("can't initialize kubelet data dirs: %v", err)
 	}
 	kubelet.daemonEndpoints = &v1.NodeDaemonEndpoints{}
@@ -335,7 +335,7 @@ func newTestKubeletWithImageList(
 		kubelet.containerManager.GetNodeConfig(),
 		kubelet.containerManager.GetNodeAllocatableAbsolute(),
 		kubelet.statusManager,
-		func(pod *v1.Pod) { kubelet.HandlePodSyncs([]*v1.Pod{pod}) },
+		func(pod *v1.Pod) { kubelet.HandlePodSyncs(tCtx, []*v1.Pod{pod}) },
 		kubelet.GetActivePods,
 		kubelet.podManager.GetPodByUID,
 		config.NewSourcesReady(func(_ sets.Set[string]) bool { return enableResizing }),
@@ -504,6 +504,7 @@ func TestSyncLoopAbort(t *testing.T) {
 }
 
 func TestSyncPodsStartPod(t *testing.T) {
+	ctx := ktesting.Init(t)
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -516,7 +517,7 @@ func TestSyncPodsStartPod(t *testing.T) {
 		}),
 	}
 	kubelet.podManager.SetPods(pods)
-	kubelet.HandlePodSyncs(pods)
+	kubelet.HandlePodSyncs(ctx, pods)
 	fakeRuntime.AssertStartedPods([]string{string(pods[0].UID)})
 }
 
@@ -756,6 +757,7 @@ func TestHandlePodCleanups(t *testing.T) {
 }
 
 func TestVolumeAttachLimitExceededCleanup(t *testing.T) {
+	ctx := ktesting.Init(t)
 	const podCount = 500
 	tk := newTestKubelet(t, true /* controller-attach-detach enabled */)
 	defer tk.Cleanup()
@@ -784,9 +786,7 @@ func TestVolumeAttachLimitExceededCleanup(t *testing.T) {
 	pods, _ := newTestPodsWithResources(podCount)
 
 	kl.podManager.SetPods(pods)
-	kl.HandlePodSyncs(pods)
-
-	ctx := context.Background()
+	kl.HandlePodSyncs(ctx, pods)
 
 	// all pods must reach a terminal, Failed state due to VolumeAttachmentLimitExceeded.
 	if err := wait.PollUntilContextTimeout(
@@ -858,6 +858,7 @@ func TestHandlePodRemovesWhenSourcesAreReady(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping test in short mode.")
 	}
+	ctx := ktesting.Init(t)
 
 	ready := false
 
@@ -884,7 +885,7 @@ func TestHandlePodRemovesWhenSourcesAreReady(t *testing.T) {
 	kubelet := testKubelet.kubelet
 	kubelet.sourcesReady = config.NewSourcesReady(func(_ sets.Set[string]) bool { return ready })
 
-	kubelet.HandlePodRemoves(pods)
+	kubelet.HandlePodRemoves(ctx, pods)
 	time.Sleep(2 * time.Second)
 
 	// Sources are not ready yet. Don't remove any pods.
@@ -893,7 +894,7 @@ func TestHandlePodRemovesWhenSourcesAreReady(t *testing.T) {
 	}
 
 	ready = true
-	kubelet.HandlePodRemoves(pods)
+	kubelet.HandlePodRemoves(ctx, pods)
 	time.Sleep(2 * time.Second)
 
 	// Sources are ready. Remove unwanted pods.
@@ -928,6 +929,7 @@ func checkPodStatus(t *testing.T, kl *Kubelet, pod *v1.Pod, phase v1.PodPhase) {
 
 // Tests that we handle port conflicts correctly by setting the failed status in status map.
 func TestHandlePortConflicts(t *testing.T) {
+	ctx := ktesting.Init(t)
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
@@ -969,7 +971,7 @@ func TestHandlePortConflicts(t *testing.T) {
 		pods[1].UID: true,
 	}
 
-	kl.HandlePodAdditions(pods)
+	kl.HandlePodAdditions(ctx, pods)
 
 	// Check pod status stored in the status map.
 	checkPodStatus(t, kl, notfittingPod, v1.PodFailed)
@@ -978,6 +980,7 @@ func TestHandlePortConflicts(t *testing.T) {
 
 // Tests that we handle host name conflicts correctly by setting the failed status in status map.
 func TestHandleHostNameConflicts(t *testing.T) {
+	ctx := ktesting.Init(t)
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
@@ -1012,7 +1015,7 @@ func TestHandleHostNameConflicts(t *testing.T) {
 	notfittingPod := pods[0]
 	fittingPod := pods[1]
 
-	kl.HandlePodAdditions(pods)
+	kl.HandlePodAdditions(ctx, pods)
 
 	// Check pod status stored in the status map.
 	checkPodStatus(t, kl, notfittingPod, v1.PodFailed)
@@ -1021,6 +1024,7 @@ func TestHandleHostNameConflicts(t *testing.T) {
 
 // Tests that we handle not matching labels selector correctly by setting the failed status in status map.
 func TestHandleNodeSelector(t *testing.T) {
+	ctx := ktesting.Init(t)
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
@@ -1054,7 +1058,7 @@ func TestHandleNodeSelector(t *testing.T) {
 	notfittingPod := pods[0]
 	fittingPod := pods[1]
 
-	kl.HandlePodAdditions(pods)
+	kl.HandlePodAdditions(ctx, pods)
 
 	// Check pod status stored in the status map.
 	checkPodStatus(t, kl, notfittingPod, v1.PodFailed)
@@ -1091,6 +1095,7 @@ func TestHandleNodeSelectorBasedOnOS(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			ctx := ktesting.Init(t)
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 			defer testKubelet.Cleanup()
 			kl := testKubelet.kubelet
@@ -1118,7 +1123,7 @@ func TestHandleNodeSelectorBasedOnOS(t *testing.T) {
 
 			pod := podWithUIDNameNsSpec("123456789", "podA", "foo", v1.PodSpec{NodeSelector: test.podSelector})
 
-			kl.HandlePodAdditions([]*v1.Pod{pod})
+			kl.HandlePodAdditions(ctx, []*v1.Pod{pod})
 
 			// Check pod status stored in the status map.
 			checkPodStatus(t, kl, pod, test.podStatus)
@@ -1128,6 +1133,7 @@ func TestHandleNodeSelectorBasedOnOS(t *testing.T) {
 
 // Tests that we handle exceeded resources correctly by setting the failed status in status map.
 func TestHandleMemExceeded(t *testing.T) {
+	ctx := ktesting.Init(t)
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
@@ -1173,7 +1179,7 @@ func TestHandleMemExceeded(t *testing.T) {
 		pods[1].UID: true,
 	}
 
-	kl.HandlePodAdditions(pods)
+	kl.HandlePodAdditions(ctx, pods)
 
 	// Check pod status stored in the status map.
 	checkPodStatus(t, kl, notfittingPod, v1.PodFailed)
@@ -1183,6 +1189,7 @@ func TestHandleMemExceeded(t *testing.T) {
 // Tests that we handle result of interface UpdatePluginResources correctly
 // by setting corresponding status in status map.
 func TestHandlePluginResources(t *testing.T) {
+	ctx := ktesting.Init(t)
 	testKubelet := newTestKubeletExcludeAdmitHandlers(t, false /* controllerAttachDetachEnabled */, false /*enableResizing*/)
 	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
@@ -1304,7 +1311,7 @@ func TestHandlePluginResources(t *testing.T) {
 	missingPod := podWithUIDNameNsSpec("3", "missingpod", "foo", missingPodSpec)
 	failedPod := podWithUIDNameNsSpec("4", "failedpod", "foo", failedPodSpec)
 
-	kl.HandlePodAdditions([]*v1.Pod{fittingPod, emptyPod, missingPod, failedPod})
+	kl.HandlePodAdditions(ctx, []*v1.Pod{fittingPod, emptyPod, missingPod, failedPod})
 
 	// Check pod status stored in the status map.
 	checkPodStatus(t, kl, fittingPod, v1.PodPending)
@@ -1315,7 +1322,7 @@ func TestHandlePluginResources(t *testing.T) {
 
 // TODO(filipg): This test should be removed once StatusSyncer can do garbage collection without external signal.
 func TestPurgingObsoleteStatusMapEntries(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 
@@ -1326,7 +1333,7 @@ func TestPurgingObsoleteStatusMapEntries(t *testing.T) {
 	}
 	podToTest := pods[1]
 	// Run once to populate the status map.
-	kl.HandlePodAdditions(pods)
+	kl.HandlePodAdditions(ctx, pods)
 	if _, found := kl.statusManager.GetPodStatus(podToTest.UID); !found {
 		t.Fatalf("expected to have status cached for pod2")
 	}
@@ -1827,7 +1834,7 @@ func TestCheckpointContainer(t *testing.T) {
 }
 
 func TestSyncPodsSetStatusToFailedForPodsThatRunTooLong(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	ctx := ktesting.Init(t)
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	fakeRuntime := testKubelet.fakeRuntime
@@ -1868,7 +1875,7 @@ func TestSyncPodsSetStatusToFailedForPodsThatRunTooLong(t *testing.T) {
 	}
 
 	// Let the pod worker sets the status to fail after this sync.
-	kubelet.HandlePodUpdates(logger, pods)
+	kubelet.HandlePodUpdates(ctx, pods)
 	status, found := kubelet.statusManager.GetPodStatus(pods[0].UID)
 	assert.True(t, found, "expected to found status for pod %q", pods[0].UID)
 	assert.Equal(t, v1.PodFailed, status.Phase)
@@ -1877,7 +1884,7 @@ func TestSyncPodsSetStatusToFailedForPodsThatRunTooLong(t *testing.T) {
 }
 
 func TestSyncPodsDoesNotSetPodsThatDidNotRunTooLongToFailed(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	ctx := ktesting.Init(t)
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	fakeRuntime := testKubelet.fakeRuntime
@@ -1919,7 +1926,7 @@ func TestSyncPodsDoesNotSetPodsThatDidNotRunTooLongToFailed(t *testing.T) {
 	}
 
 	kubelet.podManager.SetPods(pods)
-	kubelet.HandlePodUpdates(logger, pods)
+	kubelet.HandlePodUpdates(ctx, pods)
 	status, found := kubelet.statusManager.GetPodStatus(pods[0].UID)
 	assert.True(t, found, "expected to found status for pod %q", pods[0].UID)
 	assert.NotEqual(t, v1.PodFailed, status.Phase)
@@ -1943,7 +1950,7 @@ func podWithUIDNameNsSpec(uid types.UID, name, namespace string, spec v1.PodSpec
 }
 
 func TestDeletePodDirsForDeletedPods(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
@@ -1954,7 +1961,7 @@ func TestDeletePodDirsForDeletedPods(t *testing.T) {
 
 	kl.podManager.SetPods(pods)
 	// Sync to create pod directories.
-	kl.HandlePodSyncs(kl.podManager.GetPods())
+	kl.HandlePodSyncs(ctx, kl.podManager.GetPods())
 	for i := range pods {
 		assert.True(t, dirExists(kl.getPodDir(pods[i].UID)), "Expected directory to exist for pod %d", i)
 	}
@@ -1967,12 +1974,12 @@ func TestDeletePodDirsForDeletedPods(t *testing.T) {
 }
 
 func syncAndVerifyPodDir(t *testing.T, testKubelet *TestKubelet, pods []*v1.Pod, podsToCheck []*v1.Pod, shouldExist bool) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	t.Helper()
 	kl := testKubelet.kubelet
 
 	kl.podManager.SetPods(pods)
-	kl.HandlePodSyncs(pods)
+	kl.HandlePodSyncs(ctx, pods)
 	kl.HandlePodCleanups(ctx)
 	for i, pod := range podsToCheck {
 		exist := dirExists(kl.getPodDir(pod.UID))
@@ -2706,6 +2713,7 @@ func (a *testPodAdmitHandler) Admit(attrs *lifecycle.PodAdmitAttributes) lifecyc
 
 // Test verifies that the kubelet invokes an admission handler during HandlePodAdditions.
 func TestHandlePodAdditionsInvokesPodAdmitHandlers(t *testing.T) {
+	ctx := ktesting.Init(t)
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
@@ -2742,7 +2750,7 @@ func TestHandlePodAdditionsInvokesPodAdmitHandlers(t *testing.T) {
 
 	kl.allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{&testPodAdmitHandler{podsToReject: podsToReject}})
 
-	kl.HandlePodAdditions(pods)
+	kl.HandlePodAdditions(ctx, pods)
 
 	// Check pod status stored in the status map.
 	checkPodStatus(t, kl, podToReject, v1.PodFailed)
@@ -2945,6 +2953,7 @@ func TestPodResourceAllocationReset(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			ctx := ktesting.Init(t)
 			if tc.existingPodAllocation != nil {
 				// when kubelet restarts, AllocatedResources has already existed before adding pod
 				err := kubelet.allocationManager.SetAllocatedResources(tc.existingPodAllocation)
@@ -2952,7 +2961,7 @@ func TestPodResourceAllocationReset(t *testing.T) {
 					t.Fatalf("failed to set pod allocation: %v", err)
 				}
 			}
-			kubelet.HandlePodAdditions([]*v1.Pod{tc.pod})
+			kubelet.HandlePodAdditions(ctx, []*v1.Pod{tc.pod})
 
 			allocatedResources, found := kubelet.allocationManager.GetContainerResourceAllocation(tc.pod.UID, tc.pod.Spec.Containers[0].Name)
 			if !found {
@@ -3355,7 +3364,8 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 	assert.NotNil(t, testMainKubelet, "testMainKubelet should not be nil")
 
 	testMainKubelet.BirthCry()
-	testMainKubelet.StartGarbageCollection()
+	ctx := ktesting.Init(t)
+	testMainKubelet.StartGarbageCollection(ctx)
 	// Nil pointer panic can be reproduced if configmap manager is not nil.
 	// See https://github.com/kubernetes/kubernetes/issues/113492
 	// pod := &v1.Pod{
@@ -3939,7 +3949,7 @@ func TestSyncPodWithErrorsDuringInPlacePodResize(t *testing.T) {
 }
 
 func TestHandlePodUpdates_RecordContainerRequestedResizes(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	ctx := ktesting.Init(t)
 	metrics.Register()
 	metrics.ContainerRequestedResizes.Reset()
 
@@ -4521,7 +4531,7 @@ func TestHandlePodUpdates_RecordContainerRequestedResizes(t *testing.T) {
 
 			kubelet.podManager.AddPod(initialPod)
 			require.NoError(t, kubelet.allocationManager.SetAllocatedResources(initialPod))
-			kubelet.HandlePodUpdates(logger, []*v1.Pod{updatedPod})
+			kubelet.HandlePodUpdates(ctx, []*v1.Pod{updatedPod})
 
 			tc.updateExpectedFunc(&expectedMetrics)
 
@@ -4584,6 +4594,7 @@ func TestHandlePodReconcile_RetryPendingResizes(t *testing.T) {
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
 	}
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	ctx := ktesting.Init(t)
 
 	testKubelet := newTestKubeletExcludeAdmitHandlers(t, false /* controllerAttachDetachEnabled */, true /*enableResizing*/)
 	defer testKubelet.Cleanup()
@@ -4707,7 +4718,7 @@ func TestHandlePodReconcile_RetryPendingResizes(t *testing.T) {
 			kubelet.allocationManager.PushPendingResize(pendingResizeDesired.UID)
 
 			kubelet.statusManager.ClearPodResizePendingCondition(pendingResizeDesired.UID)
-			kubelet.HandlePodReconcile([]*v1.Pod{tc.newPod})
+			kubelet.HandlePodReconcile(ctx, []*v1.Pod{tc.newPod})
 			require.Equal(t, tc.shouldRetryPendingResize, kubelet.statusManager.IsPodResizeDeferred(pendingResizeDesired.UID))
 
 			kubelet.allocationManager.RemovePod(pendingResizeDesired.UID)
@@ -4718,7 +4729,7 @@ func TestHandlePodReconcile_RetryPendingResizes(t *testing.T) {
 }
 
 func TestSyncPodNodeDeclaredFeaturesUpdate(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	ctx := ktesting.Init(t)
 	cpu1000m := resource.MustParse("1")
 	mem1000M := resource.MustParse("1Gi")
 	cpu2000m := resource.MustParse("2")
@@ -4862,7 +4873,7 @@ func TestSyncPodNodeDeclaredFeaturesUpdate(t *testing.T) {
 			}
 
 			kubelet.statusManager.SetPodStatus(klog.TODO(), tc.newPod, v1.PodStatus{Phase: v1.PodRunning})
-			kubelet.HandlePodUpdates(logger, []*v1.Pod{tc.newPod})
+			kubelet.HandlePodUpdates(ctx, []*v1.Pod{tc.newPod})
 			if tc.expectEvent {
 				select {
 				case event := <-recorder.Events:
