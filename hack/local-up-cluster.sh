@@ -1467,7 +1467,7 @@ if [[ "${START_MODE}" != *"nokubelet"* ]]; then
   # Detect the OS name/arch and display appropriate error.
     case "$(uname -s)" in
       Darwin)
-        print_color "kubelet is not currently supported in darwin, kubelet aborted."
+        print_color "kubelet is not supported on macOS. Please use https://sigs.k8s.io/kind"
         KUBELET_LOG=""
         ;;
       Linux)
@@ -1487,7 +1487,7 @@ if [[ "${START_MODE}" != "kubeletonly" ]]; then
     # Detect the OS name/arch and display appropriate error.
     case "$(uname -s)" in
       Darwin)
-        print_color "kubelet is not currently supported in darwin, kube-proxy aborted."
+        print_color "kube-proxy is not supported on macOS. Please use https://sigs.k8s.io/kind."
         ;;
       Linux)
         start_kubeproxy
