@@ -7475,7 +7475,7 @@ func TestKubelet_HandlePodCleanups(t *testing.T) {
 				if !ok {
 					t.Fatalf("unable to reject pod by UID %v", reject.uid)
 				}
-				kl.rejectPod(pod, reject.reason, reject.message)
+				kl.rejectPod(tCtx, pod, reject.reason, reject.message)
 			}
 
 			if err := kl.HandlePodCleanups(tCtx); (err != nil) != tt.wantErr {
@@ -7516,7 +7516,7 @@ func testMetric(t *testing.T, metricName string, expectedMetric string) {
 }
 
 func TestGetNonExistentImagePullSecret(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	_, tCtx := ktesting.NewTestContext(t)
 	secrets := make([]*v1.Secret, 0)
 	fakeRecorder := record.NewFakeRecorder(1)
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
@@ -7539,7 +7539,7 @@ func TestGetNonExistentImagePullSecret(t *testing.T) {
 		},
 	}
 
-	pullSecrets := testKubelet.kubelet.getPullSecretsForPod(logger, testPod)
+	pullSecrets := testKubelet.kubelet.getPullSecretsForPod(tCtx, testPod)
 	assert.Empty(t, pullSecrets)
 
 	assert.Len(t, fakeRecorder.Events, 1)

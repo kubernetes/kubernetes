@@ -1065,7 +1065,8 @@ func (kl *Kubelet) makePodDataDirs(pod *v1.Pod) error {
 
 // getPullSecretsForPod inspects the Pod and retrieves the referenced pull
 // secrets.
-func (kl *Kubelet) getPullSecretsForPod(logger klog.Logger, pod *v1.Pod) []v1.Secret {
+func (kl *Kubelet) getPullSecretsForPod(ctx context.Context, pod *v1.Pod) []v1.Secret {
+	logger := klog.FromContext(ctx)
 	pullSecrets := []v1.Secret{}
 	failedPullSecrets := []string{}
 

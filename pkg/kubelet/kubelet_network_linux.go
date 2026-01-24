@@ -19,6 +19,7 @@ limitations under the License.
 package kubelet
 
 import (
+	"context"
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -35,7 +36,8 @@ const (
 	KubeFirewallChain utiliptables.Chain = "KUBE-FIREWALL"
 )
 
-func (kl *Kubelet) initNetworkUtil() {
+func (kl *Kubelet) initNetworkUtil(ctx context.Context) {
+	logger := klog.FromContext(ctx)
 	iptClients := utiliptables.NewBestEffort()
 	if len(iptClients) == 0 {
 		// We don't log this as an error because kubelet itself doesn't need any
@@ -43,33 +45,33 @@ func (kl *Kubelet) initNetworkUtil() {
 		// and because we *expect* this to fail on hosts where only nftables is
 		// supported (in which case there can't be any other components using
 		// iptables that would need these rules anyway).
-		klog.InfoS("No iptables support on this system; not creating the KUBE-IPTABLES-HINT chain")
+		logger.Info("No iptables support on this system; not creating the KUBE-IPTABLES-HINT chain")
 		return
 	}
 
 	for family := range iptClients {
 		iptClient := iptClients[family]
-		if kl.syncIPTablesRules(iptClient) {
-			klog.InfoS("Initialized iptables rules.", "protocol", iptClient.Protocol())
+		if kl.syncIPTablesRules(logger, iptClient) {
+			logger.Info("Initialized iptables rules.", "protocol", iptClient.Protocol())
 			go iptClient.Monitor(
 				utiliptables.Chain("KUBE-KUBELET-CANARY"),
 				[]utiliptables.Table{utiliptables.TableMangle, utiliptables.TableNAT, utiliptables.TableFilter},
-				func() { kl.syncIPTablesRules(iptClient) },
+				func() { kl.syncIPTablesRules(logger, iptClient) },
 				1*time.Minute, wait.NeverStop,
 			)
 		} else {
-			klog.InfoS("Failed to initialize iptables rules; some functionality may be missing.", "protocol", iptClient.Protocol())
+			logger.Info("Failed to initialize iptables rules; some functionality may be missing.", "protocol", iptClient.Protocol())
 		}
 	}
 }
 
 // syncIPTablesRules ensures the KUBE-IPTABLES-HINT chain exists, and the martian packet
 // protection rule is installed.
-func (kl *Kubelet) syncIPTablesRules(iptClient utiliptables.Interface) bool {
+func (kl *Kubelet) syncIPTablesRules(logger klog.Logger, iptClient utiliptables.Interface) bool {
 	// Create hint chain so other components can see whether we are using iptables-legacy
 	// or iptables-nft.
 	if _, err := iptClient.EnsureChain(utiliptables.TableMangle, KubeIPTablesHintChain); err != nil {
-		klog.ErrorS(err, "Failed to ensure that iptables hint chain exists")
+		logger.Error(err, "Failed to ensure that iptables hint chain exists")
 		return false
 	}
 
@@ -83,16 +85,16 @@ func (kl *Kubelet) syncIPTablesRules(iptClient utiliptables.Interface) bool {
 		// created by kube-proxy.
 
 		if _, err := iptClient.EnsureChain(utiliptables.TableFilter, KubeFirewallChain); err != nil {
-			klog.ErrorS(err, "Failed to ensure that filter table KUBE-FIREWALL chain exists")
+			logger.Error(err, "Failed to ensure that filter table KUBE-FIREWALL chain exists")
 			return false
 		}
 
 		if _, err := iptClient.EnsureRule(utiliptables.Prepend, utiliptables.TableFilter, utiliptables.ChainOutput, "-j", string(KubeFirewallChain)); err != nil {
-			klog.ErrorS(err, "Failed to ensure that OUTPUT chain jumps to KUBE-FIREWALL")
+			logger.Error(err, "Failed to ensure that OUTPUT chain jumps to KUBE-FIREWALL")
 			return false
 		}
 		if _, err := iptClient.EnsureRule(utiliptables.Prepend, utiliptables.TableFilter, utiliptables.ChainInput, "-j", string(KubeFirewallChain)); err != nil {
-			klog.ErrorS(err, "Failed to ensure that INPUT chain jumps to KUBE-FIREWALL")
+			logger.Error(err, "Failed to ensure that INPUT chain jumps to KUBE-FIREWALL")
 			return false
 		}
 
@@ -109,7 +111,7 @@ func (kl *Kubelet) syncIPTablesRules(iptClient utiliptables.Interface) bool {
 			"-m", "conntrack",
 			"!", "--ctstate", "RELATED,ESTABLISHED,DNAT",
 			"-j", "DROP"); err != nil {
-			klog.ErrorS(err, "Failed to ensure rule to drop invalid localhost packets in filter table KUBE-FIREWALL chain")
+			logger.Error(err, "Failed to ensure rule to drop invalid localhost packets in filter table KUBE-FIREWALL chain")
 			return false
 		}
 	}

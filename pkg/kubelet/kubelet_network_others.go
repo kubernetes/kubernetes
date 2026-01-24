@@ -18,5 +18,7 @@ limitations under the License.
 
 package kubelet
 
+import "context"
+
 // Do nothing.
-func (kl *Kubelet) initNetworkUtil() {}
+func (kl *Kubelet) initNetworkUtil(ctx context.Context) {}
