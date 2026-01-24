@@ -841,7 +841,9 @@ func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) err
 		return err
 	}
 
-	// Check if the ReservedFor entries are all still valid.
+	// Check if the ReservedFor entries are all still valid. Essentially we are
+	// validating and potentially removing pod references, but just leaving any
+	// non-pod references in the list.
 	valid := make([]resourceapi.ResourceClaimConsumerReference, 0, len(claim.Status.ReservedFor))
 	for _, reservedFor := range claim.Status.ReservedFor {
 		if reservedFor.APIGroup == "" &&
