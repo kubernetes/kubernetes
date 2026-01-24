@@ -104,7 +104,7 @@ func noFGPullerTestCases() []pullerTestCase {
 			qps:            0.0,
 			burst:          0,
 			expected: []pullerExpects{
-				{[]string{"GetImageRef", "PullImage", "GetImageSize"}, nil, true, true,
+				{[]string{"GetImageRef", "PullImage", "GetImageSize", "GetImageRef"}, nil, true, true,
 					[]v1.Event{
 						{Reason: "Pulling"},
 						{Reason: "Pulled"},
@@ -146,17 +146,17 @@ func noFGPullerTestCases() []pullerTestCase {
 			qps:        0.0,
 			burst:      0,
 			expected: []pullerExpects{
-				{[]string{"PullImage", "GetImageSize"}, nil, true, true,
+				{[]string{"PullImage", "GetImageSize", "GetImageRef"}, nil, true, true,
 					[]v1.Event{
 						{Reason: "Pulling"},
 						{Reason: "Pulled"},
 					}, ""},
-				{[]string{"PullImage", "GetImageSize"}, nil, true, true,
+				{[]string{"PullImage", "GetImageSize", "GetImageRef"}, nil, true, true,
 					[]v1.Event{
 						{Reason: "Pulling"},
 						{Reason: "Pulled"},
 					}, ""},
-				{[]string{"PullImage", "GetImageSize"}, nil, true, true,
+				{[]string{"PullImage", "GetImageSize", "GetImageRef"}, nil, true, true,
 					[]v1.Event{
 						{Reason: "Pulling"},
 						{Reason: "Pulled"},
@@ -260,17 +260,17 @@ func noFGPullerTestCases() []pullerTestCase {
 			qps:        400.0,
 			burst:      600,
 			expected: []pullerExpects{
-				{[]string{"PullImage", "GetImageSize"}, nil, true, true,
+				{[]string{"PullImage", "GetImageSize", "GetImageRef"}, nil, true, true,
 					[]v1.Event{
 						{Reason: "Pulling"},
 						{Reason: "Pulled"},
 					}, ""},
-				{[]string{"PullImage", "GetImageSize"}, nil, true, true,
+				{[]string{"PullImage", "GetImageSize", "GetImageRef"}, nil, true, true,
 					[]v1.Event{
 						{Reason: "Pulling"},
 						{Reason: "Pulled"},
 					}, ""},
-				{[]string{"PullImage", "GetImageSize"}, nil, true, true,
+				{[]string{"PullImage", "GetImageSize", "GetImageRef"}, nil, true, true,
 					[]v1.Event{
 						{Reason: "Pulling"},
 						{Reason: "Pulled"},
@@ -411,17 +411,17 @@ func ensureSecretImagesTestCases() []pullerTestCase {
 			burst:          0,
 			enableFeatures: []featuregate.Feature{features.KubeletEnsureSecretPulledImages},
 			expected: []pullerExpects{
-				{[]string{"GetImageRef", "PullImage", "GetImageSize"}, nil, true, true,
+				{[]string{"GetImageRef", "PullImage", "GetImageSize", "GetImageRef"}, nil, true, true,
 					[]v1.Event{
 						{Reason: "Pulling"},
 						{Reason: "Pulled"},
 					}, ""},
-				{[]string{"GetImageRef", "PullImage", "GetImageSize"}, nil, true, true,
+				{[]string{"GetImageRef", "PullImage", "GetImageSize", "GetImageRef"}, nil, true, true,
 					[]v1.Event{
 						{Reason: "Pulling"},
 						{Reason: "Pulled"},
 					}, ""},
-				{[]string{"GetImageRef", "PullImage", "GetImageSize"}, nil, true, true,
+				{[]string{"GetImageRef", "PullImage", "GetImageSize", "GetImageRef"}, nil, true, true,
 					[]v1.Event{
 						{Reason: "Pulling"},
 						{Reason: "Pulled"},
@@ -446,17 +446,17 @@ func ensureSecretImagesTestCases() []pullerTestCase {
 			burst:          0,
 			enableFeatures: []featuregate.Feature{features.KubeletEnsureSecretPulledImages},
 			expected: []pullerExpects{
-				{[]string{"GetImageRef", "PullImage", "GetImageSize"}, nil, true, true,
+				{[]string{"GetImageRef", "PullImage", "GetImageSize", "GetImageRef"}, nil, true, true,
 					[]v1.Event{
 						{Reason: "Pulling"},
 						{Reason: "Pulled"},
 					}, ""},
-				{[]string{"GetImageRef", "PullImage", "GetImageSize"}, nil, true, true,
+				{[]string{"GetImageRef", "PullImage", "GetImageSize", "GetImageRef"}, nil, true, true,
 					[]v1.Event{
 						{Reason: "Pulling"},
 						{Reason: "Pulled"},
 					}, ""},
-				{[]string{"GetImageRef", "PullImage", "GetImageSize"}, nil, true, true,
+				{[]string{"GetImageRef", "PullImage", "GetImageSize", "GetImageRef"}, nil, true, true,
 					[]v1.Event{
 						{Reason: "Pulling"},
 						{Reason: "Pulled"},
@@ -649,7 +649,7 @@ func ensureSecretImagesTestCases() []pullerTestCase {
 			burst:          0,
 			enableFeatures: []featuregate.Feature{features.KubeletEnsureSecretPulledImages},
 			expected: []pullerExpects{
-				{[]string{"GetImageRef", "PullImage", "GetImageSize"}, nil, true, true,
+				{[]string{"GetImageRef", "PullImage", "GetImageSize", "GetImageRef"}, nil, true, true,
 					[]v1.Event{
 						{Reason: "Pulling"},
 						{Reason: "Pulled"},
@@ -1024,7 +1024,7 @@ func TestPullAndListImageWithPodAnnotations(t *testing.T) {
 		inspectErr:     nil,
 		pullerErr:      nil,
 		expected: []pullerExpects{
-			{[]string{"GetImageRef", "PullImage", "GetImageSize"}, nil, true, true, nil, ""},
+			{[]string{"GetImageRef", "PullImage", "GetImageSize", "GetImageRef"}, nil, true, true, nil, ""},
 		}}
 
 	useSerializedEnv := true
@@ -1087,7 +1087,7 @@ func TestPullAndListImageWithRuntimeHandlerInImageCriAPIFeatureGate(t *testing.T
 		inspectErr:     nil,
 		pullerErr:      nil,
 		expected: []pullerExpects{
-			{[]string{"GetImageRef", "PullImage", "GetImageSize"}, nil, true, true, nil, ""},
+			{[]string{"GetImageRef", "PullImage", "GetImageSize", "GetImageRef"}, nil, true, true, nil, ""},
 		}}
 
 	useSerializedEnv := true
@@ -1554,7 +1554,7 @@ func TestEnsureImageExistsWithServiceAccountCoordinates(t *testing.T) {
 			}
 
 			if tc.expectedImagePull {
-				fakeRuntime.AssertCalls([]string{"GetImageRef", "PullImage", "GetImageSize"})
+				fakeRuntime.AssertCalls([]string{"GetImageRef", "PullImage", "GetImageSize", "GetImageRef"})
 			} else {
 				fakeRuntime.AssertCalls([]string{"GetImageRef"})
 			}

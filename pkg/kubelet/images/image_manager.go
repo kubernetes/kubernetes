@@ -378,7 +378,19 @@ func (m *imageManager) pullImage(ctx context.Context, logPrefix string, objRef *
 	finalPullCredentials = imagePullResult.credentialsUsed
 	pullSucceeded = true
 
-	return imagePullResult.imageRef, "", nil
+	// Normalize imageRef to match what GetImageRef returns.
+	// This ensures pull record storage matches credential verification lookups.
+	// Some container runtimes (e.g., containerd) return different formats:
+	// - PullImage returns config digest (sha256:...)
+	// - ImageStatus.RepoDigests returns manifest digest (repo@sha256:...)
+	imageRef = imagePullResult.imageRef
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletEnsureSecretPulledImages) {
+		if normalizedRef, getRefErr := m.imageService.GetImageRef(ctx, imgSpec); getRefErr == nil && normalizedRef != "" {
+			imageRef = normalizedRef
+		}
+	}
+
+	return imageRef, "", nil
 }
 
 func evalCRIPullErr(imgRef string, err error) (errMsg string, errRes error) {
