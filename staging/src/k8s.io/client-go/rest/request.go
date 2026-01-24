@@ -689,6 +689,7 @@ func (r *Request) tryThrottleWithInfo(ctx context.Context, retryInfo string) err
 		}
 	}
 	metrics.RateLimiterLatency.Observe(ctx, r.verb, r.finalURLTemplate(), latency)
+	metrics.RateLimiterHitCount.Increment(ctx, r.verb, r.finalURLTemplate())
 
 	return err
 }

@@ -85,6 +85,15 @@ var (
 		[]string{"verb", "host"},
 	)
 
+	rateLimiterHitCount = k8smetrics.NewCounterVec(
+		&k8smetrics.CounterOpts{
+			Name:           "rest_client_rate_limiter_hit_count_total",
+			Help:           "Client side rate limiter hit count. Broken down by verb and host.",
+			StabilityLevel: k8smetrics.ALPHA,
+		},
+		[]string{"verb", "host"},
+	)
+
 	requestResult = k8smetrics.NewCounterVec(
 		&k8smetrics.CounterOpts{
 			Name:           "rest_client_requests_total",
@@ -201,6 +210,7 @@ func init() {
 	legacyregistry.MustRegister(requestSize)
 	legacyregistry.MustRegister(responseSize)
 	legacyregistry.MustRegister(rateLimiterLatency)
+	legacyregistry.MustRegister(rateLimiterHitCount)
 	legacyregistry.MustRegister(requestResult)
 	legacyregistry.MustRegister(requestRetry)
 	legacyregistry.RawMustRegister(execPluginCertTTL)
@@ -216,6 +226,7 @@ func init() {
 		RequestSize:           &sizeAdapter{m: requestSize},
 		ResponseSize:          &sizeAdapter{m: responseSize},
 		RateLimiterLatency:    &latencyAdapter{m: rateLimiterLatency},
+		RateLimiterHitCount:   &rateLimitHitCountAdapter{m: rateLimiterHitCount},
 		RequestResult:         &resultAdapter{requestResult},
 		RequestRetry:          &retryAdapter{requestRetry},
 		ExecPluginCalls:       &callsAdapter{m: execPluginCalls},
@@ -231,6 +242,14 @@ type latencyAdapter struct {
 
 func (l *latencyAdapter) Observe(ctx context.Context, verb string, u url.URL, latency time.Duration) {
 	l.m.WithContext(ctx).WithLabelValues(verb, u.Host).Observe(latency.Seconds())
+}
+
+type rateLimitHitCountAdapter struct {
+	m *k8smetrics.CounterVec
+}
+
+func (l *rateLimitHitCountAdapter) Increment(ctx context.Context, verb string, u url.URL) {
+	l.m.WithContext(ctx).WithLabelValues(verb, u.Host).Inc()
 }
 
 type resolverLatencyAdapter struct {
