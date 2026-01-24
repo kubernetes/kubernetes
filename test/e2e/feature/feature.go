@@ -99,9 +99,6 @@ var (
 	// Testing critical pod admission
 	CriticalPod = framework.WithFeature(framework.ValidFeatures.Add("CriticalPod"))
 
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	CustomMetricsAutoscaling = framework.WithFeature(framework.ValidFeatures.Add("CustomMetricsAutoscaling"))
-
 	// OWNER: sig-node
 	// Testing device managers
 	DeviceManager = framework.WithFeature(framework.ValidFeatures.Add("DeviceManager"))
