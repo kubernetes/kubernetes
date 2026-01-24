@@ -841,8 +841,10 @@ func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) err
 		return err
 	}
 
-	// Check if the ReservedFor entries are all still valid.
-	valid := make([]resourceapi.ResourceClaimConsumerReference, 0, len(claim.Status.ReservedFor))
+	// Check if the ReservedFor entries are all still valid. Essentially we are
+	// validating and potentially removing pod references, but just leaving any
+	// non-pod references in the list.
+	remaining := make([]resourceapi.ResourceClaimConsumerReference, 0, len(claim.Status.ReservedFor))
 	for _, reservedFor := range claim.Status.ReservedFor {
 		if reservedFor.APIGroup == "" &&
 			reservedFor.Resource == "pods" {
@@ -892,22 +894,24 @@ func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) err
 			}
 
 			if keepEntry {
-				valid = append(valid, reservedFor)
+				remaining = append(remaining, reservedFor)
 			}
 			continue
 		}
 
-		// TODO: support generic object lookup
-		return fmt.Errorf("unsupported ReservedFor entry: %v", reservedFor)
+		// We don't know how to check this entry, so we just keep it to avoid
+		// accidentally removing a reservation for a non-pod consumer that we
+		// don't support yet.
+		remaining = append(remaining, reservedFor)
 	}
 
 	builtinControllerFinalizer := slices.Index(claim.Finalizers, resourceapi.Finalizer)
-	logger.V(5).Info("Claim reserved for counts", "currentCount", len(claim.Status.ReservedFor), "claim", klog.KRef(namespace, name), "updatedCount", len(valid), "builtinController", builtinControllerFinalizer >= 0)
-	if len(valid) < len(claim.Status.ReservedFor) {
+	logger.V(5).Info("Claim reserved for counts", "currentCount", len(claim.Status.ReservedFor), "claim", klog.KRef(namespace, name), "updatedCount", len(remaining), "builtinController", builtinControllerFinalizer >= 0)
+	if len(remaining) < len(claim.Status.ReservedFor) {
 		// This is not using a patch because we want the update to fail if anything
 		// changed in the meantime.
 		claim := claim.DeepCopy()
-		claim.Status.ReservedFor = valid
+		claim.Status.ReservedFor = remaining
 
 		// DRA always performs delayed allocations. Relatedly, it also
 		// deallocates a claim as soon as the last consumer stops using
@@ -925,7 +929,7 @@ func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) err
 		// those, the resource claim controller will trigger deletion when the
 		// pod is done. However, it doesn't hurt to also trigger deallocation
 		// for such claims and not checking for them keeps this code simpler.
-		if len(valid) == 0 {
+		if len(remaining) == 0 {
 			// This is a sanity check. There shouldn't be any claims without this
 			// finalizer because there's no longer any other way of allocating claims.
 			// Classic DRA was the alternative earlier.
@@ -950,7 +954,7 @@ func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) err
 				return err
 			}
 		}
-	} else if builtinControllerFinalizer >= 0 && claim.DeletionTimestamp != nil && len(valid) == 0 {
+	} else if builtinControllerFinalizer >= 0 && claim.DeletionTimestamp != nil && len(remaining) == 0 {
 		claim := claim.DeepCopy()
 		if claim.Status.Allocation != nil {
 			// This can happen when a claim with immediate allocation
@@ -971,7 +975,7 @@ func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) err
 		}
 	}
 
-	if len(valid) == 0 {
+	if len(remaining) == 0 {
 		// Claim is not reserved. If it was generated for a pod and
 		// that pod is not going to run, the claim can be
 		// deleted. Normally the garbage collector does that, but the

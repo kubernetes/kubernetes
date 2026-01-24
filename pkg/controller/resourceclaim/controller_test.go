@@ -400,6 +400,38 @@ func TestSyncHandler(t *testing.T) {
 			},
 			expectedMetrics: expectedMetrics{0, 0, 0, 0},
 		},
+		{
+			name: "clean up pod reservation with non-pod reservation present",
+			pods: func() []*v1.Pod {
+				pod := testPodWithResource.DeepCopy()
+				pod.Status.Phase = v1.PodSucceeded
+				return []*v1.Pod{pod}
+			}(),
+			claims: func() []*resourceapi.ResourceClaim {
+				claim := testClaimReserved.DeepCopy()
+				nonPodRef := resourceapi.ResourceClaimConsumerReference{
+					APIGroup: "foo.com",
+					Resource: "foo",
+					Name:     "foo",
+					UID:      "123",
+				}
+				claim.Status.ReservedFor = append(claim.Status.ReservedFor, nonPodRef)
+				return []*resourceapi.ResourceClaim{claim}
+			}(),
+			key: testClaimKey,
+			expectedClaims: []resourceapi.ResourceClaim{func() resourceapi.ResourceClaim {
+				claim := testClaimReserved.DeepCopy()
+				nonPodRef := resourceapi.ResourceClaimConsumerReference{
+					APIGroup: "foo.com",
+					Resource: "foo",
+					Name:     "foo",
+					UID:      "123",
+				}
+				claim.Status.ReservedFor = []resourceapi.ResourceClaimConsumerReference{nonPodRef}
+				return *claim
+			}()},
+			expectedMetrics: expectedMetrics{0, 0, 0, 0},
+		},
 	}
 
 	for _, tc := range tests {
