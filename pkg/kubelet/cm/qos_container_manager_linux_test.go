@@ -21,12 +21,6 @@ package cm
 import (
 	"context"
 	"fmt"
-	"strconv"
-	"strings"
-	"sync"
-	"testing"
-
-	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	resource "k8s.io/apimachinery/pkg/api/resource"
@@ -35,6 +29,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
+	"strconv"
+	"strings"
+	"sync"
+	"testing"
+	"time"
 )
 
 func activeTestPods() []*v1.Pod {
@@ -432,7 +431,7 @@ func TestQOSCPUConfigUpdate(t *testing.T) {
 
 		t.Run(testCase.name, func(t *testing.T) {
 
-			logger := logr.Discard()
+			logger, ctx := ktesting.NewTestContext(t)
 
 			testContainerManager, err := createTestQOSContainerManager(logger)
 			if err != nil {
@@ -443,7 +442,7 @@ func TestQOSCPUConfigUpdate(t *testing.T) {
 			fakecgroupManager := &fakeCgroupManager{}
 			testContainerManager.cgroupManager = fakecgroupManager
 
-			ctx, cancel := context.WithCancel(context.Background())
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
 			err = testContainerManager.Start(ctx, func() v1.ResourceList { return v1.ResourceList{} }, testCase.testPods)
@@ -460,56 +459,75 @@ func TestQOSCPUConfigUpdate(t *testing.T) {
 			}
 			cancel()
 
-			// These flags will be used to check whether UpdateCgroups()
-			// is updating the CPU shares for all QoS classes (cgroups)
-			foundBurstable := false
-			foundBestEffort := false
-			foundGuaranteed := false
+			// UpdateCgroups() may also be running in the background reconciliation loop (because of Start()).
+			// Retry until a consistent snapshot containing all QoS cgroup updates is observed.
+			//
+			// A small bounded retry count is sufficient here because UpdateCgroups()
+			// is synchronous and expected to complete quickly. This avoids test flakiness
+			// without risking an unbounded wait.
+			maxRetryAttempts := 5
 
-			// Start() initiates a background UpdateCgroups() goroutine which may
-			// still be running. Take a snapshot to avoid observing updates from
-			// the background UpdateCgroups() instead of the explicit UpdateCgroups() call.
-			fakecgroupManager.mutex.Lock()
-			updates := append([]*CgroupConfig(nil), fakecgroupManager.updates...)
-			fakecgroupManager.mutex.Unlock()
+			var (
+				foundBurstable  bool
+				foundBestEffort bool
+				foundGuaranteed bool
+			)
 
-			for _, config := range updates {
+			for i := 0; i < maxRetryAttempts; i++ {
 
-				if strings.HasSuffix(config.Name.ToCgroupfs(), "burstable") {
-					foundBurstable = true
-					if *config.ResourceParameters.CPUShares != testCase.expectedBurstableCPUShares {
-						t.Fatalf("Expected CPU Shares for Burstable: %d Got: %d", testCase.expectedBurstableCPUShares, *config.ResourceParameters.CPUShares)
+				// These flags will be used to check whether UpdateCgroups()
+				// is updating the CPU shares for all QoS classes (cgroups)
+				foundBurstable = false
+				foundBestEffort = false
+				foundGuaranteed = false
+
+				// Start() initiates a background UpdateCgroups() goroutine which may
+				// still be running. Take a snapshot to avoid observing updates from
+				// the background UpdateCgroups() instead of the explicit UpdateCgroups() call.
+				fakecgroupManager.mutex.Lock()
+				updates := append([]*CgroupConfig(nil), fakecgroupManager.updates...)
+				fakecgroupManager.mutex.Unlock()
+
+				for _, config := range updates {
+
+					if strings.HasSuffix(config.Name.ToCgroupfs(), "burstable") {
+						foundBurstable = true
+						if *config.ResourceParameters.CPUShares != testCase.expectedBurstableCPUShares {
+							t.Fatalf("Expected CPU Shares for Burstable: %d Got: %d", testCase.expectedBurstableCPUShares, *config.ResourceParameters.CPUShares)
+						}
+						continue
 					}
-					continue
+
+					if strings.HasSuffix(config.Name.ToCgroupfs(), "besteffort") {
+						foundBestEffort = true
+						if *config.ResourceParameters.CPUShares != MinShares {
+							t.Fatalf("Expected CPU Shares for BestEffort: %d Got: %d", MinShares, *config.ResourceParameters.CPUShares)
+						}
+						continue
+					}
+
+					if config.Name.ToCgroupfs() == testContainerManager.cgroupRoot.ToCgroupfs() {
+						foundGuaranteed = true
+						if config.ResourceParameters != nil && config.ResourceParameters.CPUShares != nil {
+							t.Fatalf("Expected CPU Shares for Guaranteed: <nil>, Got: %d", *config.ResourceParameters.CPUShares)
+						}
+					}
 				}
 
-				if strings.HasSuffix(config.Name.ToCgroupfs(), "besteffort") {
-					foundBestEffort = true
-					if *config.ResourceParameters.CPUShares != MinShares {
-						t.Fatalf("Expected CPU Shares for BestEffort: %d Got: %d", MinShares, *config.ResourceParameters.CPUShares)
-					}
-					continue
+				if foundBurstable && foundBestEffort && foundGuaranteed {
+					break
 				}
 
-				if config.Name.ToCgroupfs() == testContainerManager.cgroupRoot.ToCgroupfs() {
-					foundGuaranteed = true
-					if config.ResourceParameters != nil && config.ResourceParameters.CPUShares != nil {
-						t.Fatalf("Expected CPU Shares for Guaranteed: <nil>, Got: %d", *config.ResourceParameters.CPUShares)
-					}
-				}
+				time.Sleep(time.Millisecond * 10)
 			}
 
-			if !foundBurstable {
-				t.Fatalf("burstable cgroup not found")
-			}
-			if !foundBestEffort {
-				t.Fatalf("besteffort cgroup not found")
-			}
-			if !foundGuaranteed {
-				t.Fatalf("guaranteed cgroup not found")
-			}
+			if !foundBurstable || !foundBestEffort || !foundGuaranteed {
 
+				t.Fatalf(
+					"did not observe all QoS cgroup updates after %d retries (guaranteed=%v, burstable=%v, besteffort=%v)",
+					maxRetryAttempts, foundGuaranteed, foundBurstable, foundBestEffort,
+				)
+			}
 		})
-
 	}
 }
