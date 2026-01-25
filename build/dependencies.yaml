@@ -164,7 +164,7 @@ dependencies:
   # should also be updated, but go-runner is much harder to exploit and has
   # far less relevancy to go updates for Kubernetes more generally.
   - name: "registry.k8s.io/kube-cross: dependents"
-    version: v1.35.0-go1.25.5-bullseye.0
+    version: v1.36.0-go1.25.6-bullseye.0
     refPaths:
     - path: build/build-image/cross/VERSION
 
@@ -210,7 +210,7 @@ dependencies:
       match: configs\[DistrolessIptables\] = Config{list\.BuildImageRegistry, "distroless-iptables", "v([0-9]+)\.([0-9]+)\.([0-9]+)"}
 
   - name: "registry.k8s.io/go-runner: dependents"
-    version: v2.4.0-go1.25.5-bookworm.0
+    version: v2.4.0-go1.25.6-bookworm.0
     refPaths:
     - path: build/common.sh
       match: __default_go_runner_version=
