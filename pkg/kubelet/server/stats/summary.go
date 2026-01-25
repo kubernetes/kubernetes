@@ -53,8 +53,7 @@ var _ SummaryProvider = &summaryProviderImpl{}
 
 // NewSummaryProvider returns a SummaryProvider using the stats provided by the
 // specified statsProvider.
-func NewSummaryProvider(ctx context.Context, statsProvider Provider) SummaryProvider {
-	logger := klog.FromContext(ctx)
+func NewSummaryProvider(logger klog.Logger, statsProvider Provider) SummaryProvider {
 	kubeletCreationTime := metav1.Now()
 	bootTime, err := util.GetBootTime()
 	if err != nil {

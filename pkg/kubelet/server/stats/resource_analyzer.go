@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"k8s.io/client-go/tools/record"
+	"k8s.io/klog/v2"
 )
 
 // ResourceAnalyzer provides statistics on node resource consumption
@@ -41,8 +42,9 @@ var _ ResourceAnalyzer = &resourceAnalyzer{}
 
 // NewResourceAnalyzer returns a new ResourceAnalyzer
 func NewResourceAnalyzer(ctx context.Context, statsProvider Provider, calVolumeFrequency time.Duration, eventRecorder record.EventRecorder) ResourceAnalyzer {
+	logger := klog.FromContext(ctx)
 	fsAnalyzer := newFsResourceAnalyzer(statsProvider, calVolumeFrequency, eventRecorder)
-	summaryProvider := NewSummaryProvider(ctx, statsProvider)
+	summaryProvider := NewSummaryProvider(logger, statsProvider)
 	return &resourceAnalyzer{fsAnalyzer, summaryProvider}
 }
 

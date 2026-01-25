@@ -111,8 +111,7 @@ func (sp *summaryProviderImpl) getSystemWindowsGlobalmemoryStats(ctx context.Con
 
 	perfInfo, err := winstats.GetPerformanceInfo()
 	if err != nil {
-		logger := klog.FromContext(ctx)
-		logger.Error(err, "Failed to get Windows performance info")
+		klog.FromContext(ctx).Error(err, "Failed to get Windows performance info")
 		return globalMemorySummary
 	}
 

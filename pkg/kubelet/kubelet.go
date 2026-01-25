@@ -1655,7 +1655,7 @@ func (kl *Kubelet) StartGarbageCollection(ctx context.Context) {
 	prevImageGCFailed := false
 	beganGC := time.Now()
 	go wait.Until(func() {
-		if err := kl.imageManager.GarbageCollect(gcCtx, beganGC); err != nil {
+		if err := kl.imageManager.GarbageCollect(ctx, beganGC); err != nil {
 			if prevImageGCFailed {
 				logger.Error(err, "Image garbage collection failed multiple times in a row")
 				// Only create an event for repeated failures
@@ -3370,10 +3370,10 @@ func (kl *Kubelet) fastStaticPodsRegistration(ctx context.Context) {
 			return true, nil
 		}
 
-		logger.V(4).Error(err, "Unable to register mirror pod because node is not registered yet", "node", klog.KRef("", string(kl.nodeName)))
+		logger.V(4).Info("Unable to register mirror pod because node is not registered yet", "err", err, "node", klog.KRef("", string(kl.nodeName)))
 		return false, nil
 	}); err != nil {
-		logger.V(4).Error(err, "Failed to wait until node is registered", "node", klog.KRef("", string(kl.nodeName)))
+		logger.V(4).Info("Failed to wait until node is registered", "err", err, "node", klog.KRef("", string(kl.nodeName)))
 	}
 
 	staticPodToMirrorPodMap := kl.podManager.GetStaticPodToMirrorPodMap()
