@@ -42,6 +42,8 @@ message Event {
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // eventTime is the time when this Event was first observed. It is required.
+  // +required
+  // +k8s:required
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.MicroTime eventTime = 2;
 
   // series is data about the Event series this event represents or nil if it's a singleton Event.

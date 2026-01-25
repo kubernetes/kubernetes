@@ -41,6 +41,8 @@ type Event struct {
 	metav1.ObjectMeta `json:"metadata" protobuf:"bytes,1,opt,name=metadata"`
 
 	// eventTime is the time when this Event was first observed. It is required.
+	// +required
+	// +k8s:required
 	EventTime metav1.MicroTime `json:"eventTime" protobuf:"bytes,2,opt,name=eventTime"`
 
 	// series is data about the Event series this event represents or nil if it's a singleton Event.
