@@ -244,7 +244,11 @@ func (c *TypeChecker) declType(gvk schema.GroupVersionKind) (*apiservercel.DeclT
 	if err != nil {
 		return nil, err
 	}
-	return common.SchemaDeclType(&openapi.Schema{Schema: s}, true).MaybeAssignTypeName(generateUniqueTypeName(gvk.Kind)), nil
+	declType := common.SchemaDeclType(&openapi.Schema{Schema: s}, true)
+	if declType == nil {
+		return nil, nil
+	}
+	return declType.MaybeAssignTypeName(generateUniqueTypeName(gvk.Kind)), nil
 }
 
 func (c *TypeChecker) paramsGVK(policy *v1.ValidatingAdmissionPolicy) schema.GroupVersionKind {
@@ -404,7 +408,9 @@ func buildEnvSet(hasParams bool, hasAuthorizer bool, types typeOverwrite) (*envi
 	varOpts = append(varOpts, createVariableOpts(requestType, plugincel.RequestVarName)...)
 
 	// object and oldObject, same type, type(s) resolved from constraints
-	declTypes = append(declTypes, types.object)
+	if types.object != nil {
+		declTypes = append(declTypes, types.object)
+	}
 	varOpts = append(varOpts, createVariableOpts(types.object, plugincel.ObjectVarName, plugincel.OldObjectVarName)...)
 
 	// params, defined by ParamKind
