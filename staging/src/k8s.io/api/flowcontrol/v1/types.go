@@ -163,6 +163,7 @@ type FlowSchemaSpec struct {
 	// if it is an empty slice, there will be no requests matching the FlowSchema.
 	// +listType=atomic
 	// +optional
+	// +k8s:optional
 	Rules []PolicyRulesWithSubjects `json:"rules,omitempty" protobuf:"bytes,4,rep,name=rules"`
 }
 
@@ -208,6 +209,7 @@ type PolicyRulesWithSubjects struct {
 	// A slice that includes both the system:authenticated and system:unauthenticated user groups matches every request.
 	// +listType=atomic
 	// Required.
+	// +k8s:required
 	Subjects []Subject `json:"subjects" protobuf:"bytes,1,rep,name=subjects"`
 	// `resourceRules` is a slice of ResourcePolicyRules that identify matching requests according to their verb and the
 	// target resource.
@@ -229,9 +231,13 @@ type Subject struct {
 	// `kind` indicates which one of the other fields is non-empty.
 	// Required
 	// +unionDiscriminator
+	// +k8s:required
 	Kind SubjectKind `json:"kind" protobuf:"bytes,1,opt,name=kind"`
 	// `user` matches based on username.
+	// +unionMember=User
+	// +k8s:unionMember(memberName: "User")
 	// +optional
+	// +k8s:optional
 	User *UserSubject `json:"user,omitempty" protobuf:"bytes,2,opt,name=user"`
 	// `group` matches based on user group name.
 	// +optional
@@ -255,6 +261,8 @@ const (
 type UserSubject struct {
 	// `name` is the username that matches, or "*" to match all usernames.
 	// Required.
+	// +required
+	// +k8s:required
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 }
 
