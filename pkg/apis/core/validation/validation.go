@@ -4257,6 +4257,11 @@ func validateImagePullSecrets(imagePullSecrets []core.LocalObjectReference, fldP
 	return allErrors
 }
 
+// ValidateAffinity checks if given affinities are valid.
+func ValidateAffinity(affinity *core.Affinity, opts PodValidationOptions, fldPath *field.Path) field.ErrorList {
+	return validateAffinity(affinity, opts, fldPath)
+}
+
 // validateAffinity checks if given affinities are valid
 func validateAffinity(affinity *core.Affinity, opts PodValidationOptions, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
