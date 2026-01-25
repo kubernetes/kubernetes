@@ -1666,10 +1666,14 @@ func TestFilterOutInactivePods(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
-	pods := newTestPods(8)
+	pods := newTestPods(9)
 	now := metav1.NewTime(time.Now())
 
-	// terminal pods are excluded
+	// Use a real cache so we can set per-pod runtime statuses
+	realCache := kubecontainer.NewCache()
+	kubelet.podCache = realCache
+
+	// terminal pods with no runtime containers are excluded
 	pods[0].Status.Phase = v1.PodFailed
 	pods[1].Status.Phase = v1.PodSucceeded
 
@@ -1689,6 +1693,7 @@ func TestFilterOutInactivePods(t *testing.T) {
 	pods[4].Status.Phase = v1.PodRunning
 
 	// pod that is running but has been rejected by admission is excluded
+	// (rejected pods have no runtime containers)
 	pods[5].Status.Phase = v1.PodRunning
 	kubelet.statusManager.SetPodStatus(logger, pods[5], v1.PodStatus{Phase: v1.PodFailed})
 
@@ -1698,14 +1703,32 @@ func TestFilterOutInactivePods(t *testing.T) {
 		pods[6].UID: true,
 	}
 
-	// pod that is failed but still terminating is included (it may still be consuming
-	// resources)
+	// pod that is failed with no runtime containers is excluded - this represents
+	// a rejected pod or a pod that has finished container termination
+	// pod7 has no runtime containers, so it will be filtered
 	pods[7].Status.Phase = v1.PodFailed
 	kubelet.podWorkers.(*fakePodWorkers).terminationRequested = map[types.UID]bool{
 		pods[7].UID: true,
 	}
 
-	expected := []*v1.Pod{pods[2], pods[3], pods[4], pods[7]}
+	// pod that is failed but still has runtime containers is included - this
+	// represents an evicting pod where containers are still running or stopping
+	pods[8].Status.Phase = v1.PodFailed
+	kubelet.podWorkers.(*fakePodWorkers).terminationRequested[pods[8].UID] = true
+	// Set up runtime containers for pod8 to simulate an evicting pod
+	realCache.Set(pods[8].UID, &kubecontainer.PodStatus{
+		ID:        pods[8].UID,
+		Name:      pods[8].Name,
+		Namespace: pods[8].Namespace,
+		ContainerStatuses: []*kubecontainer.Status{
+			{
+				Name:  "container",
+				State: kubecontainer.ContainerStateRunning,
+			},
+		},
+	}, nil, time.Now())
+
+	expected := []*v1.Pod{pods[2], pods[3], pods[4], pods[8]}
 	kubelet.podManager.SetPods(pods)
 	actual := kubelet.filterOutInactivePods(pods)
 	assert.Equal(t, expected, actual)
