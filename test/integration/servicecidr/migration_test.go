@@ -428,7 +428,6 @@ func TestServiceCIDRMigrationScenarios(t *testing.T) {
 	}
 
 	for i, tc := range testCases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
 			etcdOptions := framework.SharedEtcd()

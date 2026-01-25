@@ -50,7 +50,6 @@ var _ = utils.SIGDescribe("CSI Mock fsgroup as mount option", func() {
 			},
 		}
 		for _, t := range tests {
-			t := t
 			ginkgo.It(t.name, func(ctx context.Context) {
 				var nodeStageFsGroup, nodePublishFsGroup string
 				if framework.NodeOSDistroIs("windows") {

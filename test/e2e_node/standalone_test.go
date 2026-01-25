@@ -606,7 +606,6 @@ func getPodFromStandaloneKubelet(ctx context.Context, podNamespace string, podNa
 
 	for _, p := range pods.Items {
 		// Static pods has a node name suffix so comparing as substring
-		p := p
 		if strings.Contains(p.Name, podName) && strings.Contains(p.Namespace, podNamespace) {
 			return &p, nil
 		}

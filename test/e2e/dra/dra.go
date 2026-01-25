@@ -3096,7 +3096,6 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			claim2b := b2.ExternalClaim()
 			pod := b1.PodExternal()
 			for i, claim := range []*resourceapi.ResourceClaim{claim1b, claim2, claim2b} {
-				claim := claim
 				pod.Spec.ResourceClaims = append(pod.Spec.ResourceClaims,
 					v1.PodResourceClaim{
 						Name:              fmt.Sprintf("claim%d", i+1),

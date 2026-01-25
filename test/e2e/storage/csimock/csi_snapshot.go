@@ -64,7 +64,6 @@ var _ = utils.SIGDescribe("CSI Mock volume snapshot", func() {
 			},
 		}
 		for _, test := range tests {
-			test := test
 			ginkgo.It(test.name, func(ctx context.Context) {
 				var hooks *drivers.Hooks
 				if test.createSnapshotHook != nil {
@@ -208,7 +207,6 @@ var _ = utils.SIGDescribe("CSI Mock volume snapshot", func() {
 			},
 		}
 		for _, test := range tests {
-			test := test
 			ginkgo.It(test.name, func(ctx context.Context) {
 				hooks := createPreHook("CreateSnapshot", test.createSnapshotHook)
 				m.init(ctx, testParameters{
@@ -299,7 +297,6 @@ var _ = utils.SIGDescribe("CSI Mock volume snapshot", func() {
 			},
 		}
 		for _, test := range tests {
-			test := test
 			ginkgo.It(test.name, func(ctx context.Context) {
 				m.init(ctx, testParameters{
 					disableAttach:  true,

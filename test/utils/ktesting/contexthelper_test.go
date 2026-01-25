@@ -105,7 +105,6 @@ func TestCause(t *testing.T) {
 			expectDeadline: time.Minute,
 		},
 	} {
-		tt := tt
 		t.Run(name, func(t *testing.T) {
 			ctx, cancel := withTimeout(tt.parentCtx, t, tt.timeout, timeoutCause.Error())
 			if tt.cancelCause != "" {
