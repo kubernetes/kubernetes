@@ -192,6 +192,7 @@ func TestRunPeerDiscoveryCacheSync(t *testing.T) {
 			}
 
 			go h.RunPeerDiscoveryCacheSync(ctx, 1)
+			go h.RunPeerDiscoveryRefilter(ctx, 1)
 
 			// Wait for initial cache update.
 			initialCache := map[string]PeerDiscoveryCacheEntry{}
@@ -204,7 +205,7 @@ func TestRunPeerDiscoveryCacheSync(t *testing.T) {
 					return false, ctx.Err()
 				default:
 				}
-				gotCache := h.peerDiscoveryInfoCache.Load()
+				gotCache := h.gvExclusionManager.GetFilteredPeerDiscoveryCache()
 				return assert.ObjectsAreEqual(initialCache, gotCache), nil
 			})
 			if err != nil {
@@ -251,7 +252,7 @@ func TestRunPeerDiscoveryCacheSync(t *testing.T) {
 					return false, ctx.Err()
 				default:
 				}
-				gotCache := h.peerDiscoveryInfoCache.Load()
+				gotCache := h.gvExclusionManager.GetFilteredPeerDiscoveryCache()
 				r := assert.ObjectsAreEqual(tt.wantCache, gotCache)
 				return r, nil
 			})

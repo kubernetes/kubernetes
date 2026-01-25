@@ -79,14 +79,12 @@ type peerProxyHandler struct {
 	localDiscoveryCacheTicker            *time.Ticker
 	localDiscoveryInfoCachePopulated     chan struct{}
 	localDiscoveryInfoCachePopulatedOnce sync.Once
-	// Cache that stores resources and groups served by peer apiservers.
-	// The map is from string to PeerDiscoveryCacheEntry where the string
-	// is the serverID of the peer apiserver.
-	// Refreshed if a new apiserver identity lease is added, deleted or
-	// holderIndentity change is observed in the lease.
-	peerDiscoveryInfoCache atomic.Value // map[string]struct{GVRs map[schema.GroupVersionResource]bool; Groups []apidiscoveryv2.APIGroupDiscovery}
-	proxyTransport         http.RoundTripper
-	// Worker queue that keeps the peerDiscoveryInfoCache up-to-date.
+	// rawPeerDiscoveryCache stores unfiltered resources and groups served by peer apiservers.
+	// The map is from string (serverID) to PeerDiscoveryCacheEntry.
+	// Written ONLY by peerLeaseQueue worker when peer leases change.
+	rawPeerDiscoveryCache atomic.Value // map[string]PeerDiscoveryCacheEntry
+	proxyTransport        http.RoundTripper
+	// Worker queue that keeps the rawPeerDiscoveryCache up-to-date.
 	peerLeaseQueue            workqueue.TypedRateLimitingInterface[string]
 	serializer                runtime.NegotiatedSerializer
 	cacheInvalidationCallback atomic.Pointer[func()]
@@ -284,16 +282,9 @@ func (r *responder) Error(w http.ResponseWriter, req *http.Request, err error) {
 // Returns a map of serverID -> []apidiscoveryv2.APIGroupDiscovery served by peer servers
 func (h *peerProxyHandler) GetPeerResources() map[string][]apidiscoveryv2.APIGroupDiscovery {
 	result := make(map[string][]apidiscoveryv2.APIGroupDiscovery)
-
-	peerCache := h.peerDiscoveryInfoCache.Load()
-	if peerCache == nil {
-		klog.V(4).Infof("GetPeerResources: peer cache is nil")
-		return result
-	}
-
-	cacheMap, ok := peerCache.(map[string]PeerDiscoveryCacheEntry)
-	if !ok {
-		klog.Warning("Invalid cache type in peerDiscoveryGVRCache")
+	cacheMap := h.gvExclusionManager.GetFilteredPeerDiscoveryCache()
+	if len(cacheMap) == 0 {
+		klog.V(4).Infof("GetPeerResources: peer cache is empty")
 		return result
 	}
 

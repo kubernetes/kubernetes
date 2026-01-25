@@ -115,21 +115,17 @@ func (h *peerProxyHandler) syncPeerDiscoveryCache(ctx context.Context) error {
 		}
 	}
 
-	// Apply current exclusion filter to new peer cache entries.
-	if filtered, changed := h.gvExclusionManager.FilterPeerDiscoveryCache(newCache); changed {
-		newCache = filtered
-	}
-
-	h.storePeerDiscoveryCacheAndInvalidate(newCache)
+	// Store unfiltered data to raw cache and trigger refilter.
+	// The refilter worker (single writer to filtered cache) will apply exclusions.
+	h.storeRawPeerDiscoveryCacheAndTriggerRefilter(newCache)
 	return fetchDiscoveryErr
 }
 
-// storePeerDiscoveryCacheAndInvalidate stores the new peer discovery cache and always calls the invalidation callback if set.
-func (h *peerProxyHandler) storePeerDiscoveryCacheAndInvalidate(newCache map[string]PeerDiscoveryCacheEntry) {
-	h.peerDiscoveryInfoCache.Store(newCache)
-	if callback := h.cacheInvalidationCallback.Load(); callback != nil {
-		(*callback)()
-	}
+// storeRawPeerDiscoveryCacheAndTriggerRefilter stores the raw (unfiltered) peer discovery cache
+// and immediately refilters to update the filtered cache.
+func (h *peerProxyHandler) storeRawPeerDiscoveryCacheAndTriggerRefilter(newCache map[string]PeerDiscoveryCacheEntry) {
+	h.rawPeerDiscoveryCache.Store(newCache)
+	h.gvExclusionManager.TriggerRefilter()
 }
 
 func (h *peerProxyHandler) fetchNewDiscoveryFor(ctx context.Context, serverID string) (PeerDiscoveryCacheEntry, error) {
@@ -285,14 +281,8 @@ func (h *peerProxyHandler) isValidPeerIdentityLease(obj interface{}) (*v1.Lease,
 
 func (h *peerProxyHandler) findServiceableByPeerFromPeerDiscoveryCache(gvr schema.GroupVersionResource) []string {
 	var serviceableByIDs []string
-	cache := h.peerDiscoveryInfoCache.Load()
-	if cache == nil {
-		return serviceableByIDs
-	}
-
-	cacheMap, ok := cache.(map[string]PeerDiscoveryCacheEntry)
-	if !ok {
-		klog.Warning("Invalid cache type in peerDiscoveryInfoCache")
+	cacheMap := h.gvExclusionManager.GetFilteredPeerDiscoveryCache()
+	if len(cacheMap) == 0 {
 		return serviceableByIDs
 	}
 

@@ -184,16 +184,18 @@ func TestDetectDiff(t *testing.T) {
 	_ = NewGVExclusionManager(5*time.Minute, 1*time.Minute, &atomic.Value{}, &atomic.Pointer[func()]{})
 
 	tests := []struct {
-		name string
-		old  map[schema.GroupVersion]struct{}
-		new  map[schema.GroupVersion]struct{}
-		want bool
+		name        string
+		old         map[schema.GroupVersion]struct{}
+		new         map[schema.GroupVersion]struct{}
+		wantChanged bool
+		wantDeleted []schema.GroupVersion
 	}{
 		{
-			name: "both empty",
-			old:  map[schema.GroupVersion]struct{}{},
-			new:  map[schema.GroupVersion]struct{}{},
-			want: false,
+			name:        "both empty",
+			old:         map[schema.GroupVersion]struct{}{},
+			new:         map[schema.GroupVersion]struct{}{},
+			wantChanged: false,
+			wantDeleted: nil,
 		},
 		{
 			name: "identical",
@@ -203,7 +205,8 @@ func TestDetectDiff(t *testing.T) {
 			new: map[schema.GroupVersion]struct{}{
 				{Group: "apps", Version: "v1"}: {},
 			},
-			want: false,
+			wantChanged: false,
+			wantDeleted: nil,
 		},
 		{
 			name: "added GV",
@@ -214,7 +217,8 @@ func TestDetectDiff(t *testing.T) {
 				{Group: "apps", Version: "v1"}:  {},
 				{Group: "batch", Version: "v1"}: {},
 			},
-			want: true,
+			wantChanged: true,
+			wantDeleted: nil, // No deletions, only addition
 		},
 		{
 			name: "removed GV",
@@ -225,7 +229,10 @@ func TestDetectDiff(t *testing.T) {
 			new: map[schema.GroupVersion]struct{}{
 				{Group: "apps", Version: "v1"}: {},
 			},
-			want: true,
+			wantChanged: true,
+			wantDeleted: []schema.GroupVersion{
+				{Group: "batch", Version: "v1"},
+			},
 		},
 		{
 			name: "different GVs same size",
@@ -235,15 +242,33 @@ func TestDetectDiff(t *testing.T) {
 			new: map[schema.GroupVersion]struct{}{
 				{Group: "batch", Version: "v1"}: {},
 			},
-			want: true,
+			wantChanged: true,
+			wantDeleted: []schema.GroupVersion{
+				{Group: "apps", Version: "v1"},
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, result := diffGVs(tt.old, tt.new)
-			if result != tt.want {
-				t.Errorf("diffGVs() = %v, want %v", result, tt.want)
+			deletedGVs, changed := diffGVs(tt.old, tt.new)
+			if changed != tt.wantChanged {
+				t.Errorf("diffGVs() changed = %v, want %v", changed, tt.wantChanged)
+			}
+			if len(deletedGVs) != len(tt.wantDeleted) {
+				t.Errorf("diffGVs() deleted count = %d, want %d", len(deletedGVs), len(tt.wantDeleted))
+			}
+			for _, wantGV := range tt.wantDeleted {
+				found := false
+				for _, gotGV := range deletedGVs {
+					if gotGV == wantGV {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("diffGVs() missing deleted GV %v", wantGV)
+				}
 			}
 		})
 	}
@@ -255,7 +280,6 @@ func TestFilterPeerDiscoveryCache(t *testing.T) {
 		activeGVs    map[schema.GroupVersion]struct{}
 		deletedGVs   map[schema.GroupVersion]time.Time
 		cacheMap     map[string]PeerDiscoveryCacheEntry
-		wantChanged  bool
 		wantPeerGVRs map[string]int // peer name -> GVR count
 	}{
 		{
@@ -273,7 +297,6 @@ func TestFilterPeerDiscoveryCache(t *testing.T) {
 					},
 				},
 			},
-			wantChanged: false,
 			wantPeerGVRs: map[string]int{
 				"peer1": 1,
 				"peer2": 1,
@@ -296,7 +319,6 @@ func TestFilterPeerDiscoveryCache(t *testing.T) {
 					},
 				},
 			},
-			wantChanged: true,
 			wantPeerGVRs: map[string]int{
 				"peer1": 0, // apps/v1 filtered out
 				"peer2": 1, // unchanged
@@ -322,7 +344,6 @@ func TestFilterPeerDiscoveryCache(t *testing.T) {
 					},
 				},
 			},
-			wantChanged: true,
 			wantPeerGVRs: map[string]int{
 				"peer1": 0, // custom/v1alpha1 filtered out
 				"peer2": 1, // unchanged
@@ -347,7 +368,6 @@ func TestFilterPeerDiscoveryCache(t *testing.T) {
 					},
 				},
 			},
-			wantChanged: true,
 			wantPeerGVRs: map[string]int{
 				"peer1": 1, // apps/v1 and custom/v1alpha1 filtered out, batch/v1 remains
 			},
@@ -365,10 +385,7 @@ func TestFilterPeerDiscoveryCache(t *testing.T) {
 				mgr.recentlyDeletedGVs.Store(tt.deletedGVs)
 			}
 
-			filtered, changed := mgr.FilterPeerDiscoveryCache(tt.cacheMap)
-			if changed != tt.wantChanged {
-				t.Errorf("Want changed=%v, got %v", tt.wantChanged, changed)
-			}
+			filtered := mgr.filterPeerDiscoveryCache(tt.cacheMap)
 
 			if len(filtered) != len(tt.cacheMap) {
 				t.Errorf("Want %d peers in filtered cache, got %d", len(tt.cacheMap), len(filtered))
@@ -393,9 +410,30 @@ func TestFilterPeerCacheEntry(t *testing.T) {
 		name         string
 		entry        PeerDiscoveryCacheEntry
 		exclusionSet map[schema.GroupVersion]struct{}
-		wantChanged  bool
 		wantGVRs     []schema.GroupVersionResource
 	}{
+		{
+			name: "empty exclusion set returns entry unchanged",
+			entry: PeerDiscoveryCacheEntry{
+				GVRs: map[schema.GroupVersionResource]bool{
+					{Group: "apps", Version: "v1", Resource: "deployments"}: true,
+					{Group: "batch", Version: "v1", Resource: "jobs"}:       true,
+				},
+				GroupDiscovery: []apidiscoveryv2.APIGroupDiscovery{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "apps"},
+						Versions: []apidiscoveryv2.APIVersionDiscovery{
+							{Version: "v1"},
+						},
+					},
+				},
+			},
+			exclusionSet: map[schema.GroupVersion]struct{}{},
+			wantGVRs: []schema.GroupVersionResource{
+				{Group: "apps", Version: "v1", Resource: "deployments"},
+				{Group: "batch", Version: "v1", Resource: "jobs"},
+			},
+		},
 		{
 			name: "filter GVRs and groups",
 			entry: PeerDiscoveryCacheEntry{
@@ -422,7 +460,6 @@ func TestFilterPeerCacheEntry(t *testing.T) {
 			exclusionSet: map[schema.GroupVersion]struct{}{
 				{Group: "apps", Version: "v1"}: {},
 			},
-			wantChanged: true,
 			wantGVRs: []schema.GroupVersionResource{
 				{Group: "batch", Version: "v1", Resource: "jobs"},
 				{Group: "custom", Version: "v1", Resource: "myresources"},
@@ -438,7 +475,6 @@ func TestFilterPeerCacheEntry(t *testing.T) {
 			exclusionSet: map[schema.GroupVersion]struct{}{
 				{Group: "apps", Version: "v1"}: {},
 			},
-			wantChanged: false,
 			wantGVRs: []schema.GroupVersionResource{
 				{Group: "batch", Version: "v1", Resource: "jobs"},
 			},
@@ -449,11 +485,7 @@ func TestFilterPeerCacheEntry(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mgr := NewGVExclusionManager(5*time.Minute, 1*time.Minute, &atomic.Value{}, &atomic.Pointer[func()]{})
 
-			filtered, changed := mgr.filterPeerCacheEntry(tt.entry, tt.exclusionSet)
-
-			if changed != tt.wantChanged {
-				t.Errorf("Want changed=%v, got %v", tt.wantChanged, changed)
-			}
+			filtered := mgr.filterPeerCacheEntry(tt.entry, tt.exclusionSet)
 
 			for _, gvr := range tt.wantGVRs {
 				if _, found := filtered.GVRs[gvr]; !found {

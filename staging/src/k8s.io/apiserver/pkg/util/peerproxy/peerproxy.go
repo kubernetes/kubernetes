@@ -138,7 +138,7 @@ func NewPeerProxyHandler(
 		localDiscoveryInfoCache:          atomic.Value{},
 		localDiscoveryCacheTicker:        time.NewTicker(localDiscoveryRefreshInterval),
 		localDiscoveryInfoCachePopulated: make(chan struct{}),
-		peerDiscoveryInfoCache:           atomic.Value{},
+		rawPeerDiscoveryCache:            atomic.Value{},
 		peerLeaseQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{
@@ -150,7 +150,7 @@ func NewPeerProxyHandler(
 	h.gvExclusionManager = NewGVExclusionManager(
 		defaultExclusionGracePeriod,
 		defaultExclusionReaperInterval,
-		&h.peerDiscoveryInfoCache,
+		&h.rawPeerDiscoveryCache,
 		&h.cacheInvalidationCallback,
 	)
 
@@ -176,7 +176,7 @@ func NewPeerProxyHandler(
 	discoveryClient.NoPeerDiscovery = true
 	h.discoveryClient = discoveryClient
 	h.localDiscoveryInfoCache.Store(map[schema.GroupVersionResource]bool{})
-	h.peerDiscoveryInfoCache.Store(map[string]PeerDiscoveryCacheEntry{})
+	h.rawPeerDiscoveryCache.Store(map[string]PeerDiscoveryCacheEntry{})
 
 	proxyTransport, err := transport.New(proxyClientConfig)
 	if err != nil {

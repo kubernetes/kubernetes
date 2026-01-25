@@ -66,22 +66,27 @@ type GVExclusionManager struct {
 	// Worker 2: triggered by Active/Deleted GV changes
 	refilterQueue workqueue.TypedRateLimitingInterface[string]
 
-	peerDiscoveryCache   *atomic.Value // peerProxyHandler.peerDiscoveryInfoCache
-	invalidationCallback *atomic.Pointer[func()]
+	// rawPeerDiscoveryCache is written only by peerLeaseQueue worker
+	// when peer leases change
+	rawPeerDiscoveryCache *atomic.Value // map[string]PeerDiscoveryCacheEntry
+	// filteredPeerDiscoveryCache is written only by the refilter worker
+	// when raw cache or exclusion set changes.
+	filteredPeerDiscoveryCache atomic.Value // map[string]PeerDiscoveryCacheEntry
+	invalidationCallback       *atomic.Pointer[func()]
 }
 
 // NewGVExclusionManager creates a new GV exclusion manager.
 func NewGVExclusionManager(
 	exclusionGracePeriod time.Duration,
 	reaperCheckInterval time.Duration,
-	peerDiscoveryCache *atomic.Value,
+	rawPeerDiscoveryCache *atomic.Value,
 	invalidationCallback *atomic.Pointer[func()],
 ) *GVExclusionManager {
 	mgr := &GVExclusionManager{
-		exclusionGracePeriod: exclusionGracePeriod,
-		reaperCheckInterval:  reaperCheckInterval,
-		peerDiscoveryCache:   peerDiscoveryCache,
-		invalidationCallback: invalidationCallback,
+		exclusionGracePeriod:  exclusionGracePeriod,
+		reaperCheckInterval:   reaperCheckInterval,
+		rawPeerDiscoveryCache: rawPeerDiscoveryCache,
+		invalidationCallback:  invalidationCallback,
 		activeGVQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{
@@ -96,8 +101,19 @@ func NewGVExclusionManager(
 
 	mgr.currentlyActiveGVs.Store(map[schema.GroupVersion]struct{}{})
 	mgr.recentlyDeletedGVs.Store(map[schema.GroupVersion]time.Time{})
+	mgr.filteredPeerDiscoveryCache.Store(map[string]PeerDiscoveryCacheEntry{})
 
 	return mgr
+}
+
+// GetFilteredPeerDiscoveryCache returns the filtered peer discovery cache.
+func (m *GVExclusionManager) GetFilteredPeerDiscoveryCache() map[string]PeerDiscoveryCacheEntry {
+	if cache := m.filteredPeerDiscoveryCache.Load(); cache != nil {
+		if cacheMap, ok := cache.(map[string]PeerDiscoveryCacheEntry); ok {
+			return cacheMap
+		}
+	}
+	return map[string]PeerDiscoveryCacheEntry{}
 }
 
 // RegisterCRDInformerHandlers registers event handlers for CRD informer using a custom extractor.
@@ -256,8 +272,7 @@ func (m *GVExclusionManager) reconcileActiveGVs() {
 			m.currentlyActiveGVs.Store(freshGVs)
 			klog.V(4).Infof("Active GVs updated: %d GVs now active", len(freshGVs))
 		}
-		// Queue re-filtering of peer discovery cache
-		m.refilterQueue.Add("refilter")
+		m.TriggerRefilter()
 	} else {
 		klog.V(4).Infof("No changes detected in active or recently deleted GVs")
 	}
@@ -373,83 +388,57 @@ func (m *GVExclusionManager) processNextRefilter(ctx context.Context) bool {
 	return true
 }
 
-// refilterPeerDiscoveryCache filters the peer discovery cache using the exclusion set.
-// Only updates the cache and calls invalidation callback if filtering actually changed content.
+// refilterPeerDiscoveryCache reads the raw peer discovery cache,
+// applies exclusion filtering, and stores the result to the filtered cache.
 func (m *GVExclusionManager) refilterPeerDiscoveryCache() {
-	if m.peerDiscoveryCache == nil {
-		klog.Warning("peerDiscoveryCache reference not set")
-		return
-	}
-
-	cache := m.peerDiscoveryCache.Load()
-	if cache == nil {
-		klog.V(4).Infof("Peer discovery cache is empty, skipping re-filter")
-		return
-	}
-
-	cacheMap, ok := cache.(map[string]PeerDiscoveryCacheEntry)
-	if !ok {
-		klog.Warning("Invalid cache type in peerDiscoveryInfoCache")
-		return
+	var cacheMap map[string]PeerDiscoveryCacheEntry
+	if m.rawPeerDiscoveryCache != nil {
+		if rawCache := m.rawPeerDiscoveryCache.Load(); rawCache != nil {
+			cacheMap, _ = rawCache.(map[string]PeerDiscoveryCacheEntry)
+		}
 	}
 
 	if len(cacheMap) == 0 {
-		klog.V(4).Infof("Peer discovery cache is empty, skipping re-filter")
+		m.filteredPeerDiscoveryCache.Store(map[string]PeerDiscoveryCacheEntry{})
+		klog.V(4).Infof("Raw peer discovery cache is empty or unavailable")
 		return
 	}
 
-	// Filter the cache
-	filteredCache, changed := m.FilterPeerDiscoveryCache(cacheMap)
+	filteredCache := m.filterPeerDiscoveryCache(cacheMap)
+	m.filteredPeerDiscoveryCache.Store(filteredCache)
 
-	if changed {
-		// Atomic swap peer cache
-		m.peerDiscoveryCache.Store(filteredCache)
-
-		// Call invalidation callback
-		if m.invalidationCallback != nil {
-			if callback := m.invalidationCallback.Load(); callback != nil {
-				(*callback)()
-			}
+	if m.invalidationCallback != nil {
+		if callback := m.invalidationCallback.Load(); callback != nil {
+			(*callback)()
 		}
-
-		klog.V(4).Infof("Peer discovery cache re-filtered, %d GVs excluded", len(m.getExclusionSet()))
-	} else {
-		klog.V(4).Infof("No changes after filtering peer discovery cache")
 	}
+
+	klog.V(4).Infof("Peer discovery cache re-filtered, %d GVs in exclusion set", len(m.getExclusionSet()))
+
 }
 
-// FilterPeerDiscoveryCache applies the current exclusion set to the provided peer cache.
-// This should be called when new peers are added to ensure their discovery is filtered.
-// Returns the filtered cache and a boolean indicating if any changes were made.
-func (m *GVExclusionManager) FilterPeerDiscoveryCache(cacheMap map[string]PeerDiscoveryCacheEntry) (map[string]PeerDiscoveryCacheEntry, bool) {
+// filterPeerDiscoveryCache applies the current exclusion set to the provided peer cache.
+func (m *GVExclusionManager) filterPeerDiscoveryCache(cacheMap map[string]PeerDiscoveryCacheEntry) map[string]PeerDiscoveryCacheEntry {
 	exclusionSet := m.getExclusionSet()
 	if len(exclusionSet) == 0 {
-		return cacheMap, false
+		return cacheMap
 	}
 
 	filtered := make(map[string]PeerDiscoveryCacheEntry, len(cacheMap))
-	anyChanged := false
-
 	for peerID, entry := range cacheMap {
-		filteredEntry, changed := m.filterPeerCacheEntry(entry, exclusionSet)
-		filtered[peerID] = filteredEntry
-		if changed {
-			anyChanged = true
-		}
+		filtered[peerID] = m.filterPeerCacheEntry(entry, exclusionSet)
 	}
 
-	return filtered, anyChanged
+	return filtered
 }
 
 // filterPeerCacheEntry filters a single peer's cache entry for excluded GVs.
-// Returns the filtered entry and whether any GVs were excluded.
 func (m *GVExclusionManager) filterPeerCacheEntry(
 	entry PeerDiscoveryCacheEntry,
 	exclusionSet map[schema.GroupVersion]struct{},
-) (PeerDiscoveryCacheEntry, bool) {
+) PeerDiscoveryCacheEntry {
 	filteredGVRs := make(map[schema.GroupVersionResource]bool, len(entry.GVRs))
 	anyExcluded := false
-
 	for existingGVR, v := range entry.GVRs {
 		gv := schema.GroupVersion{Group: existingGVR.Group, Version: existingGVR.Version}
 		if _, excluded := exclusionSet[gv]; excluded {
@@ -459,17 +448,17 @@ func (m *GVExclusionManager) filterPeerCacheEntry(
 		filteredGVRs[existingGVR] = v
 	}
 
+	// If no GVRs were excluded, the exclusion set doesn't intersect with this peer's GVs,
+	// so we can return the entry unchanged without filtering GroupDiscovery.
 	if !anyExcluded {
-		return entry, false
+		return entry
 	}
-
-	// Filter the group discovery list
 	filteredGroups := m.filterGroupDiscovery(entry.GroupDiscovery, exclusionSet)
 
 	return PeerDiscoveryCacheEntry{
 		GVRs:           filteredGVRs,
 		GroupDiscovery: filteredGroups,
-	}, true
+	}
 }
 
 // filterGroupDiscovery filters group discovery entries, removing excluded GVs.
@@ -516,4 +505,10 @@ func (m *GVExclusionManager) loadRecentlyDeletedGVs() map[schema.GroupVersion]ti
 		}
 	}
 	return map[schema.GroupVersion]time.Time{}
+}
+
+// TriggerRefilter triggers the refilter worker to apply exclusions to the filtered cache.
+// This should be called by peerLeaseQueue after updating the raw peer discovery cache.
+func (m *GVExclusionManager) TriggerRefilter() {
+	m.refilterQueue.Add("refilter")
 }
