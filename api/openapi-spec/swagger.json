@@ -534,7 +534,8 @@
         }
       },
       "required": [
-        "policyName"
+        "policyName",
+        "validationActions"
       ],
       "type": "object"
     },

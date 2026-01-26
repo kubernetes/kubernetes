@@ -931,6 +931,8 @@ message ValidatingAdmissionPolicyBindingSpec {
   //
   // Required.
   // +listType=set
+  // +required
+  // +k8s:required
   repeated string validationActions = 4;
 }
 

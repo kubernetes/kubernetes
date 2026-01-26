@@ -473,6 +473,8 @@ type ValidatingAdmissionPolicyBindingSpec struct {
 	//
 	// Required.
 	// +listType=set
+	// +required
+	// +k8s:required
 	ValidationActions []ValidationAction `json:"validationActions,omitempty" protobuf:"bytes,4,rep,name=validationActions"`
 }
 
