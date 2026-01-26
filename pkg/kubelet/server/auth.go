@@ -95,6 +95,15 @@ func (n nodeAuthorizerAttributesGetter) GetRequestAttributes(ctx context.Context
 
 	requestPath := r.URL.Path
 
+	// Force "create" verb for endpoints that execute operations,
+	// regardless of HTTP method (e.g. WebSocket upgrades via GET).
+	if isSubpath(requestPath, "/exec") ||
+		isSubpath(requestPath, "/attach") ||
+		isSubpath(requestPath, "/run") ||
+		isSubpath(requestPath, "/portForward") {
+		apiVerb = "create"
+	}
+
 	var subresources []string
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletFineGrainedAuthz) {
 		switch {
