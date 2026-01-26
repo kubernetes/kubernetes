@@ -89,7 +89,6 @@ func TestStepContext(t *testing.T) {
 			expectDuration: 5 * time.Second,
 		},
 	} {
-		tc := tc
 		t.Run(name, func(t *testing.T) {
 			tc.run(t)
 		})

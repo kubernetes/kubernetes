@@ -3209,7 +3209,6 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 	closeFn, restConfig, clientSet, ns := setup(t, "pod-replacement-policy")
 	t.Cleanup(closeFn)
 	for name, tc := range cases {
-		tc := tc
 		t.Run(name, func(t *testing.T) {
 			if !tc.podReplacementPolicyEnabled {
 				// TODO: this will be removed in 1.37.
@@ -3436,7 +3435,6 @@ func TestElasticIndexedJob(t *testing.T) {
 	closeFn, restConfig, clientSet, ns := setup(t, "indexed")
 	t.Cleanup(closeFn)
 	for name, tc := range cases {
-		tc := tc
 		t.Run(name, func(t *testing.T) {
 			ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
 			t.Cleanup(cancel)
@@ -4563,7 +4561,6 @@ func TestDelayedJobUpdateEvent(t *testing.T) {
 	}
 
 	for name, tc := range cases {
-		tc := tc
 		t.Run(name, func(t *testing.T) {
 			ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig, transformOpt)
 			t.Cleanup(cancel)
@@ -5003,7 +5000,6 @@ func updatePodStatuses(ctx context.Context, clientSet clientset.Interface, updat
 	var updated int32
 
 	for _, pod := range updates {
-		pod := pod
 		go func() {
 			_, err := clientSet.CoreV1().Pods(pod.Namespace).UpdateStatus(ctx, &pod, metav1.UpdateOptions{})
 			if err != nil {
@@ -5080,7 +5076,6 @@ func getJobPodsForIndex(ctx context.Context, clientSet clientset.Interface, jobO
 	}
 	var result []*v1.Pod
 	for _, pod := range pods.Items {
-		pod := pod
 		if !metav1.IsControlledBy(&pod, jobObj) {
 			continue
 		}

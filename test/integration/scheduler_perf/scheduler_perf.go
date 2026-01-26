@@ -1521,7 +1521,6 @@ func startCollectingMetrics(tCtx ktesting.TContext, collectorWG *sync.WaitGroup,
 	collectors := getTestDataCollectors(podInformer, fmt.Sprintf("%s/%s", workloadName, name), namespaces, labelSelector, mcc, throughputErrorMargin)
 	for _, collector := range collectors {
 		// Need loop-local variable for function below.
-		collector := collector
 		err := collector.init()
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to initialize data collector: %w", err)
