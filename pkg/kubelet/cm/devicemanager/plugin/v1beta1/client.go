@@ -104,7 +104,7 @@ func (c *client) Disconnect(logger klog.Logger) error {
 	c.mutex.Lock()
 	if c.grpc != nil {
 		if err := c.grpc.Close(); err != nil {
-			logger.V(2).Error(err, "Failed to close grpc connection", "resource", c.Resource())
+			logger.V(2).Info("Failed to close gRPC connection", "resource", c.Resource(), "err", err)
 		}
 		c.grpc = nil
 	}

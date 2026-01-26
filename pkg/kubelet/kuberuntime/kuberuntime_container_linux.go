@@ -428,7 +428,7 @@ func checkSwapControllerAvailability(ctx context.Context) bool {
 		// memory.swap.max does not exist in the cgroup root, so we check /sys/fs/cgroup/<SELF>/memory.swap.max
 		cm, err := libcontainercgroups.ParseCgroupFile("/proc/self/cgroup")
 		if err != nil {
-			logger.V(5).Error(fmt.Errorf("failed to parse /proc/self/cgroup: %w", err), warn)
+			logger.V(5).Info(warn, "err", fmt.Errorf("failed to parse /proc/self/cgroup: %w", err))
 			return false
 		}
 		// For cgroup v2 unified hierarchy, there are no per-controller
@@ -439,7 +439,7 @@ func checkSwapControllerAvailability(ctx context.Context) bool {
 	}
 	if _, err := os.Stat(p); err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
-			logger.V(5).Error(err, warn)
+			logger.V(5).Info(warn, "err", err)
 		}
 		return false
 	}

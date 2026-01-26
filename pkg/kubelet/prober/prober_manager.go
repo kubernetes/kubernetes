@@ -194,7 +194,7 @@ func (m *manager) AddPod(ctx context.Context, pod *v1.Pod) {
 		if c.StartupProbe != nil {
 			key.probeType = startup
 			if _, ok := m.workers[key]; ok {
-				logger.V(8).Error(nil, "Startup probe already exists for container",
+				logger.V(8).Info("Startup probe already exists for container",
 					"pod", klog.KObj(pod), "containerName", c.Name)
 				return
 			}
@@ -206,7 +206,7 @@ func (m *manager) AddPod(ctx context.Context, pod *v1.Pod) {
 		if c.ReadinessProbe != nil {
 			key.probeType = readiness
 			if _, ok := m.workers[key]; ok {
-				logger.V(8).Error(nil, "Readiness probe already exists for container",
+				logger.V(8).Info("Readiness probe already exists for container",
 					"pod", klog.KObj(pod), "containerName", c.Name)
 				return
 			}
@@ -218,7 +218,7 @@ func (m *manager) AddPod(ctx context.Context, pod *v1.Pod) {
 		if c.LivenessProbe != nil {
 			key.probeType = liveness
 			if _, ok := m.workers[key]; ok {
-				logger.V(8).Error(nil, "Liveness probe already exists for container",
+				logger.V(8).Info("Liveness probe already exists for container",
 					"pod", klog.KObj(pod), "containerName", c.Name)
 				return
 			}
