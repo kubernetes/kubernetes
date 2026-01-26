@@ -166,26 +166,97 @@ var schemaYAML = typed.YAMLObject(`types:
     elementRelationship: atomic
 - name: io.k8s.apimachinery.pkg.apis.meta.v1.Time
   scalar: untyped
-- name: io.k8s.sample-apiserver.pkg.apis.wardle.v1alpha1.Fischer
+- name: io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.APIService
   map:
     fields:
     - name: apiVersion
       type:
         scalar: string
-    - name: disallowedFlunders
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.APIServiceSpec
+      default: {}
+    - name: status
+      type:
+        namedType: io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.APIServiceStatus
+      default: {}
+- name: io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.APIServiceCondition
+  map:
+    fields:
+    - name: lastTransitionTime
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
+    - name: message
+      type:
+        scalar: string
+    - name: reason
+      type:
+        scalar: string
+    - name: status
+      type:
+        scalar: string
+      default: ""
+    - name: type
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.APIServiceSpec
+  map:
+    fields:
+    - name: caBundle
+      type:
+        scalar: string
+    - name: group
+      type:
+        scalar: string
+    - name: groupPriorityMinimum
+      type:
+        scalar: numeric
+      default: 0
+    - name: insecureSkipTLSVerify
+      type:
+        scalar: boolean
+    - name: service
+      type:
+        namedType: io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.ServiceReference
+    - name: version
+      type:
+        scalar: string
+    - name: versionPriority
+      type:
+        scalar: numeric
+      default: 0
+- name: io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.APIServiceStatus
+  map:
+    fields:
+    - name: conditions
       type:
         list:
           elementType:
-            scalar: string
-          elementRelationship: atomic
-    - name: kind
+            namedType: io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.APIServiceCondition
+          elementRelationship: associative
+          keys:
+          - type
+- name: io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.ServiceReference
+  map:
+    fields:
+    - name: name
       type:
         scalar: string
-    - name: metadata
+    - name: namespace
       type:
-        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
-      default: {}
-- name: io.k8s.sample-apiserver.pkg.apis.wardle.v1alpha1.Flunder
+        scalar: string
+    - name: port
+      type:
+        scalar: numeric
+- name: io.k8s.kube-aggregator.pkg.apis.apiregistration.v1beta1.APIService
   map:
     fields:
     - name: apiVersion
@@ -200,78 +271,81 @@ var schemaYAML = typed.YAMLObject(`types:
       default: {}
     - name: spec
       type:
-        namedType: io.k8s.sample-apiserver.pkg.apis.wardle.v1alpha1.FlunderSpec
+        namedType: io.k8s.kube-aggregator.pkg.apis.apiregistration.v1beta1.APIServiceSpec
       default: {}
     - name: status
       type:
-        namedType: io.k8s.sample-apiserver.pkg.apis.wardle.v1alpha1.FlunderStatus
+        namedType: io.k8s.kube-aggregator.pkg.apis.apiregistration.v1beta1.APIServiceStatus
       default: {}
-- name: io.k8s.sample-apiserver.pkg.apis.wardle.v1alpha1.FlunderSpec
+- name: io.k8s.kube-aggregator.pkg.apis.apiregistration.v1beta1.APIServiceCondition
   map:
     fields:
-    - name: reference
+    - name: lastTransitionTime
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
+    - name: message
       type:
         scalar: string
-    - name: referenceType
+    - name: reason
       type:
         scalar: string
-- name: io.k8s.sample-apiserver.pkg.apis.wardle.v1alpha1.FlunderStatus
-  map:
-    elementType:
-      scalar: untyped
-      list:
-        elementType:
-          namedType: __untyped_atomic_
-        elementRelationship: atomic
-      map:
-        elementType:
-          namedType: __untyped_deduced_
-        elementRelationship: separable
-- name: io.k8s.sample-apiserver.pkg.apis.wardle.v1beta1.Flunder
-  map:
-    fields:
-    - name: apiVersion
-      type:
-        scalar: string
-    - name: kind
-      type:
-        scalar: string
-    - name: metadata
-      type:
-        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
-      default: {}
-    - name: spec
-      type:
-        namedType: io.k8s.sample-apiserver.pkg.apis.wardle.v1beta1.FlunderSpec
-      default: {}
     - name: status
       type:
-        namedType: io.k8s.sample-apiserver.pkg.apis.wardle.v1beta1.FlunderStatus
-      default: {}
-- name: io.k8s.sample-apiserver.pkg.apis.wardle.v1beta1.FlunderSpec
+        scalar: string
+      default: ""
+    - name: type
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.kube-aggregator.pkg.apis.apiregistration.v1beta1.APIServiceSpec
   map:
     fields:
-    - name: fischerReference
+    - name: caBundle
       type:
         scalar: string
-    - name: flunderReference
+    - name: group
       type:
         scalar: string
-    - name: referenceType
+    - name: groupPriorityMinimum
+      type:
+        scalar: numeric
+      default: 0
+    - name: insecureSkipTLSVerify
+      type:
+        scalar: boolean
+    - name: service
+      type:
+        namedType: io.k8s.kube-aggregator.pkg.apis.apiregistration.v1beta1.ServiceReference
+    - name: version
       type:
         scalar: string
-- name: io.k8s.sample-apiserver.pkg.apis.wardle.v1beta1.FlunderStatus
+    - name: versionPriority
+      type:
+        scalar: numeric
+      default: 0
+- name: io.k8s.kube-aggregator.pkg.apis.apiregistration.v1beta1.APIServiceStatus
   map:
-    elementType:
-      scalar: untyped
-      list:
-        elementType:
-          namedType: __untyped_atomic_
-        elementRelationship: atomic
-      map:
-        elementType:
-          namedType: __untyped_deduced_
-        elementRelationship: separable
+    fields:
+    - name: conditions
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.kube-aggregator.pkg.apis.apiregistration.v1beta1.APIServiceCondition
+          elementRelationship: associative
+          keys:
+          - type
+- name: io.k8s.kube-aggregator.pkg.apis.apiregistration.v1beta1.ServiceReference
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+    - name: namespace
+      type:
+        scalar: string
+    - name: port
+      type:
+        scalar: numeric
 - name: __untyped_atomic_
   scalar: untyped
   list:

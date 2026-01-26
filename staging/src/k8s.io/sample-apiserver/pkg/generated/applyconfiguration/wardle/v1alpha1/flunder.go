@@ -21,8 +21,10 @@ package v1alpha1
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
+	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 	wardlev1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
+	internal "k8s.io/sample-apiserver/pkg/generated/applyconfiguration/internal"
 )
 
 // FlunderApplyConfiguration represents a declarative configuration of the Flunder type for use
@@ -43,6 +45,47 @@ func Flunder(name, namespace string) *FlunderApplyConfiguration {
 	b.WithKind("Flunder")
 	b.WithAPIVersion("wardle.example.com/v1alpha1")
 	return b
+}
+
+// ExtractFlunderFrom extracts the applied configuration owned by fieldManager from
+// flunder for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
+// flunder must be a unmodified Flunder API object that was retrieved from the Kubernetes API.
+// ExtractFlunderFrom provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractFlunderFrom(flunder *wardlev1alpha1.Flunder, fieldManager string, subresource string) (*FlunderApplyConfiguration, error) {
+	b := &FlunderApplyConfiguration{}
+	err := managedfields.ExtractInto(flunder, internal.Parser().Type("io.k8s.sample-apiserver.pkg.apis.wardle.v1alpha1.Flunder"), fieldManager, b, subresource)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(flunder.Name)
+	b.WithNamespace(flunder.Namespace)
+
+	b.WithKind("Flunder")
+	b.WithAPIVersion("wardle.example.com/v1alpha1")
+	return b, nil
+}
+
+// ExtractFlunder extracts the applied configuration owned by fieldManager from
+// flunder. If no managedFields are found in flunder for fieldManager, a
+// FlunderApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// flunder must be a unmodified Flunder API object that was retrieved from the Kubernetes API.
+// ExtractFlunder provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractFlunder(flunder *wardlev1alpha1.Flunder, fieldManager string) (*FlunderApplyConfiguration, error) {
+	return ExtractFlunderFrom(flunder, fieldManager, "")
+}
+
+// ExtractFlunderStatus extracts the applied configuration owned by fieldManager from
+// flunder for the status subresource.
+func ExtractFlunderStatus(flunder *wardlev1alpha1.Flunder, fieldManager string) (*FlunderApplyConfiguration, error) {
+	return ExtractFlunderFrom(flunder, fieldManager, "status")
 }
 
 func (b FlunderApplyConfiguration) IsApplyConfiguration() {}
