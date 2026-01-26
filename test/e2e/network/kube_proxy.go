@@ -46,6 +46,20 @@ import (
 	netutils "k8s.io/utils/net"
 )
 
+// expandIPv6ForConntrack expands an IPv6 address to the format used in /proc/net/nf_conntrack.
+// The conntrack file uses fully expanded IPv6 addresses with leading zeros in each group.
+// e.g., "fc00:f853:ccd:e793::3" -> "fc00:f853:0ccd:e793:0000:0000:0000:0003"
+func expandIPv6ForConntrack(ipStr string) string {
+	ip := netutils.ParseIPSloppy(ipStr)
+	if ip == nil || ip.To4() != nil {
+		return ipStr // not IPv6 or invalid, return as-is
+	}
+	ip = ip.To16()
+	return fmt.Sprintf("%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x",
+		ip[0], ip[1], ip[2], ip[3], ip[4], ip[5], ip[6], ip[7],
+		ip[8], ip[9], ip[10], ip[11], ip[12], ip[13], ip[14], ip[15])
+}
+
 var kubeProxyE2eImage = imageutils.GetE2EImage(imageutils.Agnhost)
 
 var _ = common.SIGDescribe("KubeProxy", func() {
@@ -215,6 +229,7 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 		ipFamily := "ipv4"
 		if netutils.IsIPv6String(ip) {
 			ipFamily = "ipv6"
+			ip = expandIPv6ForConntrack(ip)
 		}
 		// Obtain the corresponding conntrack entry on the host by reading
 		// /proc/net/nf_conntrack directly from the pod e2e-net-exec.
