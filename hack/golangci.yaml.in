@@ -169,6 +169,7 @@ linters:
     - ineffassign
     - kubeapilinter
     - logcheck
+    - modernize
     - revive
     - sorted
     - staticcheck
@@ -268,6 +269,47 @@ linters:
         - underef
         - unslice
     {{- end}}
+    modernize:
+      # List of analyzers to disable.
+      # By default, all analyzers are enabled but in
+      # Kubernetes we want to be more selective and
+      # disable those which are not useful for it.
+      disable:
+        # Replace interface{} with any.
+        - any
+        # Replace for-range over b.N with b.Loop.
+        - bloop
+        # Replace []byte(fmt.Sprintf) with fmt.Appendf.
+        - fmtappendf
+        # Remove redundant re-declaration of loop variables.
+        - forvar
+        # Replace explicit loops over maps with calls to maps package.
+        - mapsloop
+        # Replace if/else statements with calls to min or max.
+        - minmax
+        # Suggest replacing omitempty with omitzero for struct fields.
+        - omitzero
+        # Replace 3-clause for loops with for-range over integers.
+        - rangeint
+        # Replace reflect.TypeOf(x) with TypeFor[T]().
+        - reflecttypefor
+        # Replace loops with slices.Contains or slices.ContainsFunc.
+        - slicescontains
+        # Replace sort.Slice with slices.Sort for basic types.
+        - slicessort
+        # Use iterators instead of Len/At-style APIs.
+        - stditerators
+        # Replace HasPrefix/TrimPrefix with CutPrefix.
+        - stringscutprefix
+        # Replace ranging over Split/Fields with SplitSeq/FieldsSeq.
+        - stringsseq
+        # Replace += with strings.Builder.
+        - stringsbuilder
+        # Replace context.WithCancel with t.Context in tests.
+        - testingcontext
+        # Replace wg.Add(1)/go/wg.Done() with wg.Go.
+        - waitgroup
+
     revive:
       # Only these rules are enabled.
       rules:
