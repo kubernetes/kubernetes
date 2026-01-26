@@ -863,6 +863,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.33"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.36"
 - name: KubeletInUserNamespace
   versionedSpecs:
   - default: false
