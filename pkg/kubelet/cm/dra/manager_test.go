@@ -984,7 +984,8 @@ dra_operations_duration_seconds_count{is_error="false",operation_name="PrepareRe
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
-			backgroundCtx, cancel := context.WithCancel(context.Background())
+			tCtx := ktesting.Init(t)
+			backgroundCtx, cancel := context.WithCancel(tCtx)
 			defer cancel()
 
 			kubeletmetrics.Register()
@@ -1000,7 +1001,6 @@ dra_operations_duration_seconds_count{is_error="false",operation_name="PrepareRe
 				)
 			}()
 
-			tCtx := ktesting.Init(t)
 			backgroundCtx = klog.NewContext(backgroundCtx, tCtx.Logger())
 
 			manager, err := NewManager(tCtx.Logger(), fakeKubeClient, t.TempDir())
@@ -1305,8 +1305,7 @@ dra_operations_duration_seconds_count{is_error="false",operation_name="Unprepare
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
-			backgroundCtx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			tCtx := ktesting.Init(t)
 
 			kubeletmetrics.Register()
 			kubeletmetrics.DRAOperationsDuration.Reset()
@@ -1321,16 +1320,13 @@ dra_operations_duration_seconds_count{is_error="false",operation_name="Unprepare
 				)
 			}()
 
-			tCtx := ktesting.Init(t)
-			backgroundCtx = klog.NewContext(backgroundCtx, tCtx.Logger())
-
 			var pluginClientTimeout *time.Duration
 			if test.wantTimeout {
 				timeout := time.Millisecond * 20
 				pluginClientTimeout = &timeout
 			}
 
-			draServerInfo, err := setupFakeDRADriverGRPCServer(backgroundCtx, test.wantTimeout, pluginClientTimeout, nil, test.resp, nil)
+			draServerInfo, err := setupFakeDRADriverGRPCServer(tCtx, test.wantTimeout, pluginClientTimeout, nil, test.resp, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1338,7 +1334,7 @@ dra_operations_duration_seconds_count{is_error="false",operation_name="Unprepare
 
 			manager, err := NewManager(tCtx.Logger(), fakeKubeClient, t.TempDir())
 			require.NoError(t, err, "create DRA manager")
-			manager.initDRAPluginManager(backgroundCtx, getFakeNode, time.Second /* very short wiping delay for testing */)
+			manager.initDRAPluginManager(tCtx, getFakeNode, time.Second /* very short wiping delay for testing */)
 
 			plg := manager.GetWatcherHandler()
 			if err := plg.RegisterPlugin(test.driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, pluginClientTimeout); err != nil {
@@ -1350,7 +1346,7 @@ dra_operations_duration_seconds_count{is_error="false",operation_name="Unprepare
 			}
 
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, true)
-			err = manager.UnprepareResources(backgroundCtx, test.pod)
+			err = manager.UnprepareResources(tCtx, test.pod)
 
 			assert.Equal(t, test.expectedUnprepareCalls, draServerInfo.server.unprepareResourceCalls.Load())
 
@@ -1595,7 +1591,9 @@ func TestParallelPrepareUnprepareResources(t *testing.T) {
 // is updated correctly, if affected pods are identified, and if update notifications are sent
 // through the manager's update channel. It covers various scenarios including health changes, stream errors, and context cancellation.
 func TestHandleWatchResourcesStream(t *testing.T) {
-	overallTestCtx, overallTestCancel := context.WithCancel(ktesting.Init(t))
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+	overallTestCtx, overallTestCancel := context.WithCancel(tCtx)
 	defer overallTestCancel()
 
 	// Helper to create and setup a new manager for each sub-test
@@ -1788,7 +1786,7 @@ func TestHandleWatchResourcesStream(t *testing.T) {
 
 		// Pre-populate health cache
 		initialHealth := state.DeviceHealth{PoolName: poolName, DeviceName: deviceName, Health: "Unhealthy", LastUpdated: time.Now().Add(-5 * time.Millisecond), HealthCheckTimeout: DefaultHealthTimeout} // Ensure LastUpdated is slightly in past
-		_, err := manager.healthInfoCache.updateHealthInfo(driverName, []state.DeviceHealth{initialHealth})
+		_, err := manager.healthInfoCache.updateHealthInfo(logger, driverName, []state.DeviceHealth{initialHealth})
 		require.NoError(t, err, "Failed to pre-populate health cache")
 
 		t.Log("NoActualStateChange: Test Case Started")
@@ -2036,7 +2034,8 @@ func TestUpdateAllocatedResourcesStatus(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
-			manager, err := NewManager(tCtx.Logger(), nil, t.TempDir())
+			logger := tCtx.Logger()
+			manager, err := NewManager(logger, nil, t.TempDir())
 			require.NoError(t, err)
 
 			for _, ci := range tc.claimInfos {
@@ -2050,7 +2049,7 @@ func TestUpdateAllocatedResourcesStatus(t *testing.T) {
 					for _, dev := range ds.Devices {
 						devices = append(devices, state.DeviceHealth{PoolName: dev.PoolName, DeviceName: dev.DeviceName, Health: state.DeviceHealthStatusHealthy})
 					}
-					_, err := manager.healthInfoCache.updateHealthInfo(driverName, devices)
+					_, err := manager.healthInfoCache.updateHealthInfo(logger, driverName, devices)
 					require.NoError(t, err)
 				}
 			}

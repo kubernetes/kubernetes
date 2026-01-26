@@ -41,13 +41,13 @@ type healthInfoCache struct {
 }
 
 // newHealthInfoCache creates a new cache, loading from a checkpoint if present.
-func newHealthInfoCache(stateFile string) (*healthInfoCache, error) {
+func newHealthInfoCache(logger klog.Logger, stateFile string) (*healthInfoCache, error) {
 	cache := &healthInfoCache{
 		HealthInfo: &state.DevicesHealthMap{},
 		stateFile:  stateFile,
 	}
 	if err := cache.loadFromCheckpoint(); err != nil {
-		klog.Background().Error(err, "Failed to load health checkpoint, proceeding with empty cache")
+		logger.Error(err, "Failed to load health checkpoint, proceeding with empty cache")
 	}
 	return cache, nil
 }
@@ -84,7 +84,7 @@ func (cache *healthInfoCache) withRLock(f func() error) error {
 
 // saveToCheckpointInternal does the actual saving without locking.
 // Assumes the caller holds the necessary lock.
-func (cache *healthInfoCache) saveToCheckpointInternal() error {
+func (cache *healthInfoCache) saveToCheckpointInternal(logger klog.Logger) error {
 	if cache.stateFile == "" {
 		return nil
 	}
@@ -100,7 +100,7 @@ func (cache *healthInfoCache) saveToCheckpointInternal() error {
 
 	defer func() {
 		if err := os.Remove(tempFile.Name()); err != nil && !os.IsNotExist(err) {
-			klog.Background().Error(err, "Failed to remove temporary checkpoint file", "path", tempFile.Name())
+			logger.Error(err, "Failed to remove temporary checkpoint file", "path", tempFile.Name())
 		}
 	}()
 
@@ -151,7 +151,7 @@ func (cache *healthInfoCache) getHealthInfo(driverName, poolName, deviceName str
 // updateHealthInfo reconciles the cache with a fresh list of device health states
 // from a plugin. It identifies which devices have changed state and handles devices
 // that are no longer being reported by the plugin.
-func (cache *healthInfoCache) updateHealthInfo(driverName string, devices []state.DeviceHealth) ([]state.DeviceHealth, error) {
+func (cache *healthInfoCache) updateHealthInfo(logger klog.Logger, driverName string, devices []state.DeviceHealth) ([]state.DeviceHealth, error) {
 	changedDevices := []state.DeviceHealth{}
 	err := cache.withLock(func() error {
 		now := time.Now()
@@ -204,8 +204,8 @@ func (cache *healthInfoCache) updateHealthInfo(driverName string, devices []stat
 
 		// Phase 3: Persist changes to the checkpoint file if any state changed.
 		if len(changedDevices) > 0 {
-			if err := cache.saveToCheckpointInternal(); err != nil {
-				klog.Background().Error(err, "Failed to save health checkpoint after update. Kubelet restart may lose the device health information.")
+			if err := cache.saveToCheckpointInternal(logger); err != nil {
+				logger.Error(err, "Failed to save health checkpoint after update. Kubelet restart may lose the device health information.")
 			}
 		}
 		return nil
@@ -218,9 +218,9 @@ func (cache *healthInfoCache) updateHealthInfo(driverName string, devices []stat
 }
 
 // clearDriver clears all health data for a specific driver.
-func (cache *healthInfoCache) clearDriver(driverName string) error {
+func (cache *healthInfoCache) clearDriver(logger klog.Logger, driverName string) error {
 	return cache.withLock(func() error {
 		delete(*cache.HealthInfo, driverName)
-		return cache.saveToCheckpointInternal()
+		return cache.saveToCheckpointInternal(logger)
 	})
 }
