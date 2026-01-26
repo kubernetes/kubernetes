@@ -49,3 +49,16 @@ func TestAsPartialObjectMetadata(t *testing.T) {
 		}
 	}
 }
+
+func TestAccessor_NilPointer(t *testing.T) {
+	var object metav1.ObjectMeta
+	_, err := Accessor(object)
+	if err != errNotObject {
+		t.Fatalf("expected errNotObject, got: %v", err)
+	}
+	var nilPtr *metav1.ObjectMeta = nil
+	_, err = Accessor(nilPtr)
+	if err != errNilObject {
+		t.Fatalf("expected errNilObject, got: %v", err)
+	}
+}

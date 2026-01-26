@@ -89,11 +89,18 @@ func ListAccessor(obj interface{}) (List, error) {
 // interfaces.
 var errNotObject = fmt.Errorf("object does not implement the Object interfaces")
 
+// errNilObject is returned when a nil object is passed to Accessor.
+var errNilObject = fmt.Errorf("nil object passed")
+
 // Accessor takes an arbitrary object pointer and returns meta.Interface.
 // obj must be a pointer to an API type. An error is returned if the minimum
 // required fields are missing. Fields that are not required return the default
 // value and are a no-op if set.
 func Accessor(obj interface{}) (metav1.Object, error) {
+	// nil pointer check
+	if obj == nil || (reflect.ValueOf(obj).Kind() == reflect.Ptr && reflect.ValueOf(obj).IsNil()) {
+		return nil, errNilObject
+	}
 	switch t := obj.(type) {
 	case metav1.Object:
 		return t, nil
