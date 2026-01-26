@@ -186,7 +186,7 @@ func Test_ListKind(t *testing.T) {
 			"kind":       "TheKindList",
 			"metadata": map[string]interface{}{
 				"continue":        "",
-				"resourceVersion": "3", // Three objects created so far.
+				"resourceVersion": "4", // Three objects created so far, starting value is 1.
 			},
 		},
 		Items: []unstructured.Unstructured{
@@ -340,7 +340,7 @@ func TestListWithUnstructuredObjectsAndTypedScheme(t *testing.T) {
 
 	expectedList := &unstructured.UnstructuredList{}
 	expectedList.SetGroupVersionKind(listGVK)
-	expectedList.SetResourceVersion("1") // One object created so far.
+	expectedList.SetResourceVersion("2") // One object created so far, initial value is 1.
 	expectedList.SetContinue("")
 	expectedList.Items = append(expectedList.Items, u)
 
@@ -369,7 +369,7 @@ func TestListWithNoFixturesAndTypedScheme(t *testing.T) {
 
 	expectedList := &unstructured.UnstructuredList{}
 	expectedList.SetGroupVersionKind(listGVK)
-	expectedList.SetResourceVersion("") // by product of the fake setting resource version
+	expectedList.SetResourceVersion("1") // No objects created so far.
 	expectedList.SetContinue("")
 
 	if diff := cmp.Diff(expectedList, list); diff != "" {
@@ -402,7 +402,7 @@ func TestListWithNoScheme(t *testing.T) {
 
 	expectedList := &unstructured.UnstructuredList{}
 	expectedList.SetGroupVersionKind(listGVK)
-	expectedList.SetResourceVersion("1") // One object created so far.
+	expectedList.SetResourceVersion("2") // One object created so far, initial value is 1.
 	expectedList.SetContinue("")
 	expectedList.Items = append(expectedList.Items, u)
 
@@ -443,7 +443,7 @@ func TestListWithTypedFixtures(t *testing.T) {
 
 	expectedList := &unstructured.UnstructuredList{}
 	expectedList.SetGroupVersionKind(listGVK)
-	expectedList.SetResourceVersion("1") // One object created so far.
+	expectedList.SetResourceVersion("2") // One object created so far, initial value is 1.
 	expectedList.SetContinue("")
 	expectedList.Items = []unstructured.Unstructured{u}
 

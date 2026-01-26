@@ -255,7 +255,7 @@ func convertResourceEphemeralStorageToString(ephemeralStorage *resource.Quantity
 	return strconv.FormatInt(m, 10), nil
 }
 
-var standardContainerResources = sets.New[string](
+var standardContainerResources = sets.New(
 	string(corev1.ResourceCPU),
 	string(corev1.ResourceMemory),
 	string(corev1.ResourceEphemeralStorage),

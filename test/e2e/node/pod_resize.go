@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	helpers "k8s.io/component-helpers/resource"
-	resourceapi "k8s.io/kubernetes/pkg/api/v1/resource"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/common/node/framework/cgroups"
 	"k8s.io/kubernetes/test/e2e/common/node/framework/podresize"
@@ -501,9 +500,10 @@ func doPodResizeSchedulerTests(f *framework.Framework) {
 
 		ginkgo.By("Find node CPU resources available for allocation!")
 		node := nodes.Items[0]
-		nodeAllocatableMilliCPU, nodeAvailableMilliCPU := getNodeAllocatableAndAvailableValues(ctx, f, &node, v1.ResourceCPU)
+		nodeAllocatableCPU, nodeAvailableCPU, err := e2enode.GetNodeAllocatableAndAvailableQuantities(ctx, f.ClientSet, &node, v1.ResourceCPU)
+		framework.ExpectNoError(err, "failed to get CPU resources available for allocation")
 		framework.Logf("Node '%s': NodeAllocatable MilliCPUs = %dm. MilliCPUs currently available to allocate = %dm.",
-			node.Name, nodeAllocatableMilliCPU, nodeAvailableMilliCPU)
+			node.Name, nodeAllocatableCPU.MilliValue(), nodeAvailableCPU.MilliValue())
 
 		//
 		// Scheduler focused pod resize E2E test case #1:
@@ -511,8 +511,8 @@ func doPodResizeSchedulerTests(f *framework.Framework) {
 		//     2. Resize pod2 down so that it fits on the node and can be scheduled.
 		//     3. Verify that pod2 gets scheduled and comes up and running.
 		//
-		testPod1CPUQuantity := resource.NewMilliQuantity(nodeAvailableMilliCPU/2, resource.DecimalSI)
-		testPod2CPUQuantity := resource.NewMilliQuantity(nodeAvailableMilliCPU, resource.DecimalSI)
+		testPod1CPUQuantity := resource.NewMilliQuantity(nodeAvailableCPU.MilliValue()/2, resource.DecimalSI)
+		testPod2CPUQuantity := resource.NewMilliQuantity(nodeAvailableCPU.MilliValue(), resource.DecimalSI)
 		testPod2CPUQuantityResized := resource.NewMilliQuantity(testPod1CPUQuantity.MilliValue()/2, resource.DecimalSI)
 		framework.Logf("TEST1: testPod1 initial CPU request is '%dm'", testPod1CPUQuantity.MilliValue())
 		framework.Logf("TEST1: testPod2 initial CPU request is '%dm'", testPod2CPUQuantity.MilliValue())
@@ -575,10 +575,11 @@ func doPodResizeSchedulerTests(f *framework.Framework) {
 		//     2. Resize pod1 down so that pod3 gets room to be scheduled.
 		//     3. Verify that pod3 is scheduled and running.
 		//
-		nodeAllocatableMilliCPU2, nodeAvailableMilliCPU2 := getNodeAllocatableAndAvailableValues(ctx, f, &node, v1.ResourceCPU)
+		nodeAllocatableCPU2, nodeAvailableCPU2, err := e2enode.GetNodeAllocatableAndAvailableQuantities(ctx, f.ClientSet, &node, v1.ResourceCPU)
+		framework.ExpectNoError(err, "failed to get CPU resources available for allocation")
 		framework.Logf("TEST2: Node '%s': NodeAllocatable MilliCPUs = %dm. MilliCPUs currently available to allocate = %dm.",
-			node.Name, nodeAllocatableMilliCPU2, nodeAvailableMilliCPU2)
-		testPod3CPUQuantity := resource.NewMilliQuantity(nodeAvailableMilliCPU2+testPod1CPUQuantity.MilliValue()/4, resource.DecimalSI)
+			node.Name, nodeAllocatableCPU2.MilliValue(), nodeAvailableCPU2.MilliValue())
+		testPod3CPUQuantity := resource.NewMilliQuantity(nodeAvailableCPU2.MilliValue()+testPod1CPUQuantity.MilliValue()/4, resource.DecimalSI)
 		testPod1CPUQuantityResized := resource.NewMilliQuantity(testPod1CPUQuantity.MilliValue()/3, resource.DecimalSI)
 		framework.Logf("TEST2: testPod1 MilliCPUs after resize '%dm'", testPod1CPUQuantityResized.MilliValue())
 
@@ -639,7 +640,7 @@ func doPodResizeSchedulerTests(f *framework.Framework) {
 			}
 		}`, testPod1CPUQuantity.MilliValue(), testPod1CPUQuantity.MilliValue())
 
-		testPod1CPUExceedingAllocatable := resource.NewMilliQuantity(nodeAllocatableMilliCPU*2, resource.DecimalSI)
+		testPod1CPUExceedingAllocatable := resource.NewMilliQuantity(nodeAllocatableCPU.MilliValue()*2, resource.DecimalSI)
 		patchTestpod1ExceedNodeAllocatable := fmt.Sprintf(`{
 			"spec": {
 				"containers": [
@@ -702,11 +703,12 @@ func doPodResizeRetryDeferredTests(f *framework.Framework) {
 
 		ginkgo.By("Find node CPU resources available for allocation!")
 		node := nodes.Items[0]
-		nodeAllocatableMilliCPU, nodeAvailableMilliCPU := getNodeAllocatableAndAvailableValues(ctx, f, &node, v1.ResourceCPU)
+		nodeAllocatableCPU, nodeAvailableCPU, err := e2enode.GetNodeAllocatableAndAvailableQuantities(ctx, f.ClientSet, &node, v1.ResourceCPU)
+		framework.ExpectNoError(err, "failed to get CPU resources available for allocation")
 		framework.Logf("Node '%s': NodeAllocatable MilliCPUs = %dm. MilliCPUs currently available to allocate = %dm.",
-			node.Name, nodeAllocatableMilliCPU, nodeAvailableMilliCPU)
+			node.Name, nodeAllocatableCPU.MilliValue(), nodeAvailableCPU.MilliValue())
 
-		testPod1CPUQuantity := resource.NewMilliQuantity(nodeAvailableMilliCPU/2, resource.DecimalSI)
+		testPod1CPUQuantity := resource.NewMilliQuantity(nodeAvailableCPU.MilliValue()/2, resource.DecimalSI)
 		testPod2CPUQuantity := resource.NewMilliQuantity(testPod1CPUQuantity.MilliValue()/2, resource.DecimalSI)
 		framework.Logf("testPod1 initial CPU request is '%dm'", testPod1CPUQuantity.MilliValue())
 		framework.Logf("testPod2 initial CPU request is '%dm'", testPod2CPUQuantity.MilliValue())
@@ -741,12 +743,13 @@ func doPodResizeRetryDeferredTests(f *framework.Framework) {
 		gomega.Expect(testPod2.Status.Phase).To(gomega.Equal(v1.PodRunning))
 		gomega.Expect(testPod2.Generation).To(gomega.BeEquivalentTo(1))
 
-		nodeAllocatableMilliCPU2, nodeAvailableMilliCPU2 := getNodeAllocatableAndAvailableValues(ctx, f, &node, v1.ResourceCPU)
+		nodeAllocatableCPU2, nodeAvailableCPU2, err := e2enode.GetNodeAllocatableAndAvailableQuantities(ctx, f.ClientSet, &node, v1.ResourceCPU)
+		framework.ExpectNoError(err, "failed to get CPU resources available for allocation")
 		framework.Logf("Node '%s': NodeAllocatable MilliCPUs = %dm. MilliCPUs currently available to allocate = %dm.",
-			node.Name, nodeAllocatableMilliCPU2, nodeAvailableMilliCPU2)
+			node.Name, nodeAllocatableCPU2.MilliValue(), nodeAvailableCPU2.MilliValue())
 
-		testPod3CPUQuantity := resource.NewMilliQuantity(nodeAvailableMilliCPU2/4, resource.DecimalSI)
-		testPod3CPUQuantityResized := resource.NewMilliQuantity(nodeAvailableMilliCPU2+testPod1CPUQuantity.MilliValue()/4, resource.DecimalSI)
+		testPod3CPUQuantity := resource.NewMilliQuantity(nodeAvailableCPU2.MilliValue()/4, resource.DecimalSI)
+		testPod3CPUQuantityResized := resource.NewMilliQuantity(nodeAvailableCPU2.MilliValue()+testPod1CPUQuantity.MilliValue()/4, resource.DecimalSI)
 		framework.Logf("testPod3 MilliCPUs after resize '%dm'", testPod3CPUQuantityResized.MilliValue())
 
 		testPod1CPUQuantityResizedCPU := resource.NewMilliQuantity(testPod1CPUQuantity.MilliValue()/3, resource.DecimalSI)
@@ -832,14 +835,13 @@ func doPodResizeRetryDeferredTests(f *framework.Framework) {
 		ginkgo.By("Find node CPU and memory resources available for allocation!")
 		node := nodes.Items[0]
 
-		nodeAllocatableMilliCPU, nodeAvailableMilliCPU := getNodeAllocatableAndAvailableValues(ctx, f, &node, v1.ResourceCPU)
+		nodeAllocatableCPU, nodeAvailableCPU, err := e2enode.GetNodeAllocatableAndAvailableQuantities(ctx, f.ClientSet, &node, v1.ResourceCPU)
+		framework.ExpectNoError(err, "failed to get CPU resources available for allocation")
 		framework.Logf("Node '%s': NodeAllocatable MilliCPUs = %dm. MilliCPUs currently available to allocate = %dm.",
-			node.Name, nodeAllocatableMilliCPU, nodeAvailableMilliCPU)
-		framework.Logf("Node '%s': NodeAllocatable MilliCPUs = %dm. MilliCPUs currently available to allocate = %dm.",
-			node.Name, nodeAllocatableMilliCPU, nodeAvailableMilliCPU)
+			node.Name, nodeAllocatableCPU.MilliValue(), nodeAvailableCPU.MilliValue())
 
-		majorityCPUQuantity := resource.NewMilliQuantity(2*nodeAvailableMilliCPU/3, resource.DecimalSI)
-		littleCPUQuantity := resource.NewMilliQuantity(nodeAvailableMilliCPU/16, resource.DecimalSI)
+		majorityCPUQuantity := resource.NewMilliQuantity(2*nodeAvailableCPU.MilliValue()/3, resource.DecimalSI)
+		littleCPUQuantity := resource.NewMilliQuantity(nodeAvailableCPU.MilliValue()/16, resource.DecimalSI)
 		containerWithMajorityCPU := []podresize.ResizableContainerInfo{
 			{
 				Name:      "c",
@@ -1060,16 +1062,18 @@ func doPodResizeRetryDeferredTests(f *framework.Framework) {
 		ginkgo.By("Find node CPU and memory resources available for allocation!")
 		node := nodes.Items[0]
 
-		nodeAllocatableMilliCPU, initNodeAvailableMilliCPU := getNodeAllocatableAndAvailableValues(ctx, f, &node, v1.ResourceCPU)
+		nodeAllocatableCPU, initNodeAvailableCPU, err := e2enode.GetNodeAllocatableAndAvailableQuantities(ctx, f.ClientSet, &node, v1.ResourceCPU)
+		framework.ExpectNoError(err, "failed to get CPU resources available for allocation")
 		framework.Logf("Node '%s': NodeAllocatable MilliCPUs = %dm. MilliCPUs currently available to allocate = %dm.",
-			node.Name, nodeAllocatableMilliCPU, initNodeAvailableMilliCPU)
+			node.Name, nodeAllocatableCPU.MilliValue(), initNodeAvailableCPU.MilliValue())
 
-		nodeAllocatableMem, initNodeAvailableMem := getNodeAllocatableAndAvailableValues(ctx, f, &node, v1.ResourceMemory)
+		nodeAllocatableMem, initNodeAvailableMem, err := e2enode.GetNodeAllocatableAndAvailableQuantities(ctx, f.ClientSet, &node, v1.ResourceMemory)
+		framework.ExpectNoError(err, "failed to get CPU resources available for allocation")
 		framework.Logf("Node '%s': NodeAllocatable Memory = %d. Memory currently available to allocate = %d.",
-			node.Name, nodeAllocatableMem, initNodeAvailableMem)
+			node.Name, nodeAllocatableMem.Value(), initNodeAvailableMem.Value())
 
-		initialCPUQuantity := resource.NewMilliQuantity(initNodeAvailableMilliCPU/4, resource.DecimalSI)
-		initialMemoryQuantity := resource.NewQuantity(initNodeAvailableMem/5, resource.DecimalSI)
+		initialCPUQuantity := resource.NewMilliQuantity(initNodeAvailableCPU.MilliValue()/4, resource.DecimalSI)
+		initialMemoryQuantity := resource.NewQuantity(initNodeAvailableMem.Value()/5, resource.DecimalSI)
 		framework.Logf("initial CPU request is '%dm'", initialCPUQuantity.MilliValue())
 		framework.Logf("initial Memory request is '%d'", initialMemoryQuantity.Value())
 
@@ -1104,13 +1108,13 @@ func doPodResizeRetryDeferredTests(f *framework.Framework) {
 		ginkgo.By(fmt.Sprintf("Create pods that fits the node '%s'", node.Name))
 		podClient.CreateBatch(ctx, testPods)
 
-		testPod2CPUQuantityResized := resource.NewMilliQuantity(initNodeAvailableMilliCPU/3, resource.DecimalSI)
-		testPod2MemoryQuantityResized := resource.NewQuantity(initNodeAvailableMem/24, resource.DecimalSI)
+		testPod2CPUQuantityResized := resource.NewMilliQuantity(initNodeAvailableCPU.MilliValue()/3, resource.DecimalSI)
+		testPod2MemoryQuantityResized := resource.NewQuantity(initNodeAvailableMem.Value()/24, resource.DecimalSI)
 
-		testPod3CPUQuantityResized := resource.NewMilliQuantity(initNodeAvailableMilliCPU/24, resource.DecimalSI)
-		testPod3MemoryQuantityResized := resource.NewQuantity(2*initNodeAvailableMem/3, resource.DecimalSI)
+		testPod3CPUQuantityResized := resource.NewMilliQuantity(initNodeAvailableCPU.MilliValue()/24, resource.DecimalSI)
+		testPod3MemoryQuantityResized := resource.NewQuantity(2*initNodeAvailableMem.Value()/3, resource.DecimalSI)
 
-		testPod4CPUQuantityResized := resource.NewMilliQuantity(initNodeAvailableMilliCPU/2+initNodeAvailableMilliCPU/8, resource.DecimalSI)
+		testPod4CPUQuantityResized := resource.NewMilliQuantity(initNodeAvailableCPU.MilliValue()/2+initNodeAvailableCPU.MilliValue()/8, resource.DecimalSI)
 		testPod4MemoryQuantityResized := initialMemoryQuantity
 
 		expectedTestPod2Resized := []podresize.ResizableContainerInfo{
@@ -1236,41 +1240,6 @@ func waitForResourceQuota(ctx context.Context, c clientset.Interface, ns, quotaN
 		}
 		return quota.Status.Used, nil
 	})).WithTimeout(framework.PollShortTimeout).ShouldNot(gomega.BeEmpty())
-}
-
-// Calculate available resource. nodeAvailable = nodeAllocatable - sum(podAllocated). If resourceName is "CPU", the values
-// returned are in MilliValues.
-func getNodeAllocatableAndAvailableValues(ctx context.Context, f *framework.Framework, n *v1.Node, resourceName v1.ResourceName) (int64, int64) {
-	var nodeAllocatable int64
-	switch resourceName {
-	case v1.ResourceCPU:
-		nodeAllocatable = n.Status.Allocatable.Cpu().MilliValue()
-	case v1.ResourceMemory:
-		nodeAllocatable = n.Status.Allocatable.Memory().Value()
-	default:
-		framework.Failf("unexpected resource type %q; expected either 'CPU' or 'Memory'", resourceName)
-	}
-
-	gomega.Expect(n.Status.Allocatable).ShouldNot(gomega.BeEmpty(), "allocatable")
-	podAllocated := int64(0)
-
-	// Exclude pods that are in the Succeeded or Failed states
-	selector := fmt.Sprintf("spec.nodeName=%s,status.phase!=%v,status.phase!=%v", n.Name, v1.PodSucceeded, v1.PodFailed)
-	listOptions := metav1.ListOptions{FieldSelector: selector}
-	podList, err := f.ClientSet.CoreV1().Pods(metav1.NamespaceAll).List(ctx, listOptions)
-
-	framework.ExpectNoError(err, "failed to get running pods")
-	framework.Logf("Found %d pods on node '%s'", len(podList.Items), n.Name)
-	for _, pod := range podList.Items {
-		podRequest := resourceapi.GetResourceRequest(&pod, resourceName)
-		podAllocated += podRequest
-	}
-	nodeAvailable := nodeAllocatable - podAllocated
-	if nodeAvailable < 0 {
-		framework.Failf("unexpected negative value of nodeAvailable %d", nodeAvailable)
-	}
-
-	return nodeAllocatable, nodeAvailable
 }
 
 func waitForPodDeferred(ctx context.Context, f *framework.Framework, testPod *v1.Pod) {

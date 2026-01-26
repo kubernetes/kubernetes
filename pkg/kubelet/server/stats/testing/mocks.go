@@ -205,8 +205,8 @@ func (_c *MockProvider_GetCgroupStats_Call) RunAndReturn(run func(cgroupName str
 }
 
 // GetNode provides a mock function for the type MockProvider
-func (_mock *MockProvider) GetNode() (*v1.Node, error) {
-	ret := _mock.Called()
+func (_mock *MockProvider) GetNode(context1 context.Context) (*v1.Node, error) {
+	ret := _mock.Called(context1)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetNode")
@@ -214,18 +214,18 @@ func (_mock *MockProvider) GetNode() (*v1.Node, error) {
 
 	var r0 *v1.Node
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func() (*v1.Node, error)); ok {
-		return returnFunc()
+	if returnFunc, ok := ret.Get(0).(func(context.Context) (*v1.Node, error)); ok {
+		return returnFunc(context1)
 	}
-	if returnFunc, ok := ret.Get(0).(func() *v1.Node); ok {
-		r0 = returnFunc()
+	if returnFunc, ok := ret.Get(0).(func(context.Context) *v1.Node); ok {
+		r0 = returnFunc(context1)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*v1.Node)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func() error); ok {
-		r1 = returnFunc()
+	if returnFunc, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = returnFunc(context1)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -238,13 +238,20 @@ type MockProvider_GetNode_Call struct {
 }
 
 // GetNode is a helper method to define mock.On call
-func (_e *MockProvider_Expecter) GetNode() *MockProvider_GetNode_Call {
-	return &MockProvider_GetNode_Call{Call: _e.mock.On("GetNode")}
+//   - context1 context.Context
+func (_e *MockProvider_Expecter) GetNode(context1 interface{}) *MockProvider_GetNode_Call {
+	return &MockProvider_GetNode_Call{Call: _e.mock.On("GetNode", context1)}
 }
 
-func (_c *MockProvider_GetNode_Call) Run(run func()) *MockProvider_GetNode_Call {
+func (_c *MockProvider_GetNode_Call) Run(run func(context1 context.Context)) *MockProvider_GetNode_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run()
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		run(
+			arg0,
+		)
 	})
 	return _c
 }
@@ -254,7 +261,7 @@ func (_c *MockProvider_GetNode_Call) Return(node *v1.Node, err error) *MockProvi
 	return _c
 }
 
-func (_c *MockProvider_GetNode_Call) RunAndReturn(run func() (*v1.Node, error)) *MockProvider_GetNode_Call {
+func (_c *MockProvider_GetNode_Call) RunAndReturn(run func(context1 context.Context) (*v1.Node, error)) *MockProvider_GetNode_Call {
 	_c.Call.Return(run)
 	return _c
 }

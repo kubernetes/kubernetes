@@ -1042,8 +1042,8 @@ runTests() {
   # kubectl debug    #
   ####################
   if kube::test::if_supports_resource "${pods}" ; then
-    record_command run_kubectl_debug_pod_tests
-    record_command run_kubectl_debug_general_tests
+    record_command run_kubectl_debug_tests
+    record_command run_kubectl_debug_legacy_tests
     record_command run_kubectl_debug_baseline_tests
     record_command run_kubectl_debug_restricted_tests
     record_command run_kubectl_debug_netadmin_tests
@@ -1052,7 +1052,7 @@ runTests() {
   fi
   if kube::test::if_supports_resource "${nodes}" ; then
     record_command run_kubectl_debug_node_tests
-    record_command run_kubectl_debug_general_node_tests
+    record_command run_kubectl_debug_legacy_node_tests
     record_command run_kubectl_debug_baseline_node_tests
     record_command run_kubectl_debug_restricted_node_tests
     record_command run_kubectl_debug_netadmin_node_tests

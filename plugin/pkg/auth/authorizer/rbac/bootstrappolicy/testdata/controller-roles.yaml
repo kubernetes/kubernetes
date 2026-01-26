@@ -654,12 +654,6 @@ items:
     - create
     - patch
     - update
-  - apiGroups:
-    - ""
-    resources:
-    - services
-    verbs:
-    - get
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:
@@ -1000,12 +994,6 @@ items:
     - events
     verbs:
     - watch
-  - apiGroups:
-    - ""
-    resources:
-    - services
-    verbs:
-    - get
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:

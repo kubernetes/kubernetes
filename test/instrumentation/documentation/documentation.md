@@ -6,10 +6,10 @@ description: >-
   Details of the metric data that Kubernetes components export.
 ---
 
-## Metrics (v1.35)
+## Metrics (v1.36)
 
-<!-- (auto-generated 2026 Jan 06) -->
-<!-- (auto-generated v1.35) -->
+<!-- (auto-generated 2026 Jan 09) -->
+<!-- (auto-generated v1.36) -->
 This page details the metrics that different Kubernetes components export. You can query the metrics endpoint for these 
 components using an HTTP scrape, and fetch the current metrics data in Prometheus format.
 
@@ -403,6 +403,13 @@ Beta metrics observe a looser API contract than its stable counterparts. No labe
 	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
 	</ul>
 	</div><div class="metric" data-stability="beta">
+	<div class="metric_name">apiserver_watch_list_duration_seconds</div>
+	<div class="metric_help">Response latency distribution in seconds for watch list requests broken by group, version, resource and scope.</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">BETA</span></li>
+	<li data-type="histogram"><label class="metric_detail">Type:</label> <span class="metric_type">Histogram</span></li>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">group</span><span class="metric_label">resource</span><span class="metric_label">scope</span><span class="metric_label">version</span></li></ul>
+	</div><div class="metric" data-stability="beta">
 	<div class="metric_name">disabled_metrics_total</div>
 	<div class="metric_help">The count of disabled metrics.</div>
 	<ul>
@@ -465,6 +472,55 @@ Beta metrics observe a looser API contract than its stable counterparts. No labe
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">BETA</span></li>
 	<li data-type="histogram"><label class="metric_detail">Type:</label> <span class="metric_type">Histogram</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">attempts</span></li></ul>
+	</div><div class="metric" data-stability="beta">
+	<div class="metric_name">workqueue_adds_total</div>
+	<div class="metric_help">Total number of adds handled by workqueue</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">BETA</span></li>
+	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">name</span></li></ul>
+	</div><div class="metric" data-stability="beta">
+	<div class="metric_name">workqueue_depth</div>
+	<div class="metric_help">Current depth of workqueue</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">BETA</span></li>
+	<li data-type="gauge"><label class="metric_detail">Type:</label> <span class="metric_type">Gauge</span></li>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">name</span></li></ul>
+	</div><div class="metric" data-stability="beta">
+	<div class="metric_name">workqueue_longest_running_processor_seconds</div>
+	<div class="metric_help">How many seconds has the longest running processor for workqueue been running.</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">BETA</span></li>
+	<li data-type="gauge"><label class="metric_detail">Type:</label> <span class="metric_type">Gauge</span></li>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">name</span></li></ul>
+	</div><div class="metric" data-stability="beta">
+	<div class="metric_name">workqueue_queue_duration_seconds</div>
+	<div class="metric_help">How long in seconds an item stays in workqueue before being requested.</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">BETA</span></li>
+	<li data-type="histogram"><label class="metric_detail">Type:</label> <span class="metric_type">Histogram</span></li>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">name</span></li></ul>
+	</div><div class="metric" data-stability="beta">
+	<div class="metric_name">workqueue_retries_total</div>
+	<div class="metric_help">Total number of retries handled by workqueue</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">BETA</span></li>
+	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">name</span></li></ul>
+	</div><div class="metric" data-stability="beta">
+	<div class="metric_name">workqueue_unfinished_work_seconds</div>
+	<div class="metric_help">How many seconds of work has done that is in progress and hasn't been observed by work_duration. Large values indicate stuck threads. One can deduce the number of stuck threads by observing the rate at which this increases.</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">BETA</span></li>
+	<li data-type="gauge"><label class="metric_detail">Type:</label> <span class="metric_type">Gauge</span></li>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">name</span></li></ul>
+	</div><div class="metric" data-stability="beta">
+	<div class="metric_name">workqueue_work_duration_seconds</div>
+	<div class="metric_help">How long in seconds processing an item from workqueue takes.</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">BETA</span></li>
+	<li data-type="histogram"><label class="metric_detail">Type:</label> <span class="metric_type">Histogram</span></li>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">name</span></li></ul>
 	</div>
 </div>
 
@@ -1466,13 +1522,6 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
 	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">group</span><span class="metric_label">resource</span><span class="metric_label">version</span></li></ul>
-	</div><div class="metric" data-stability="alpha">
-	<div class="metric_name">apiserver_watch_list_duration_seconds</div>
-	<div class="metric_help">Response latency distribution in seconds for watch list requests broken by group, version, resource and scope.</div>
-	<ul>
-	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
-	<li data-type="histogram"><label class="metric_detail">Type:</label> <span class="metric_type">Histogram</span></li>
-	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">group</span><span class="metric_label">resource</span><span class="metric_label">scope</span><span class="metric_label">version</span></li></ul>
 	</div><div class="metric" data-stability="alpha">
 	<div class="metric_name">apiserver_webhooks_x509_insecure_sha1_total</div>
 	<div class="metric_help">Counts the number of requests to servers with insecure SHA1 signatures in their serving certificate OR the number of connection failures due to the insecure SHA1 signatures (either/or, based on the runtime environment)</div>
@@ -3427,6 +3476,13 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li data-type="histogram"><label class="metric_detail">Type:</label> <span class="metric_type">Histogram</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">extension_point</span><span class="metric_label">plugin</span><span class="metric_label">status</span></li></ul>
 	</div><div class="metric" data-stability="alpha">
+	<div class="metric_name">scheduler_pod_scheduled_after_flush_total</div>
+	<div class="metric_help">Number of pods that were successfully scheduled after being flushed from unschedulablePods due to timeout. This metric helps detect potential queueing hint misconfigurations or event handling issues.</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
+	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
+	</ul>
+	</div><div class="metric" data-stability="alpha">
 	<div class="metric_name">scheduler_preemption_goroutines_duration_seconds</div>
 	<div class="metric_help">Duration in seconds for running goroutines for the preemption.</div>
 	<ul>
@@ -3720,54 +3776,5 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
 	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">group</span><span class="metric_label">resource</span></li></ul>
-	</div><div class="metric" data-stability="beta">
-	<div class="metric_name">workqueue_adds_total</div>
-	<div class="metric_help">Total number of adds handled by workqueue</div>
-	<ul>
-	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">BETA</span></li>
-	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
-	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">name</span></li></ul>
-	</div><div class="metric" data-stability="beta">
-	<div class="metric_name">workqueue_depth</div>
-	<div class="metric_help">Current depth of workqueue</div>
-	<ul>
-	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">BETA</span></li>
-	<li data-type="gauge"><label class="metric_detail">Type:</label> <span class="metric_type">Gauge</span></li>
-	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">name</span></li></ul>
-	</div><div class="metric" data-stability="beta">
-	<div class="metric_name">workqueue_longest_running_processor_seconds</div>
-	<div class="metric_help">How many seconds has the longest running processor for workqueue been running.</div>
-	<ul>
-	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">BETA</span></li>
-	<li data-type="gauge"><label class="metric_detail">Type:</label> <span class="metric_type">Gauge</span></li>
-	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">name</span></li></ul>
-	</div><div class="metric" data-stability="beta">
-	<div class="metric_name">workqueue_queue_duration_seconds</div>
-	<div class="metric_help">How long in seconds an item stays in workqueue before being requested.</div>
-	<ul>
-	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">BETA</span></li>
-	<li data-type="histogram"><label class="metric_detail">Type:</label> <span class="metric_type">Histogram</span></li>
-	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">name</span></li></ul>
-	</div><div class="metric" data-stability="beta">
-	<div class="metric_name">workqueue_retries_total</div>
-	<div class="metric_help">Total number of retries handled by workqueue</div>
-	<ul>
-	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">BETA</span></li>
-	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
-	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">name</span></li></ul>
-	</div><div class="metric" data-stability="beta">
-	<div class="metric_name">workqueue_unfinished_work_seconds</div>
-	<div class="metric_help">How many seconds of work has done that is in progress and hasn't been observed by work_duration. Large values indicate stuck threads. One can deduce the number of stuck threads by observing the rate at which this increases.</div>
-	<ul>
-	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">BETA</span></li>
-	<li data-type="gauge"><label class="metric_detail">Type:</label> <span class="metric_type">Gauge</span></li>
-	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">name</span></li></ul>
-	</div><div class="metric" data-stability="beta">
-	<div class="metric_name">workqueue_work_duration_seconds</div>
-	<div class="metric_help">How long in seconds processing an item from workqueue takes.</div>
-	<ul>
-	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">BETA</span></li>
-	<li data-type="histogram"><label class="metric_detail">Type:</label> <span class="metric_type">Histogram</span></li>
-	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">name</span></li></ul>
 	</div>
 </div>

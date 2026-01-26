@@ -22,6 +22,7 @@ import (
 	"os"
 	"path"
 	"regexp"
+	"runtime"
 
 	"strconv"
 	"strings"
@@ -37,8 +38,10 @@ import (
 )
 
 var (
-	coreRegExp = regexp.MustCompile(`(?m)^core id\s*:\s*([0-9]+)$`)
-	nodeRegExp = regexp.MustCompile(`(?m)^physical id\s*:\s*([0-9]+)$`)
+	coreRegExp   = regexp.MustCompile(`(?m)^core id\s*:\s*([0-9]+)$`)
+	nodeRegExp   = regexp.MustCompile(`(?m)^physical id\s*:\s*([0-9]+)$`)
+	bookRegExp   = regexp.MustCompile(`(?m)^book id\s*:\s*([0-9]+)$`)
+	drawerRegExp = regexp.MustCompile(`(?m)^drawer id\s*:\s*([0-9]+)$`)
 	// Power systems have a different format so cater for both
 	cpuClockSpeedMHz     = regexp.MustCompile(`(?:cpu MHz|CPU MHz|clock)\s*:\s*([0-9]+\.[0-9]+)(?:MHz)?`)
 	memoryCapacityRegexp = regexp.MustCompile(`MemTotal:\s*([0-9]+) kB`)
@@ -96,6 +99,41 @@ func GetSockets(procInfo []byte) int {
 		klog.Errorf("Cannot read number of sockets correctly, number of sockets set to %d", numSocket)
 	}
 	return numSocket
+}
+
+// GetBooks returns number of CPU books reading from sysfs cpu path
+func GetBooks(procInfo []byte) int {
+	if runtime.GOARCH != "s390x" {
+		return 0
+	}
+	numBook := getUniqueMatchesCount(string(procInfo), bookRegExp)
+	if numBook == 0 {
+		// read number of books from /sys/bus/cpu/devices/cpu*/topology/book_id to deal with processors
+		// for which 'book id' is not available in /proc/cpuinfo
+		numBook = sysfs.GetUniqueCPUPropertyCount(cpuAttributesPath, sysfs.CPUBookID)
+	}
+	if numBook == 0 {
+		klog.Errorf("Cannot read number of books correctly, number of books set to %d", numBook)
+	}
+	return numBook
+}
+
+// GetDrawer returns number of CPU drawerss reading from sysfs cpu path
+func GetDrawers(procInfo []byte) int {
+	if runtime.GOARCH != "s390x" {
+		return 0
+	}
+	numDrawer := getUniqueMatchesCount(string(procInfo), drawerRegExp)
+	if numDrawer == 0 {
+		// read number of books from /sys/bus/cpu/devices/cpu*/topology/book_id to deal with processors
+		// read number of drawers from /sys/bus/cpu/devices/cpu*/topology/drawer_id to deal with processors
+		// for which 'drawer id' is not available in /proc/cpuinfo
+		numDrawer = sysfs.GetUniqueCPUPropertyCount(cpuAttributesPath, sysfs.CPUDrawerID)
+	}
+	if numDrawer == 0 {
+		klog.Errorf("Cannot read number of drawers correctly, number of drawers set to %d", numDrawer)
+	}
+	return numDrawer
 }
 
 // GetClockSpeed returns the CPU clock speed, given a []byte formatted as the /proc/cpuinfo file.

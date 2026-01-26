@@ -35,6 +35,8 @@ func TestVersionedValidationByFuzzing(t *testing.T) {
 	typesWithDeclarativeValidation := []schema.GroupVersion{
 		// Registered group versions for versioned validation fuzz testing:
 		{Group: "", Version: "v1"},
+		{Group: "batch", Version: "v1"},
+		{Group: "batch", Version: "v1beta1"},
 		{Group: "certificates.k8s.io", Version: "v1"},
 		{Group: "certificates.k8s.io", Version: "v1alpha1"},
 		{Group: "certificates.k8s.io", Version: "v1beta1"},
@@ -59,6 +61,9 @@ func TestVersionedValidationByFuzzing(t *testing.T) {
 		{Group: "flowcontrol.apiserver.k8s.io", Version: "v1beta3"},
 		{Group: "flowcontrol.apiserver.k8s.io", Version: "v1beta2"},
 		{Group: "flowcontrol.apiserver.k8s.io", Version: "v1beta1"},
+		{Group: "admissionregistration.k8s.io", Version: "v1"},
+		{Group: "admissionregistration.k8s.io", Version: "v1beta1"},
+		{Group: "admissionregistration.k8s.io", Version: "v1alpha1"},
 	}
 
 	fuzzIters := *roundtrip.FuzzIters / 10 // TODO: Find a better way to manage test running time

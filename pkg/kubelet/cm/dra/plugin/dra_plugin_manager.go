@@ -58,7 +58,7 @@ type DRAPluginManager struct {
 	backgroundCtx context.Context
 	cancel        func(err error)
 	kubeClient    kubernetes.Interface
-	getNode       func() (*v1.Node, error)
+	getNode       func(context.Context) (*v1.Node, error)
 	wipingDelay   time.Duration
 	streamHandler StreamHandler
 
@@ -146,7 +146,7 @@ func (m *monitoredPlugin) HandleConn(_ context.Context, stats grpcstats.ConnStat
 // The context can be used to cancel all background activities.
 // If desired, Stop can be called in addition or instead of canceling
 // the context. It then also waits for background activities to stop.
-func NewDRAPluginManager(ctx context.Context, kubeClient kubernetes.Interface, getNode func() (*v1.Node, error), streamHandler StreamHandler, wipingDelay time.Duration) *DRAPluginManager {
+func NewDRAPluginManager(ctx context.Context, kubeClient kubernetes.Interface, getNode func(context.Context) (*v1.Node, error), streamHandler StreamHandler, wipingDelay time.Duration) *DRAPluginManager {
 	ctx, cancel := context.WithCancelCause(ctx)
 	pm := &DRAPluginManager{
 		backgroundCtx: klog.NewContext(ctx, klog.LoggerWithName(klog.FromContext(ctx), "DRA registration handler")),
@@ -228,7 +228,7 @@ func (pm *DRAPluginManager) wipeResourceSlices(ctx context.Context, driver strin
 
 	// Error logging is done inside the loop. Context cancellation doesn't get logged.
 	_ = wait.ExponentialBackoffWithContext(ctx, backoff, func(ctx context.Context) (bool, error) {
-		node, err := pm.getNode()
+		node, err := pm.getNode(ctx)
 		if apierrors.IsNotFound(err) {
 			return false, nil
 		}
@@ -395,7 +395,7 @@ func (pm *DRAPluginManager) add(driverName string, endpoint string, chosenServic
 				logger.V(4).Info("Attempting to start WatchResources health stream")
 				stream, err := p.NodeWatchResources(ctx)
 				if err != nil {
-					logger.V(3).Error(err, "Failed to establish WatchResources stream, will retry")
+					logger.V(3).Info("Failed to establish WatchResources stream, will retry", "err", err)
 					return
 				}
 

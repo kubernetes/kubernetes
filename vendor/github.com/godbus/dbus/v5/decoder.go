@@ -291,9 +291,10 @@ func sigByteSize(sig string) int {
 			i := 1
 			depth := 1
 			for i < len(sig[offset:]) && depth != 0 {
-				if sig[offset+i] == '(' {
+				switch sig[offset+i] {
+				case '(':
 					depth++
-				} else if sig[offset+i] == ')' {
+				case ')':
 					depth--
 				}
 				i++

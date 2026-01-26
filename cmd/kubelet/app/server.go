@@ -218,8 +218,10 @@ is checked every 20 seconds (also configurable with a flag).`,
 				}
 			}
 			// Merge the kubelet configurations if --config-dir is set
+			var skippedDropinFiles []string
 			if len(kubeletFlags.KubeletDropinConfigDirectory) > 0 {
-				if err := mergeKubeletConfigurations(kubeletConfig, kubeletFlags.KubeletDropinConfigDirectory); err != nil {
+				skippedDropinFiles, err = mergeKubeletConfigurations(kubeletConfig, kubeletFlags.KubeletDropinConfigDirectory)
+				if err != nil {
 					return fmt.Errorf("failed to merge kubelet configs: %w", err)
 				}
 			}
@@ -284,6 +286,14 @@ is checked every 20 seconds (also configurable with a flag).`,
 			for k := range config.StaticPodURLHeader {
 				config.StaticPodURLHeader[k] = []string{"<masked>"}
 			}
+
+			// Log skipped drop-in files if any were encountered during configuration merge
+			if len(skippedDropinFiles) > 0 {
+				for _, skippedFile := range skippedDropinFiles {
+					logger.V(4).Info("Skipped file in drop-in directory (does not have .conf extension)", "file", skippedFile)
+				}
+			}
+
 			// log the kubelet's config for inspection
 			logger.V(5).Info("KubeletConfiguration", "configuration", klog.Format(config))
 
@@ -320,63 +330,70 @@ is checked every 20 seconds (also configurable with a flag).`,
 // configurations in files with lower numeric prefixes are applied first, followed by higher numeric prefixes.
 // For example, if the drop-in directory contains files named "10-config.conf" and "20-config.conf",
 // the configurations in "10-config.conf" will be applied first, and then the configurations in "20-config.conf" will be applied,
-// potentially overriding the previous values.
-func mergeKubeletConfigurations(kubeletConfig *kubeletconfiginternal.KubeletConfiguration, kubeletDropInConfigDir string) error {
+// potentially overriding the previous values. Files in subdirectories are also processed in lexical order.
+// Returns a list of skipped files and an error.
+func mergeKubeletConfigurations(kubeletConfig *kubeletconfiginternal.KubeletConfiguration, kubeletDropInConfigDir string) ([]string, error) {
 	const dropinFileExtension = ".conf"
+	var skippedFiles []string
 
 	// TODO: move the "internal --> versioned --> merge --> default --> internal" operation inside the loop,
 	// and use the version of each drop-in file as the versioned target once config files can be in versions other than just v1beta1
 	versionedConfig := &kubeletconfigv1beta1.KubeletConfiguration{}
 	if err := kubeletconfigv1beta1conversion.Convert_config_KubeletConfiguration_To_v1beta1_KubeletConfiguration(kubeletConfig, versionedConfig, nil); err != nil {
-		return err
+		return nil, err
 	}
 
 	baseKubeletConfigJSON, err := json.Marshal(versionedConfig)
 	if err != nil {
-		return fmt.Errorf("failed to marshal base config: %w", err)
+		return nil, fmt.Errorf("failed to marshal base config: %w", err)
 	}
 	// Walk through the drop-in directory and update the configuration for each file
 	if err := filepath.WalkDir(kubeletDropInConfigDir, func(path string, info fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		if !info.IsDir() && filepath.Ext(info.Name()) == dropinFileExtension {
-			dropinConfigJSON, gvk, err := loadDropinConfigFileIntoJSON(path)
-			if err != nil {
-				return fmt.Errorf("failed to load kubelet dropin file, path: %s, error: %w", path, err)
-			}
-			if gvk == nil || gvk.Empty() {
-				return fmt.Errorf("failed to load kubelet dropin file, path: %s, no apiVersion/kind", path)
-			}
-			// TODO: expand this once more than a single kubelet config version exists
-			if *gvk != kubeletconfigv1beta1.SchemeGroupVersion.WithKind("KubeletConfiguration") {
-				return fmt.Errorf("failed to load kubelet dropin file, path: %s, unknown apiVersion/kind: %v", path, gvk.String())
-			}
-			mergedConfigJSON, err := jsonpatch.MergePatch(baseKubeletConfigJSON, dropinConfigJSON)
-			if err != nil {
-				return fmt.Errorf("failed to merge drop-in and current config: %w", err)
-			}
-			baseKubeletConfigJSON = mergedConfigJSON
+		if info.IsDir() {
+			return nil
 		}
+		if filepath.Ext(info.Name()) != dropinFileExtension {
+			skippedFiles = append(skippedFiles, path)
+			return nil
+		}
+		dropinConfigJSON, gvk, err := loadDropinConfigFileIntoJSON(path)
+		if err != nil {
+			return fmt.Errorf("failed to load kubelet dropin file, path: %s, error: %w", path, err)
+		}
+		if gvk == nil || gvk.Empty() {
+			return fmt.Errorf("failed to load kubelet dropin file, path: %s, no apiVersion/kind", path)
+		}
+		// TODO: expand this once more than a single kubelet config version exists
+		if *gvk != kubeletconfigv1beta1.SchemeGroupVersion.WithKind("KubeletConfiguration") {
+			return fmt.Errorf("failed to load kubelet dropin file, path: %s, unknown apiVersion/kind: %v", path, gvk.String())
+		}
+		mergedConfigJSON, err := jsonpatch.MergePatch(baseKubeletConfigJSON, dropinConfigJSON)
+		if err != nil {
+			return fmt.Errorf("failed to merge drop-in and current config: %w", err)
+		}
+		baseKubeletConfigJSON = mergedConfigJSON
 		return nil
 	}); err != nil {
-		return fmt.Errorf("failed to walk through kubelet dropin directory %q: %w", kubeletDropInConfigDir, err)
+		return nil, fmt.Errorf("failed to walk through kubelet dropin directory %q: %w", kubeletDropInConfigDir, err)
 	}
 
 	// reset versioned config and decode
 	versionedConfig = &kubeletconfigv1beta1.KubeletConfiguration{}
 	if err := json.Unmarshal(baseKubeletConfigJSON, versionedConfig); err != nil {
-		return fmt.Errorf("failed to unmarshal merged JSON into kubelet configuration: %w", err)
+		return nil, fmt.Errorf("failed to unmarshal merged JSON into kubelet configuration: %w", err)
 	}
 	// apply defaulting after decoding
 	kubeletconfigv1beta1conversion.SetDefaults_KubeletConfiguration(versionedConfig)
 
 	// convert back to internal config
 	if err := kubeletconfigv1beta1conversion.Convert_v1beta1_KubeletConfiguration_To_config_KubeletConfiguration(versionedConfig, kubeletConfig, nil); err != nil {
-		return fmt.Errorf("failed to convert merged config to internal kubelet configuration: %w", err)
+		return nil, fmt.Errorf("failed to convert merged config to internal kubelet configuration: %w", err)
 	}
 
-	return nil
+	return skippedFiles, nil
 }
 
 // newFlagSetWithGlobals constructs a new pflag.FlagSet with global flags registered

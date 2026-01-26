@@ -261,6 +261,30 @@ const (
 	Stable StabilityLevel = "Stable"
 )
 
+var stabilityOrder = map[StabilityLevel]int{
+	Alpha:  0,
+	Beta:   1,
+	Stable: 2,
+}
+
+// Min returns the minimum of two stability levels, or an error if either
+// stability level is unknown.
+func (s StabilityLevel) Min(other StabilityLevel) (StabilityLevel, error) {
+	sOrder, okS := stabilityOrder[s]
+	if !okS {
+		return "", fmt.Errorf("unknown stability level %q", s)
+	}
+	otherOrder, okOther := stabilityOrder[other]
+	if !okOther {
+		return "", fmt.Errorf("unknown stability level %q", other)
+	}
+
+	if sOrder < otherOrder {
+		return s, nil
+	}
+	return other, nil
+}
+
 // TagDoc describes a comment-tag and its usage.
 type TagDoc struct {
 	// Tag is the tag name, without the leading '+'.
@@ -426,6 +450,10 @@ const (
 	// accumulated as an error, but should trigger other aspects of the failure
 	// path (e.g. early return when combined with ShortCircuit).
 	NonError
+
+	// DeclarativeNative indicates that the validation function returns an error
+	// list which should be marked as declarative-native.
+	DeclarativeNative
 )
 
 // Conditions defines what conditions must be true for a resource to be validated.

@@ -10,11 +10,16 @@ import (
 )
 
 type exemplarFromCtxFn func(ctx context.Context) prometheus.Labels
+type labelsFromCtxFn func(metadata context.Context) prometheus.Labels
 
 type serverMetricsConfig struct {
 	counterOpts counterOptions
-	// serverHandledHistogram can be nil.
-	serverHandledHistogram *prometheus.HistogramVec
+	// histogramOpts stores the options for creating the histogram with dynamic labels
+	histogramOpts histogramOptions
+	// enableHistogram indicates whether histogram should be created
+	enableHistogram bool
+	// contextLabels defines the names of dynamic labels to be extracted from context
+	contextLabels []string
 }
 
 type ServerMetricsOption func(*serverMetricsConfig)
@@ -36,13 +41,16 @@ func WithServerCounterOptions(opts ...CounterOption) ServerMetricsOption {
 // Histogram metrics can be very expensive for Prometheus to retain and query.
 func WithServerHandlingTimeHistogram(opts ...HistogramOption) ServerMetricsOption {
 	return func(o *serverMetricsConfig) {
-		o.serverHandledHistogram = prometheus.NewHistogramVec(
-			histogramOptions(opts).apply(prometheus.HistogramOpts{
-				Name:    "grpc_server_handling_seconds",
-				Help:    "Histogram of response latency (seconds) of gRPC that had been application-level handled by the server.",
-				Buckets: prometheus.DefBuckets,
-			}),
-			[]string{"grpc_type", "grpc_service", "grpc_method"},
-		)
+		o.histogramOpts = opts
+		o.enableHistogram = true
+	}
+}
+
+// WithContextLabels configures the server metrics to include dynamic labels extracted from context.
+// The provided label names will be added to all server metrics as dynamic labels.
+// Use WithLabelsFromContext in the interceptor options to specify how to extract these labels from context.
+func WithContextLabels(labelNames ...string) ServerMetricsOption {
+	return func(o *serverMetricsConfig) {
+		o.contextLabels = labelNames
 	}
 }

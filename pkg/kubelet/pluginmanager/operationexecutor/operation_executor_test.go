@@ -34,6 +34,10 @@ import (
 const (
 	numPluginsToRegister   = 2
 	numPluginsToUnregister = 2
+	// maxConcurrentOperations is the buffer size for the ch channel.
+	// Must be >= max number of goroutines any test spawns to prevent
+	// goroutine leaks when timeout fires before all sends complete.
+	maxConcurrentOperations = max(numPluginsToRegister, numPluginsToUnregister)
 )
 
 var _ OperationGenerator = &fakeOperationGenerator{}
@@ -178,13 +182,16 @@ loop:
 
 func setup(t *testing.T) (context.Context, chan interface{}, chan interface{}, OperationExecutor) {
 	tCtx := ktesting.Init(t)
-	ch, quit := make(chan interface{}), make(chan interface{})
+	ch, quit := make(chan interface{}, maxConcurrentOperations), make(chan interface{})
 	return tCtx, ch, quit, NewOperationExecutor(newFakeOperationGenerator(ch, quit))
 }
 
 // This function starts by writing to ch and blocks on the quit channel
 // until it is closed by the currently running test
 func startOperationAndBlock(ch chan<- interface{}, quit <-chan interface{}) {
-	ch <- nil
-	<-quit
+	select {
+	case ch <- nil:
+		<-quit
+	case <-quit:
+	}
 }

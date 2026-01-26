@@ -27,8 +27,15 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/spf13/pflag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	cbordirect "k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apiserver/pkg/features"
 	v1alpha1 "k8s.io/apiserver/pkg/server/flagz/api/v1alpha1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cliflag "k8s.io/component-base/cli/flag"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"sigs.k8s.io/yaml"
 )
 
 const wantTmpl = `
@@ -37,6 +44,8 @@ Warning: This endpoint is not meant to be machine parseable, has no formatting c
 `
 
 func TestHandleFlagz(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CBORServingAndStorage, true)
+
 	fakeFlagName := "test-flag"
 	fakeFlagValue := "test-value"
 	fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
@@ -50,14 +59,14 @@ func TestHandleFlagz(t *testing.T) {
 	}
 
 	tests := []struct {
-		name           string
-		acceptHeader   string
-		componentName  string
-		registry       *registry
-		wantStatusCode int
-		wantBody       string
-		wantJSONBody   *v1alpha1.Flagz
-		wantWarning    bool
+		name               string
+		acceptHeader       string
+		componentName      string
+		registry           *registry
+		wantStatusCode     int
+		wantBody           string
+		wantStructuredBody *v1alpha1.Flagz
+		wantWarning        bool
 	}{
 		{
 			name:          "valid request for text/plain",
@@ -74,7 +83,7 @@ func TestHandleFlagz(t *testing.T) {
 			),
 		},
 		{
-			name:          "valid request for v1alpha1",
+			name:          "valid request for application/json",
 			acceptHeader:  "application/json;v=v1alpha1;g=config.k8s.io;as=Flagz",
 			componentName: "test-server",
 			registry: &registry{
@@ -82,7 +91,7 @@ func TestHandleFlagz(t *testing.T) {
 				deprecatedVersionsMap: map[string]bool{},
 			},
 			wantStatusCode: http.StatusOK,
-			wantJSONBody: &v1alpha1.Flagz{
+			wantStructuredBody: &v1alpha1.Flagz{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       Kind,
 					APIVersion: fmt.Sprintf("%s/%s", GroupName, Version),
@@ -104,7 +113,7 @@ func TestHandleFlagz(t *testing.T) {
 				deprecatedVersionsMap: map[string]bool{"v1alpha1": true},
 			},
 			wantStatusCode: http.StatusOK,
-			wantJSONBody: &v1alpha1.Flagz{
+			wantStructuredBody: &v1alpha1.Flagz{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       Kind,
 					APIVersion: fmt.Sprintf("%s/%s", GroupName, Version),
@@ -117,6 +126,50 @@ func TestHandleFlagz(t *testing.T) {
 				},
 			},
 			wantWarning: true,
+		},
+		{
+			name:          "valid request for application/yaml",
+			acceptHeader:  "application/yaml;v=v1alpha1;g=config.k8s.io;as=Flagz",
+			componentName: "test-server",
+			registry: &registry{
+				reader:                fakeReader,
+				deprecatedVersionsMap: map[string]bool{},
+			},
+			wantStatusCode: http.StatusOK,
+			wantStructuredBody: &v1alpha1.Flagz{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       Kind,
+					APIVersion: fmt.Sprintf("%s/%s", GroupName, Version),
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-server",
+				},
+				Flags: map[string]string{
+					fakeFlagName: fakeFlagValue,
+				},
+			},
+		},
+		{
+			name:          "valid request for application/cbor",
+			acceptHeader:  "application/cbor;v=v1alpha1;g=config.k8s.io;as=Flagz",
+			componentName: "test-server",
+			registry: &registry{
+				reader:                fakeReader,
+				deprecatedVersionsMap: map[string]bool{},
+			},
+			wantStatusCode: http.StatusOK,
+			wantStructuredBody: &v1alpha1.Flagz{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       Kind,
+					APIVersion: fmt.Sprintf("%s/%s", GroupName, Version),
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-server",
+				},
+				Flags: map[string]string{
+					fakeFlagName: fakeFlagValue,
+				},
+			},
 		},
 		{
 			name:          "no accept header falls back to text/plain",
@@ -224,12 +277,10 @@ func TestHandleFlagz(t *testing.T) {
 			}
 
 			if tt.wantStatusCode == http.StatusOK {
-				if tt.wantJSONBody != nil {
+				if tt.wantStructuredBody != nil {
 					var got v1alpha1.Flagz
-					if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
-						t.Fatalf("unexpected error while unmarshalling response: %v", err)
-					}
-					if diff := cmp.Diff(*tt.wantJSONBody, got); diff != "" {
+					unmarshalResponse(t, w.Header().Get("Content-Type"), w.Body.Bytes(), &got)
+					if diff := cmp.Diff(*tt.wantStructuredBody, got); diff != "" {
 						t.Errorf("Unexpected diff on response (-want,+got):\n%s", diff)
 					}
 					if tt.wantWarning {
@@ -242,6 +293,26 @@ func TestHandleFlagz(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func unmarshalResponse(t *testing.T, contentType string, body []byte, got *v1alpha1.Flagz) {
+	t.Helper()
+	switch {
+	case strings.Contains(contentType, "application/json"):
+		if err := json.Unmarshal(body, got); err != nil {
+			t.Fatalf("unexpected error while unmarshalling JSON response: %v", err)
+		}
+	case strings.Contains(contentType, "application/yaml"):
+		if err := yaml.Unmarshal(body, got); err != nil {
+			t.Fatalf("unexpected error while unmarshalling YAML response: %v", err)
+		}
+	case strings.Contains(contentType, "application/cbor"):
+		if err := cbordirect.Unmarshal(body, got); err != nil {
+			t.Fatalf("unexpected error while unmarshalling CBOR response: %v", err)
+		}
+	default:
+		t.Fatalf("unexpected content type: %s", contentType)
 	}
 }
 
@@ -289,5 +360,20 @@ func TestCache(t *testing.T) {
 	}
 	if diff := cmp.Diff(cached, capturedReg.cachedPlainTextResponse); diff != "" {
 		t.Errorf("Unexpected diff on cached response (-want,+got):\n%s", diff)
+	}
+}
+
+// TestNewFlagzCodecFactory ensures all media types in the codec factory
+// are explicitly handled. If this test fails, a new media type was added
+// to the codec factory and needs to be explicitly added to the supported
+// or unsupported list in newFlagzCodecFactory.
+func TestNewFlagzCodecFactory(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CBORServingAndStorage, true)
+	scheme := runtime.NewScheme()
+	utilruntime.Must(v1alpha1.AddToScheme(scheme))
+
+	_, err := newFlagzCodecFactory(scheme, "", nil)
+	if err != nil {
+		t.Fatalf("unknown media type(s) detected - update newFlagzCodecFactory to explicitly handle them: %v", err)
 	}
 }

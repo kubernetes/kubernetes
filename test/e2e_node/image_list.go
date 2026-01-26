@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"os"
 	"os/user"
-	"runtime"
 	"sync"
 	"time"
 
@@ -61,6 +60,7 @@ var NodePrePullImageList = sets.NewString(
 	imageutils.GetPauseImageName(),
 	imageutils.GetE2EImage(imageutils.NodePerfNpbEp),
 	imageutils.GetE2EImage(imageutils.NodePerfNpbIs),
+	imageutils.GetE2EImage(imageutils.NodePerfPytorchWideDeep),
 	imageutils.GetE2EImage(imageutils.Etcd),
 )
 
@@ -69,11 +69,6 @@ var NodePrePullImageList = sets.NewString(
 // 2. the ones passed in from framework.TestContext.ExtraEnvs
 // So this function needs to be called after the extra envs are applied.
 func updateImageAllowList(ctx context.Context) {
-	// Architecture-specific image
-	if !isRunningOnArm64() {
-		// NodePerfTfWideDeep is only supported on x86_64, pulling in arm64 will fail
-		NodePrePullImageList = NodePrePullImageList.Insert(imageutils.GetE2EImage(imageutils.NodePerfTfWideDeep))
-	}
 	// Union NodePrePullImageList and PrePulledImages into the framework image pre-pull list.
 	e2epod.ImagePrePullList = NodePrePullImageList.Union(commontest.PrePulledImages)
 	// Images from extra envs
@@ -93,10 +88,6 @@ func updateImageAllowList(ctx context.Context) {
 	} else {
 		e2epod.ImagePrePullList.Insert(samplePluginImageCtrlReg)
 	}
-}
-
-func isRunningOnArm64() bool {
-	return runtime.GOARCH == "arm64"
 }
 
 func getNodeProblemDetectorImage() string {

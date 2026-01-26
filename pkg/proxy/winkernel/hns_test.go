@@ -29,21 +29,24 @@ import (
 )
 
 const (
-	sourceVip         = "192.168.1.2"
-	serviceVip        = "11.0.0.1"
-	addressPrefix     = "192.168.1.0/24"
-	gatewayAddress    = "192.168.1.1"
-	epMacAddress      = "00-11-22-33-44-55"
-	epIpAddress       = "192.168.1.3"
-	epIpv6Address     = "192::3"
-	epIpAddressB      = "192.168.1.4"
-	epIpAddressRemote = "192.168.2.3"
-	epIpAddressLocal1 = "192.168.4.4"
-	epIpAddressLocal2 = "192.168.4.5"
-	epPaAddress       = "10.0.0.3"
-	protocol          = 6
-	internalPort      = 80
-	externalPort      = 32440
+	sourceVip           = "192.168.1.2"
+	serviceVip          = "11.0.0.1"
+	addressPrefix       = "192.168.1.0/24"
+	gatewayAddress      = "192.168.1.1"
+	epMacAddress        = "00-11-22-33-44-55"
+	epIpAddress         = "192.168.1.3"
+	epIpv6Address       = "192::3"
+	epIpAddressB        = "192.168.1.4"
+	epIpAddressLocal    = "192.168.5.3"
+	epIpAddressLocalv6  = "192::5:3"
+	epIpAddressRemote   = "192.168.2.3"
+	epIpAddressRemotev6 = "192::2:3"
+	epIpAddressLocal1   = "192.168.4.4"
+	epIpAddressLocal2   = "192.168.4.5"
+	epPaAddress         = "10.0.0.3"
+	protocol            = 6
+	internalPort        = 80
+	externalPort        = 32440
 )
 
 func TestGetNetworkByName(t *testing.T) {

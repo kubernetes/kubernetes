@@ -175,6 +175,35 @@
   help: Number of times declarative validation has panicked during validation.
   type: Counter
   stabilityLevel: BETA
+- name: watch_list_duration_seconds
+  subsystem: apiserver
+  help: Response latency distribution in seconds for watch list requests broken by
+    group, version, resource and scope.
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - group
+  - resource
+  - scope
+  - version
+  buckets:
+  - 0.05
+  - 0.1
+  - 0.2
+  - 0.4
+  - 0.6
+  - 0.8
+  - 1
+  - 2
+  - 4
+  - 6
+  - 8
+  - 10
+  - 15
+  - 20
+  - 30
+  - 45
+  - 60
 - name: disabled_metrics_total
   help: The count of disabled metrics.
   type: Counter

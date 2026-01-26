@@ -16,11 +16,12 @@ linters:
     # - "nophase" # Ensure field names do not have the word "phase" in them.
     - "notimestamp" # Ensure fields are not named "timestamp", prefer "time".
     # - "optionalfields" # Ensure fields marked optional have omitempty and pointers.
-    # - "optionalorrequired" # Every field should be marked as `+optional` xor `+required`.
+    - "optionalorrequired" # Every field should be marked as `+optional` xor `+required`.
     # - "requiredfields" # Required fields should only be pointers when required based on the validity of the zero value, they should always have `omitempty`.
     - "ssatags" # Ensure lists have a listType tag.
     # - "uniquemarkers" # Ensure markers are not duplicated across field and type definitions.
     - "duplicatemarkers" #Prevent identical markers from being present on types and fields
+    - "dependenttags" # Ensure markers dependent on other markers are present.
 lintersConfig:
   conditions:
     isFirstField: Ignore
@@ -38,6 +39,12 @@ lintersConfig:
       - ["k8s:required", "required", "kubebuilder:validation:Required"]
       - ["default"]
       description: "fields with default values are always optional"
+  dependenttags:
+    rules:
+      - identifier: "k8s:unionMember"
+        type: "All"
+        dependsOn:
+          - "k8s:optional"
   # jsonTags:
   #   jsonTagRegex: "^[a-z][a-z0-9]*(?:[A-Z][a-z0-9]*)*$" # The default regex is appropriate for our use case.
   # nomaps:

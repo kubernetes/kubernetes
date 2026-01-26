@@ -573,7 +573,7 @@ func (m *manager) RemovePod(uid types.UID) {
 	logger := klog.TODO()
 	if err := m.allocated.RemovePod(uid); err != nil {
 		// If the deletion fails, it will be retried by RemoveOrphanedPods, so we can safely ignore the error.
-		logger.V(3).Error(err, "Failed to delete pod allocation", "podUID", uid)
+		logger.V(3).Info("Failed to delete pod allocation", "podUID", uid, "err", err)
 	}
 }
 
@@ -718,8 +718,7 @@ func (m *manager) canResizePod(logger klog.Logger, allocatedPods []*v1.Pod, pod 
 			metrics.PodInfeasibleResizes.WithLabelValues("guaranteed_pod_cpu_manager_static_policy").Inc()
 			return false, v1.PodReasonInfeasible, msg
 		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.MemoryManager) &&
-			!utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveMemory) &&
+		if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveMemory) &&
 			m.nodeConfig.MemoryManagerPolicy == string(memorymanager.PolicyTypeStatic) &&
 			m.guaranteedPodResourceResizeRequired(pod, v1.ResourceMemory) {
 			msg := fmt.Sprintf("Resize is infeasible for Guaranteed Pods alongside Memory Manager policy \"%s\"", string(memorymanager.PolicyTypeStatic))

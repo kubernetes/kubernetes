@@ -55,14 +55,14 @@ type RuntimeHelper interface {
 	// of a pod.
 	GetPodCgroupParent(pod *v1.Pod) string
 	GetPodDir(podUID types.UID) string
-	GeneratePodHostNameAndDomain(pod *v1.Pod) (hostname string, hostDomain string, err error)
+	GeneratePodHostNameAndDomain(logger klog.Logger, pod *v1.Pod) (hostname string, hostDomain string, err error)
 	// GetExtraSupplementalGroupsForPod returns a list of the extra
 	// supplemental groups for the Pod. These extra supplemental groups come
 	// from annotations on persistent volumes that the pod depends on.
 	GetExtraSupplementalGroupsForPod(pod *v1.Pod) []int64
 
 	// GetOrCreateUserNamespaceMappings returns the configuration for the sandbox user namespace
-	GetOrCreateUserNamespaceMappings(pod *v1.Pod, runtimeHandler string) (*runtimeapi.UserNamespace, error)
+	GetOrCreateUserNamespaceMappings(logger klog.Logger, pod *v1.Pod, runtimeHandler string) (*runtimeapi.UserNamespace, error)
 
 	// PrepareDynamicResources prepares resources for a pod.
 	PrepareDynamicResources(ctx context.Context, pod *v1.Pod) error

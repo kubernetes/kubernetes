@@ -23,7 +23,7 @@
 # Commentstart - Ignore commentstart issues for existing API group
 # TODO: For each existing API group, we aim to remove it over time.
 - text: "godoc for field .* should start with '.* ...'"
-  path: "staging/src/k8s.io/api/(admissionregistration|apiserverinternal|apps|authentication|authorization|autoscaling|batch|certificates|coordination|core|discovery|events|extensions|flowcontrol|imagepolicy|networking|node|policy|rbac|resource|scheduling|storage|storagemigration)"
+  path: "staging/src/k8s.io/api/(admissionregistration|apiserverinternal|apps|authorization|autoscaling|batch|certificates|coordination|core|discovery|events|extensions|flowcontrol|imagepolicy|networking|node|policy|rbac|resource|scheduling|storage|storagemigration)"
 - text: "field .* is missing godoc comment"
   path: "staging/src/k8s.io/api/autoscaling/"
 
@@ -87,3 +87,11 @@
   path: "staging/src/k8s.io/api/resource/(v1|v1beta2)/types.go"
 - text: "field (CapacityRequirements.Requests|DeviceRequestAllocationResult.ConsumedCapacity) should not use a map type, use a list type with a unique name/identifier instead"
   path: "staging/src/k8s.io/api/resource/(v1|v1beta1|v1beta2)/types.go"
+
+# OptionalOrRequired is being enabled over time. For now, each API group should be added to this list until we comb through each group and fix the missing tags.
+- text: "must be marked as optional or required"
+  path: "staging/src/k8s.io/api/(admission|apidiscovery|apiserverinternal|apps|authentication|authorization|autoscaling|batch|certificates|coordination|core|discovery|events|extensions|flowcontrol|imagepolicy|networking|node|policy|rbac|resource|storage|storagemigration)"
+
+# OptionalOrRequired - Existing fields that are marked as both optional and required (based on standard optional vs kubebuilder:validation:Required) and should not be fixed.
+- text: "field (PortStatus|IngressPortStatus)\\.Error must not be marked as both optional and required"
+  path: "staging/src/k8s.io/api/(core/v1|extensions/v1beta1|networking/(v1|v1beta1))"

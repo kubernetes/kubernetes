@@ -8,13 +8,13 @@ import (
 	"time"
 
 	"github.com/felixge/httpsnoop"
-
-	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp/internal/request"
-	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp/internal/semconv"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
+
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp/internal/request"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp/internal/semconv"
 )
 
 // middleware is an http middleware which wraps the next handler in a span.
@@ -29,7 +29,6 @@ type middleware struct {
 	writeEvent         bool
 	filters            []Filter
 	spanNameFormatter  func(string, *http.Request) string
-	publicEndpoint     bool
 	publicEndpointFn   func(*http.Request) bool
 	metricAttributesFn func(*http.Request) []attribute.KeyValue
 
@@ -77,7 +76,6 @@ func (h *middleware) configure(c *config) {
 	h.writeEvent = c.WriteEvent
 	h.filters = c.Filters
 	h.spanNameFormatter = c.SpanNameFormatter
-	h.publicEndpoint = c.PublicEndpoint
 	h.publicEndpointFn = c.PublicEndpointFn
 	h.server = c.ServerName
 	h.semconv = semconv.NewHTTPServer(c.Meter)
@@ -102,7 +100,7 @@ func (h *middleware) serveHTTP(w http.ResponseWriter, r *http.Request, next http
 	}
 
 	opts = append(opts, h.spanStartOptions...)
-	if h.publicEndpoint || (h.publicEndpointFn != nil && h.publicEndpointFn(r.WithContext(ctx))) {
+	if h.publicEndpointFn != nil && h.publicEndpointFn(r.WithContext(ctx)) {
 		opts = append(opts, trace.WithNewRoot())
 		// Linking incoming span context if any for public endpoint.
 		if s := trace.SpanContextFromContext(ctx); s.IsValid() && s.IsRemote() {
@@ -224,6 +222,9 @@ func (h *middleware) metricAttributesFromRequest(r *http.Request) []attribute.Ke
 
 // WithRouteTag annotates spans and metrics with the provided route name
 // with HTTP route attribute.
+//
+// Deprecated: spans are automatically annotated with the route attribute.
+// To annotate metrics, use the [WithMetricAttributesFn] option.
 func WithRouteTag(route string, h http.Handler) http.Handler {
 	attr := semconv.NewHTTPServer(nil).Route(route)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

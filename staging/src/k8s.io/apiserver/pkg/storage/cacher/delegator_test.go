@@ -19,6 +19,7 @@ package cacher
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -96,6 +97,11 @@ func TestConsistencyCheckerDigest(t *testing.T) {
 				ResourceVersion: "2",
 				CacheDigest:     "4ae4e750bd825b17",
 				EtcdDigest:      "f940a60af965b03",
+				DiffDetail: &diffDetail{
+					Index:     0,
+					CacheItem: &namespaceNameRV{Namespace: "kube-system", Name: "pod", RV: "2"},
+					EtcdItem:  &namespaceNameRV{Namespace: "kube-public", Name: "pod", RV: "2"},
+				},
 			},
 			expectConsistent: false,
 		},
@@ -113,6 +119,11 @@ func TestConsistencyCheckerDigest(t *testing.T) {
 				ResourceVersion: "2",
 				CacheDigest:     "c9120494e4c1897d",
 				EtcdDigest:      "c9156494e4c46274",
+				DiffDetail: &diffDetail{
+					Index:     0,
+					CacheItem: &namespaceNameRV{Namespace: "default", Name: "pod2", RV: "2"},
+					EtcdItem:  &namespaceNameRV{Namespace: "default", Name: "pod3", RV: "2"},
+				},
 			},
 			expectConsistent: false,
 		},
@@ -130,6 +141,11 @@ func TestConsistencyCheckerDigest(t *testing.T) {
 				ResourceVersion: "4",
 				CacheDigest:     "86bf3a5e80d1c5ca",
 				EtcdDigest:      "86bf3a5e80d1c5cd",
+				DiffDetail: &diffDetail{
+					Index:     0,
+					CacheItem: &namespaceNameRV{Namespace: "default", Name: "pod", RV: "3"},
+					EtcdItem:  &namespaceNameRV{Namespace: "default", Name: "pod", RV: "4"},
+				},
 			},
 			expectConsistent: false,
 		},
@@ -148,6 +164,34 @@ func TestConsistencyCheckerDigest(t *testing.T) {
 				ResourceVersion: "3",
 				CacheDigest:     "1859bac707c2cb2b",
 				EtcdDigest:      "11d147fc800df0e0",
+				DiffDetail: &diffDetail{
+					Index:     1,
+					CacheItem: nil,
+					EtcdItem:  &namespaceNameRV{Namespace: "Default", Name: "pod", RV: "3"},
+				},
+			},
+			expectConsistent: false,
+		},
+		{
+			desc:            "watch missed delete event",
+			resourceVersion: "3",
+			cacherReady:     true,
+			cacherItems: []example.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Namespace: "Default", Name: "pod", ResourceVersion: "2"}},
+				{ObjectMeta: metav1.ObjectMeta{Namespace: "Default", Name: "pod", ResourceVersion: "3"}},
+			},
+			etcdItems: []example.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Namespace: "Default", Name: "pod", ResourceVersion: "2"}},
+			},
+			expectDigest: storageDigest{
+				ResourceVersion: "3",
+				CacheDigest:     "11d147fc800df0e0",
+				EtcdDigest:      "1859bac707c2cb2b",
+				DiffDetail: &diffDetail{
+					Index:     1,
+					CacheItem: &namespaceNameRV{Namespace: "Default", Name: "pod", RV: "3"},
+					EtcdItem:  nil,
+				},
 			},
 			expectConsistent: false,
 		},
@@ -201,7 +245,7 @@ func TestConsistencyCheckerDigest(t *testing.T) {
 			if err != nil {
 				return
 			}
-			if *digest != tc.expectDigest {
+			if !reflect.DeepEqual(*digest, tc.expectDigest) {
 				t.Errorf("Expect: %+v Got: %+v", &tc.expectDigest, *digest)
 			}
 

@@ -144,16 +144,12 @@ func (endpointSliceStrategy) AllowUnconditionalUpdate() bool {
 
 // dropDisabledConditionsOnCreate will drop any fields that are disabled.
 func dropDisabledFieldsOnCreate(endpointSlice *discovery.EndpointSlice) {
-	dropHints := !utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareHints)
-	dropNodeHints := !utilfeature.DefaultFeatureGate.Enabled(features.PreferSameTrafficDistribution)
-	if !dropHints && !dropNodeHints {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PreferSameTrafficDistribution) {
 		return
 	}
 
 	for i := range endpointSlice.Endpoints {
-		if dropHints {
-			endpointSlice.Endpoints[i].Hints = nil
-		} else if endpointSlice.Endpoints[i].Hints != nil {
+		if endpointSlice.Endpoints[i].Hints != nil {
 			endpointSlice.Endpoints[i].Hints.ForNodes = nil
 		}
 	}
@@ -162,27 +158,18 @@ func dropDisabledFieldsOnCreate(endpointSlice *discovery.EndpointSlice) {
 // dropDisabledFieldsOnUpdate will drop any disable fields that have not already
 // been set on the EndpointSlice.
 func dropDisabledFieldsOnUpdate(oldEPS, newEPS *discovery.EndpointSlice) {
-	dropHints := !utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareHints)
-	dropNodeHints := !utilfeature.DefaultFeatureGate.Enabled(features.PreferSameTrafficDistribution)
-	if dropHints || dropNodeHints {
-		for _, ep := range oldEPS.Endpoints {
-			if ep.Hints != nil {
-				dropHints = false
-				if ep.Hints.ForNodes != nil {
-					dropNodeHints = false
-					break
-				}
-			}
-		}
-	}
-	if !dropHints && !dropNodeHints {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PreferSameTrafficDistribution) {
 		return
 	}
 
+	for _, ep := range oldEPS.Endpoints {
+		if ep.Hints != nil && ep.Hints.ForNodes != nil {
+			return
+		}
+	}
+
 	for i := range newEPS.Endpoints {
-		if dropHints {
-			newEPS.Endpoints[i].Hints = nil
-		} else if newEPS.Endpoints[i].Hints != nil {
+		if newEPS.Endpoints[i].Hints != nil {
 			newEPS.Endpoints[i].Hints.ForNodes = nil
 		}
 	}

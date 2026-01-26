@@ -417,10 +417,6 @@ func (expc *expandController) GetMounter() mount.Interface {
 	return nil
 }
 
-func (expc *expandController) GetHostName() string {
-	return ""
-}
-
 func (expc *expandController) GetNodeAllocatable() (v1.ResourceList, error) {
 	return v1.ResourceList{}, nil
 }

@@ -162,6 +162,15 @@ func Init(tb TB, opts ...InitOption) TContext {
 	tCtx.Cleanup(func() {
 		tCtx.Cancel(cleanupErr(tCtx.Name()).Error())
 	})
+
+	// Only enable signal handling if we are sure that we are not
+	// in a Ginkgo suite. Only structs from the testing package
+	// can implement this interface because it contains an "internal"
+	// method, so this has to run under `go test`.
+	if _, ok := tb.(testing.TB); ok {
+		initSignalsOnce.Do(initSignals)
+	}
+
 	return tCtx
 }
 

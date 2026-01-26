@@ -32,6 +32,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/klog/v2"
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/test/utils/ktesting"
@@ -77,7 +78,7 @@ func (m *testUserNsPodsManager) HandlerSupportsUserNamespaces(runtimeHandler str
 	return m.userns, nil
 }
 
-func (m *testUserNsPodsManager) GetKubeletMappings(idsPerPod uint32) (uint32, uint32, error) {
+func (m *testUserNsPodsManager) GetKubeletMappings(logger klog.Logger, idsPerPod uint32) (uint32, uint32, error) {
 	if m.mappingFirstID != 0 {
 		return m.mappingFirstID, m.mappingLen, nil
 	}
@@ -384,16 +385,16 @@ func TestGetOrCreateUserNamespaceMappings(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
 			// These tests will create the userns file, so use an existing podDir.
 			testUserNsPodsManager := &testUserNsPodsManager{
 				podDir: t.TempDir(),
 				userns: tc.runtimeUserns,
 			}
-			logger, ctx := ktesting.NewTestContext(t)
 			m, err := MakeUserNsManager(logger, testUserNsPodsManager, nil)
 			assert.NoError(t, err)
 
-			userns, err := m.GetOrCreateUserNamespaceMappings(ctx, tc.pod, tc.runtimeHandler)
+			userns, err := m.GetOrCreateUserNamespaceMappings(logger, tc.pod, tc.runtimeHandler)
 			if (tc.success && err != nil) || (!tc.success && err == nil) {
 				t.Errorf("expected success: %v but got error: %v", tc.success, err)
 			}

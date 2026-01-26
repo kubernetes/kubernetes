@@ -503,7 +503,6 @@ func ctbForCA(ctbName, signerName, caPEM string, labels map[string]string) *cert
 func mustInitCTBs(ctx context.Context, f *framework.Framework, ctbs []*certificatesv1beta1.ClusterTrustBundle) func(context.Context) {
 	cleanups := []func(context.Context){}
 	for _, ctb := range ctbs {
-		ctb := ctb
 		cleanups = append(cleanups, mustCreateCTB(ctx, f, ctb.DeepCopy()))
 	}
 

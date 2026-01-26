@@ -51,7 +51,7 @@ func TestGetPodList(t *testing.T) {
 			sortBy:  func(pods []*corev1.Pod) sort.Interface { return podutils.ByLogging(pods) },
 			expected: &corev1.PodList{
 				ListMeta: metav1.ListMeta{
-					ResourceVersion: "2", // Two objects created.
+					ResourceVersion: "3", // Two objects created, initial value is 1.
 				},
 				Items: []corev1.Pod{
 					{

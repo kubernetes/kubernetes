@@ -1,4 +1,4 @@
-linux/amd64=debian:buster-slim
-linux/arm64=arm64v8/debian:buster-slim
-linux/ppc64le=ppc64le/debian:buster-slim
-linux/s390x=s390x/debian:buster-slim
+linux/amd64=debian:bookworm-slim
+linux/arm64=arm64v8/debian:bookworm-slim
+linux/ppc64le=ppc64le/debian:bookworm-slim
+linux/s390x=s390x/debian:bookworm-slim

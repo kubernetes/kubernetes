@@ -90,8 +90,8 @@ func doGuaranteedPodLevelResizeTests(f *framework.Framework) {
 
 			var originalPodResources, desiredPodResources *v1.ResourceRequirements
 			if desiredPodCPU != "" || desiredPodMem != "" {
-				originalPodResources = makePodResources(offsetCPU(15, originalCPU), offsetCPU(15, originalCPU), offsetMemory(15, originalMem), offsetMemory(15, originalMem))
-				desiredPodResources = makePodResources(offsetCPU(15, desiredPodCPU), offsetCPU(15, desiredPodCPU), offsetMemory(15, desiredPodMem), offsetMemory(15, desiredPodMem))
+				originalPodResources = makePodResources(offsetCPU(30, originalCPU), offsetCPU(30, originalCPU), offsetMemory(30, originalMem), offsetMemory(30, originalMem))
+				desiredPodResources = makePodResources(offsetCPU(30, desiredPodCPU), offsetCPU(30, desiredPodCPU), offsetMemory(30, desiredPodMem), offsetMemory(30, desiredPodMem))
 			}
 
 			doPatchAndRollbackPLR(ctx, f, originalContainers, expectedContainers, originalPodResources, desiredPodResources, true, true)

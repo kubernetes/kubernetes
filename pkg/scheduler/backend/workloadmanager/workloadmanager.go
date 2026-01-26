@@ -44,14 +44,14 @@ type WorkloadManager interface {
 type workloadManager struct {
 	lock sync.RWMutex
 
-	// podGroupInfos stores the runtime state for each known pod group.
-	podGroupInfos map[podGroupKey]*podGroupInfo
+	// podGroupStates stores the runtime state for each known pod group.
+	podGroupStates map[podGroupKey]*podGroupState
 }
 
 // New initializes a new workload manager and returns it.
 func New() *workloadManager {
 	return &workloadManager{
-		podGroupInfos: make(map[podGroupKey]*podGroupInfo),
+		podGroupStates: make(map[podGroupKey]*podGroupState),
 	}
 }
 
@@ -65,12 +65,12 @@ func (wm *workloadManager) AddPod(pod *v1.Pod) {
 	defer wm.lock.Unlock()
 
 	key := newPodGroupKey(pod.Namespace, pod.Spec.WorkloadRef)
-	info, ok := wm.podGroupInfos[key]
+	state, ok := wm.podGroupStates[key]
 	if !ok {
-		info = newPodGroupInfo()
-		wm.podGroupInfos[key] = info
+		state = newPodGroupState()
+		wm.podGroupStates[key] = state
 	}
-	info.addPod(pod)
+	state.addPod(pod)
 }
 
 // UpdatePod updates a pod in the workload manager if it has a workload reference.
@@ -83,15 +83,15 @@ func (wm *workloadManager) UpdatePod(oldPod, newPod *v1.Pod) {
 	defer wm.lock.Unlock()
 
 	key := newPodGroupKey(newPod.Namespace, newPod.Spec.WorkloadRef)
-	info, ok := wm.podGroupInfos[key]
+	state, ok := wm.podGroupStates[key]
 	if !ok {
 		// Shouldn't happen, but handling this case gracefully.
-		info = newPodGroupInfo()
-		wm.podGroupInfos[key] = info
-		info.addPod(newPod)
+		state = newPodGroupState()
+		wm.podGroupStates[key] = state
+		state.addPod(newPod)
 		return
 	}
-	info.updatePod(oldPod, newPod)
+	state.updatePod(oldPod, newPod)
 }
 
 // DeletePod removes a pod from the workload manager if it has a workload reference.
@@ -104,24 +104,24 @@ func (wm *workloadManager) DeletePod(pod *v1.Pod) {
 	defer wm.lock.Unlock()
 
 	key := newPodGroupKey(pod.Namespace, pod.Spec.WorkloadRef)
-	info, ok := wm.podGroupInfos[key]
+	state, ok := wm.podGroupStates[key]
 	if !ok {
 		// The pod group may have already been cleaned up, or the pod was never added.
 		return
 	}
-	info.deletePod(pod.UID)
+	state.deletePod(pod.UID)
 	// Clean up the map entry if no pods are left in the group.
-	if info.empty() {
-		delete(wm.podGroupInfos, key)
+	if state.empty() {
+		delete(wm.podGroupStates, key)
 	}
 }
 
-// PodGroupInfo returns the state of a pod group.
-func (wm *workloadManager) PodGroupInfo(namespace string, workloadRef *v1.WorkloadReference) (fwk.PodGroupInfo, error) {
+// PodGroupState returns the runtime state of a pod group.
+func (wm *workloadManager) PodGroupState(namespace string, workloadRef *v1.WorkloadReference) (fwk.PodGroupState, error) {
 	wm.lock.RLock()
 	defer wm.lock.RUnlock()
 
-	state, ok := wm.podGroupInfos[newPodGroupKey(namespace, workloadRef)]
+	state, ok := wm.podGroupStates[newPodGroupKey(namespace, workloadRef)]
 	if !ok {
 		return nil, fmt.Errorf("internal pod group state doesn't exist for a pod's workload")
 	}

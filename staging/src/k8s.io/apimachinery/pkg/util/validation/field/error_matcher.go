@@ -44,6 +44,7 @@ type ErrorMatcher struct {
 	matchOrigin              bool
 	matchDetail              func(want, got string) bool
 	requireOriginWhenInvalid bool
+	matchDeclarativeNative   bool
 	// normalizationRules holds the pre-compiled regex patterns for path normalization.
 	normalizationRules []NormalizationRule
 }
@@ -86,6 +87,10 @@ func (m ErrorMatcher) Matches(want, got *Error) bool {
 	if m.matchDetail != nil && !m.matchDetail(want.Detail, got.Detail) {
 		return false
 	}
+	if m.matchDeclarativeNative && want.DeclarativeNative != got.DeclarativeNative {
+		return false
+	}
+
 	return true
 }
 
@@ -147,6 +152,10 @@ func (m ErrorMatcher) Render(e *Error) string {
 	if m.matchDetail != nil {
 		comma()
 		buf.WriteString(fmt.Sprintf("Detail=%q", e.Detail))
+	}
+	if m.matchDeclarativeNative {
+		comma()
+		buf.WriteString(fmt.Sprintf("DeclarativeNative=%t", e.DeclarativeNative))
 	}
 	return "{" + buf.String() + "}"
 }
@@ -221,6 +230,13 @@ func (m ErrorMatcher) ByOrigin() ErrorMatcher {
 // matching by Origin.
 func (m ErrorMatcher) RequireOriginWhenInvalid() ErrorMatcher {
 	m.requireOriginWhenInvalid = true
+	return m
+}
+
+// ByDeclarativeNative returns a derived ErrorMatcher which also matches by the DeclarativeNative
+// value of field errors.
+func (m ErrorMatcher) ByDeclarativeNative() ErrorMatcher {
+	m.matchDeclarativeNative = true
 	return m
 }
 

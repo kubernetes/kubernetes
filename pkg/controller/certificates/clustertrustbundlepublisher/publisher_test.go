@@ -313,6 +313,10 @@ func fakeKubeClientSetWithCTBList(t *testing.T, signerName string, ctbs ...runti
 			}
 		}
 
+		// Ensure that Watch doesn't return any objects either by bumping up the resource version
+		// beyond what the fake client uses.
+		retList.ResourceVersion = "1000"
+
 		return true, retList, nil
 	})
 

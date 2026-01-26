@@ -67,6 +67,21 @@ func (f *FIFO) GetByKey(key string) (item interface{}, exists bool, err error) {
 	return item, exists, nil
 }
 
+// Pop is helper function for popping from Queue.
+// WARNING: Do NOT use this function in non-test code to avoid races
+// unless you really really really really know what you are doing.
+//
+// NOTE: This function is deprecated and may be removed in the future without
+// additional warning.
+func Pop(queue Queue) interface{} {
+	var result interface{}
+	queue.Pop(func(obj interface{}, isInInitialList bool) error {
+		result = obj
+		return nil
+	})
+	return result
+}
+
 func testFifoObjectKeyFunc(obj interface{}) (string, error) {
 	return obj.(testFifoObject).name, nil
 }

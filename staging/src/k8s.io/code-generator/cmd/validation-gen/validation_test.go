@@ -17,10 +17,13 @@ limitations under the License.
 package main
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
 	"k8s.io/code-generator/cmd/validation-gen/validators"
+	"k8s.io/gengo/v2/generator"
+	"k8s.io/gengo/v2/namer"
 	"k8s.io/gengo/v2/types"
 )
 
@@ -474,5 +477,219 @@ func TestSortIntoCohorts(t *testing.T) {
 		if !reflect.DeepEqual(out, tc.expected) {
 			t.Errorf("expected %v, got %v", tc.expected, out)
 		}
+	}
+}
+
+func TestDiscoverStruct(t *testing.T) {
+	c := &generator.Context{
+		Namers:    namer.NameSystems{},
+		Universe:  types.Universe{},
+		FileTypes: map[string]generator.FileType{},
+	}
+	validator := validators.InitGlobalValidator(c)
+
+	testCases := []struct {
+		name                   string
+		typeToTest             *types.Type
+		expectErr              error
+		expectedStabilityLevel validators.StabilityLevel
+	}{
+		{
+			name: "simple struct with stable validations",
+			typeToTest: &types.Type{
+				Kind: types.Struct,
+				Name: types.Name{Name: "MyStruct"},
+				Members: []types.Member{
+					{
+						Name:         "StringField",
+						Type:         types.String,
+						CommentLines: []string{"+k8s:required"},
+						Tags:         `json:"stringField"`,
+					},
+					{
+						Name:         "IntegerField",
+						Type:         types.Int64,
+						CommentLines: []string{"+k8s:minimum=1", "+k8s:maximum=10"},
+						Tags:         `json:"integerField"`,
+					},
+					{
+						Name: "StringSliceField",
+						Type: &types.Type{
+							Kind: types.Slice,
+							Elem: types.String,
+						},
+						CommentLines: []string{"+k8s:maxItems=10", "+k8s:listType=atomic"},
+						Tags:         `json:"sliceStringField"`,
+					},
+				},
+			},
+			expectErr:              nil,
+			expectedStabilityLevel: validators.Stable,
+		},
+		{
+			name: "struct with non-stable validation on a field",
+			typeToTest: &types.Type{
+				Kind: types.Struct,
+				Name: types.Name{Name: "MyStruct"},
+				Members: []types.Member{
+					{
+						Name:         "AlphaField",
+						Type:         types.String,
+						CommentLines: []string{"+k8s:validateFalse"},
+						Tags:         `json:"alphaField"`,
+					},
+				},
+			},
+			expectErr:              nil,
+			expectedStabilityLevel: validators.Alpha,
+		},
+		{
+			name: "struct with declarative native fields with stable validations",
+			typeToTest: &types.Type{
+				Kind: types.Struct,
+				Name: types.Name{Name: "MyStruct"},
+				Members: []types.Member{
+					{
+						Name:         "DeclarativeField",
+						Type:         types.String,
+						CommentLines: []string{"+k8s:declarativeValidationNative", "+k8s:required", "+k8s:format=k8s-uuid"},
+						Tags:         `json:"declarativeField"`,
+					}, {
+						Name:         "DeclarativeField",
+						Type:         types.Int64,
+						CommentLines: []string{"+k8s:declarativeValidationNative", "+k8s:minimum=1", "+k8s:maximum=10"},
+						Tags:         `json:"declarativeField"`,
+					}, {
+						Name: "DeclarativeField",
+						Type: &types.Type{
+							Kind: types.Slice,
+							Elem: types.String,
+						},
+						CommentLines: []string{"+k8s:declarativeValidationNative", "+k8s:maxItems=10", "+k8s:listType=atomic", "+k8s:required"},
+						Tags:         `json:"declarativeField"`,
+					},
+				},
+			},
+			expectErr:              nil,
+			expectedStabilityLevel: validators.Stable,
+		},
+		{
+			name: "struct with declarative native field string with non-stable validations",
+			typeToTest: &types.Type{
+				Kind: types.Struct,
+				Name: types.Name{Name: "MyStruct"},
+				Members: []types.Member{
+					{
+						Name:         "DeclarativeField",
+						Type:         types.String,
+						CommentLines: []string{"+k8s:declarativeValidationNative", "+k8s:validateFalse", "+k8s:required"},
+						Tags:         `json:"declarativeField"`,
+					},
+				},
+			},
+			expectErr: fmt.Errorf("field MyStruct.declarativeField: +k8s:declarativeValidationNative can only be used with stable validation tags, but found \"k8s:validateFalse\" which is Alpha"),
+		},
+		{
+			name: "struct with declarative native field integer with non-stable validations",
+			typeToTest: &types.Type{
+				Kind: types.Struct,
+				Name: types.Name{Name: "MyStruct"},
+				Members: []types.Member{
+					{
+						Name:         "DeclarativeField",
+						Type:         types.Int64,
+						CommentLines: []string{"+k8s:declarativeValidationNative", "+k8s:validateFalse", "+k8s:required"},
+						Tags:         `json:"declarativeField"`,
+					},
+				},
+			},
+			expectErr: fmt.Errorf("field MyStruct.declarativeField: +k8s:declarativeValidationNative can only be used with stable validation tags, but found \"k8s:validateFalse\" which is Alpha"),
+		},
+		{
+			name: "struct with declarative native field slice with stable validations (item+zeroOrOneOf)",
+			typeToTest: &types.Type{
+				Kind: types.Struct,
+				Name: types.Name{Name: "MyStructSlice"},
+				Members: []types.Member{
+					{
+						Name: "DeclarativeField",
+						Type: &types.Type{
+							Kind: types.Slice,
+							Elem: &types.Type{
+								Kind: types.Struct,
+								Name: types.Name{Name: "MyInnerStruct"},
+								Members: []types.Member{
+									{Name: "Name", Type: types.String, Tags: `json:"name"`},
+								},
+							},
+						},
+						CommentLines: []string{"+k8s:declarativeValidationNative", "+k8s:listType=map", "+k8s:listMapKey=name", `+k8s:item(name: "failed")=+k8s:zeroOrOneOfMember`},
+						Tags:         `json:"declarativeField"`,
+					},
+				},
+			},
+			expectErr:              nil,
+			expectedStabilityLevel: validators.Stable,
+		},
+		{
+			name: "struct with a field whose type has non-stable validations",
+			typeToTest: &types.Type{
+				Kind: types.Struct,
+				Name: types.Name{Name: "MyStruct"},
+				Members: []types.Member{
+					{
+						Name: "OtherField",
+						Type: &types.Type{
+							Kind: types.Struct,
+							Name: types.Name{Name: "OtherType"},
+							Members: []types.Member{
+								{
+									Name:         "AlphaField",
+									Type:         types.String,
+									CommentLines: []string{"+k8s:validateFalse"},
+									Tags:         `json:"alphaField"`,
+								},
+							},
+						},
+						Tags: `json:"otherField"`,
+					},
+				},
+			},
+			expectErr:              nil,
+			expectedStabilityLevel: validators.Alpha,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			discoverer := NewTypeDiscoverer(validator, map[string]string{})
+			if err := discoverer.Init(c); err != nil {
+				t.Fatalf("discoverer.Init() failed: %v", err)
+			}
+
+			// Manually discover the types to populate the typeNodes map
+			if err := discoverer.DiscoverType(tc.typeToTest); err != nil {
+				if tc.expectErr != nil {
+					if err.Error() != tc.expectErr.Error() {
+						t.Fatalf("expected error %q, but got %q", tc.expectErr, err)
+					}
+					return
+				}
+				t.Fatalf("discoverer.DiscoverType() failed: %v", err)
+			}
+
+			thisNode := discoverer.typeNodes[tc.typeToTest]
+			if thisNode == nil {
+				t.Fatalf("typeNode for %s not found", tc.typeToTest.Name.Name)
+			}
+
+			if tc.expectErr != nil {
+				// Error was expected during DiscoverType
+				return
+			}
+
+			if thisNode.lowestStabilityLevel != tc.expectedStabilityLevel {
+				t.Errorf("Expected lowestStabilityLevel to be %v, but got %v", tc.expectedStabilityLevel, thisNode.lowestStabilityLevel)
+			}
+		})
 	}
 }

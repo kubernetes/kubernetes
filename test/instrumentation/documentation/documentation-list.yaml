@@ -497,6 +497,22 @@
   labels:
   - namespace
   - reason
+- name: sorting_deletion_age_ratio
+  subsystem: replicaset_controller
+  help: The ratio of chosen deleted pod's ages to the current youngest pod's age (at
+    the time). Should be <2. The intent of this metric is to measure the rough efficacy
+    of the LogarithmicScaleDown feature gate's effect on the sorting (and deletion)
+    of pods when a replicaset scales down. This only considers Ready pods when calculating
+    and reporting.
+  type: Histogram
+  stabilityLevel: ALPHA
+  buckets:
+  - 0.25
+  - 0.5
+  - 1
+  - 2
+  - 4
+  - 8
 - name: job_pods_finished_total
   subsystem: job_controller
   help: The number of finished Pods that are fully tracked
@@ -580,6 +596,39 @@
   help: Number of PersistentVolumeClaim creation requests
   type: Counter
   stabilityLevel: ALPHA
+- name: kubelet_credential_provider_config_info
+  help: Information about the last applied credential provider configuration with
+    hash as label
+  type: Custom
+  stabilityLevel: ALPHA
+  labels:
+  - hash
+- name: credential_provider_plugin_duration
+  subsystem: kubelet
+  help: Duration of execution in seconds for credential provider plugin
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - plugin_name
+  buckets:
+  - 0.005
+  - 0.01
+  - 0.025
+  - 0.05
+  - 0.1
+  - 0.25
+  - 0.5
+  - 1
+  - 2.5
+  - 5
+  - 10
+- name: credential_provider_plugin_errors_total
+  subsystem: kubelet
+  help: Number of errors from credential provider plugin
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - plugin_name
 - name: pv_collector_bound_pv_count
   help: Gauge measuring number of persistent volume currently bound
   type: Custom
@@ -615,22 +664,6 @@
   - namespace
   - storage_class
   - volume_attributes_class
-- name: sorting_deletion_age_ratio
-  subsystem: replicaset_controller
-  help: The ratio of chosen deleted pod's ages to the current youngest pod's age (at
-    the time). Should be <2. The intent of this metric is to measure the rough efficacy
-    of the LogarithmicScaleDown feature gate's effect on the sorting (and deletion)
-    of pods when a replicaset scales down. This only considers Ready pods when calculating
-    and reporting.
-  type: Histogram
-  stabilityLevel: ALPHA
-  buckets:
-  - 0.25
-  - 0.5
-  - 1
-  - 2
-  - 4
-  - 8
 - name: creates_total
   subsystem: resourceclaim_controller
   help: Number of ResourceClaims creation requests, categorized by creation status
@@ -778,39 +811,6 @@
     If serving certificate is invalid or unused, the value will be +INF.
   type: Gauge
   stabilityLevel: ALPHA
-- name: kubelet_credential_provider_config_info
-  help: Information about the last applied credential provider configuration with
-    hash as label
-  type: Custom
-  stabilityLevel: ALPHA
-  labels:
-  - hash
-- name: credential_provider_plugin_duration
-  subsystem: kubelet
-  help: Duration of execution in seconds for credential provider plugin
-  type: Histogram
-  stabilityLevel: ALPHA
-  labels:
-  - plugin_name
-  buckets:
-  - 0.005
-  - 0.01
-  - 0.025
-  - 0.05
-  - 0.1
-  - 0.25
-  - 0.5
-  - 1
-  - 2.5
-  - 5
-  - 10
-- name: credential_provider_plugin_errors_total
-  subsystem: kubelet
-  help: Number of errors from credential provider plugin
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - plugin_name
 - name: server_expiration_renew_errors
   subsystem: kubelet
   help: Counter of certificate renewal errors.
@@ -2724,6 +2724,13 @@
   - 0.009852612533569338
   - 0.014778918800354007
   - 0.02216837820053101
+- name: pod_scheduled_after_flush_total
+  subsystem: scheduler
+  help: Number of pods that were successfully scheduled after being flushed from unschedulablePods
+    due to timeout. This metric helps detect potential queueing hint misconfigurations
+    or event handling issues.
+  type: Counter
+  stabilityLevel: ALPHA
 - name: preemption_goroutines_duration_seconds
   subsystem: scheduler
   help: Duration in seconds for running goroutines for the preemption.
@@ -3211,6 +3218,24 @@
   - 0.16384
   - 0.65536
   - 2.62144
+- name: apiextensions_openapi_v2_regeneration_count
+  help: Counter of OpenAPI v2 spec regeneration count broken down by causing CRD name
+    and reason.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - crd
+  - reason
+- name: apiextensions_openapi_v3_regeneration_count
+  help: Counter of OpenAPI v3 spec regeneration count broken down by group, version,
+    causing CRD and reason.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - crd
+  - group
+  - reason
+  - version
 - name: conversion_webhook_duration_seconds
   namespace: apiserver
   help: Conversion webhook request latency
@@ -3269,24 +3294,6 @@
   - 4.096
   - 8.192
   - 16.384
-- name: apiextensions_openapi_v2_regeneration_count
-  help: Counter of OpenAPI v2 spec regeneration count broken down by causing CRD name
-    and reason.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - crd
-  - reason
-- name: apiextensions_openapi_v3_regeneration_count
-  help: Counter of OpenAPI v3 spec regeneration count broken down by group, version,
-    causing CRD and reason.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - crd
-  - group
-  - reason
-  - version
 - name: match_condition_evaluation_errors_total
   subsystem: admission
   namespace: apiserver
@@ -3390,6 +3397,34 @@
   - operation
   - rejected
   - type
+- name: check_duration_seconds
+  subsystem: mutating_admission_policy
+  namespace: apiserver
+  help: Mutation admission latency for individual mutation expressions in seconds,
+    labeled by policy and binding.
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - error_type
+  - policy
+  - policy_binding
+  buckets:
+  - 5e-07
+  - 0.001
+  - 0.01
+  - 0.1
+  - 1
+- name: check_total
+  subsystem: mutating_admission_policy
+  namespace: apiserver
+  help: Mutation admission policy check total, labeled by policy and further identified
+    by binding.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - error_type
+  - policy
+  - policy_binding
 - name: controller_admission_duration_seconds
   subsystem: admission
   namespace: apiserver
@@ -3448,34 +3483,31 @@
   - 2.5
   - 10
   - 25
-- name: check_duration_seconds
-  subsystem: mutating_admission_policy
-  namespace: apiserver
-  help: Mutation admission latency for individual mutation expressions in seconds,
-    labeled by policy and binding.
-  type: Histogram
-  stabilityLevel: ALPHA
-  labels:
-  - error_type
-  - policy
-  - policy_binding
-  buckets:
-  - 5e-07
-  - 0.001
-  - 0.01
-  - 0.1
-  - 1
-- name: check_total
-  subsystem: mutating_admission_policy
-  namespace: apiserver
-  help: Mutation admission policy check total, labeled by policy and further identified
-    by binding.
+- name: error_total
+  subsystem: apiserver_audit
+  help: Counter of audit events that failed to be audited properly. Plugin identifies
+    the plugin affected by the error.
   type: Counter
   stabilityLevel: ALPHA
   labels:
-  - error_type
-  - policy
-  - policy_binding
+  - plugin
+- name: event_total
+  subsystem: apiserver_audit
+  help: Counter of audit events generated and sent to the audit backend.
+  type: Counter
+  stabilityLevel: ALPHA
+- name: level_total
+  subsystem: apiserver_audit
+  help: Counter of policy levels for audit events (1 per request).
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - level
+- name: requests_rejected_total
+  subsystem: apiserver_audit
+  help: Counter of apiserver requests rejected due to an error in audit logging backend.
+  type: Counter
+  stabilityLevel: ALPHA
 - name: check_duration_seconds
   subsystem: validating_admission_policy
   namespace: apiserver
@@ -3524,31 +3556,6 @@
 - name: peer_aggregated_cache_misses_total
   subsystem: aggregator_discovery
   help: Counter of number of times discovery was aggregated across all API servers
-  type: Counter
-  stabilityLevel: ALPHA
-- name: error_total
-  subsystem: apiserver_audit
-  help: Counter of audit events that failed to be audited properly. Plugin identifies
-    the plugin affected by the error.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - plugin
-- name: event_total
-  subsystem: apiserver_audit
-  help: Counter of audit events generated and sent to the audit backend.
-  type: Counter
-  stabilityLevel: ALPHA
-- name: level_total
-  subsystem: apiserver_audit
-  help: Counter of policy levels for audit events (1 per request).
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - level
-- name: requests_rejected_total
-  subsystem: apiserver_audit
-  help: Counter of apiserver requests rejected due to an error in audit logging backend.
   type: Counter
   stabilityLevel: ALPHA
 - name: decisions_total
@@ -3906,35 +3913,6 @@
   - group
   - resource
   - version
-- name: watch_list_duration_seconds
-  subsystem: apiserver
-  help: Response latency distribution in seconds for watch list requests broken by
-    group, version, resource and scope.
-  type: Histogram
-  stabilityLevel: ALPHA
-  labels:
-  - group
-  - resource
-  - scope
-  - version
-  buckets:
-  - 0.05
-  - 0.1
-  - 0.2
-  - 0.4
-  - 0.6
-  - 0.8
-  - 1
-  - 2
-  - 4
-  - 6
-  - 8
-  - 10
-  - 15
-  - 20
-  - 30
-  - 45
-  - 60
 - name: authenticated_user_requests
   help: Counter of authenticated requests broken out by username.
   type: Counter
@@ -4066,6 +4044,35 @@
   help: CEL evaluation time in seconds.
   type: Histogram
   stabilityLevel: BETA
+- name: watch_list_duration_seconds
+  subsystem: apiserver
+  help: Response latency distribution in seconds for watch list requests broken by
+    group, version, resource and scope.
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - group
+  - resource
+  - scope
+  - version
+  buckets:
+  - 0.05
+  - 0.1
+  - 0.2
+  - 0.4
+  - 0.6
+  - 0.8
+  - 1
+  - 2
+  - 4
+  - 6
+  - 8
+  - 10
+  - 15
+  - 20
+  - 30
+  - 45
+  - 60
 - name: current_inflight_requests
   subsystem: apiserver
   help: Maximal number of currently used inflight request limit of this apiserver
@@ -5686,6 +5693,30 @@
   - component
   - emulation
   - min_compat
+- name: disabled_metrics_total
+  help: The count of disabled metrics.
+  type: Counter
+  stabilityLevel: BETA
+- name: hidden_metrics_total
+  help: The count of hidden metrics.
+  type: Counter
+  stabilityLevel: BETA
+- name: feature_enabled
+  namespace: kubernetes
+  help: This metric records the data about the stage and enablement of a k8s feature.
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - name
+  - stage
+- name: registered_metrics_total
+  help: The count of registered metrics broken by stability level and deprecation
+    version.
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - deprecated_version
+  - stability_level
 - name: adds_total
   subsystem: workqueue
   help: Total number of adds handled by workqueue
@@ -5759,30 +5790,6 @@
   - 0.1
   - 1
   - 10
-- name: disabled_metrics_total
-  help: The count of disabled metrics.
-  type: Counter
-  stabilityLevel: BETA
-- name: hidden_metrics_total
-  help: The count of hidden metrics.
-  type: Counter
-  stabilityLevel: BETA
-- name: feature_enabled
-  namespace: kubernetes
-  help: This metric records the data about the stage and enablement of a k8s feature.
-  type: Gauge
-  stabilityLevel: BETA
-  labels:
-  - name
-  - stage
-- name: registered_metrics_total
-  help: The count of registered metrics broken by stability level and deprecation
-    version.
-  type: Counter
-  stabilityLevel: BETA
-  labels:
-  - deprecated_version
-  - stability_level
 - name: healthcheck
   namespace: kubernetes
   help: This metric records the result of a single healthcheck.
@@ -5800,6 +5807,22 @@
   - name
   - status
   - type
+- name: x509_insecure_sha1_total
+  subsystem: kube_aggregator
+  namespace: apiserver
+  help: Counts the number of requests to servers with insecure SHA1 signatures in
+    their serving certificate OR the number of connection failures due to the insecure
+    SHA1 signatures (either/or, based on the runtime environment)
+  type: Counter
+  stabilityLevel: ALPHA
+- name: x509_missing_san_total
+  subsystem: kube_aggregator
+  namespace: apiserver
+  help: Counts the number of requests to servers missing SAN extension in their serving
+    certificate OR the number of connection failures due to the lack of x509 certificate
+    SAN extension missing (either/or, based on the runtime environment)
+  type: Counter
+  stabilityLevel: ALPHA
 - name: changes
   subsystem: endpoint_slice_controller
   help: Number of EndpointSlice changes
@@ -5915,22 +5938,6 @@
   labels:
   - name
   - reason
-- name: x509_insecure_sha1_total
-  subsystem: kube_aggregator
-  namespace: apiserver
-  help: Counts the number of requests to servers with insecure SHA1 signatures in
-    their serving certificate OR the number of connection failures due to the insecure
-    SHA1 signatures (either/or, based on the runtime environment)
-  type: Counter
-  stabilityLevel: ALPHA
-- name: x509_missing_san_total
-  subsystem: kube_aggregator
-  namespace: apiserver
-  help: Counts the number of requests to servers missing SAN extension in their serving
-    certificate OR the number of connection failures due to the lack of x509 certificate
-    SAN extension missing (either/or, based on the runtime environment)
-  type: Counter
-  stabilityLevel: ALPHA
 - name: pod_security_errors_total
   help: Number of errors preventing normal evaluation. Non-fatal errors may result
     in the latest restricted profile being used for evaluation.

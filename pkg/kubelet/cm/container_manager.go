@@ -60,7 +60,7 @@ const (
 
 type ActivePodsFunc func() []*v1.Pod
 
-type GetNodeFunc func() (*v1.Node, error)
+type GetNodeFunc func(context.Context) (*v1.Node, error)
 
 // Manages the containers running on a machine.
 type ContainerManager interface {
