@@ -110,6 +110,13 @@ const (
 	// Allow the usage of options to fine-tune the cpumanager policies.
 	CPUManagerPolicyOptions featuregate.Feature = "CPUManagerPolicyOptions"
 
+	// owner: @AutuSnow
+	//
+	// Enables setting cpu.idle=1 (SCHED_IDLE) for BestEffort QoS cgroups to provide
+	// true idle priority scheduling, reducing latency interference from BestEffort pods.
+	// Requires cgroup v2 and kernel version >= 5.4.
+	CPUIdleQoS featuregate.Feature = "CPUIdleQoS"
+
 	// owner: @aramase
 	// kep:  http://kep.k8s.io/5538
 	//
@@ -1147,6 +1154,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.22"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.23"), Default: true, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.36
+	},
+
+	CPUIdleQoS: {
+		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	CSIServiceAccountTokenSecrets: {
