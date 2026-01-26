@@ -61,11 +61,13 @@ func RegisterConversions(s *runtime.Scheme) error {
 
 func autoConvert_v1alpha1_DaemonSetControllerConfiguration_To_config_DaemonSetControllerConfiguration(in *configv1alpha1.DaemonSetControllerConfiguration, out *config.DaemonSetControllerConfiguration, s conversion.Scope) error {
 	out.ConcurrentDaemonSetSyncs = in.ConcurrentDaemonSetSyncs
+	out.BurstReplicas = in.BurstReplicas
 	return nil
 }
 
 func autoConvert_config_DaemonSetControllerConfiguration_To_v1alpha1_DaemonSetControllerConfiguration(in *config.DaemonSetControllerConfiguration, out *configv1alpha1.DaemonSetControllerConfiguration, s conversion.Scope) error {
 	out.ConcurrentDaemonSetSyncs = in.ConcurrentDaemonSetSyncs
+	out.BurstReplicas = in.BurstReplicas
 	return nil
 }
 

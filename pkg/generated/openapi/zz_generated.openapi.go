@@ -65469,8 +65469,16 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_DaemonSetControllerCon
 							Format:      "int32",
 						},
 					},
+					"BurstReplicas": {
+						SchemaProps: spec.SchemaProps{
+							Description: "burstReplicas is the maximum number of pods the daemonset controller will create/delete in a single sync. Larger number = faster rollouts but risks registry/API DoS.",
+							Default:     0,
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
 				},
-				Required: []string{"ConcurrentDaemonSetSyncs"},
+				Required: []string{"ConcurrentDaemonSetSyncs", "BurstReplicas"},
 			},
 		},
 	}

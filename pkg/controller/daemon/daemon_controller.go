@@ -56,9 +56,9 @@ import (
 )
 
 const (
-	// BurstReplicas is a rate limiter for booting pods on a lot of pods.
+	// DefaultBurstReplicas is the default rate limit for creating/deleting pods per sync.
 	// The value of 250 is chosen b/c values that are too high can cause registry DoS issues.
-	BurstReplicas = 250
+	DefaultBurstReplicas = 250
 
 	// StatusUpdateRetries limits the number of retries if sending a status update to API server fails.
 	StatusUpdateRetries = 1
@@ -145,6 +145,7 @@ func NewDaemonSetsController(
 	nodeInformer coreinformers.NodeInformer,
 	kubeClient clientset.Interface,
 	failedPodsBackoff *flowcontrol.Backoff,
+	burstReplicas int,
 ) (*DaemonSetsController, error) {
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	logger := klog.FromContext(ctx)
@@ -159,7 +160,7 @@ func NewDaemonSetsController(
 		crControl: controller.RealControllerRevisionControl{
 			KubeClient: kubeClient,
 		},
-		burstReplicas: BurstReplicas,
+		burstReplicas: burstReplicas,
 		expectations:  controller.NewControllerExpectations(),
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
