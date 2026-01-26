@@ -123,7 +123,7 @@ func NewManager(logger klog.Logger, kubeClient clientset.Interface, stateFileDir
 		return nil, fmt.Errorf("create ResourceClaim cache: %w", err)
 	}
 
-	healthInfoCache, err := newHealthInfoCache(filepath.Join(stateFileDirectory, "dra_health_state"))
+	healthInfoCache, err := newHealthInfoCache(logger, filepath.Join(stateFileDirectory, "dra_health_state"))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create healthInfo cache: %w", err)
 	}
@@ -898,7 +898,7 @@ func (m *Manager) HandleWatchResourcesStream(ctx context.Context, stream draheal
 	defer func() {
 		logger.V(4).Info("Clearing health cache for driver upon stream exit", "pluginName", pluginName)
 		// Use a separate context for clearDriver if needed, though background should be fine.
-		if err := m.healthInfoCache.clearDriver(pluginName); err != nil {
+		if err := m.healthInfoCache.clearDriver(logger, pluginName); err != nil {
 			logger.Error(err, "Failed to clear health info cache for driver", "pluginName", pluginName)
 		}
 	}()
@@ -959,7 +959,7 @@ func (m *Manager) HandleWatchResourcesStream(ctx context.Context, stream draheal
 			}
 		}
 
-		changedDevices, updateErr := m.healthInfoCache.updateHealthInfo(pluginName, devices)
+		changedDevices, updateErr := m.healthInfoCache.updateHealthInfo(logger, pluginName, devices)
 		if updateErr != nil {
 			logger.Error(updateErr, "Failed to update health info cache", "pluginName", pluginName)
 		}
