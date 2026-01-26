@@ -21,6 +21,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	dra "k8s.io/api/resource/v1"
 	schedulingapi "k8s.io/api/scheduling/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -658,7 +659,35 @@ type PodGroupInfo struct {
 // Workload scheduling cycle can check multiple placements and select the one that results
 // in the best pod assignments.
 type Placement struct {
+
+	// NodeSelector specifies the node constraints for this Placement.
+	// For Topology this is derived from topology labels (e.g., all nodes with label
+	// 'topology-rack: rack-1').
+	// For DRA, this selector would be constructed based on nodeSelector from
+	// DRA's AllocationResult from DRAAllocations.
+	// All pods within the PodGroup, when being evaluated against this Placement,
+	// are restricted to the nodes matching this NodeSelector.
 	NodeSelector *v1.NodeSelector
+
+	// DRAAllocations details the proposed DRA resource assignments for
+	// the ResourceClaims made by the PodGroup. This field is primarily used
+	// by DRA-aware plugins.
+	DRAAllocations []DraClaimAllocation
+}
+
+// DraClaimAllocation maps a specific ResourceClaim name to a set of proposed
+// device allocations. These allocations are tentative and used by the scheduler's
+// AssumePlacement phase to simulate resource commitment.
+type DraClaimAllocation struct {
+	// ResourceClaimName is the name of the ResourceClaim within the PodGroup's
+	// context that these allocations are intended to satisfy.
+	ResourceClaimName string
+
+	// Allocation contains DRA AllocationResult structures, specifying devices
+	// from ResourceSlices that are proposed to fulfill the ResourceClaim.
+	// The scheduler will use this information in AssumePlacement to temporarily
+	// consider these devices as allocated.
+	Allocation dra.AllocationResult
 }
 
 // PlacementInfo is a placement with precomputed nodes that match the placement.
