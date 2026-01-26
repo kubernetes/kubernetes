@@ -118,8 +118,11 @@ var (
 				Namespace(namespace).
 				RequestWithPrioritizedList(st.SubRequest("subreq-1", className, 1)).
 				Obj()
+)
 
-	numNodes = 8
+const (
+	numNodes       = 8
+	maxPodsPerNode = 5000 // This should never be the limiting factor, no matter how many tests run in parallel.
 )
 
 func TestDRA(t *testing.T) {
@@ -154,6 +157,7 @@ func TestDRA(t *testing.T) {
 				// Number of devices per slice is chosen so that Filter takes a few seconds:
 				// without a timeout, the test doesn't run too long, but long enough that a short timeout triggers.
 				tCtx.Run("FilterTimeout", func(tCtx ktesting.TContext) { testFilterTimeout(tCtx, 9) })
+				tCtx.Run("UsesAllResources", testUsesAllResources)
 			},
 		},
 		"GA": {
@@ -176,6 +180,7 @@ func TestDRA(t *testing.T) {
 					tCtx = tCtx.WithNamespace(namespace)
 					TestCreateResourceSlices(tCtx, 100)
 				})
+				tCtx.Run("UsesAllResources", testUsesAllResources)
 			},
 		},
 		"v1beta1": {
@@ -231,6 +236,8 @@ func TestDRA(t *testing.T) {
 				features.DRAExtendedResource:          true,
 			},
 			f: func(tCtx ktesting.TContext) {
+				// These tests must run in parallel as much as possible to keep overall runtime low!
+
 				tCtx.Run("AdminAccess", func(tCtx ktesting.TContext) { testAdminAccess(tCtx, true) })
 				tCtx.Run("Convert", testConvert)
 				tCtx.Run("ControllerManagerMetrics", testControllerManagerMetrics)
@@ -249,6 +256,7 @@ func TestDRA(t *testing.T) {
 				// in the experimental channel has an improvement that requires a higher number here than
 				// in the incubating and stable channels.
 				tCtx.Run("FilterTimeout", func(tCtx ktesting.TContext) { testFilterTimeout(tCtx, 20) })
+				tCtx.Run("UsesAllResources", testUsesAllResources)
 			},
 		},
 	} {
@@ -309,7 +317,7 @@ func createNodes(tCtx ktesting.TContext) {
 			Capacity: v1.ResourceList{
 				v1.ResourceCPU:    resource.MustParse("100"),
 				v1.ResourceMemory: resource.MustParse("1000"),
-				v1.ResourcePods:   resource.MustParse("100"),
+				v1.ResourcePods:   *resource.NewScaledQuantity(maxPodsPerNode, 0),
 			},
 			Phase: v1.NodeRunning,
 			Conditions: []v1.NodeCondition{
@@ -486,6 +494,8 @@ func testConvert(tCtx ktesting.TContext) {
 // when the AdminAccess feature is enabled, it also checks that the field
 // is only allowed to be used in namespace with the Resource Admin Access label
 func testAdminAccess(tCtx ktesting.TContext, adminAccessEnabled bool) {
+	tCtx.Parallel()
+
 	namespace := createTestNamespace(tCtx, nil)
 	claim1 := claim.DeepCopy()
 	claim1.Namespace = namespace
@@ -1186,6 +1196,8 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 //
 // When enabled, it tries server-side-apply (SSA) with different clients. This is what DRA drivers should be using.
 func testResourceClaimDeviceStatus(tCtx ktesting.TContext, enabled bool) {
+	tCtx.Parallel()
+
 	namespace := createTestNamespace(tCtx, nil)
 
 	claim := &resourceapi.ResourceClaim{
@@ -1380,7 +1392,8 @@ func testMaxResourceSlice(tCtx ktesting.TContext) {
 	}
 }
 
-// testControllerManagerMetrics tests ResourceClaim metrics
+// testControllerManagerMetrics tests ResourceClaim metrics.
+// It must run sequentially.
 func testControllerManagerMetrics(tCtx ktesting.TContext) {
 	namespace := createTestNamespace(tCtx, nil)
 	class, _ := createTestClass(tCtx, namespace)
