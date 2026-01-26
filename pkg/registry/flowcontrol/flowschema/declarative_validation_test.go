@@ -113,9 +113,6 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 				IsResourceRequest: true,
 				Verb:              "update",
 			})
-			// Set resource versions for update validation
-			tc.oldObj.ResourceVersion = "1"
-			tc.updateObj.ResourceVersion = "1"
 			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, Strategy.ValidateUpdate, tc.expectedErrs)
 		})
 	}
@@ -125,6 +122,7 @@ func mkValidFlowSchema(tweaks ...func(obj *flowcontrol.FlowSchema)) flowcontrol.
 	obj := flowcontrol.FlowSchema{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "valid-flow-schema",
+			ResourceVersion: "1",
 		},
 		Spec: flowcontrol.FlowSchemaSpec{
 			PriorityLevelConfiguration: flowcontrol.PriorityLevelConfigurationReference{
@@ -143,10 +141,11 @@ func mkValidFlowSchema(tweaks ...func(obj *flowcontrol.FlowSchema)) flowcontrol.
 					},
 					ResourceRules: []flowcontrol.ResourcePolicyRule{
 						{
-							Verbs:      []string{"*"},
+							// Read-only access to pods in specific namespaces
+							Verbs:      []string{"get", "list", "watch"},
 							APIGroups:  []string{"*"},
-							Resources:  []string{"*"},
-							Namespaces: []string{"*"},
+							Resources:  []string{"pods"},
+							Namespaces: []string{"production", "staging"},
 						},
 					},
 				},
