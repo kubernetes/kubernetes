@@ -92,3 +92,44 @@ func TestGuaranteedPodExclusiveCPUsFeatureDiscovery(t *testing.T) {
 		})
 	}
 }
+
+func TestExtendWebSocketsToKubeletFeatureDiscovery(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
+
+	testcases := []struct {
+		name                          string
+		extendWebSocketsToKubeletGate bool
+		expectFeature                 bool
+	}{
+		{
+			name:                          "ExtendWebSocketsToKubelet feature enabled",
+			extendWebSocketsToKubeletGate: true,
+			expectFeature:                 true,
+		},
+		{
+			name:                          "ExtendWebSocketsToKubelet feature disabled",
+			extendWebSocketsToKubeletGate: false,
+			expectFeature:                 false,
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExtendWebSocketsToKubelet, tc.extendWebSocketsToKubeletGate)
+
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+			kubelet := testKubelet.kubelet
+
+			framework, err := ndflib.New(ndffeatures.AllFeatures)
+			require.NoError(t, err)
+			kubelet.nodeDeclaredFeaturesFramework = framework
+
+			features := kubelet.discoverNodeDeclaredFeatures()
+			if tc.expectFeature {
+				assert.Contains(t, features, "ExtendWebSocketsToKubelet")
+			} else {
+				assert.NotContains(t, features, "ExtendWebSocketsToKubelet")
+			}
+		})
+	}
+}
