@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
@@ -511,6 +512,111 @@ func TestStatusEquality(t *testing.T) {
 	if !isPodStatusByKubeletEqual(&oldPodStatus, &podStatus) {
 		t.Fatalf("Differences in pod condition not owned by kubelet should not affect normalized equality.")
 	}
+}
+
+func TestIsPodStatusByKubeletEqualFutureProof(t *testing.T) {
+	// kubeletOwnedFields are fields in v1.PodStatus owned by the kubelet.
+	// Changes to these fields should NOT be ignored by isPodStatusByKubeletEqual.
+	kubeletOwnedFields := sets.NewString(
+		"Phase",
+		"Conditions", // Conditions are specially handled, but considered owned.
+		"Message",
+		"Reason",
+		"HostIP",
+		"HostIPs",
+		"PodIP",
+		"PodIPs",
+		"StartTime",
+		"InitContainerStatuses",
+		"ContainerStatuses",
+		"QOSClass",
+		"EphemeralContainerStatuses",
+		"Resize",
+		"AllocatedResources",
+		"ObservedGeneration",
+		"Resources",
+	)
+
+	// kubeletIgnoredFields are fields in v1.PodStatus not owned by the kubelet.
+	// Changes to these fields SHOULD be ignored by isPodStatusByKubeletEqual.
+	kubeletIgnoredFields := sets.NewString(
+		"NominatedNodeName",
+		"ResourceClaimStatuses",
+		"ExtendedResourceClaimStatus",
+	)
+
+	// This test uses reflection to future-proof our equality check. It ensures that
+	// every field in the v1.PodStatus struct is explicitly categorized as either
+	// owned by kubelet or ignored. If a new field is added to v1.PodStatus, this
+	// test will fail until that field is categorized, preventing accidental regressions.
+	var status v1.PodStatus
+	val := reflect.TypeOf(status)
+	allStructFields := sets.NewString()
+	for i := 0; i < val.NumField(); i++ {
+		allStructFields.Insert(val.Field(i).Name)
+	}
+
+	knownFields := kubeletOwnedFields.Union(kubeletIgnoredFields)
+	unknownFields := allStructFields.Difference(knownFields)
+
+	if unknownFields.Len() > 0 {
+		t.Fatalf("New fields found in v1.PodStatus: %v. Please add them to either "+
+			"kubeletOwnedFields or kubeletIgnoredFields in TestIsPodStatusByKubeletEqualFutureProof "+
+			"and update isPodStatusByKubeletEqual logic if necessary.", unknownFields.List())
+	}
+
+	// Verify that changes to fields that are not owned by kubelet are ignored.
+	t.Run("ignored fields are ignored", func(t *testing.T) {
+		pod := getTestPod()
+		baseStatus := pod.Status.DeepCopy()
+		baseStatus.QOSClass = v1.PodQOSGuaranteed
+
+		// Test ResourceClaimStatuses - Temporarily commented out
+		// This test case relies on the logic change in PR #136238 (ignore non-kubelet-owned fields)
+		// Uncomment after PR #136238 is merged to validate the fix
+		// status2 := baseStatus.DeepCopy()
+		// status2.ResourceClaimStatuses = []v1.PodResourceClaimStatus{{Name: "a-different-claim"}}
+		// if !isPodStatusByKubeletEqual(baseStatus, status2) {
+		// 	t.Errorf("change in ResourceClaimStatuses should be ignored, but was not")
+		// }
+
+		// Test ExtendedResourceClaimStatus - Temporarily commented out
+		// This test case relies on the logic change in PR #136238 (ignore non-kubelet-owned fields)
+		// Uncomment after PR #136238 is merged to validate the fix
+		// status2 = baseStatus.DeepCopy()
+		// status2.ExtendedResourceClaimStatus = &v1.PodExtendedResourceClaimStatus{ResourceClaimName: "a-different-extended-claim"}
+		// if !isPodStatusByKubeletEqual(baseStatus, status2) {
+		// 	t.Errorf("change in ExtendedResourceClaimStatus should be ignored, but was not")
+		// }
+
+		// TODO: NominatedNodeName - This field is marked as ignored, but the current isPodStatusByKubeletEqual
+		// does not handle it. Need to discuss whether to update the logic to ignore this field.
+		// status2 = baseStatus.DeepCopy()
+		// status2.NominatedNodeName = "a-different-node"
+		// if !isPodStatusByKubeletEqual(baseStatus, status2) {
+		// 	t.Errorf("change in NominatedNodeName should be ignored, but was not")
+		// }
+	})
+
+	// Verify that changes to fields that are owned by kubelet are NOT ignored.
+	t.Run("owned fields are not ignored", func(t *testing.T) {
+		pod := getTestPod()
+		baseStatus := pod.Status.DeepCopy()
+
+		// Test Phase (an owned field)
+		status2 := baseStatus.DeepCopy()
+		status2.Phase = v1.PodFailed
+		if isPodStatusByKubeletEqual(baseStatus, status2) {
+			t.Errorf("change in Phase (kubelet-owned field) should NOT be ignored, but was")
+		}
+
+		// Test PodIPs (an owned field)
+		status2 = baseStatus.DeepCopy()
+		status2.PodIPs = []v1.PodIP{{IP: "1.2.3.5"}}
+		if isPodStatusByKubeletEqual(baseStatus, status2) {
+			t.Errorf("change in PodIPs (kubelet-owned field) should NOT be ignored, but was")
+		}
+	})
 }
 
 func TestStatusNormalizationEnforcesMaxBytes(t *testing.T) {
