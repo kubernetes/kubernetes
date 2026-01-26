@@ -48,6 +48,16 @@ func TestPrinterSupportsExpectedJSONYamlFormats(t *testing.T) {
 			expectedOutput: "name: foo",
 		},
 		{
+			name:           "yml output format matches a yaml printer (alias)",
+			outputFormat:   "yml",
+			expectedOutput: "name: foo",
+		},
+		{
+			name:           "YML output format (uppercase) matches a yaml printer (alias)",
+			outputFormat:   "YML",
+			expectedOutput: "name: foo",
+		},
+		{
 			name:          "output format for another printer does not match a json/yaml printer",
 			outputFormat:  "jsonpath",
 			expectNoMatch: true,
@@ -87,5 +97,39 @@ func TestPrinterSupportsExpectedJSONYamlFormats(t *testing.T) {
 				t.Errorf("unexpected output: expecting %q, got %q", tc.expectedOutput, out.String())
 			}
 		})
+	}
+}
+
+func TestYmlAliasProducesIdenticalOutputToYaml(t *testing.T) {
+	testObject := &v1.Pod{
+		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
+	}
+
+	printFlags := JSONYamlPrintFlags{}
+
+	yamlPrinter, err := printFlags.ToPrinter("yaml")
+	if err != nil {
+		t.Fatalf("unexpected error creating yaml printer: %v", err)
+	}
+
+	ymlPrinter, err := printFlags.ToPrinter("yml")
+	if err != nil {
+		t.Fatalf("unexpected error creating yml printer: %v", err)
+	}
+
+	yamlOut := bytes.NewBuffer([]byte{})
+	ymlOut := bytes.NewBuffer([]byte{})
+
+	if err := yamlPrinter.PrintObj(testObject, yamlOut); err != nil {
+		t.Fatalf("unexpected error printing yaml: %v", err)
+	}
+
+	if err := ymlPrinter.PrintObj(testObject, ymlOut); err != nil {
+		t.Fatalf("unexpected error printing yml: %v", err)
+	}
+
+	if yamlOut.String() != ymlOut.String() {
+		t.Errorf("yml and yaml output differ:\nyaml: %q\nyml:  %q", yamlOut.String(), ymlOut.String())
 	}
 }

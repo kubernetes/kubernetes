@@ -54,6 +54,10 @@ func (f *JSONYamlPrintFlags) ToPrinter(outputFormat string) (printers.ResourcePr
 	var printer printers.ResourcePrinter
 
 	outputFormat = strings.ToLower(outputFormat)
+	// Normalize "yml" to "yaml" as a universally accepted alias
+	if outputFormat == "yml" {
+		outputFormat = "yaml"
+	}
 
 	valid := f.AllowedFormats()
 	if !slices.Contains(valid, outputFormat) {
