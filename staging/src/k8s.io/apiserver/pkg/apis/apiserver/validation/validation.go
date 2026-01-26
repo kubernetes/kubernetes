@@ -763,7 +763,7 @@ func ValidateWebhookConfiguration(compiler authorizationcel.Compiler, fldPath *f
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("connectionInfo", "type"), c.ConnectionInfo, []string{api.AuthorizationWebhookConnectionInfoTypeInCluster, api.AuthorizationWebhookConnectionInfoTypeKubeConfigFile}))
 	}
 
-	_, errs := compileMatchConditions(compiler, c.MatchConditions, fldPath, utilfeature.DefaultFeatureGate.Enabled(features.StructuredAuthorizationConfiguration))
+	_, errs := compileMatchConditions(compiler, c.MatchConditions, fldPath)
 	allErrs = append(allErrs, errs...)
 
 	return allErrs
@@ -772,15 +772,11 @@ func ValidateWebhookConfiguration(compiler authorizationcel.Compiler, fldPath *f
 // ValidateAndCompileMatchConditions validates a given webhook's matchConditions.
 // This is exported for use in authz package.
 func ValidateAndCompileMatchConditions(compiler authorizationcel.Compiler, matchConditions []api.WebhookMatchCondition) (*authorizationcel.CELMatcher, field.ErrorList) {
-	return compileMatchConditions(compiler, matchConditions, nil, utilfeature.DefaultFeatureGate.Enabled(features.StructuredAuthorizationConfiguration))
+	return compileMatchConditions(compiler, matchConditions, nil)
 }
 
-func compileMatchConditions(compiler authorizationcel.Compiler, matchConditions []api.WebhookMatchCondition, fldPath *field.Path, structuredAuthzFeatureEnabled bool) (*authorizationcel.CELMatcher, field.ErrorList) {
+func compileMatchConditions(compiler authorizationcel.Compiler, matchConditions []api.WebhookMatchCondition, fldPath *field.Path) (*authorizationcel.CELMatcher, field.ErrorList) {
 	var allErrs field.ErrorList
-	// should fail when match conditions are used without feature enabled
-	if len(matchConditions) > 0 && !structuredAuthzFeatureEnabled {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("matchConditions"), "", "not supported when StructuredAuthorizationConfiguration feature gate is disabled"))
-	}
 	if len(matchConditions) > 64 {
 		allErrs = append(allErrs, field.TooMany(fldPath.Child("matchConditions"), len(matchConditions), 64))
 		return nil, allErrs
