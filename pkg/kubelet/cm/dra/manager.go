@@ -118,7 +118,7 @@ type Manager struct {
 // - Avoid repeated "failed to ...: failed to ..." when wrapping errors.
 // - Avoid wrapping when it does not provide relevant additional information to keep the user-visible error short.
 func NewManager(logger klog.Logger, kubeClient clientset.Interface, stateFileDirectory string) (*Manager, error) {
-	claimInfoCache, err := newClaimInfoCache(logger, stateFileDirectory, draManagerStateFileName)
+	claimInfoCache, err := newClaimInfoCache(stateFileDirectory, draManagerStateFileName)
 	if err != nil {
 		return nil, fmt.Errorf("create ResourceClaim cache: %w", err)
 	}
@@ -327,7 +327,7 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 
 	// Now that we have everything that we need, we can update the claim info cache.
 	// Almost nothing can go wrong anymore at this point.
-	err = m.cache.withLock(func() error {
+	err = m.cache.withLock(logger, func() error {
 		for i := range podResourceClaims {
 			resourceClaim := infos[i].resourceClaim
 			podClaim := infos[i].podClaim
@@ -412,7 +412,7 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 			claim := resourceClaims[types.UID(claimUID)]
 
 			// Add the prepared CDI devices to the claim info
-			err := m.cache.withLock(func() error {
+			err := m.cache.withLock(logger, func() error {
 				info, exists := m.cache.get(claim.Name, claim.Namespace)
 				if !exists {
 					return fmt.Errorf("internal error: unable to get claim info for ResourceClaim %s", claim.Name)
@@ -437,7 +437,7 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 	}
 
 	// Atomically perform some operations on the claimInfo cache.
-	err = m.cache.withLock(func() error {
+	err = m.cache.withLock(logger, func() error {
 		// Mark all pod claims as prepared.
 		for _, claim := range resourceClaims {
 			info, exists := m.cache.get(claim.Name, claim.Namespace)
@@ -594,7 +594,7 @@ func (m *Manager) unprepareResources(ctx context.Context, podUID types.UID, name
 	claimNamesMap := make(map[types.UID]string)
 	for _, claimName := range claimNames {
 		// Atomically perform some operations on the claimInfo cache.
-		err := m.cache.withLock(func() error {
+		err := m.cache.withLock(logger, func() error {
 			// Get the claim info from the cache
 			claimInfo, exists := m.cache.get(claimName, namespace)
 
@@ -670,7 +670,7 @@ func (m *Manager) unprepareResources(ctx context.Context, podUID types.UID, name
 	}
 
 	// Atomically perform some operations on the claimInfo cache.
-	err := m.cache.withLock(func() error {
+	err := m.cache.withLock(logger, func() error {
 		// TODO(#132978): Re-evaluate this logic to support post-mortem health updates.
 		// As of the initial implementation, we immediately delete the claim info upon
 		// unprepare. This means a late-arriving health update for a terminated pod
