@@ -5348,11 +5348,11 @@ func TestMutablePodResourcesWithPodReplacementPolicyFailed(t *testing.T) {
 	jobClient := cs.BatchV1().Jobs(ns.Name)
 
 	// Wait for pods to be active
-	t.Logf("Waiting for 2 pods to be active")
+	t.Log("Waiting for 2 pods to be active")
 	waitForPodsToBeActive(ctx, t, jobClient, 2, job)
 
 	// Suspend the job
-	t.Logf("Suspending the job")
+	t.Log("Suspending the job")
 	_, err = updateJob(ctx, jobClient, job.Name, func(j *batchv1.Job) {
 		j.Spec.Suspend = ptr.To(true)
 	})
@@ -5371,10 +5371,10 @@ func TestMutablePodResourcesWithPodReplacementPolicyFailed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to wait for job to be suspended: %v", err)
 	}
-	t.Logf("Job is suspended")
+	t.Log("Job is suspended")
 
 	// Delete the pods to make them go to Terminating state
-	t.Logf("Deleting pods to make them go to Terminating state")
+	t.Log("Deleting pods to make them go to Terminating state")
 	deletePods(ctx, t, cs, ns.Name)
 
 	// Verify pods are in Terminating state (because of the finalizer)
@@ -5383,10 +5383,10 @@ func TestMutablePodResourcesWithPodReplacementPolicyFailed(t *testing.T) {
 		Active:      0,
 		Ready:       ptr.To[int32](0),
 	})
-	t.Logf("Pods are in Terminating state")
+	t.Log("Pods are in Terminating state")
 
 	// Update the job's pod template with new resources
-	t.Logf("Updating job resources")
+	t.Log("Updating job resources")
 	_, err = updateJob(ctx, jobClient, job.Name, func(j *batchv1.Job) {
 		for i := range j.Spec.Template.Spec.Containers {
 			j.Spec.Template.Spec.Containers[i].Resources = v1.ResourceRequirements{
@@ -5404,7 +5404,7 @@ func TestMutablePodResourcesWithPodReplacementPolicyFailed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to update Job resources: %v", err)
 	}
-	t.Logf("Job resources updated")
+	t.Log("Job resources updated")
 
 	// Wait a bit to ensure the controller has time to process the update
 	// With PodReplacementPolicy=Failed, no new pods should be created while old pods are terminating
@@ -5416,10 +5416,10 @@ func TestMutablePodResourcesWithPodReplacementPolicyFailed(t *testing.T) {
 		Active:      0,
 		Ready:       ptr.To[int32](0),
 	})
-	t.Logf("Verified: No new pods created while old pods are terminating")
+	t.Log("Verified: No new pods created while old pods are terminating")
 
 	// Remove the finalizers to allow pods to finish terminating
-	t.Logf("Removing finalizers from terminating pods")
+	t.Log("Removing finalizers from terminating pods")
 	err = removePodsFinalizers(ctx, cs, ns.Name, []string{blockDeletionFinalizerForTest})
 	if err != nil {
 		t.Fatalf("Failed to remove finalizers: %v", err)
@@ -5436,10 +5436,10 @@ func TestMutablePodResourcesWithPodReplacementPolicyFailed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to wait for terminating pods to be removed: %v", err)
 	}
-	t.Logf("Terminating pods have been removed")
+	t.Log("Terminating pods have been removed")
 
 	// Unsuspend the job
-	t.Logf("Unsuspending the job")
+	t.Log("Unsuspending the job")
 	_, err = updateJob(ctx, jobClient, job.Name, func(j *batchv1.Job) {
 		j.Spec.Suspend = ptr.To(false)
 	})
@@ -5449,7 +5449,7 @@ func TestMutablePodResourcesWithPodReplacementPolicyFailed(t *testing.T) {
 
 	// Wait for new pods to be created
 	waitForPodsToBeActive(ctx, t, jobClient, 2, job)
-	t.Logf("New pods are active")
+	t.Log("New pods are active")
 
 	// Verify that the new pods have the updated resources
 	pods, err := getJobPods(ctx, t, cs, job, func(s v1.PodStatus) bool { return true })
@@ -5478,5 +5478,5 @@ func TestMutablePodResourcesWithPodReplacementPolicyFailed(t *testing.T) {
 			}
 		}
 	}
-	t.Logf("Verified: New pods have the updated resources")
+	t.Log("Verified: New pods have the updated resources")
 }
