@@ -6595,6 +6595,88 @@ func TestDescribeNodeWithSidecar(t *testing.T) {
 		}
 	}
 }
+
+func TestDescribeNodeWithPodLevelResources(t *testing.T) {
+	holderIdentity := "holder"
+	nodeCapacity := getResourceList("8", "24Gi")
+	nodeAllocatable := getResourceList("4", "12Gi")
+
+	fake := fake.NewClientset(
+		&corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "bar",
+				UID:  "uid",
+			},
+			Spec: corev1.NodeSpec{
+				Unschedulable: false,
+			},
+			Status: corev1.NodeStatus{
+				Capacity:    nodeCapacity,
+				Allocatable: nodeAllocatable,
+			},
+		},
+		&coordinationv1.Lease{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "bar",
+				Namespace: corev1.NamespaceNodeLease,
+			},
+			Spec: coordinationv1.LeaseSpec{
+				HolderIdentity: &holderIdentity,
+				AcquireTime:    &metav1.MicroTime{Time: time.Now().Add(-time.Hour)},
+				RenewTime:      &metav1.MicroTime{Time: time.Now()},
+			},
+		},
+		&corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pod-with-pod-level-resources",
+				Namespace: "foo",
+			},
+			TypeMeta: metav1.TypeMeta{
+				Kind: "Pod",
+			},
+			Spec: corev1.PodSpec{
+				// Pod-level resources
+				Resources: &corev1.ResourceRequirements{
+					Requests: getResourceList("2", "4Gi"),
+					Limits:   getResourceList("4", "8Gi"),
+				},
+				Containers: []corev1.Container{
+					{
+						Name:  "container-1",
+						Image: "image:latest",
+					},
+					{
+						Name:  "container-2",
+						Image: "image:latest",
+					},
+				},
+			},
+			Status: corev1.PodStatus{
+				Phase: corev1.PodRunning,
+			},
+		},
+	)
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+	d := NodeDescriber{c}
+	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// Verify that describeNodeResource works correctly with pod-level resources
+	expectedOut := []string{
+		"pod-with-pod-level-resources",
+		"Allocated resources:",
+		"cpu",
+		"memory",
+	}
+	for _, expected := range expectedOut {
+		if !strings.Contains(out, expected) {
+			t.Errorf("expected to find %q in output: %q", expected, out)
+		}
+	}
+}
+
 func TestDescribeStatefulSet(t *testing.T) {
 	var partition int32 = 2672
 	var replicas int32 = 1
