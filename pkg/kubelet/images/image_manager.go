@@ -386,7 +386,12 @@ func (m *imageManager) pullImage(ctx context.Context, logPrefix string, objRef *
 	imageRef = imagePullResult.imageRef
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletEnsureSecretPulledImages) {
 		if normalizedRef, getRefErr := m.imageService.GetImageRef(ctx, imgSpec); getRefErr == nil && normalizedRef != "" {
+			logger.V(4).Info("Normalized imageRef after pull", "original", imageRef, "normalized", normalizedRef)
 			imageRef = normalizedRef
+		} else if getRefErr != nil {
+			logger.V(4).Info("Failed to get normalized imageRef", "imageRef", imageRef, "error", getRefErr)
+		} else {
+			logger.V(4).Info("GetImageRef returned empty, using original imageRef", "imageRef", imageRef)
 		}
 	}
 
