@@ -155,3 +155,91 @@ func TestQoSContainerCgroup(t *testing.T) {
 	assert.Equal(t, qosConfigs[v1.PodQOSGuaranteed].ResourceParameters.Unified["memory.min"], strconv.FormatInt(burstableMin.Value()+guaranteedMin.Value(), 10))
 	assert.Equal(t, qosConfigs[v1.PodQOSBurstable].ResourceParameters.Unified["memory.min"], strconv.FormatInt(burstableMin.Value(), 10))
 }
+
+func TestCPUIdleQoS(t *testing.T) {
+	testCases := []struct {
+		name                 string
+		cpuIdleEnabled       bool
+		expectedCPUIdle      string
+		expectCPUSharesSet   bool
+		expectedCPUShares    uint64
+	}{
+		{
+			name:                 "CPU idle disabled",
+			cpuIdleEnabled:       false,
+			expectedCPUIdle:      "",
+			expectCPUSharesSet:   true,
+			expectedCPUShares:    MinShares,
+		},
+		{
+			name:                 "CPU idle enabled",
+			cpuIdleEnabled:       true,
+			expectedCPUIdle:      "1",
+			expectCPUSharesSet:   false, // CPUShares should NOT be set when cpu.idle is enabled
+			expectedCPUShares:    0,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			m, err := createTestQOSContainerManager(logger)
+			assert.NoError(t, err)
+
+			// Set cpuIdleEnabled based on test case
+			m.cpuIdleEnabled = tc.cpuIdleEnabled
+
+			qosConfigs := map[v1.PodQOSClass]*CgroupConfig{
+				v1.PodQOSGuaranteed: {
+					Name:               m.qosContainersInfo.Guaranteed,
+					ResourceParameters: &ResourceConfig{},
+				},
+				v1.PodQOSBurstable: {
+					Name:               m.qosContainersInfo.Burstable,
+					ResourceParameters: &ResourceConfig{},
+				},
+				v1.PodQOSBestEffort: {
+					Name:               m.qosContainersInfo.BestEffort,
+					ResourceParameters: &ResourceConfig{},
+				},
+			}
+
+			// Call setCPUCgroupConfig which should set cpu.idle if enabled
+			err = m.setCPUCgroupConfig(qosConfigs)
+			assert.NoError(t, err)
+
+			// Verify cpu.shares behavior based on cpu.idle setting
+			if tc.expectCPUSharesSet {
+				// When cpu.idle is disabled, CPUShares should be set to MinShares
+				assert.NotNil(t, qosConfigs[v1.PodQOSBestEffort].ResourceParameters.CPUShares)
+				assert.Equal(t, tc.expectedCPUShares, *qosConfigs[v1.PodQOSBestEffort].ResourceParameters.CPUShares)
+			} else {
+				// When cpu.idle is enabled, CPUShares should NOT be set (kernel enforces cpu.shares=1)
+				assert.Nil(t, qosConfigs[v1.PodQOSBestEffort].ResourceParameters.CPUShares,
+					"CPUShares should not be set when cpu.idle is enabled (kernel enforces cpu.shares=1)")
+			}
+
+			// Verify cpu.idle is set correctly based on cpuIdleEnabled
+			if tc.cpuIdleEnabled {
+				assert.NotNil(t, qosConfigs[v1.PodQOSBestEffort].ResourceParameters.Unified)
+				assert.Equal(t, tc.expectedCPUIdle, qosConfigs[v1.PodQOSBestEffort].ResourceParameters.Unified["cpu.idle"])
+			} else {
+				// When disabled, cpu.idle should not be set
+				if qosConfigs[v1.PodQOSBestEffort].ResourceParameters.Unified != nil {
+					_, exists := qosConfigs[v1.PodQOSBestEffort].ResourceParameters.Unified["cpu.idle"]
+					assert.False(t, exists, "cpu.idle should not be set when feature is disabled")
+				}
+			}
+
+			// Verify Burstable and Guaranteed QoS classes don't have cpu.idle set
+			if qosConfigs[v1.PodQOSBurstable].ResourceParameters.Unified != nil {
+				_, exists := qosConfigs[v1.PodQOSBurstable].ResourceParameters.Unified["cpu.idle"]
+				assert.False(t, exists, "cpu.idle should not be set for Burstable QoS")
+			}
+			if qosConfigs[v1.PodQOSGuaranteed].ResourceParameters.Unified != nil {
+				_, exists := qosConfigs[v1.PodQOSGuaranteed].ResourceParameters.Unified["cpu.idle"]
+				assert.False(t, exists, "cpu.idle should not be set for Guaranteed QoS")
+			}
+		})
+	}
+}
