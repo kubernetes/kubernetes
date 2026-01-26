@@ -1419,6 +1419,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	KubeletPSI: {
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	},
 
 	KubeletPodResourcesDynamicResources: {
