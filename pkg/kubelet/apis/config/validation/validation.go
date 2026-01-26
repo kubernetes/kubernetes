@@ -30,6 +30,7 @@ import (
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics"
 	tracingapi "k8s.io/component-base/tracing/api/v1"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	imagepullmanager "k8s.io/kubernetes/pkg/kubelet/images/pullmanager"
@@ -44,7 +45,7 @@ var (
 )
 
 // ValidateKubeletConfiguration validates `kc` and returns an error if it is invalid
-func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featureGate featuregate.FeatureGate) error {
+func ValidateKubeletConfiguration(logger klog.Logger, kc *kubeletconfig.KubeletConfiguration, featureGate featuregate.FeatureGate) error {
 	allErrors := []error{}
 
 	// TODO(lauralorenz): Reasses / confirm interpretation of feature gates
@@ -331,7 +332,7 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 
 	allErrors = append(allErrors, validateReservedMemoryConfiguration(kc)...)
 
-	if err := validateKubeletOSConfiguration(kc); err != nil {
+	if err := validateKubeletOSConfiguration(logger, kc); err != nil {
 		allErrors = append(allErrors, err)
 	}
 	allErrors = append(allErrors, metrics.ValidateShowHiddenMetricsVersion(kc.ShowHiddenMetricsForVersion)...)

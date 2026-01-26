@@ -59,6 +59,7 @@ func NewInitializedVolumePluginMgr(
 	clusterTrustBundleManager clustertrustbundle.Manager,
 	plugins []volume.VolumePlugin,
 	prober volume.DynamicPluginProber) (*volume.VolumePluginMgr, error) {
+	logger := klog.Background()
 
 	// Initialize csiDriverLister before calling InitPlugins
 	var informerFactory informers.SharedInformerFactory
@@ -73,7 +74,7 @@ func NewInitializedVolumePluginMgr(
 		csiDriversSynced = csiDriverInformer.Informer().HasSynced
 
 	} else {
-		klog.InfoS("KubeClient is nil. Skip initialization of CSIDriverLister")
+		logger.Info("KubeClient is nil. Skip initialization of CSIDriverLister")
 	}
 
 	kvh := &kubeletVolumeHost{
@@ -87,6 +88,7 @@ func NewInitializedVolumePluginMgr(
 		informerFactory:           informerFactory,
 		csiDriverLister:           csiDriverLister,
 		csiDriversSynced:          csiDriversSynced,
+		logger:                    logger,
 	}
 
 	if err := kvh.volumePluginMgr.InitPlugins(plugins, prober, kvh); err != nil {
@@ -117,6 +119,7 @@ type kubeletVolumeHost struct {
 	informerFactory           informers.SharedInformerFactory
 	csiDriverLister           storagelisters.CSIDriverLister
 	csiDriversSynced          cache.InformerSynced
+	logger                    klog.Logger
 }
 
 func (kvh *kubeletVolumeHost) SetKubeletError(err error) {
@@ -174,13 +177,13 @@ func (kvh *kubeletVolumeHost) CSIDriversSynced() cache.InformerSynced {
 // WaitForCacheSync is a helper function that waits for cache sync for CSIDriverLister
 func (kvh *kubeletVolumeHost) WaitForCacheSync() error {
 	if kvh.csiDriversSynced == nil {
-		klog.ErrorS(nil, "CsiDriversSynced not found on KubeletVolumeHost")
+		kvh.logger.Error(nil, "CsiDriversSynced not found on KubeletVolumeHost")
 		return fmt.Errorf("csiDriversSynced not found on KubeletVolumeHost")
 	}
 
 	synced := []cache.InformerSynced{kvh.csiDriversSynced}
 	if !cache.WaitForCacheSync(wait.NeverStop, synced...) {
-		klog.InfoS("Failed to wait for cache sync for CSIDriverLister")
+		kvh.logger.Info("Failed to wait for cache sync for CSIDriverLister")
 		return fmt.Errorf("failed to wait for cache sync for CSIDriverLister")
 	}
 
@@ -221,7 +224,8 @@ func (kvh *kubeletVolumeHost) GetMounter() mount.Interface {
 
 func (kvh *kubeletVolumeHost) GetNodeAllocatable() (v1.ResourceList, error) {
 	// TODO: Pass proper context when VolumeHost interface methods support context parameters
-	node, err := kvh.kubelet.getNodeAnyWay(context.TODO())
+	ctx := klog.NewContext(context.Background(), kvh.logger)
+	node, err := kvh.kubelet.getNodeAnyWay(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving node: %v", err)
 	}
@@ -268,7 +272,8 @@ func (kvh *kubeletVolumeHost) GetPodCertificateCredentialBundle(ctx context.Cont
 
 func (kvh *kubeletVolumeHost) GetNodeLabels() (map[string]string, error) {
 	// TODO: Pass proper context when VolumeHost interface methods support context parameters
-	node, err := kvh.kubelet.GetNode(context.TODO())
+	ctx := klog.NewContext(context.Background(), kvh.logger)
+	node, err := kvh.kubelet.GetNode(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving node: %v", err)
 	}
@@ -277,7 +282,8 @@ func (kvh *kubeletVolumeHost) GetNodeLabels() (map[string]string, error) {
 
 func (kvh *kubeletVolumeHost) GetAttachedVolumesFromNodeStatus() (map[v1.UniqueVolumeName]string, error) {
 	// TODO: Pass proper context when VolumeHost interface methods support context parameters
-	node, err := kvh.kubelet.GetNode(context.TODO())
+	ctx := klog.NewContext(context.Background(), kvh.logger)
+	node, err := kvh.kubelet.GetNode(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving node: %v", err)
 	}

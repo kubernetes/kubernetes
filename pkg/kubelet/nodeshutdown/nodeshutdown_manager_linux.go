@@ -20,6 +20,7 @@ limitations under the License.
 package nodeshutdown
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"sync"
@@ -62,7 +63,7 @@ type managerImpl struct {
 	nodeRef  *v1.ObjectReference
 
 	getPods        eviction.ActivePodsFunc
-	syncNodeStatus func()
+	syncNodeStatus func(context.Context)
 
 	dbusCon     dbusInhibiter
 	inhibitLock systemd.InhibitLock
@@ -274,7 +275,10 @@ func (m *managerImpl) start() (chan struct{}, error) {
 
 				if isShuttingDown {
 					// Update node status and ready condition
-					go m.syncNodeStatus()
+					// Shutdown events are delivered without an upper-level context.
+					// Use Background to avoid cancellation propagation while preserving structured logging.
+					nodeStatusCtx := klog.NewContext(context.Background(), m.logger)
+					go m.syncNodeStatus(nodeStatusCtx)
 
 					m.processShutdownEvent()
 				} else {

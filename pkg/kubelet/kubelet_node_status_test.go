@@ -1328,6 +1328,7 @@ func TestFastStatusUpdateOnce(t *testing.T) {
 }
 
 func TestRegisterWithApiServer(t *testing.T) {
+	ctx := ktesting.Init(t)
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -1374,7 +1375,7 @@ func TestRegisterWithApiServer(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		kubelet.registerWithAPIServer()
+		kubelet.registerWithAPIServer(ctx)
 		done <- struct{}{}
 	}()
 	select {
@@ -1525,6 +1526,7 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			ctx := ktesting.Init(t)
 			if tc.getOnForbiddenDisabled {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, utilversion.MustParse("1.32"))
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletRegistrationGetOnExistsOnly, true)
@@ -1552,7 +1554,7 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 			})
 			addNotImplatedReaction(kubeClient)
 
-			result := kubelet.tryRegisterWithAPIServer(tc.newNode)
+			result := kubelet.tryRegisterWithAPIServer(ctx, tc.newNode)
 			require.Equal(t, tc.expectedResult, result, "test [%s]", tc.name)
 
 			actions := kubeClient.Actions()
@@ -2450,10 +2452,11 @@ func TestReconcileHugePageResource(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(T *testing.T) {
+			ctx := ktesting.Init(T)
 			defer testKubelet.Cleanup()
 			kubelet := testKubelet.kubelet
 
-			needsUpdate := kubelet.reconcileHugePageResource(tc.initialNode, tc.existingNode)
+			needsUpdate := kubelet.reconcileHugePageResource(ctx, tc.initialNode, tc.existingNode)
 			assert.Equal(t, tc.needsUpdate, needsUpdate, tc.name)
 			assert.Equal(t, tc.expectedNode, tc.existingNode, tc.name)
 		})
@@ -2641,7 +2644,8 @@ func TestReconcileExtendedResource(t *testing.T) {
 		defer testKubelet.Cleanup()
 		kubelet := testKubelet.kubelet
 
-		needsUpdate := kubelet.reconcileExtendedResource(tc.initialNode, tc.existingNode)
+		ctx := ktesting.Init(t)
+		needsUpdate := kubelet.reconcileExtendedResource(ctx, tc.initialNode, tc.existingNode)
 		assert.Equal(t, tc.needsUpdate, needsUpdate, tc.name)
 		assert.Equal(t, tc.expectedNode, tc.existingNode, tc.name)
 	}
@@ -2739,6 +2743,7 @@ func TestValidateNodeIPParam(t *testing.T) {
 }
 
 func TestRegisterWithApiServerWithTaint(t *testing.T) {
+	ctx := ktesting.Init(t)
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -2773,7 +2778,7 @@ func TestRegisterWithApiServerWithTaint(t *testing.T) {
 	kubelet.registrationCompleted = false
 
 	// Register node to apiserver.
-	kubelet.registerWithAPIServer()
+	kubelet.registerWithAPIServer(ctx)
 
 	// Check the unschedulable taint.
 	got := gotNode.(*v1.Node)

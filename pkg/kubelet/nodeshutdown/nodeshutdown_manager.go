@@ -54,7 +54,7 @@ type Config struct {
 	NodeRef                          *v1.ObjectReference
 	GetPodsFunc                      eviction.ActivePodsFunc
 	KillPodFunc                      eviction.KillPodFunc
-	SyncNodeStatusFunc               func()
+	SyncNodeStatusFunc               func(context.Context)
 	ShutdownGracePeriodRequested     time.Duration
 	ShutdownGracePeriodCriticalPods  time.Duration
 	ShutdownGracePeriodByPodPriority []kubeletconfig.ShutdownGracePeriodByPodPriority

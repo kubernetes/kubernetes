@@ -250,7 +250,7 @@ is checked every 20 seconds (also configurable with a flag).`,
 
 			// We always validate the local configuration (command line + config file).
 			// This is the default "last-known-good" config for dynamic config, and must always remain valid.
-			if err := kubeletconfigvalidation.ValidateKubeletConfiguration(kubeletConfig, utilfeature.DefaultFeatureGate); err != nil {
+			if err := kubeletconfigvalidation.ValidateKubeletConfiguration(logger, kubeletConfig, utilfeature.DefaultFeatureGate); err != nil {
 				return fmt.Errorf("failed to validate kubelet configuration, error: %w, path: %s", err, kubeletConfig)
 			}
 
@@ -634,7 +634,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		return err
 	}
 	// validate the initial KubeletServer (we set feature gates first, because this validation depends on feature gates)
-	if err := options.ValidateKubeletServer(s); err != nil {
+	if err := options.ValidateKubeletServer(logger, s); err != nil {
 		return err
 	}
 
