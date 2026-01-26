@@ -42,6 +42,7 @@ type healthInfoCache struct {
 
 // newHealthInfoCache creates a new cache, loading from a checkpoint if present.
 func newHealthInfoCache(logger klog.Logger, stateFile string) (*healthInfoCache, error) {
+	logger = logger.WithName("dra-healthinfo")
 	cache := &healthInfoCache{
 		HealthInfo: &state.DevicesHealthMap{},
 		stateFile:  stateFile,
@@ -85,6 +86,7 @@ func (cache *healthInfoCache) withRLock(f func() error) error {
 // saveToCheckpointInternal does the actual saving without locking.
 // Assumes the caller holds the necessary lock.
 func (cache *healthInfoCache) saveToCheckpointInternal(logger klog.Logger) error {
+	logger = logger.WithName("dra-healthinfo")
 	if cache.stateFile == "" {
 		return nil
 	}
@@ -152,6 +154,7 @@ func (cache *healthInfoCache) getHealthInfo(driverName, poolName, deviceName str
 // from a plugin. It identifies which devices have changed state and handles devices
 // that are no longer being reported by the plugin.
 func (cache *healthInfoCache) updateHealthInfo(logger klog.Logger, driverName string, devices []state.DeviceHealth) ([]state.DeviceHealth, error) {
+	logger = logger.WithName("dra-healthinfo")
 	changedDevices := []state.DeviceHealth{}
 	err := cache.withLock(func() error {
 		now := time.Now()
