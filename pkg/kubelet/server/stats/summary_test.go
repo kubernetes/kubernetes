@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -287,7 +288,8 @@ func TestSummaryProviderGetCPUAndMemoryStats(t *testing.T) {
 	mockStatsProvider.EXPECT().GetCgroupCPUAndMemoryStats("/kubelet", false).Return(cgroupStatsMap["/kubelet"].cs, nil)
 	mockStatsProvider.EXPECT().GetCgroupCPUAndMemoryStats("/kubepods", false).Return(cgroupStatsMap["/pods"].cs, nil)
 
-	provider := NewSummaryProvider(ctx, mockStatsProvider)
+	logger := klog.FromContext(ctx)
+	provider := NewSummaryProvider(logger, mockStatsProvider)
 	summary, err := provider.GetCPUAndMemoryStats(ctx)
 	assert.NoError(err)
 
