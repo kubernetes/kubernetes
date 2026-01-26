@@ -63,7 +63,7 @@
     featureGates:
       SchedulerQueueingHints: false
     labels: [performance]
-    threshold: 476
+    threshold: 260
     params:
       initNodes: 5000
       initPods: 1000
@@ -72,7 +72,7 @@
     featureGates:
       SchedulerQueueingHints: true
     labels: [performance]
-    threshold: 419
+    threshold: 170
     params:
       initNodes: 5000
       initPods: 1000
@@ -184,7 +184,7 @@
     featureGates:
       SchedulerQueueingHints: false
     labels: [performance]
-    threshold: 238
+    threshold: 180
     params:
       initNodes: 5000
       initPods: 5000
@@ -193,7 +193,7 @@
     featureGates:
       SchedulerQueueingHints: true
     labels: [performance]
-    threshold: 228
+    threshold: 170
     params:
       initNodes: 5000
       initPods: 5000
@@ -245,7 +245,7 @@
     featureGates:
       SchedulerQueueingHints: false
     labels: [performance]
-    threshold: 533
+    threshold: 390
     params:
       initNodes: 5000
       initPods: 5000
@@ -254,7 +254,7 @@
     featureGates:
       SchedulerQueueingHints: true
     labels: [performance]
-    threshold: 515
+    threshold: 380
     params:
       initNodes: 5000
       initPods: 5000
@@ -307,7 +307,7 @@
     featureGates:
       SchedulerQueueingHints: false
     labels: [performance]
-    threshold: 258
+    threshold: 190
     params:
       initNodes: 5000
       initPods: 5000
@@ -316,7 +316,7 @@
     featureGates:
       SchedulerQueueingHints: true
     labels: [performance]
-    threshold: 249
+    threshold: 190
     params:
       initNodes: 5000
       initPods: 5000
@@ -367,7 +367,7 @@
     featureGates:
       SchedulerQueueingHints: false
     labels: [performance]
-    threshold: 1043
+    threshold: 800
     params:
       initNodes: 5000
       initPods: 5000
@@ -376,7 +376,7 @@
     featureGates:
       SchedulerQueueingHints: true
     labels: [performance]
-    threshold: 995
+    threshold: 760
     params:
       initNodes: 5000
       initPods: 5000
@@ -447,7 +447,7 @@
     featureGates:
       SchedulerQueueingHints: false
     labels: [performance]
-    threshold: 848
+    threshold: 620
     params:
       initNodes: 5000
       initPods: 2000
@@ -456,7 +456,7 @@
     featureGates:
       SchedulerQueueingHints: true
     labels: [performance]
-    threshold: 790
+    threshold: 210
     params:
       initNodes: 5000
       initPods: 2000
@@ -521,7 +521,7 @@
     featureGates:
       SchedulerQueueingHints: false
     labels: [performance]
-    threshold: 207
+    threshold: 170
     params:
       initNodes: 6000
       initPodsPerNamespace: 40
@@ -531,7 +531,7 @@
     featureGates:
       SchedulerQueueingHints: true
     labels: [performance]
-    threshold: 199
+    threshold: 160
     params:
       initNodes: 6000
       initPodsPerNamespace: 40
@@ -597,7 +597,7 @@
     featureGates:
       SchedulerQueueingHints: false
     labels: [performance]
-    threshold: 294
+    threshold: 230
     params:
       initNodes: 5000
       initPodsPerNamespace: 40
@@ -607,7 +607,7 @@
     featureGates:
       SchedulerQueueingHints: true
     labels: [performance]
-    threshold: 287
+    threshold: 220
     params:
       initNodes: 5000
       initPodsPerNamespace: 40
@@ -676,7 +676,7 @@
     featureGates:
       SchedulerQueueingHints: false
     labels: [performance]
-    threshold: 257
+    threshold: 200
     params:
       initNodes: 5000
       initPodsPerNamespace: 50
@@ -686,7 +686,7 @@
     featureGates:
       SchedulerQueueingHints: true
     labels: [performance]
-    threshold: 251
+    threshold: 180
     params:
       initNodes: 5000
       initPodsPerNamespace: 50
@@ -751,7 +751,7 @@
     featureGates:
       SchedulerQueueingHints: false
     labels: [performance]
-    threshold: 509
+    threshold: 370
     params:
       initNodes: 5000
       initPodsPerNamespace: 50
@@ -761,7 +761,7 @@
     featureGates:
       SchedulerQueueingHints: true
     labels: [performance]
-    threshold: 494
+    threshold: 250
     params:
       initNodes: 5000
       initPodsPerNamespace: 50
@@ -805,7 +805,7 @@
     featureGates:
       SchedulerQueueingHints: false
     labels: [performance]
-    threshold: 1217
+    threshold: 640
     params:
       gatedPods: 10000
       measurePods: 20000
@@ -813,7 +813,7 @@
     featureGates:
       SchedulerQueueingHints: true
     labels: [performance]
-    threshold: 1582
+    threshold: 570
     params:
       gatedPods: 10000
       measurePods: 20000
