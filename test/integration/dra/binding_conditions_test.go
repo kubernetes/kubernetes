@@ -42,6 +42,8 @@ var (
 // testDeviceBindingConditions is the entry point for running each integration test that verifies DeviceBindingConditions.
 // Some of these tests use device taints, and they assume that DRADeviceTaints is enabled.
 func testDeviceBindingConditions(tCtx ktesting.TContext, enabled bool) {
+	tCtx.Parallel()
+
 	tCtx.Run("BasicFlow", func(tCtx ktesting.TContext) { testDeviceBindingConditionsBasicFlow(tCtx, enabled) })
 	if enabled {
 		tCtx.Run("FailureTaints", func(tCtx ktesting.TContext) { testDeviceBindingFailureConditionsReschedule(tCtx, true) })

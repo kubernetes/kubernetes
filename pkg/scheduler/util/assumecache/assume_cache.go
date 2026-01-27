@@ -124,6 +124,9 @@ type AssumeCache struct {
 	// Synchronizes updates to all fields below.
 	rwMutex sync.RWMutex
 
+	// cond is used by emitEvents.
+	cond *sync.Cond
+
 	// All registered event handlers.
 	eventHandlers       []cache.ResourceEventHandler
 	handlerRegistration cache.ResourceEventHandlerRegistration
@@ -148,6 +151,9 @@ type AssumeCache struct {
 	// while not holding the rwMutex doesn't work because in-order delivery
 	// of events would no longer be guaranteed.
 	eventQueue buffer.Ring[func()]
+
+	// emittingEvents is true while one emitEvents call is actively emitting events.
+	emittingEvents bool
 
 	// describes the object stored
 	description string
@@ -196,6 +202,7 @@ func NewAssumeCache(logger klog.Logger, informer Informer, description, indexNam
 		indexName:   indexName,
 		eventQueue:  *buffer.NewRing[func()](buffer.RingOptions{InitialSize: 0, NormalSize: 4}),
 	}
+	c.cond = sync.NewCond(&c.rwMutex)
 	indexers := cache.Indexers{}
 	if indexName != "" && indexFunc != nil {
 		indexers[indexName] = c.objInfoIndexFunc
@@ -508,8 +515,31 @@ func (c *AssumeCache) AddEventHandler(handler cache.ResourceEventHandler) cache.
 }
 
 // emitEvents delivers all pending events that are in the queue, in the order
-// in which they were stored there (FIFO).
+// in which they were stored there (FIFO). Only one goroutine at a time is
+// delivering events, to ensure correct order.
 func (c *AssumeCache) emitEvents() {
+	c.rwMutex.Lock()
+	for c.emittingEvents {
+		// Wait for the active caller of emitEvents to finish.
+		// When it is done, it may or may not have drained
+		// the events pushed by our caller.
+		// We'll check below ourselves.
+		c.cond.Wait()
+	}
+	c.emittingEvents = true
+	c.rwMutex.Unlock()
+
+	defer func() {
+		c.rwMutex.Lock()
+		c.emittingEvents = false
+		// Hand over the batton to one other goroutine, if there is one.
+		// We don't need to wake up more than one because only one of
+		// them would be able to grab the "emittingEvents" responsibility.
+		c.cond.Signal()
+		c.rwMutex.Unlock()
+	}()
+
+	// When we get here, this instance of emitEvents is the active one.
 	for {
 		c.rwMutex.Lock()
 		deliver, ok := c.eventQueue.ReadOne()

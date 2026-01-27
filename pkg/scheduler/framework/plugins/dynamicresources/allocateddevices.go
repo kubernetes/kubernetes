@@ -85,11 +85,18 @@ func foreachAllocatedDevice(claim *resourceapi.ResourceClaim,
 // This is cheaper than repeatedly calling List, making strings unique, and building the set
 // each time PreFilter is called.
 //
+// To simplify detecting concurrent changes, each modification bumps a revision counter,
+// similar to ResourceVersion in the apiserver. Get and Capacities include the
+// current value in their result. A caller than can compare againt the current value
+// to determine whether some prior results are still up-to-date, without having to get
+// and compare them.
+//
 // All methods are thread-safe. Get returns a cloned set.
 type allocatedDevices struct {
 	logger klog.Logger
 
 	mutex                     sync.RWMutex
+	revision                  int64
 	ids                       sets.Set[structured.DeviceID]
 	shareIDs                  sets.Set[structured.SharedDeviceID]
 	capacities                structured.ConsumedCapacityCollection
@@ -106,18 +113,25 @@ func newAllocatedDevices(logger klog.Logger) *allocatedDevices {
 	}
 }
 
-func (a *allocatedDevices) Get() sets.Set[structured.DeviceID] {
+func (a *allocatedDevices) Get() (sets.Set[structured.DeviceID], int64) {
 	a.mutex.RLock()
 	defer a.mutex.RUnlock()
 
-	return a.ids.Clone()
+	return a.ids.Clone(), a.revision
 }
 
-func (a *allocatedDevices) Capacities() structured.ConsumedCapacityCollection {
+func (a *allocatedDevices) Capacities() (structured.ConsumedCapacityCollection, int64) {
 	a.mutex.RLock()
 	defer a.mutex.RUnlock()
 
-	return a.capacities.Clone()
+	return a.capacities.Clone(), a.revision
+}
+
+func (a *allocatedDevices) Revision() int64 {
+	a.mutex.RLock()
+	defer a.mutex.RUnlock()
+
+	return a.revision
 }
 
 func (a *allocatedDevices) handlers() cache.ResourceEventHandler {
@@ -200,8 +214,13 @@ func (a *allocatedDevices) addDevices(claim *resourceapi.ResourceClaim) {
 		},
 	)
 
+	if len(deviceIDs) == 0 && len(shareIDs) == 0 && len(deviceCapacities) == 0 {
+		return
+	}
+
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
+	a.revision++
 	for _, deviceID := range deviceIDs {
 		a.ids.Insert(deviceID)
 	}
@@ -241,8 +260,14 @@ func (a *allocatedDevices) removeDevices(claim *resourceapi.ResourceClaim) {
 			a.logger.V(6).Info("Observed consumed capacity release", "device id", capacity.DeviceID, "consumed capacity", capacity.ConsumedCapacity, "claim", klog.KObj(claim))
 			deviceCapacities = append(deviceCapacities, capacity)
 		})
+
+	if len(deviceIDs) == 0 && len(shareIDs) == 0 && len(deviceCapacities) == 0 {
+		return
+	}
+
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
+	a.revision++
 	for _, deviceID := range deviceIDs {
 		a.ids.Delete(deviceID)
 	}

@@ -265,6 +265,65 @@ func TestAssume(t *testing.T) {
 	}
 }
 
+// TestAssumeRace simulates this sequence of events:
+//   - Informer update arrives, event handler gets invoked and is slow.
+//   - Assume for the same object is called. It must block until
+//     the informer-triggered event is delivered.
+func TestAssumeRace(t *testing.T) { ktesting.Init(t).SyncTest("", testAssumeRace) }
+func testAssumeRace(tCtx ktesting.TContext) {
+	var informer testInformer
+	testObj := makeObj("pvc1", "1", "")
+	ac := NewAssumeCache(tCtx.Logger(), &informer, "TestObject", "", nil)
+	blockEvent := ktesting.WithCancel(tCtx)
+	defer blockEvent.Cancel("test done")
+	eventBlocked := false
+	eventDone := false
+	ac.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj any) {
+			eventBlocked = true
+			<-blockEvent.Done()
+			eventDone = true
+		},
+	})
+
+	// Here a real client with to a Create. What the assume cache may or may not
+	// see before Assume is the new object from the informer - let's pretend that
+	// comes first.
+	go informer.add(testObj)
+
+	// Wait for processing to finish.
+	tCtx.Wait()
+	if !eventBlocked {
+		tCtx.Fatal("Event handler should have been called and wasn't.")
+	}
+
+	// Assume should block until we unblock the event delivery.
+	assumeDone := false
+	go func() {
+		err := ac.Assume(testObj)
+		if err != nil {
+			tCtx.Errorf("Assume failed: %v", err)
+		}
+		assumeDone = true
+	}()
+
+	// Wait for Assume to be blocked in its implementation.
+	tCtx.Wait()
+	if assumeDone {
+		tCtx.Fatal("Assume should have blocked and didn't.")
+	}
+
+	// Unblock both goroutines.
+	blockEvent.Cancel("proceed")
+	tCtx.Wait()
+	if !eventDone {
+		tCtx.Fatal("Event should have been delivered and wasn't.")
+	}
+	if !assumeDone {
+		tCtx.Fatal("Assume should have returned and didn't.")
+	}
+}
+
 func TestRestore(t *testing.T) {
 	tCtx, cache, informer := newTest(t)
 	var events mockEventHandler
