@@ -21,6 +21,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/stretchr/testify/assert"
@@ -35,23 +36,25 @@ type testcase struct {
 }
 
 func (tc testcase) run(t *testing.T) {
-	buffer := &mockTB{}
-	tCtx := Init(buffer)
-	start := time.Now()
-	func() {
-		defer func() {
-			if r := recover(); r != nil && r != logBufferStop {
-				panic(r)
-			}
+	synctest.Test(t, func(t *testing.T) {
+		buffer := &mockTB{}
+		tCtx := Init(buffer)
+		start := time.Now()
+		func() {
+			defer func() {
+				if r := recover(); r != nil && r != logBufferStop {
+					panic(r)
+				}
+			}()
+			tc.cb(tCtx)
 		}()
-		tc.cb(tCtx)
-	}()
-	duration := time.Since(start)
+		duration := time.Since(start)
 
-	trace := buffer.log.String()
-	t.Logf("Trace:\n%s\n", trace)
-	assert.InDelta(t, tc.expectDuration.Seconds(), duration.Seconds(), 0.1, "callback invocation duration %s", duration)
-	assert.Equal(t, tc.expectTrace, normalize(trace))
+		trace := buffer.log.String()
+		t.Logf("Trace:\n%s\n", trace)
+		assert.Equal(t, tc.expectDuration, duration, "callback invocation duration %s")
+		assert.Equal(t, tc.expectTrace, normalize(trace))
+	})
 }
 
 // normalize replaces parts of message texts which may vary with constant strings.
