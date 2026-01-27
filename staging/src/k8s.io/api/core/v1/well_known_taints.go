@@ -16,37 +16,42 @@ limitations under the License.
 
 package v1
 
+import (
+	"k8s.io/constants/taints"
+)
+
+// Well-known taints re-exported from k8s.io/constants/taints for backwards compatibility.
 const (
 	// TaintNodeNotReady will be added when node is not ready
 	// and removed when node becomes ready.
-	TaintNodeNotReady = "node.kubernetes.io/not-ready"
+	TaintNodeNotReady = taints.TaintNodeNotReady
 
 	// TaintNodeUnreachable will be added when node becomes unreachable
 	// (corresponding to NodeReady status ConditionUnknown)
 	// and removed when node becomes reachable (NodeReady status ConditionTrue).
-	TaintNodeUnreachable = "node.kubernetes.io/unreachable"
+	TaintNodeUnreachable = taints.TaintNodeUnreachable
 
 	// TaintNodeUnschedulable will be added when node becomes unschedulable
 	// and removed when node becomes schedulable.
-	TaintNodeUnschedulable = "node.kubernetes.io/unschedulable"
+	TaintNodeUnschedulable = taints.TaintNodeUnschedulable
 
 	// TaintNodeMemoryPressure will be added when node has memory pressure
 	// and removed when node has enough memory.
-	TaintNodeMemoryPressure = "node.kubernetes.io/memory-pressure"
+	TaintNodeMemoryPressure = taints.TaintNodeMemoryPressure
 
 	// TaintNodeDiskPressure will be added when node has disk pressure
 	// and removed when node has enough disk.
-	TaintNodeDiskPressure = "node.kubernetes.io/disk-pressure"
+	TaintNodeDiskPressure = taints.TaintNodeDiskPressure
 
 	// TaintNodeNetworkUnavailable will be added when node's network is unavailable
 	// and removed when network becomes ready.
-	TaintNodeNetworkUnavailable = "node.kubernetes.io/network-unavailable"
+	TaintNodeNetworkUnavailable = taints.TaintNodeNetworkUnavailable
 
 	// TaintNodePIDPressure will be added when node has pid pressure
 	// and removed when node has enough pid.
-	TaintNodePIDPressure = "node.kubernetes.io/pid-pressure"
+	TaintNodePIDPressure = taints.TaintNodePIDPressure
 
 	// TaintNodeOutOfService can be added when node is out of service in case of
 	// a non-graceful shutdown
-	TaintNodeOutOfService = "node.kubernetes.io/out-of-service"
+	TaintNodeOutOfService = taints.TaintNodeOutOfService
 )
