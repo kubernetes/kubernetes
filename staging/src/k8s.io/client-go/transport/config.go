@@ -156,5 +156,5 @@ type TLSConfig struct {
 
 // GetCertHolder is used to make the wrapped function comparable so that it can be used as a map key.
 type GetCertHolder struct {
-	GetCert func() (*tls.Certificate, error)
+	GetCert func(ctx context.Context) (*tls.Certificate, error)
 }
