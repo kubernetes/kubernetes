@@ -51,10 +51,9 @@ import (
 // e.g., "fc00:f853:ccd:e793::3" -> "fc00:f853:0ccd:e793:0000:0000:0000:0003"
 func expandIPv6ForConntrack(ipStr string) string {
 	ip := netutils.ParseIPSloppy(ipStr)
-	if ip == nil || ip.To4() != nil {
+	if !netutils.IsIPv6(ip) {
 		return ipStr // not IPv6 or invalid, return as-is
 	}
-	ip = ip.To16()
 	return fmt.Sprintf("%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x",
 		ip[0], ip[1], ip[2], ip[3], ip[4], ip[5], ip[6], ip[7],
 		ip[8], ip[9], ip[10], ip[11], ip[12], ip[13], ip[14], ip[15])
@@ -226,9 +225,7 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 		const expectedTimeoutSeconds = 60 * 60
 		// the conntrack file uses the IPv6 expanded format
 		ip := serverNodeInfo.nodeIP
-		ipFamily := "ipv4"
 		if netutils.IsIPv6String(ip) {
-			ipFamily = "ipv6"
 			ip = expandIPv6ForConntrack(ip)
 		}
 		// Obtain the corresponding conntrack entry on the host by reading
@@ -236,8 +233,8 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 		// This avoids dependency on the conntrack binary.
 		// It retries in a loop if the entry is not found.
 		cmd := fmt.Sprintf("cat /proc/net/nf_conntrack "+
-			"| grep -m 1 -E '%s.*CLOSE_WAIT.*dst=%v.*dport=%v'",
-			ipFamily, ip, testDaemonTCPPort)
+			"| grep -m 1 -E 'CLOSE_WAIT.*dst=%v.*dport=%v'",
+			ip, testDaemonTCPPort)
 		if err := wait.PollImmediate(2*time.Second, epsilonSeconds*time.Second, func() (bool, error) {
 			result, err := e2epodoutput.RunHostCmd(fr.Namespace.Name, "e2e-net-exec", cmd)
 			// retry if we can't obtain the conntrack entry
