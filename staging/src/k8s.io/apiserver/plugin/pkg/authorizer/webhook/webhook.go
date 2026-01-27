@@ -204,21 +204,18 @@ func (w *WebhookAuthorizer) Authorize(ctx context.Context, attr authorizer.Attri
 			Verb: attr.GetVerb(),
 		}
 	}
-	// skipping match when feature is not enabled
-	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StructuredAuthorizationConfiguration) {
-		// Process Match Conditions before calling the webhook
-		matches, err := w.match(ctx, r)
-		// If at least one matchCondition evaluates to an error (but none are FALSE):
-		// If failurePolicy=Deny, then the webhook rejects the request
-		// If failurePolicy=NoOpinion, then the error is ignored and the webhook is skipped
-		if err != nil {
-			return w.decisionOnError, "", err
-		}
-		// If at least one matchCondition successfully evaluates to FALSE,
-		// then the webhook is skipped.
-		if !matches {
-			return authorizer.DecisionNoOpinion, "", nil
-		}
+	// Process Match Conditions before calling the webhook
+	matches, err := w.match(ctx, r)
+	// If at least one matchCondition evaluates to an error (but none are FALSE):
+	// If failurePolicy=Deny, then the webhook rejects the request
+	// If failurePolicy=NoOpinion, then the error is ignored and the webhook is skipped
+	if err != nil {
+		return w.decisionOnError, "", err
+	}
+	// If at least one matchCondition successfully evaluates to FALSE,
+	// then the webhook is skipped.
+	if !matches {
+		return authorizer.DecisionNoOpinion, "", nil
 	}
 	// If all evaluated successfully and ALL matchConditions evaluate to TRUE,
 	// then the webhook is called.
