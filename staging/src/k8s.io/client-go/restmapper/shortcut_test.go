@@ -31,12 +31,9 @@ import (
 	"k8s.io/client-go/openapi"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
-	"k8s.io/klog/v2/ktesting"
 )
 
 func TestReplaceAliases(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
-
 	tests := []struct {
 		name     string
 		arg      string
@@ -138,7 +135,7 @@ func TestReplaceAliases(t *testing.T) {
 		}
 		mapper := NewShortcutExpander(&fakeRESTMapper{}, ds, nil).(shortcutExpander)
 
-		actual := mapper.expandResourceShortcut(ctx, schema.GroupVersionResource{Resource: test.arg})
+		actual := mapper.expandResourceShortcut(schema.GroupVersionResource{Resource: test.arg})
 		if actual != test.expected {
 			t.Errorf("%s: unexpected argument: expected %s, got %s", test.name, test.expected, actual)
 		}
@@ -263,8 +260,6 @@ func TestKindForWithNewCRDs(t *testing.T) {
 }
 
 func TestWarnAmbigious(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
-
 	tests := []struct {
 		name                string
 		arg                 string
@@ -444,7 +439,7 @@ func TestWarnAmbigious(t *testing.T) {
 			actualWarnings = append(actualWarnings, a)
 		}).(shortcutExpander)
 
-		actual := mapper.expandResourceShortcut(ctx, schema.GroupVersionResource{Resource: test.arg})
+		actual := mapper.expandResourceShortcut(schema.GroupVersionResource{Resource: test.arg})
 		if actual != test.expected {
 			t.Errorf("%s: unexpected argument: expected %s, got %s", test.name, test.expected, actual)
 		}

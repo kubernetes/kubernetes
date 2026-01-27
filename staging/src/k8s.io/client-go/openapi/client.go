@@ -25,38 +25,8 @@ import (
 	"k8s.io/kube-openapi/pkg/handler3"
 )
 
-// Deprecated: use ClientWithContext instead.
 type Client interface {
 	Paths() (map[string]GroupVersion, error)
-}
-
-type ClientWithContext interface {
-	PathsWithContext(ctx context.Context) (map[string]GroupVersionWithContext, error)
-}
-
-func ToClientWithContext(c Client) ClientWithContext {
-	if c == nil {
-		return nil
-	}
-	if c, ok := c.(ClientWithContext); ok {
-		return c
-	}
-	return &clientWrapper{
-		delegate: c,
-	}
-}
-
-type clientWrapper struct {
-	delegate Client
-}
-
-func (c *clientWrapper) PathsWithContext(ctx context.Context) (map[string]GroupVersionWithContext, error) {
-	resultWithoutContext, err := c.delegate.Paths()
-	result := make(map[string]GroupVersionWithContext, len(resultWithoutContext))
-	for key, entry := range resultWithoutContext {
-		result[key] = ToGroupVersionWithContext(entry)
-	}
-	return result, err
 }
 
 type client struct {
@@ -64,36 +34,16 @@ type client struct {
 	restClient rest.Interface
 }
 
-// Deprecated: use NewClientWithContext instead.
 func NewClient(restClient rest.Interface) Client {
-	return newClient(restClient)
-}
-
-func NewClientWithContext(restClient rest.Interface) ClientWithContext {
-	return newClient(restClient)
-}
-
-func newClient(restClient rest.Interface) *client {
 	return &client{
 		restClient: restClient,
 	}
 }
 
-// Deprecated: use PathsWithContext instead.
 func (c *client) Paths() (map[string]GroupVersion, error) {
-	resultWithContext, err := c.PathsWithContext(context.Background())
-	result := make(map[string]GroupVersion, len(resultWithContext))
-	for key, entry := range resultWithContext {
-		// We know that this is a *groupversion which implements GroupVersion.
-		result[key] = entry.(GroupVersion)
-	}
-	return result, err
-}
-
-func (c *client) PathsWithContext(ctx context.Context) (map[string]GroupVersionWithContext, error) {
 	data, err := c.restClient.Get().
 		AbsPath("/openapi/v3").
-		Do(ctx).
+		Do(context.TODO()).
 		Raw()
 
 	if err != nil {
@@ -109,7 +59,7 @@ func (c *client) PathsWithContext(ctx context.Context) (map[string]GroupVersionW
 	// Calculate the client-side prefix for a "root" request
 	rootPrefix := strings.TrimSuffix(c.restClient.Get().AbsPath("/").URL().Path, "/")
 	// Create GroupVersions for each element of the result
-	result := make(map[string]GroupVersionWithContext, len(discoMap.Paths))
+	result := map[string]GroupVersion{}
 	for k, v := range discoMap.Paths {
 		// Trim off the prefix that will always be added in client-side
 		v.ServerRelativeURL = strings.TrimPrefix(v.ServerRelativeURL, rootPrefix)

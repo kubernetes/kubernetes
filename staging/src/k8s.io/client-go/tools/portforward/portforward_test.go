@@ -299,7 +299,6 @@ func TestParsePortsAndNew(t *testing.T) {
 
 		var pf *PortForwarder
 		if len(test.addresses) > 0 {
-			//nolint:logcheck // Testing the original function.
 			pf, err = NewOnAddresses(dialer, test.addresses, test.input, expectedStopChan, readyChan, os.Stdout, os.Stderr)
 		} else {
 			pf, err = New(dialer, test.input, expectedStopChan, readyChan, os.Stdout, os.Stderr)
