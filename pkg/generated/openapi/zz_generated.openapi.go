@@ -67857,7 +67857,7 @@ func schema_k8sio_kube_scheduler_config_v1_Plugin(ref common.ReferenceCallback) 
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "Plugin specifies a plugin name and its weight when applicable. Weight is used only for Score plugins.",
+				Description: "Plugin specifies a plugin name and its weight when applicable. Weight is used only for Score and PlacementScore plugins.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"name": {
@@ -67870,7 +67870,7 @@ func schema_k8sio_kube_scheduler_config_v1_Plugin(ref common.ReferenceCallback) 
 					},
 					"weight": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Weight defines the weight of plugin, only used for Score plugins.",
+							Description: "Weight defines the weight of plugin, only used for Score and PlacementScore plugins.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -68062,6 +68062,20 @@ func schema_k8sio_kube_scheduler_config_v1_Plugins(ref common.ReferenceCallback)
 					"multiPoint": {
 						SchemaProps: spec.SchemaProps{
 							Description: "MultiPoint is a simplified config section to enable plugins for all valid extension points. Plugins enabled through MultiPoint will automatically register for every individual extension point the plugin has implemented. Disabling a plugin through MultiPoint disables that behavior. The same is true for disabling \"*\" through MultiPoint (no default plugins will be automatically registered). Plugins can still be disabled through their individual extension points.\n\nIn terms of precedence, plugin config follows this basic hierarchy\n  1. Specific extension points\n  2. Explicitly configured MultiPoint plugins\n  3. The set of default plugins, as MultiPoint plugins\nThis implies that a higher precedence plugin will run first and overwrite any settings within MultiPoint. Explicitly user-configured plugins also take a higher precedence over default plugins. Within this hierarchy, an Enabled setting takes precedence over Disabled. For example, if a plugin is set in both `multiPoint.Enabled` and `multiPoint.Disabled`, the plugin will be enabled. Similarly, including `multiPoint.Disabled = '*'` and `multiPoint.Enabled = pluginA` will still register that specific plugin through MultiPoint. This follows the same behavior as all other extension point configurations.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(configv1.PluginSet{}.OpenAPIModelName()),
+						},
+					},
+					"placementGenerate": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PlacementGenerate is a list of plugins that should be invoked during workload scheduling cycle when determining placements for a pod group.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(configv1.PluginSet{}.OpenAPIModelName()),
+						},
+					},
+					"placementScore": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PlacementScore is a list of plugins that should be invoked during workload scheduling cycle when ranking pod group assignments.",
 							Default:     map[string]interface{}{},
 							Ref:         ref(configv1.PluginSet{}.OpenAPIModelName()),
 						},
