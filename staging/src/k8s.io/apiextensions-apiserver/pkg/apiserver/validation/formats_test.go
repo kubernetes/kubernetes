@@ -26,7 +26,7 @@ import (
 )
 
 func TestRegistryFormats(t *testing.T) {
-	for _, sf := range supportedVersionedFormats {
+	for _, sf := range supportedStringVersionedFormats {
 		for f := range sf.formats {
 			if !strfmt.Default.ContainsName(f) {
 				t.Errorf("expected format %q in strfmt default registry", f)
@@ -201,22 +201,34 @@ func TestGetUnrecognizedFormats(t *testing.T) {
 			expectedFormats:      []string{},
 		},
 		{
-			name:                 "unrecognized format for integer type is not reported",
-			schema:               &spec.Schema{SchemaProps: spec.SchemaProps{Format: "unknown-format", Type: []string{"integer"}}},
+			name:                 "recognized int32 format for integer type",
+			schema:               &spec.Schema{SchemaProps: spec.SchemaProps{Format: "int32", Type: []string{"integer"}}},
 			compatibilityVersion: version.MajorMinor(1, 0),
 			expectedFormats:      []string{},
 		},
 		{
-			name:                 "unrecognized format for string,null type is not reported",
+			name:                 "recognized double format for number type",
+			schema:               &spec.Schema{SchemaProps: spec.SchemaProps{Format: "double", Type: []string{"number"}}},
+			compatibilityVersion: version.MajorMinor(1, 0),
+			expectedFormats:      []string{},
+		},
+		{
+			name:                 "unrecognized float format for integer type",
+			schema:               &spec.Schema{SchemaProps: spec.SchemaProps{Format: "float", Type: []string{"integer"}}},
+			compatibilityVersion: version.MajorMinor(1, 0),
+			expectedFormats:      []string{"float"},
+		},
+		{
+			name:                 "unrecognized format for string,null type is reported",
 			schema:               &spec.Schema{SchemaProps: spec.SchemaProps{Format: "unknown-format", Type: []string{"string", "null"}}},
 			compatibilityVersion: version.MajorMinor(1, 0),
-			expectedFormats:      []string{},
+			expectedFormats:      []string{"unknown-format"},
 		},
 		{
-			name:                 "unrecognized format for no type is not reported",
+			name:                 "unrecognized format for no type is reported",
 			schema:               &spec.Schema{SchemaProps: spec.SchemaProps{Format: "unknown-format"}},
 			compatibilityVersion: version.MajorMinor(1, 0),
-			expectedFormats:      []string{},
+			expectedFormats:      []string{"unknown-format"},
 		},
 	}
 
@@ -234,7 +246,7 @@ func TestGetUnrecognizedFormats(t *testing.T) {
 			expectedSet := sets.New(tc.expectedFormats...)
 
 			if !gotSet.Equal(expectedSet) {
-				t.Errorf("expected unrecognized formats %v, got %v", tc.expectedFormats, got)
+				t.Errorf("expected unrecognized formats %v, got %v", expectedSet, gotSet)
 			}
 		})
 	}
