@@ -499,6 +499,48 @@ func (ex *ExamplePlugin) UnprepareResourceClaims(ctx context.Context, claims []k
 	return result, nil
 }
 
+// UnprepareResourceClaimsWithHealth implements kubeletplugin.DRAPluginWithUnprepareHealth.
+// It returns the device health status along with the unprepare result.
+func (ex *ExamplePlugin) UnprepareResourceClaimsWithHealth(ctx context.Context, claims []kubeletplugin.NamespacedObject) (map[types.UID]kubeletplugin.UnprepareResult, error) {
+	result := make(map[types.UID]kubeletplugin.UnprepareResult)
+
+	if failure := ex.getUnprepareResourcesFailure(); failure != nil {
+		return nil, failure
+	}
+
+	for _, claimRef := range claims {
+		// Collect device health before unpreparing.
+		// We need to do this before nodeUnprepareResource because it deletes from prepared map.
+		claimID := ClaimID{Name: claimRef.Name, UID: claimRef.UID}
+		var deviceHealths []kubeletplugin.DeviceHealth
+
+		ex.mutex.Lock()
+		devices := ex.prepared[claimID]
+		ex.mutex.Unlock()
+
+		ex.healthMutex.Lock()
+		for _, device := range devices {
+			key := device.PoolName + "/" + device.DeviceName
+			if health, ok := ex.deviceHealth[key]; ok {
+				deviceHealths = append(deviceHealths, kubeletplugin.DeviceHealth{
+					PoolName:   device.PoolName,
+					DeviceName: device.DeviceName,
+					Health:     health,
+				})
+			}
+		}
+		ex.healthMutex.Unlock()
+
+		// Now unprepare the resource.
+		err := ex.nodeUnprepareResource(ctx, claimRef)
+		result[claimRef.UID] = kubeletplugin.UnprepareResult{
+			Err:           err,
+			DeviceHealths: deviceHealths,
+		}
+	}
+	return result, nil
+}
+
 func (ex *ExamplePlugin) GetPreparedResources() []ClaimID {
 	ex.mutex.Lock()
 	defer ex.mutex.Unlock()

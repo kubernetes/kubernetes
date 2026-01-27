@@ -97,6 +97,36 @@ message NodeUnprepareResourcesResponse {
 message NodeUnprepareResourceResponse {
     // If non-empty, unpreparing the ResourceClaim failed.
     string error = 1;
+
+    // Health status of devices at the time of unprepare.
+    // Optional. If provided, kubelet will use this to update the pod's
+    // allocated resources status before cleaning up the claim info.
+    // This allows plugins to report final device health synchronously,
+    // ensuring health status is captured even for terminated pods.
+    repeated DeviceHealth device_healths = 2;
+}
+
+// HealthStatus defines the possible health states of a device.
+enum HealthStatus {
+    // UNKNOWN indicates that the health of the device cannot be determined.
+    UNKNOWN = 0;
+    // HEALTHY indicates that the device is operating normally.
+    HEALTHY = 1;
+    // UNHEALTHY indicates that the device has reported a problem.
+    UNHEALTHY = 2;
+}
+
+// DeviceHealth represents the health status of a single device
+// at the time of unprepare.
+message DeviceHealth {
+    // The pool which contains the device.
+    string pool_name = 1;
+
+    // The device name within the pool.
+    string device_name = 2;
+
+    // The health status of the device.
+    HealthStatus health = 3;
 }
 
 message Claim {

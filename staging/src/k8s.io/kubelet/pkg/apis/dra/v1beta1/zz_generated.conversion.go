@@ -315,6 +315,7 @@ func autoConvert_v1beta1_NodeUnprepareResourceResponse_To_v1_NodeUnprepareResour
 func autoConvert_v1_NodeUnprepareResourceResponse_To_v1beta1_NodeUnprepareResourceResponse(in *v1.NodeUnprepareResourceResponse, out *NodeUnprepareResourceResponse, s conversion.Scope) error {
 	// WARNING: in.state is not exported and cannot be read
 	out.Error = in.Error
+	// WARNING: in.DeviceHealths requires manual conversion: does not exist in peer-type
 	// WARNING: in.unknownFields is not exported and cannot be read
 	// WARNING: in.sizeCache is not exported and cannot be read
 	return nil

@@ -1314,6 +1314,106 @@ func TestPodMightNeedToUnprepareResources(t *testing.T) {
 	assert.True(t, needsUnprepare)
 }
 
+func TestUnprepareResourcesWithHealthStatus(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	fakeKubeClient := fake.NewClientset()
+
+	const (
+		testPoolName   = "test-pool"
+		testDeviceName = "test-device"
+	)
+
+	for _, test := range []struct {
+		description    string
+		deviceHealths  []*drapb.DeviceHealth
+		expectedHealth state.DeviceHealthStatus
+	}{
+		{
+			description: "should update health cache with UNHEALTHY status from unprepare response",
+			deviceHealths: []*drapb.DeviceHealth{
+				{
+					PoolName:   testPoolName,
+					DeviceName: testDeviceName,
+					Health:     drapb.HealthStatus_UNHEALTHY,
+				},
+			},
+			expectedHealth: state.DeviceHealthStatusUnhealthy,
+		},
+		{
+			description: "should update health cache with HEALTHY status from unprepare response",
+			deviceHealths: []*drapb.DeviceHealth{
+				{
+					PoolName:   testPoolName,
+					DeviceName: testDeviceName,
+					Health:     drapb.HealthStatus_HEALTHY,
+				},
+			},
+			expectedHealth: state.DeviceHealthStatusHealthy,
+		},
+		{
+			description: "should update health cache with UNKNOWN status from unprepare response",
+			deviceHealths: []*drapb.DeviceHealth{
+				{
+					PoolName:   testPoolName,
+					DeviceName: testDeviceName,
+					Health:     drapb.HealthStatus_UNKNOWN,
+				},
+			},
+			expectedHealth: state.DeviceHealthStatusUnknown,
+		},
+		{
+			description:    "should handle empty device healths in unprepare response",
+			deviceHealths:  []*drapb.DeviceHealth{},
+			expectedHealth: state.DeviceHealthStatusUnknown, // No update, so unknown by default
+		},
+	} {
+		t.Run(test.description, func(t *testing.T) {
+			backgroundCtx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			backgroundCtx = klog.NewContext(backgroundCtx, tCtx.Logger())
+
+			// Create response with device health status
+			resp := &drapb.NodeUnprepareResourcesResponse{
+				Claims: map[string]*drapb.NodeUnprepareResourceResponse{
+					string(claimUID): {
+						DeviceHealths: test.deviceHealths,
+					},
+				},
+			}
+
+			draServerInfo, err := setupFakeDRADriverGRPCServer(backgroundCtx, false, nil, nil, resp, nil)
+			require.NoError(t, err)
+			defer draServerInfo.teardownFn()
+
+			manager, err := NewManager(tCtx.Logger(), fakeKubeClient, t.TempDir())
+			require.NoError(t, err, "create DRA manager")
+			manager.initDRAPluginManager(backgroundCtx, getFakeNode, time.Second)
+
+			// Register plugin BEFORE enabling the feature gate to avoid starting the health stream.
+			// The health stream would clear the cache when it ends, causing a race condition.
+			plg := manager.GetWatcherHandler()
+			err = plg.RegisterPlugin(driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, nil)
+			require.NoError(t, err)
+
+			// Now enable the feature gate - this affects unprepareResources processing
+			// but doesn't start a new health stream since plugin is already registered.
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ResourceHealthStatus, true)
+
+			// Add claim info to cache
+			claimInfo := genTestClaimInfo(claimUID, []string{podUID}, true)
+			manager.cache.add(claimInfo)
+
+			// Call UnprepareResources
+			err = manager.UnprepareResources(backgroundCtx, genTestPod())
+			require.NoError(t, err)
+
+			// Verify health info cache was updated
+			healthStatus := manager.healthInfoCache.getHealthInfo(driverName, testPoolName, testDeviceName)
+			assert.Equal(t, test.expectedHealth, healthStatus, "health status should match expected value")
+		})
+	}
+}
+
 func TestGetContainerClaimInfos(t *testing.T) {
 	for _, test := range []struct {
 		description string

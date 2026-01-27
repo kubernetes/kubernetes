@@ -64,6 +64,7 @@ import (
 
 	"k8s.io/dynamic-resource-allocation/kubeletplugin"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
+	drapbv1 "k8s.io/kubelet/pkg/apis/dra/v1"
 	testdriver "k8s.io/kubernetes/test/e2e/dra/test-driver/app"
 	testdrivergomega "k8s.io/kubernetes/test/e2e/dra/test-driver/gomega"
 )
@@ -1116,6 +1117,70 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 				}).WithTimeout(60*time.Second).WithPolling(2*time.Second).Should(gomega.Equal("Unhealthy"),
 					fmt.Sprintf("Health for device %s should be Unhealthy", deviceName))
 			}
+		})
+
+		// Verifies that device health is returned in NodeUnprepareResourcesResponse
+		// so that health status is captured even for terminated pods.
+		ginkgo.It("should return device health in NodeUnprepareResourcesResponse", func(ctx context.Context) {
+			ginkgo.By("Starting the test driver with channel-based control")
+			kubeletPlugin := newKubeletPlugin(ctx, f.ClientSet, f.Namespace.Name, getNodeName(ctx, f), driverName)
+
+			className := "unprepare-health-class"
+			claimName := "unprepare-health-claim"
+			podName := "unprepare-health-pod"
+			poolName := "pool-unprepare"
+			deviceName := "dev-unprepare"
+
+			ginkgo.By("Creating a pod with a resource claim")
+			pod := createHealthTestPodAndClaim(ctx, f, driverName, podName, claimName, className, poolName, deviceName)
+
+			ginkgo.By("Waiting for the pod to be running")
+			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod))
+
+			ginkgo.By("Setting device health to Unhealthy before deletion")
+			kubeletPlugin.HealthControlChan <- testdriver.DeviceHealthUpdate{
+				PoolName:   poolName,
+				DeviceName: deviceName,
+				Health:     "Unhealthy",
+			}
+
+			ginkgo.By("Waiting for unhealthy status to be reflected in pod status")
+			gomega.Eventually(ctx, func(ctx context.Context) (string, error) {
+				return getDeviceHealthFromAPIServer(f, pod.Namespace, pod.Name, driverName, claimName, poolName, deviceName)
+			}).WithTimeout(30*time.Second).WithPolling(1*time.Second).Should(gomega.Equal("Unhealthy"),
+				"Device health should be reflected as Unhealthy before pod deletion")
+
+			ginkgo.By("Deleting the pod to trigger NodeUnprepareResources")
+			e2epod.DeletePodOrFail(ctx, f.ClientSet, pod.Namespace, pod.Name)
+
+			ginkgo.By("Waiting for NodeUnprepareResources to succeed")
+			gomega.Eventually(kubeletPlugin.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdrivergomega.NodeUnprepareResourcesSucceeded)
+
+			ginkgo.By("Verifying that device health was included in NodeUnprepareResourcesResponse")
+			var foundHealthInResponse bool
+			for _, call := range kubeletPlugin.GetGRPCCalls() {
+				if !strings.HasSuffix(call.FullMethod, "/NodeUnprepareResources") {
+					continue
+				}
+				resp, ok := call.Response.(*drapbv1.NodeUnprepareResourcesResponse)
+				if !ok || resp == nil {
+					continue
+				}
+				for _, claimResp := range resp.Claims {
+					if claimResp == nil {
+						continue
+					}
+					for _, dh := range claimResp.DeviceHealths {
+						if dh.PoolName == poolName && dh.DeviceName == deviceName {
+							gomega.Expect(dh.Health).To(gomega.Equal(drapbv1.HealthStatus_UNHEALTHY),
+								"Device health in NodeUnprepareResourcesResponse should be UNHEALTHY")
+							foundHealthInResponse = true
+						}
+					}
+				}
+			}
+			gomega.Expect(foundHealthInResponse).To(gomega.BeTrueBecause(
+				"NodeUnprepareResourcesResponse should contain device health for the unprepared device"))
 		})
 	})
 

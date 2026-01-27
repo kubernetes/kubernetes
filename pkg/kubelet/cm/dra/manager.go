@@ -661,6 +661,35 @@ func (m *Manager) unprepareResources(ctx context.Context, podUID types.UID, name
 			if result.GetError() != "" {
 				return fmt.Errorf("NodeUnprepareResources failed for ResourceClaim %s: %s", reqClaim.Name, result.Error)
 			}
+
+			// Process health status returned by the plugin.
+			// This allows plugins to report final device health synchronously,
+			// ensuring health status is captured even for terminated pods.
+			// Only process if ResourceHealthStatus feature gate is enabled.
+			if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.ResourceHealthStatus) {
+				if deviceHealths := result.GetDeviceHealths(); len(deviceHealths) > 0 {
+					healthUpdates := make([]state.DeviceHealth, 0, len(deviceHealths))
+					for _, dh := range deviceHealths {
+						var healthStatus state.DeviceHealthStatus
+						switch dh.GetHealth() {
+						case drapb.HealthStatus_HEALTHY:
+							healthStatus = state.DeviceHealthStatusHealthy
+						case drapb.HealthStatus_UNHEALTHY:
+							healthStatus = state.DeviceHealthStatusUnhealthy
+						default:
+							healthStatus = state.DeviceHealthStatusUnknown
+						}
+						healthUpdates = append(healthUpdates, state.DeviceHealth{
+							PoolName:   dh.GetPoolName(),
+							DeviceName: dh.GetDeviceName(),
+							Health:     healthStatus,
+						})
+					}
+					if _, err := m.healthInfoCache.updateHealthInfo(driverName, healthUpdates); err != nil {
+						logger.Error(err, "Failed to update health info from NodeUnprepareResources", "driverName", driverName)
+					}
+				}
+			}
 		}
 
 		unfinished := len(claims) - len(response.Claims)
@@ -671,11 +700,10 @@ func (m *Manager) unprepareResources(ctx context.Context, podUID types.UID, name
 
 	// Atomically perform some operations on the claimInfo cache.
 	err := m.cache.withLock(func() error {
-		// TODO(#132978): Re-evaluate this logic to support post-mortem health updates.
-		// As of the initial implementation, we immediately delete the claim info upon
-		// unprepare. This means a late-arriving health update for a terminated pod
-		// will be missed. A future enhancement could be to "tombstone" this entry for
-		// a grace period instead of deleting it.
+		// Note: Health status for terminated pods is now handled synchronously via
+		// the device_healths field in NodeUnprepareResourceResponse (see #132978).
+		// Plugins can report final device health in the unprepare response, which
+		// is processed above before we delete the claim info.
 
 		// Delete all claimInfos from the cache that have just been unprepared.
 		for _, claimName := range claimNamesMap {

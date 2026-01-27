@@ -205,6 +205,45 @@ type Device struct {
 	ShareID *types.UID
 }
 
+// UnprepareResult contains the result of unpreparing a single ResourceClaim.
+type UnprepareResult struct {
+	// Err, if non-nil, describes a problem that occurred while unpreparing
+	// the ResourceClaim.
+	Err error
+
+	// DeviceHealths contains the health status of devices at the time of unprepare.
+	// This is optional. If provided, the kubelet will use this to update the pod's
+	// allocated resources status before cleaning up the claim info.
+	// This allows plugins to report final device health synchronously,
+	// ensuring health status is captured even for terminated pods.
+	DeviceHealths []DeviceHealth
+}
+
+// DeviceHealth represents the health status of a single device.
+type DeviceHealth struct {
+	// PoolName is the name of the pool where the device is allocated.
+	PoolName string
+
+	// DeviceName is the name of the device within the pool.
+	DeviceName string
+
+	// Health is the health status of the device.
+	// Valid values are: "Healthy", "Unhealthy", "Unknown".
+	Health string
+}
+
+// DRAPluginWithUnprepareHealth is an optional interface that DRAPlugin implementations
+// can implement to return device health status when unpreparing resources.
+// If a plugin implements this interface, UnprepareResourceClaimsWithHealth will be
+// called instead of UnprepareResourceClaims.
+type DRAPluginWithUnprepareHealth interface {
+	DRAPlugin
+
+	// UnprepareResourceClaimsWithHealth is like UnprepareResourceClaims but returns
+	// structured UnprepareResult that can include device health status.
+	UnprepareResourceClaimsWithHealth(ctx context.Context, claims []NamespacedObject) (result map[types.UID]UnprepareResult, err error)
+}
+
 // Option implements the functional options pattern for Start.
 type Option func(o *options) error
 
@@ -931,12 +970,47 @@ func (d *nodePluginImplementation) NodeUnprepareResources(ctx context.Context, r
 	for _, claim := range req.Claims {
 		claims = append(claims, NamespacedObject{UID: types.UID(claim.Uid), NamespacedName: types.NamespacedName{Name: claim.Name, Namespace: claim.Namespace}})
 	}
+
+	resp := &drapbv1.NodeUnprepareResourcesResponse{Claims: map[string]*drapbv1.NodeUnprepareResourceResponse{}}
+
+	// Check if the plugin supports returning health status on unprepare.
+	if pluginWithHealth, ok := d.plugin.(DRAPluginWithUnprepareHealth); ok {
+		result, err := pluginWithHealth.UnprepareResourceClaimsWithHealth(ctx, claims)
+		if err != nil {
+			return nil, fmt.Errorf("unprepare resource claims with health: %w", err)
+		}
+		for uid, unprepareResult := range result {
+			claimResp := &drapbv1.NodeUnprepareResourceResponse{
+				Error: errorString(unprepareResult.Err),
+			}
+			// Convert device health to proto format.
+			for _, dh := range unprepareResult.DeviceHealths {
+				var healthStatus drapbv1.HealthStatus
+				switch dh.Health {
+				case "Healthy":
+					healthStatus = drapbv1.HealthStatus_HEALTHY
+				case "Unhealthy":
+					healthStatus = drapbv1.HealthStatus_UNHEALTHY
+				default:
+					healthStatus = drapbv1.HealthStatus_UNKNOWN
+				}
+				claimResp.DeviceHealths = append(claimResp.DeviceHealths, &drapbv1.DeviceHealth{
+					PoolName:   dh.PoolName,
+					DeviceName: dh.DeviceName,
+					Health:     healthStatus,
+				})
+			}
+			resp.Claims[string(uid)] = claimResp
+		}
+		return resp, nil
+	}
+
+	// Fall back to the basic interface without health status.
 	result, err := d.plugin.UnprepareResourceClaims(ctx, claims)
 	if err != nil {
 		return nil, fmt.Errorf("unprepare resource claims: %w", err)
 	}
 
-	resp := &drapbv1.NodeUnprepareResourcesResponse{Claims: map[string]*drapbv1.NodeUnprepareResourceResponse{}}
 	for uid, err := range result {
 		resp.Claims[string(uid)] = &drapbv1.NodeUnprepareResourceResponse{
 			Error: errorString(err),
