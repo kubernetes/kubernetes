@@ -37,6 +37,15 @@ import (
 	"k8s.io/utils/cpuset"
 )
 
+type alignHintMode int
+
+const (
+	// alignHintNUMAOnly uses the exact NUMA nodes from the hint.
+	alignHintNUMAOnly alignHintMode = iota
+	// alignHintNUMAToSocket expands NUMA hints to cover the full socket.
+	alignHintNUMAToSocket
+)
+
 const (
 
 	// PolicyStatic is the name of the static policy.
@@ -449,19 +458,36 @@ func (p *staticPolicy) allocateCPUs(logger logr.Logger, s state.State, numCPUs i
 	// If there are aligned CPUs in numaAffinity, attempt to take those first.
 	result := topology.EmptyAllocation()
 	if numaAffinity != nil {
-		alignedCPUs := p.getAlignedCPUs(numaAffinity, allocatableCPUs)
+		if p.options.AlignBySocket {
+			if p.topology.NumNUMANodes >= p.topology.NumSockets {
+				// Multiple NUMA nodes per socket: first try to allocate from
+				// the exact NUMA nodes in the hint.
+				preferredCPUs := p.getAlignedCPUs(numaAffinity, allocatableCPUs, alignHintNUMAOnly)
+				allocated, err := p.allocateFromCPUSet(logger, preferredCPUs, numCPUs, "AllocateCPUs from preferred NUMA nodes")
+				if err != nil {
+					return topology.EmptyAllocation(), err
+				}
+				result.CPUs = result.CPUs.Union(allocated)
+			}
 
-		numAlignedToAlloc := alignedCPUs.Size()
-		if numCPUs < numAlignedToAlloc {
-			numAlignedToAlloc = numCPUs
+			// If we still need more CPUs, expand to socket-aligned CPUs.
+			if result.CPUs.Size() < numCPUs {
+				alignedCPUs := p.getAlignedCPUs(numaAffinity, allocatableCPUs, alignHintNUMAToSocket)
+				remainingAlignedCPUs := alignedCPUs.Difference(result.CPUs)
+				allocated, err := p.allocateFromCPUSet(logger, remainingAlignedCPUs, numCPUs-result.CPUs.Size(), "AllocateCPUs from socket-aligned NUMA nodes")
+				if err != nil {
+					return topology.EmptyAllocation(), err
+				}
+				result.CPUs = result.CPUs.Union(allocated)
+			}
+		} else {
+			alignedCPUs := p.getAlignedCPUs(numaAffinity, allocatableCPUs, alignHintNUMAOnly)
+			allocated, err := p.allocateFromCPUSet(logger, alignedCPUs, numCPUs, "AllocateCPUs from NUMA-aligned CPUs")
+			if err != nil {
+				return topology.EmptyAllocation(), err
+			}
+			result.CPUs = result.CPUs.Union(allocated)
 		}
-
-		allocatedCPUs, err := p.takeByTopology(logger, alignedCPUs, numAlignedToAlloc)
-		if err != nil {
-			return topology.EmptyAllocation(), err
-		}
-
-		result.CPUs = result.CPUs.Union(allocatedCPUs)
 	}
 
 	// Get any remaining CPUs from what's leftover after attempting to grab aligned ones.
@@ -751,15 +777,30 @@ func (p *staticPolicy) isHintSocketAligned(hint topologymanager.TopologyHint, mi
 	return p.topology.CPUDetails.SocketsInNUMANodes(numaNodesBitMask...).Size() == minSockets
 }
 
-// getAlignedCPUs return set of aligned CPUs based on numa affinity mask and configured policy options.
-func (p *staticPolicy) getAlignedCPUs(numaAffinity bitmask.BitMask, allocatableCPUs cpuset.CPUSet) cpuset.CPUSet {
+// allocateFromCPUSet allocates up to needed CPUs from the given CPU set using
+// takeByTopology and returns the allocated CPUs.
+func (p *staticPolicy) allocateFromCPUSet(logger logr.Logger, available cpuset.CPUSet, needed int, logMsg string) (cpuset.CPUSet, error) {
+	numToAlloc := min(available.Size(), needed)
+	if numToAlloc == 0 {
+		return cpuset.New(), nil
+	}
+	allocated, err := p.takeByTopology(logger, available, numToAlloc)
+	if err != nil {
+		return cpuset.New(), err
+	}
+	logger.V(4).Info(logMsg, "allocated", allocated.String(), "numAllocated", allocated.Size())
+	return allocated, nil
+}
+
+// getAlignedCPUs return set of aligned CPUs based on numa affinity mask.
+// If scope is alignHintNUMAToSocket, NUMA based hint is expanded to socket aligned hint.
+// It will ensure that first socket aligned available CPUs are allocated before
+// we try to find CPUs across socket to satisfy allocation request.
+func (p *staticPolicy) getAlignedCPUs(numaAffinity bitmask.BitMask, allocatableCPUs cpuset.CPUSet, scope alignHintMode) cpuset.CPUSet {
 	alignedCPUs := cpuset.New()
 	numaBits := numaAffinity.GetBits()
 
-	// If align-by-socket policy option is enabled, NUMA based hint is expanded to
-	// socket aligned hint. It will ensure that first socket aligned available CPUs are
-	// allocated before we try to find CPUs across socket to satisfy allocation request.
-	if p.options.AlignBySocket {
+	if scope == alignHintNUMAToSocket {
 		socketBits := p.topology.CPUDetails.SocketsInNUMANodes(numaBits...).UnsortedList()
 		for _, socketID := range socketBits {
 			alignedCPUs = alignedCPUs.Union(allocatableCPUs.Intersection(p.topology.CPUDetails.CPUsInSockets(socketID)))
