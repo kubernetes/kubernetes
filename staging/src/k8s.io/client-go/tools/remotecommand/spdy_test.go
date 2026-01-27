@@ -38,7 +38,6 @@ import (
 	remotecommandconsts "k8s.io/apimachinery/pkg/util/remotecommand"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
-	"k8s.io/klog/v2/ktesting"
 )
 
 type AttachFunc func(in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan TerminalSize) error
@@ -329,7 +328,6 @@ func (w *writeDetector) Write(p []byte) (n int, err error) {
 // and expects the deferred close of the connection leads to the exit of the goroutine on cancellation.
 // This test verifies that works.
 func TestStreamExitsAfterConnectionIsClosed(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
 	writeDetector := newWriterDetector(&fakeEmptyDataPty{})
 	options := StreamOptions{
 		Stdin:  &fakeEmptyDataPty{},
@@ -354,7 +352,7 @@ func TestStreamExitsAfterConnectionIsClosed(t *testing.T) {
 
 	errorChan := make(chan error)
 	go func() {
-		errorChan <- streamer.stream(logger, conn, nil)
+		errorChan <- streamer.stream(conn, nil)
 	}()
 
 	// Wait until stream goroutine starts.

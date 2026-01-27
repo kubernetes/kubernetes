@@ -25,7 +25,6 @@ import (
 
 const ContentTypeOpenAPIV3PB = "application/com.github.proto-openapi.spec.v3@v1.0+protobuf"
 
-// Deprecated: use GroupVersionWithContext instead.
 type GroupVersion interface {
 	Schema(contentType string) ([]byte, error)
 
@@ -36,61 +35,22 @@ type GroupVersion interface {
 	ServerRelativeURL() string
 }
 
-type GroupVersionWithContext interface {
-	SchemaWithContext(ctx context.Context, contentType string) ([]byte, error)
-
-	// ServerRelativeURL. Returns the path and parameters used to fetch the schema.
-	// You should use the Schema method to fetch it, but this value can be used
-	// to key the current version of the schema in a cache since it contains a
-	// hash string which changes upon schema update.
-	ServerRelativeURL() string
-}
-
-func ToGroupVersionWithContext(gv GroupVersion) GroupVersionWithContext {
-	if gv == nil {
-		return nil
-	}
-	if gv, ok := gv.(GroupVersionWithContext); ok {
-		return gv
-	}
-	return &groupVersionWrapper{
-		GroupVersion: gv,
-	}
-}
-
-type groupVersionWrapper struct {
-	GroupVersion
-}
-
-func (gv *groupVersionWrapper) SchemaWithContext(ctx context.Context, contentType string) ([]byte, error) {
-	return gv.Schema(contentType)
-}
-
 type groupversion struct {
 	client          *client
 	item            handler3.OpenAPIV3DiscoveryGroupVersion
 	useClientPrefix bool
 }
 
-var (
-	_ GroupVersion            = &groupversion{}
-	_ GroupVersionWithContext = &groupversion{}
-)
-
 func newGroupVersion(client *client, item handler3.OpenAPIV3DiscoveryGroupVersion, useClientPrefix bool) *groupversion {
 	return &groupversion{client: client, item: item, useClientPrefix: useClientPrefix}
 }
 
 func (g *groupversion) Schema(contentType string) ([]byte, error) {
-	return g.SchemaWithContext(context.Background(), contentType)
-}
-
-func (g *groupversion) SchemaWithContext(ctx context.Context, contentType string) ([]byte, error) {
 	if !g.useClientPrefix {
 		return g.client.restClient.Get().
 			RequestURI(g.item.ServerRelativeURL).
 			SetHeader("Accept", contentType).
-			Do(ctx).
+			Do(context.TODO()).
 			Raw()
 	}
 
@@ -112,7 +72,7 @@ func (g *groupversion) SchemaWithContext(ctx context.Context, contentType string
 		}
 	}
 
-	return path.Do(ctx).Raw()
+	return path.Do(context.TODO()).Raw()
 }
 
 // URL used for fetching the schema. The URL includes a hash and can be used

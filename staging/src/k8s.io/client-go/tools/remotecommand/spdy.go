@@ -121,7 +121,6 @@ func (e *spdyStreamExecutor) newConnectionAndStream(ctx context.Context, options
 
 	var streamer streamProtocolHandler
 
-	logger := klog.FromContext(ctx)
 	switch protocol {
 	case remotecommand.StreamProtocolV5Name:
 		streamer = newStreamProtocolV5(options)
@@ -132,7 +131,7 @@ func (e *spdyStreamExecutor) newConnectionAndStream(ctx context.Context, options
 	case remotecommand.StreamProtocolV2Name:
 		streamer = newStreamProtocolV2(options)
 	case "":
-		logger.V(4).Info("The server did not negotiate a streaming protocol version, falling back", "protocol", remotecommand.StreamProtocolV1Name)
+		klog.V(4).Infof("The server did not negotiate a streaming protocol version. Falling back to %s", remotecommand.StreamProtocolV1Name)
 		fallthrough
 	case remotecommand.StreamProtocolV1Name:
 		streamer = newStreamProtocolV1(options)
@@ -162,7 +161,7 @@ func (e *spdyStreamExecutor) StreamWithContext(ctx context.Context, options Stre
 		// The SPDY executor does not need to synchronize stream creation, so we pass a nil
 		// ready channel. The underlying spdystream library handles stream multiplexing
 		// without a race condition.
-		errorChan <- streamer.stream(klog.FromContext(ctx), conn, nil)
+		errorChan <- streamer.stream(conn, nil)
 	}()
 
 	select {

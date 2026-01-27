@@ -25,7 +25,6 @@ import (
 
 func init() {
 	if err := rest.RegisterAuthProviderPlugin("azure", newAzureAuthProvider); err != nil {
-		//nolint:logcheck // Should not happen.
 		klog.Fatalf("Failed to register azure auth plugin: %v", err)
 	}
 }

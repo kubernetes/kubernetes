@@ -17,7 +17,6 @@ limitations under the License.
 package wsstream
 
 import (
-	"context"
 	"encoding/base64"
 	"io"
 	"net/http"
@@ -27,7 +26,6 @@ import (
 	"golang.org/x/net/websocket"
 
 	"k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/klog/v2"
 )
 
 // The WebSocket subprotocol "binary.k8s.io" will only send messages to the
@@ -58,7 +56,6 @@ func NewDefaultReaderProtocols() map[string]ReaderProtocolConfig {
 
 // Reader supports returning an arbitrary byte stream over a websocket channel.
 type Reader struct {
-	logger           klog.Logger
 	err              chan error
 	r                io.Reader
 	ping             bool
@@ -66,7 +63,7 @@ type Reader struct {
 	protocols        map[string]ReaderProtocolConfig
 	selectedProtocol string
 
-	handleCrash func(ctx context.Context, additionalHandlers ...func(context.Context, interface{})) // overridable for testing
+	handleCrash func(additionalHandlers ...func(interface{})) // overridable for testing
 }
 
 // NewReader creates a WebSocket pipe that will copy the contents of r to a provided
@@ -75,26 +72,13 @@ type Reader struct {
 //
 // The protocols parameter maps subprotocol names to StreamProtocols. The empty string
 // subprotocol name is used if websocket.Config.Protocol is empty.
-//
-//logcheck:context // NewReaderWithLogger should be used instead of NewReader in code which supports contextual logging.
 func NewReader(r io.Reader, ping bool, protocols map[string]ReaderProtocolConfig) *Reader {
-	return NewReaderWithLogger(klog.Background(), r, ping, protocols)
-}
-
-// NewReaderWithLogger creates a WebSocket pipe that will copy the contents of r to a provided
-// WebSocket connection. If ping is true, a zero length message will be sent to the client
-// before the stream begins reading.
-//
-// The protocols parameter maps subprotocol names to StreamProtocols. The empty string
-// subprotocol name is used if websocket.Config.Protocol is empty.
-func NewReaderWithLogger(logger klog.Logger, r io.Reader, ping bool, protocols map[string]ReaderProtocolConfig) *Reader {
 	return &Reader{
-		logger:      logger,
 		r:           r,
 		err:         make(chan error),
 		ping:        ping,
 		protocols:   protocols,
-		handleCrash: runtime.HandleCrashWithContext,
+		handleCrash: runtime.HandleCrash,
 	}
 }
 
@@ -116,7 +100,7 @@ func (r *Reader) handshake(config *websocket.Config, req *http.Request) error {
 // method completes.
 func (r *Reader) Copy(w http.ResponseWriter, req *http.Request) error {
 	go func() {
-		defer r.handleCrash(req.Context())
+		defer r.handleCrash()
 		websocket.Server{Handshake: r.handshake, Handler: r.handle}.ServeHTTP(w, req)
 	}()
 	return <-r.err
@@ -138,10 +122,10 @@ func (r *Reader) handle(ws *websocket.Conn) {
 	defer closeConn()
 
 	go func() {
-		defer runtime.HandleCrashWithLogger(r.logger)
+		defer runtime.HandleCrash()
 		// This blocks until the connection is closed.
 		// Client should not send anything.
-		IgnoreReceivesWithLogger(r.logger, ws, r.timeout)
+		IgnoreReceives(ws, r.timeout)
 		// Once the client closes, we should also close
 		closeConn()
 	}()

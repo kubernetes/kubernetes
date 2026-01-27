@@ -21,7 +21,7 @@ import (
 	"io"
 	"net/http"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/klog/v2"
 )
@@ -31,7 +31,6 @@ import (
 // non-interactive stdin data has ended. See https://issues.k8s.io/13394 and
 // https://issues.k8s.io/13395 for more details.
 type streamProtocolV1 struct {
-	logger klog.Logger
 	StreamOptions
 
 	errorStream  httpstream.Stream
@@ -48,15 +47,15 @@ func newStreamProtocolV1(options StreamOptions) streamProtocolHandler {
 	}
 }
 
-func (p *streamProtocolV1) stream(logger klog.Logger, conn streamCreator, ready chan<- struct{}) error {
+func (p *streamProtocolV1) stream(conn streamCreator, ready chan<- struct{}) error {
 	doneChan := make(chan struct{}, 2)
 	errorChan := make(chan error)
 
 	cp := func(s string, dst io.Writer, src io.Reader) {
-		p.logger.V(6).Info("Copying", "data", s)
-		defer p.logger.V(6).Info("Done copying", "data", s)
+		klog.V(6).Infof("Copying %s", s)
+		defer klog.V(6).Infof("Done copying %s", s)
 		if _, err := io.Copy(dst, src); err != nil && err != io.EOF {
-			p.logger.Error(err, "Error copying", "data", s)
+			klog.Errorf("Error copying %s: %v", s, err)
 		}
 		if s == v1.StreamTypeStdout || s == v1.StreamTypeStderr {
 			doneChan <- struct{}{}
