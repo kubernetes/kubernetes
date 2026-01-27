@@ -17,12 +17,12 @@ limitations under the License.
 package ktesting
 
 import (
-	"bytes"
+	"io"
 	"os"
 	"testing"
-	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/onsi/gomega"
+	"go.uber.org/goleak"
 )
 
 func TestStepContext(t *testing.T) {
@@ -65,33 +65,58 @@ func TestStepContext(t *testing.T) {
 	step: Error a b 42
 `,
 		},
-		"progress": {
-			cb: func(tCtx TContext) {
-				tCtx = WithStep(tCtx, "step")
-				var buffer bytes.Buffer
-				oldOut := defaultProgressReporter.setOutput(&buffer)
-				defer defaultProgressReporter.setOutput(oldOut)
-				remove := tCtx.Value("GINKGO_SPEC_CONTEXT").(ginkgoReporter).AttachProgressReporter(func() string { return "hello world" })
-				defer remove()
-				defaultSignalChannel <- os.Interrupt
-				// No good way to sync here, so let's just wait.
-				time.Sleep(5 * time.Second)
-				defaultProgressReporter.setOutput(oldOut)
-				tCtx.Log(buffer.String())
-
-				noSuchValue := tCtx.Value("some other key")
-				assert.Nil(tCtx, noSuchValue, "value for unknown context value key")
-			},
-			expectTrace: `(LOG) <klog header>: step: You requested a progress report.
-	
-	step: hello world
-`,
-			expectDuration: 5 * time.Second,
-		},
 	} {
 		tc := tc
 		t.Run(name, func(t *testing.T) {
 			tc.run(t)
 		})
 	}
+}
+
+func TestProgressReport(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t)
+	})
+
+	oldOut := defaultProgressReporter.out
+	reportStream := newOutputStream()
+	defaultProgressReporter.out = reportStream
+	t.Cleanup(func() {
+		defaultProgressReporter.out = oldOut
+	})
+
+	// This must use a real testing.T, otherwise Init doesn't initialize signal handling.
+	tCtx := Init(t)
+	tCtx = WithStep(tCtx, "step")
+	removeReporter := tCtx.Value("GINKGO_SPEC_CONTEXT").(ginkgoReporter).AttachProgressReporter(func() string { return "hello world" })
+	defer removeReporter()
+	tCtx.Expect(tCtx.Value("some other key")).To(gomega.BeNil(), "value for unknown context value key")
+
+	// Trigger report and wait for it.
+	defaultProgressReporter.progressChannel <- os.Interrupt
+	report := <-reportStream.stream
+	tCtx.Expect(report).To(gomega.Equal(`You requested a progress report.
+
+step: hello world
+`), "report")
+}
+
+// outputStream forwards exactly one Write call to a stream.
+// A second Write call is an error and will panic.
+type outputStream struct {
+	stream chan string
+}
+
+var _ io.Writer = &outputStream{}
+
+func newOutputStream() *outputStream {
+	return &outputStream{
+		stream: make(chan string),
+	}
+}
+
+func (s *outputStream) Write(buf []byte) (int, error) {
+	s.stream <- string(buf)
+	close(s.stream)
+	return len(buf), nil
 }
