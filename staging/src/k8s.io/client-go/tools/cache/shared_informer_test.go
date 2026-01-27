@@ -245,8 +245,13 @@ func testListenerResyncPeriods(t *testing.T, startupDelay time.Duration) {
 		t.Logf("%s: %s", delta, msg)
 	}
 
-	sharedProcessorRunDelay.Store(&startupDelay)
-	defer sharedProcessorRunDelay.Store(nil)
+	if startupDelay > 0 {
+		hook := func() {
+			time.Sleep(startupDelay)
+		}
+		sharedProcessorRunHook.Store(&hook)
+		defer sharedProcessorRunHook.Store(nil)
+	}
 
 	// source simulates an apiserver object endpoint.
 	source := newFakeControllerSource(t)
