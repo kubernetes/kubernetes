@@ -105,6 +105,177 @@ func (cl *candidateList) get() []Candidate {
 	return cl.items[:cl.size()]
 }
 
+type Preemptor interface {
+	Priority() int32
+	PreemptionPolicy() *v1.PreemptionPolicy
+	IsWorkload() bool
+	Members() []*v1.Pod
+}
+
+type preemptor struct {
+	Preemptor
+	priority         int32
+	pods             []*v1.Pod
+	preemptionPolicy *v1.PreemptionPolicy
+	isWorkload       bool
+}
+
+func NewPodPreemptor(p *v1.Pod) Preemptor {
+	return &preemptor{
+		priority:         corev1helpers.PodPriority(p),
+		pods:             []*v1.Pod{p},
+		preemptionPolicy: p.Spec.PreemptionPolicy,
+		isWorkload:       false,
+	}
+}
+
+func NewWorkloadPreemptor(pod *v1.Pod, priority int32, members []*v1.Pod, policy *v1.PreemptionPolicy) Preemptor {
+	// if any pod is not .... .
+	return &preemptor{
+		priority:         priority,
+		pods:             members,
+		isWorkload:       true,
+		preemptionPolicy: policy,
+	}
+}
+
+func (p *preemptor) Priority() int32 {
+	return p.priority
+}
+
+func (p *preemptor) IsWorkload() bool {
+	return p.isWorkload
+}
+
+func (p *preemptor) Members() []*v1.Pod {
+	return p.pods
+}
+
+func (p *preemptor) PreemptionPolicy() *v1.PreemptionPolicy {
+	return p.preemptionPolicy
+}
+
+type Domain interface {
+	Nodes() []fwk.NodeInfo
+	GetAllPossibleVictims() []PreemptionUnit
+	GetName() string
+	Snapshot() Domain
+}
+
+type domain struct {
+	Domain
+	nodes      []fwk.NodeInfo
+	nameToNode map[string]fwk.NodeInfo
+}
+
+func (d *domain) Nodes() []fwk.NodeInfo {
+	return d.nodes
+}
+
+// For now it considers only single pod as victim
+func (d *domain) GetAllPossibleVictims() []PreemptionUnit {
+
+	processedPodGroups := make(map[string]bool)
+	transformIntoPreemptionUnit := func(pi fwk.PodInfo) PreemptionUnit {
+		if pi.GetPod().Spec.WorkloadRef != nil {
+			// 1. TODO: Check via premption policy if it should preempted as a gang
+			// 2. If group already transformed
+			if processedPodGroups[pi.GetPod().Spec.WorkloadRef.PodGroup] {
+				return nil
+			}
+			// 2. TODO: Collect all pods from the podGroup
+			// 4. newPreeptionUnit(pods)
+			// 3. Mark podGroup as processed
+			processedPodGroups[pi.GetPod().Spec.WorkloadRef.PodGroup] = true
+		}
+
+		return d.newPreemptionUnit([]fwk.PodInfo{pi}, corev1helpers.PodPriority(pi.GetPod()))
+	}
+
+	var allVictims []PreemptionUnit
+	for _, nodeInfo := range d.nodes {
+		for _, pi := range nodeInfo.GetPods() {
+			preemptionUnit := transformIntoPreemptionUnit(pi)
+			if preemptionUnit != nil {
+				allVictims = append(allVictims, preemptionUnit)
+			}
+		}
+	}
+
+	return allVictims
+
+	//TODO: need to consider the podGroup as a victim
+	// 1. Check if pod is a part of PodGroup that should be preempted as a Gang
+	// 2. Collect all pods for considered PodGroup into the same Victim (also pods out of selected domain)
+}
+
+func (d *domain) Snapshot() Domain {
+	var snapshotNodes []fwk.NodeInfo
+	for _, node := range d.nodes {
+		snapshotNodes = append(snapshotNodes, node.Snapshot())
+	}
+	nameToNode := make(map[string]fwk.NodeInfo)
+	for _, node := range snapshotNodes {
+		nameToNode[node.Node().Name] = node
+	}
+	return &domain{
+		nodes:      snapshotNodes,
+		nameToNode: nameToNode,
+	}
+}
+
+type PreemptionUnit interface {
+	Priority() int32
+	IsWorkload() bool
+	AffectedNodes() map[string]fwk.NodeInfo
+	Pods() []fwk.PodInfo
+}
+
+type preemptionUnit struct {
+	PreemptionUnit
+	pods          []fwk.PodInfo
+	priority      int32
+	affectedNodes map[string]fwk.NodeInfo //TODO: should I store that here?
+	isWorkload    bool
+}
+
+func (d *domain) newPreemptionUnit(pods []fwk.PodInfo, priority int32) PreemptionUnit {
+	nodes := make(map[string]fwk.NodeInfo)
+
+	for _, pi := range pods {
+		nodeName := pi.GetPod().Spec.NodeName
+		node := d.nameToNode[nodeName]
+		if node == nil {
+			// TODO fetch nodeInfo is it's outside the domain
+		}
+
+		nodes[nodeName] = node
+	}
+
+	return &preemptionUnit{
+		affectedNodes: nodes,
+		priority:      priority,
+		isWorkload:    len(pods) > 1,
+		pods:          pods,
+	}
+}
+
+func (pu *preemptionUnit) Pods() []fwk.PodInfo {
+	return pu.pods
+}
+
+func (pu *preemptionUnit) Priority() int32 {
+	return pu.priority
+}
+
+func (pu *preemptionUnit) IsWorkload() bool {
+	return pu.isWorkload
+}
+
+func (pu *preemptionUnit) AffectedNodes() map[string]fwk.NodeInfo {
+	return pu.affectedNodes
+}
+
 // Interface is expected to be implemented by different preemption plugins as all those member
 // methods might have different behavior compared with the default preemption.
 type Interface interface {
@@ -121,11 +292,12 @@ type Interface interface {
 	// Note that both `state` and `nodeInfo` are deep copied.
 	SelectVictimsOnNode(ctx context.Context, state fwk.CycleState,
 		pod *v1.Pod, nodeInfo fwk.NodeInfo, pdbs []*policy.PodDisruptionBudget) ([]*v1.Pod, int, *fwk.Status)
+	SelectVictimsOnDomain(ctx context.Context, state fwk.CycleState, preemptor Preemptor, domain Domain, pdbs []*policy.PodDisruptionBudget) ([]*v1.Pod, int, *fwk.Status)
 	// OrderedScoreFuncs returns a list of ordered score functions to select preferable node where victims will be preempted.
-	// The ordered score functions will be processed one by one iff we find more than one node with the highest score.
+	// The ordered score functions will be processed one by one if we find more than one node with the highest score.
 	// Default score functions will be processed if nil returned here for backwards-compatibility.
 	OrderedScoreFuncs(ctx context.Context, nodesToVictims map[string]*extenderv1.Victims) []func(node string) int64
-}
+} //TODO do we need another interface
 
 type Evaluator struct {
 	PluginName string
@@ -269,42 +441,48 @@ func (ev *Evaluator) IsPodRunningPreemption(podUID types.UID) bool {
 //
 //   - <non-nil PostFilterResult, Success>. It's the regular happy path
 //     and the non-empty nominatedNodeName will be applied to the preemptor pod.
-func (ev *Evaluator) Preempt(ctx context.Context, state fwk.CycleState, pod *v1.Pod, m fwk.NodeToStatusReader) (*fwk.PostFilterResult, *fwk.Status) {
+func (ev *Evaluator) Preempt(ctx context.Context, state fwk.CycleState, preemptor Preemptor, m fwk.NodeToStatusReader) (*fwk.PostFilterResult, *fwk.Status) {
 	logger := klog.FromContext(ctx)
 
-	// 0) Fetch the latest version of <pod>.
-	// It's safe to directly fetch pod here. Because the informer cache has already been
-	// initialized when creating the Scheduler obj.
-	// However, tests may need to manually initialize the shared pod informer.
-	podNamespace, podName := pod.Namespace, pod.Name
-	pod, err := ev.PodLister.Pods(pod.Namespace).Get(pod.Name)
+	if preemptor.PreemptionPolicy() != nil && *preemptor.PreemptionPolicy() == v1.PreemptNever {
+		return nil, fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "Preemptor couldn't preempt other victims because of preemptionPolicy: never")
+	}
+
+	for _, pod := range preemptor.Members() {
+		// 0) Fetch the latest version of <pod>.
+		// It's safe to directly fetch pod here. Because the informer cache has already been
+		// initialized when creating the Scheduler obj.
+		// However, tests may need to manually initialize the shared pod informer.
+		podNamespace, podName := pod.Namespace, pod.Name
+		pod, err := ev.PodLister.Pods(pod.Namespace).Get(pod.Name)
+		if err != nil {
+			logger.Error(err, "Could not get the updated preemptor pod object", "pod", klog.KRef(podNamespace, podName))
+			return nil, fwk.AsStatus(err)
+		}
+
+		// 1) Ensure that pod related to the preemptor is eligible to preempt other pods.
+		nominatedNodeStatus := m.Get(pod.Status.NominatedNodeName)
+		if ok, msg := ev.PodEligibleToPreemptOthers(ctx, pod, nominatedNodeStatus); !ok {
+			logger.V(5).Info("Pod is not eligible for preemption", "pod", klog.KObj(pod), "reason", msg)
+			return nil, fwk.NewStatus(fwk.Unschedulable, msg)
+		}
+	}
+
+	domains, allNodes, err := ev.newDomains(preemptor, m)
 	if err != nil {
-		logger.Error(err, "Could not get the updated preemptor pod object", "pod", klog.KRef(podNamespace, podName))
 		return nil, fwk.AsStatus(err)
 	}
 
-	// 1) Ensure the preemptor is eligible to preempt other pods.
-	nominatedNodeStatus := m.Get(pod.Status.NominatedNodeName)
-	if ok, msg := ev.PodEligibleToPreemptOthers(ctx, pod, nominatedNodeStatus); !ok {
-		logger.V(5).Info("Pod is not eligible for preemption", "pod", klog.KObj(pod), "reason", msg)
-		return nil, fwk.NewStatus(fwk.Unschedulable, msg)
-	}
-
-	// 2) Find all preemption candidates.
-	allNodes, err := ev.Handler.SnapshotSharedLister().NodeInfos().List()
-	if err != nil {
-		return nil, fwk.AsStatus(err)
-	}
-	candidates, nodeToStatusMap, err := ev.findCandidates(ctx, state, allNodes, pod, m)
+	candidates, nodeToStatusMap, err := ev.findCandidates(ctx, state, domains, preemptor, m)
 	if err != nil && len(candidates) == 0 {
 		return nil, fwk.AsStatus(err)
 	}
 
 	// Return a FitError only when there are no candidates that fit the pod.
 	if len(candidates) == 0 {
-		logger.V(2).Info("No preemption candidate is found; preemption is not helpful for scheduling", "pod", klog.KObj(pod))
+		// logger.V(2).Info("No preemption candidate is found; preemption is not helpful for scheduling", "pod", klog.KObj())
 		fitError := &framework.FitError{
-			Pod:         pod,
+			Pod:         preemptor.Members()[0], //TODO: not sure, assuming we have single pod as preemptor for now
 			NumAllNodes: len(allNodes),
 			Diagnosis: framework.Diagnosis{
 				NodeToStatus: nodeToStatusMap,
@@ -317,7 +495,7 @@ func (ev *Evaluator) Preempt(ctx context.Context, state fwk.CycleState, pod *v1.
 	}
 
 	// 3) Interact with registered Extenders to filter out some candidates if needed.
-	candidates, status := ev.callExtenders(logger, pod, candidates)
+	candidates, status := ev.callExtenders(logger, preemptor, candidates)
 	if !status.IsSuccess() {
 		return nil, status
 	}
@@ -328,14 +506,18 @@ func (ev *Evaluator) Preempt(ctx context.Context, state fwk.CycleState, pod *v1.
 		return nil, fwk.NewStatus(fwk.Unschedulable, "no candidate node for preemption")
 	}
 
-	logger.V(2).Info("the target node for the preemption is determined", "node", bestCandidate.Name(), "pod", klog.KObj(pod))
+	// logger.V(2).Info("the target node for the preemption is determined", "node", bestCandidate.Name(), "pod", klog.KObj(pod))
 
 	// 5) Perform preparation work before nominating the selected candidate.
 	if ev.enableAsyncPreemption {
-		ev.prepareCandidateAsync(bestCandidate, pod, ev.PluginName)
+		for _, pod := range preemptor.Members() {
+			ev.prepareCandidateAsync(bestCandidate, pod, ev.PluginName)
+		}
 	} else {
-		if status := ev.prepareCandidate(ctx, bestCandidate, pod, ev.PluginName); !status.IsSuccess() {
-			return nil, status
+		for _, pod := range preemptor.Members() {
+			if status := ev.prepareCandidate(ctx, bestCandidate, pod, ev.PluginName); !status.IsSuccess() {
+				return nil, status
+			}
 		}
 	}
 
@@ -344,18 +526,10 @@ func (ev *Evaluator) Preempt(ctx context.Context, state fwk.CycleState, pod *v1.
 
 // FindCandidates calculates a slice of preemption candidates.
 // Each candidate is executable to make the given <pod> schedulable.
-func (ev *Evaluator) findCandidates(ctx context.Context, state fwk.CycleState, allNodes []fwk.NodeInfo, pod *v1.Pod, m fwk.NodeToStatusReader) ([]Candidate, *framework.NodeToStatus, error) {
-	if len(allNodes) == 0 {
-		return nil, nil, errors.New("no nodes available")
-	}
-	logger := klog.FromContext(ctx)
-	// Get a list of nodes with failed predicates (Unschedulable) that may be satisfied by removing pods from the node.
-	potentialNodes, err := m.NodesForStatusCode(ev.Handler.SnapshotSharedLister().NodeInfos(), fwk.Unschedulable)
-	if err != nil {
-		return nil, nil, err
-	}
-	if len(potentialNodes) == 0 {
-		logger.V(3).Info("Preemption will not help schedule pod on any node", "pod", klog.KObj(pod))
+func (ev *Evaluator) findCandidates(ctx context.Context, state fwk.CycleState, domains []Domain, preemptor Preemptor, m fwk.NodeToStatusReader) ([]Candidate, *framework.NodeToStatus, error) {
+	// logger := klog.FromContext(ctx)
+	if len(domains) == 0 {
+		// logger.V(3).Info("Preemption will not help schedule preemptor on any node", "preemptor", klog.KObj(preemptor))
 		return nil, framework.NewDefaultNodeToStatus(), nil
 	}
 
@@ -364,15 +538,15 @@ func (ev *Evaluator) findCandidates(ctx context.Context, state fwk.CycleState, a
 		return nil, nil, err
 	}
 
-	offset, candidatesNum := ev.GetOffsetAndNumCandidates(int32(len(potentialNodes)))
-	return ev.DryRunPreemption(ctx, state, pod, potentialNodes, pdbs, offset, candidatesNum)
+	offset, candidatesNum := ev.GetOffsetAndNumCandidates(int32(len(domains)))
+	return ev.DryRunPreemption(ctx, state, preemptor, domains, pdbs, offset, candidatesNum)
 }
 
 // callExtenders calls given <extenders> to select the list of feasible candidates.
 // We will only check <candidates> with extenders that support preemption.
 // Extenders which do not support preemption may later prevent preemptor from being scheduled on the nominated
 // node. In that case, scheduler will find a different host for the preemptor in subsequent scheduling cycles.
-func (ev *Evaluator) callExtenders(logger klog.Logger, pod *v1.Pod, candidates []Candidate) ([]Candidate, *fwk.Status) {
+func (ev *Evaluator) callExtenders(logger klog.Logger, preemptor Preemptor, candidates []Candidate) ([]Candidate, *fwk.Status) {
 	extenders := ev.Handler.Extenders()
 	nodeLister := ev.Handler.SnapshotSharedLister().NodeInfos()
 	if len(extenders) == 0 {
@@ -386,37 +560,38 @@ func (ev *Evaluator) callExtenders(logger klog.Logger, pod *v1.Pod, candidates [
 		return candidates, nil
 	}
 	for _, extender := range extenders {
-		if !extender.SupportsPreemption() || !extender.IsInterested(pod) {
-			continue
-		}
-		nodeNameToVictims, err := extender.ProcessPreemption(pod, victimsMap, nodeLister)
-		if err != nil {
-			if extender.IsIgnorable() {
-				logger.V(2).Info("Skipped extender as it returned error and has ignorable flag set",
-					"extender", extender.Name(), "err", err)
+		for _, pod := range preemptor.Members() {
+			if !extender.SupportsPreemption() || !extender.IsInterested(pod) {
 				continue
 			}
-			return nil, fwk.AsStatus(err)
-		}
-		// Check if the returned victims are valid.
-		for nodeName, victims := range nodeNameToVictims {
-			if victims == nil || len(victims.Pods) == 0 {
+			nodeNameToVictims, err := extender.ProcessPreemption(pod, victimsMap, nodeLister)
+			if err != nil {
 				if extender.IsIgnorable() {
-					delete(nodeNameToVictims, nodeName)
-					logger.V(2).Info("Ignored node for which the extender didn't report victims", "node", klog.KRef("", nodeName), "extender", extender.Name())
+					logger.V(2).Info("Skipped extender as it returned error and has ignorable flag set",
+						"extender", extender.Name(), "err", err)
 					continue
 				}
-				return nil, fwk.AsStatus(fmt.Errorf("expected at least one victim pod on node %q", nodeName))
+				return nil, fwk.AsStatus(err)
 			}
-		}
+			// Check if the returned victims are valid.
+			for nodeName, victims := range nodeNameToVictims {
+				if victims == nil || len(victims.Pods) == 0 {
+					if extender.IsIgnorable() {
+						delete(nodeNameToVictims, nodeName)
+						logger.V(2).Info("Ignored node for which the extender didn't report victims", "node", klog.KRef("", nodeName), "extender", extender.Name())
+						continue
+					}
+					return nil, fwk.AsStatus(fmt.Errorf("expected at least one victim pod on node %q", nodeName))
+				}
+			}
+			// Replace victimsMap with new result after preemption. So the
+			// rest of extenders can continue use it as parameter.
+			victimsMap = nodeNameToVictims
 
-		// Replace victimsMap with new result after preemption. So the
-		// rest of extenders can continue use it as parameter.
-		victimsMap = nodeNameToVictims
-
-		// If node list becomes empty, no preemption can happen regardless of other extenders.
-		if len(victimsMap) == 0 {
-			break
+			// If node list becomes empty, no preemption can happen regardless of other extenders.
+			if len(victimsMap) == 0 {
+				break
+			}
 		}
 	}
 
@@ -776,7 +951,7 @@ func getLowerPriorityNominatedPods(logger klog.Logger, pn fwk.PodNominator, pod 
 // The number of candidates depends on the constraints defined in the plugin's args. In the returned list of
 // candidates, ones that do not violate PDB are preferred over ones that do.
 // NOTE: This method is exported for easier testing in default preemption.
-func (ev *Evaluator) DryRunPreemption(ctx context.Context, state fwk.CycleState, pod *v1.Pod, potentialNodes []fwk.NodeInfo,
+func (ev *Evaluator) DryRunPreemption(ctx context.Context, state fwk.CycleState, preemptor Preemptor, domains []Domain,
 	pdbs []*policy.PodDisruptionBudget, offset int32, candidatesNum int32) ([]Candidate, *framework.NodeToStatus, error) {
 
 	fh := ev.Handler
@@ -787,16 +962,17 @@ func (ev *Evaluator) DryRunPreemption(ctx context.Context, state fwk.CycleState,
 	nodeStatuses := framework.NewDefaultNodeToStatus()
 
 	logger := klog.FromContext(ctx)
-	logger.V(5).Info("Dry run the preemption", "potentialNodesNumber", len(potentialNodes), "pdbsNumber", len(pdbs), "offset", offset, "candidatesNumber", candidatesNum)
+	logger.V(5).Info("Dry run the preemption", "domainsNumber", len(domains), "pdbsNumber", len(pdbs), "offset", offset, "candidatesNumber", candidatesNum)
 
 	var statusesLock sync.Mutex
 	var errs []error
-	checkNode := func(i int) {
-		nodeInfoCopy := potentialNodes[(int(offset)+i)%len(potentialNodes)].Snapshot()
-		logger.V(5).Info("Check the potential node for preemption", "node", nodeInfoCopy.Node().Name)
+	checkDomain := func(i int) {
+		domain := domains[(int(offset)+i)%len(domains)].Snapshot()
+		logger.V(5).Info("Check the potential domain for preemption", "domain", domain)
 
 		stateCopy := state.Clone()
-		pods, numPDBViolations, status := ev.SelectVictimsOnNode(ctx, stateCopy, pod, nodeInfoCopy, pdbs)
+		pods, numPDBViolations, status := ev.SelectVictimsOnDomain(ctx, stateCopy, preemptor, domain, pdbs)
+
 		if status.IsSuccess() && len(pods) != 0 {
 			victims := extenderv1.Victims{
 				Pods:             pods,
@@ -804,7 +980,7 @@ func (ev *Evaluator) DryRunPreemption(ctx context.Context, state fwk.CycleState,
 			}
 			c := &candidate{
 				victims: &victims,
-				name:    nodeInfoCopy.Node().Name,
+				name:    domain.GetName(),
 			}
 			if numPDBViolations == 0 {
 				nonViolatingCandidates.add(c)
@@ -818,15 +994,60 @@ func (ev *Evaluator) DryRunPreemption(ctx context.Context, state fwk.CycleState,
 			return
 		}
 		if status.IsSuccess() && len(pods) == 0 {
-			status = fwk.AsStatus(fmt.Errorf("expected at least one victim pod on node %q", nodeInfoCopy.Node().Name))
+			status = fwk.AsStatus(fmt.Errorf("expected at least one victim pod on domain %q", domain.GetName()))
 		}
 		statusesLock.Lock()
 		if status.Code() == fwk.Error {
 			errs = append(errs, status.AsError())
 		}
-		nodeStatuses.Set(nodeInfoCopy.Node().Name, status)
+		for _, node := range domain.Nodes() {
+			nodeStatuses.Set(node.Node().Name, status)
+		}
 		statusesLock.Unlock()
 	}
-	fh.Parallelizer().Until(ctx, len(potentialNodes), checkNode, ev.PluginName)
+	fh.Parallelizer().Until(ctx, len(domains), checkDomain, ev.PluginName)
 	return append(nonViolatingCandidates.get(), violatingCandidates.get()...), nodeStatuses, utilerrors.NewAggregate(errs)
+}
+
+func (ev *Evaluator) newDomains(preemptor Preemptor, m fwk.NodeToStatusReader) ([]Domain, []fwk.NodeInfo, error) {
+	allNodes, err := ev.Handler.SnapshotSharedLister().NodeInfos().List()
+	if err != nil {
+		return nil, allNodes, err
+	}
+
+	if len(allNodes) == 0 {
+		return nil, allNodes, errors.New("no nodes available")
+	}
+
+	potentialNodes, err := m.NodesForStatusCode(ev.Handler.SnapshotSharedLister().NodeInfos(), fwk.Unschedulable)
+	if err != nil {
+		return nil, allNodes, err
+	}
+
+	if preemptor.IsWorkload() {
+		// assume for now we have only cluster level
+		nameToNode := make(map[string]fwk.NodeInfo)
+		if len(potentialNodes) == 0 {
+			return []Domain{}, allNodes, nil
+		}
+		for _, node := range potentialNodes {
+			nameToNode[node.Node().Name] = node
+		}
+		return []Domain{&domain{nodes: potentialNodes, nameToNode: nameToNode}}, allNodes, nil
+	}
+
+	domains := make([]Domain, 0, len(potentialNodes))
+	for _, node := range potentialNodes {
+		domains = append(domains, &domain{nodes: []fwk.NodeInfo{node}, nameToNode: map[string]fwk.NodeInfo{node.Node().Name: node}})
+	}
+
+	return domains, allNodes, nil
+}
+
+// TODO: for cluster we can use clusterName, topology???
+func (d *domain) GetName() string {
+	if d.nodes == nil || len(d.nodes) == 0 {
+		return ""
+	} //TODO: Any other naming approach for the
+	return d.nodes[0].Node().Name // TODO: for now assuming that we have only single node for domain
 }
