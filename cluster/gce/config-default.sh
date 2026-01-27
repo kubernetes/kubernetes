@@ -469,17 +469,6 @@ PROMETHEUS_TO_SD_ENDPOINT="${PROMETHEUS_TO_SD_ENDPOINT:-https://monitoring.googl
 PROMETHEUS_TO_SD_PREFIX="${PROMETHEUS_TO_SD_PREFIX:-custom.googleapis.com}"
 ENABLE_PROMETHEUS_TO_SD="${ENABLE_PROMETHEUS_TO_SD:-false}"
 
-# TODO(#51292): Make kube-proxy Daemonset default and remove the configuration here.
-# Optional: [Experiment Only] Run kube-proxy as a DaemonSet if set to true, run as static pods otherwise.
-KUBE_PROXY_DAEMONSET="${KUBE_PROXY_DAEMONSET:-false}" # true, false
-
-# Control whether the startup scripts manage the lifecycle of kube-proxy
-# When true, the startup scripts do not enable kube-proxy either as a daemonset addon or as a static pod
-# regardless of the value of KUBE_PROXY_DAEMONSET.
-# When false, the value of KUBE_PROXY_DAEMONSET controls whether kube-proxy comes up as a static pod or
-# as an addon daemonset.
-KUBE_PROXY_DISABLE="${KUBE_PROXY_DISABLE:-false}" # true, false
-
 # Will be passed into the kube-proxy via `--detect-local-mode`
 DETECT_LOCAL_MODE="${DETECT_LOCAL_MODE:-}"
 
