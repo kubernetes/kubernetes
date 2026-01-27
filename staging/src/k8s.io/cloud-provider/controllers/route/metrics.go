@@ -35,7 +35,7 @@ var (
 		Name:           "route_sync_total",
 		Subsystem:      subsystem,
 		Help:           "A metric counting the amount of times routes have been synced with the cloud provider.",
-		StabilityLevel: metrics.BETA,
+		StabilityLevel: metrics.ALPHA,
 	})
 )
 

@@ -256,12 +256,6 @@
   labels:
   - deprecated_version
   - stability_level
-- name: route_sync_total
-  subsystem: route_controller
-  help: A metric counting the amount of times routes have been synced with the cloud
-    provider.
-  type: Counter
-  stabilityLevel: BETA
 - name: pod_scheduling_sli_duration_seconds
   subsystem: scheduler
   help: E2e latency for a pod being scheduled, from the time the pod enters the scheduling
