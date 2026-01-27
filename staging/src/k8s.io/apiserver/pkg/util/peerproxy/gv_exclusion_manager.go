@@ -193,16 +193,15 @@ func (m *GVExclusionManager) handleGVUpdate() {
 	m.activeGVQueue.Add("sync")
 }
 
-// RunPeerDiscoveryActiveGVTracker runs Worker 1: Active GV Tracker
+// RunPeerDiscoveryActiveGVTracker runs the Active GV Tracker worker.
 // This worker is triggered by CRD/APIService events and
-// rebuilds the active GV set and reaps expired GVs if indicated so.
-func (m *GVExclusionManager) RunPeerDiscoveryActiveGVTracker(ctx context.Context, workers int) {
+// rebuilds the active GV set and reaps expired GVs.
+// Only a single worker is used to avoid race conditions on atomic store operations.
+func (m *GVExclusionManager) RunPeerDiscoveryActiveGVTracker(ctx context.Context) {
 	defer m.activeGVQueue.ShutDown()
 
-	klog.Infof("Starting %d Active GV Tracker worker(s)", workers)
-	for i := 0; i < workers; i++ {
-		go wait.UntilWithContext(ctx, m.runActiveGVTrackerWorker, time.Second)
-	}
+	klog.Info("Starting Active GV Tracker worker")
+	go wait.UntilWithContext(ctx, m.runActiveGVTrackerWorker, time.Second)
 
 	<-ctx.Done()
 	klog.Info("Active GV Tracker workers stopped")
@@ -344,7 +343,7 @@ func (m *GVExclusionManager) RunPeerDiscoveryReaper(ctx context.Context) {
 		select {
 		case <-ticker.C:
 			// Trigger reconciliation which will also reap expired GVs
-			m.activeGVQueue.Add("reap")
+			m.activeGVQueue.Add("sync")
 		case <-ctx.Done():
 			klog.Info("GV Reaper stopped")
 			return
@@ -352,15 +351,13 @@ func (m *GVExclusionManager) RunPeerDiscoveryReaper(ctx context.Context) {
 	}
 }
 
-// RunPeerDiscoveryRefilter runs Worker 2: Peer Discovery Re-filter
+// RunPeerDiscoveryRefilter runs the Peer Discovery Re-filter worker.
 // This worker filters the peer discovery cache using the exclusion set.
-func (m *GVExclusionManager) RunPeerDiscoveryRefilter(ctx context.Context, workers int) {
+func (m *GVExclusionManager) RunPeerDiscoveryRefilter(ctx context.Context) {
 	defer m.refilterQueue.ShutDown()
 
-	klog.Infof("Starting %d Peer Discovery Re-filter worker(s)", workers)
-	for i := 0; i < workers; i++ {
-		go wait.UntilWithContext(ctx, m.runRefilterWorker, time.Second)
-	}
+	klog.Info("Starting Peer Discovery Re-filter worker")
+	go wait.UntilWithContext(ctx, m.runRefilterWorker, time.Second)
 
 	<-ctx.Done()
 	klog.Info("Peer Discovery Re-filter workers stopped")

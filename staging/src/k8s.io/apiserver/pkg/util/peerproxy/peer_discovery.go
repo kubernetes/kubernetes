@@ -117,15 +117,9 @@ func (h *peerProxyHandler) syncPeerDiscoveryCache(ctx context.Context) error {
 
 	// Store unfiltered data to raw cache and trigger refilter.
 	// The refilter worker (single writer to filtered cache) will apply exclusions.
-	h.storeRawPeerDiscoveryCacheAndTriggerRefilter(newCache)
-	return fetchDiscoveryErr
-}
-
-// storeRawPeerDiscoveryCacheAndTriggerRefilter stores the raw (unfiltered) peer discovery cache
-// and immediately refilters to update the filtered cache.
-func (h *peerProxyHandler) storeRawPeerDiscoveryCacheAndTriggerRefilter(newCache map[string]PeerDiscoveryCacheEntry) {
 	h.rawPeerDiscoveryCache.Store(newCache)
 	h.gvExclusionManager.TriggerRefilter()
+	return fetchDiscoveryErr
 }
 
 func (h *peerProxyHandler) fetchNewDiscoveryFor(ctx context.Context, serverID string) (PeerDiscoveryCacheEntry, error) {

@@ -227,9 +227,9 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 			// Run peer-discovery workers
 			s.GenericAPIServer.AddPostStartHookOrDie("peer-discovery-workers", func(context genericapiserver.PostStartHookContext) error {
 				go c.Extra.PeerProxy.RunPeerDiscoveryCacheSync(context, 1)
-				go c.Extra.PeerProxy.RunPeerDiscoveryActiveGVTracker(context, 1)
+				go c.Extra.PeerProxy.RunPeerDiscoveryActiveGVTracker(context)
 				go c.Extra.PeerProxy.RunPeerDiscoveryReaper(context)
-				go c.Extra.PeerProxy.RunPeerDiscoveryRefilter(context, 1)
+				go c.Extra.PeerProxy.RunPeerDiscoveryRefilter(context)
 				return nil
 			})
 		}

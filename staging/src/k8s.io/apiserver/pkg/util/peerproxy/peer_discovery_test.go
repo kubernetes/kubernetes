@@ -192,7 +192,7 @@ func TestRunPeerDiscoveryCacheSync(t *testing.T) {
 			}
 
 			go h.RunPeerDiscoveryCacheSync(ctx, 1)
-			go h.RunPeerDiscoveryRefilter(ctx, 1)
+			go h.RunPeerDiscoveryRefilter(ctx)
 
 			// Wait for initial cache update.
 			initialCache := map[string]PeerDiscoveryCacheEntry{}

@@ -101,7 +101,7 @@ type Interface interface {
 	// events to rebuild the set of actively served GroupVersions. This worker is triggered
 	// whenever a CRD or APIService is added or updated and updates the exclusion
 	// set accordingly.
-	RunPeerDiscoveryActiveGVTracker(ctx context.Context, workers int)
+	RunPeerDiscoveryActiveGVTracker(ctx context.Context)
 
 	// RunPeerDiscoveryReaper starts a background worker that periodically removes expired
 	// GroupVersions from the exclusion set. When a CRD/APIService is deleted, its GV remains
@@ -115,7 +115,7 @@ type Interface interface {
 	// already-cached peer discovery responses are immediately updated to exclude newly added
 	// or updated local GVs, rather than waiting for the next peer lease event to trigger a
 	// cache refresh of peer discovery data.
-	RunPeerDiscoveryRefilter(ctx context.Context, workers int)
+	RunPeerDiscoveryRefilter(ctx context.Context)
 }
 
 // New creates a new instance to implement unknown version proxy
@@ -229,9 +229,9 @@ func (h *peerProxyHandler) RegisterAPIServiceInformerHandlers(apiServiceInformer
 }
 
 // RunPeerDiscoveryActiveGVTracker starts the worker that tracks active GVs from CRDs/APIServices.
-func (h *peerProxyHandler) RunPeerDiscoveryActiveGVTracker(ctx context.Context, workers int) {
+func (h *peerProxyHandler) RunPeerDiscoveryActiveGVTracker(ctx context.Context) {
 	if h.gvExclusionManager != nil {
-		h.gvExclusionManager.RunPeerDiscoveryActiveGVTracker(ctx, workers)
+		h.gvExclusionManager.RunPeerDiscoveryActiveGVTracker(ctx)
 	}
 }
 
@@ -243,8 +243,8 @@ func (h *peerProxyHandler) RunPeerDiscoveryReaper(ctx context.Context) {
 }
 
 // RunPeerDiscoveryRefilter starts the worker that refilters peer discovery cache.
-func (h *peerProxyHandler) RunPeerDiscoveryRefilter(ctx context.Context, workers int) {
+func (h *peerProxyHandler) RunPeerDiscoveryRefilter(ctx context.Context) {
 	if h.gvExclusionManager != nil {
-		h.gvExclusionManager.RunPeerDiscoveryRefilter(ctx, workers)
+		h.gvExclusionManager.RunPeerDiscoveryRefilter(ctx)
 	}
 }
