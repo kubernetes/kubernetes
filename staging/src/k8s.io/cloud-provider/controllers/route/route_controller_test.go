@@ -636,3 +636,241 @@ func flatten(list []*cloudprovider.Route) []cloudprovider.Route {
 	}
 	return structList
 }
+
+func TestUpdateNetworkingCondition(t *testing.T) {
+	cluster := "test-cluster"
+	_, clusterCIDR, _ := netutils.ParseCIDRSloppy("10.244.0.0/16")
+
+	testCases := []struct {
+		description           string
+		existingCondition     *v1.NodeCondition
+		routesCreated         bool
+		expectedUpdate        bool
+		expectedConditionType v1.ConditionStatus
+		expectedReason        string
+		expectedMessage       string
+	}{
+		{
+			description:           "No existing condition, routes created - should update",
+			existingCondition:     nil,
+			routesCreated:         true,
+			expectedUpdate:        true,
+			expectedConditionType: v1.ConditionFalse,
+			expectedReason:        "RouteCreated",
+			expectedMessage:       "RouteController created a route",
+		},
+		{
+			description:           "No existing condition, routes not created - should update",
+			existingCondition:     nil,
+			routesCreated:         false,
+			expectedUpdate:        true,
+			expectedConditionType: v1.ConditionTrue,
+			expectedReason:        "NoRouteCreated",
+			expectedMessage:       "RouteController failed to create a route",
+		},
+		{
+			description: "Existing condition with same status and reason (RouteCreated) - should not update",
+			existingCondition: &v1.NodeCondition{
+				Type:    v1.NodeNetworkUnavailable,
+				Status:  v1.ConditionFalse,
+				Reason:  "RouteCreated",
+				Message: "RouteController created a route",
+			},
+			routesCreated:  true,
+			expectedUpdate: false,
+		},
+		{
+			description: "Existing condition with same status but different reason (CalicoIsUp) - should update",
+			existingCondition: &v1.NodeCondition{
+				Type:    v1.NodeNetworkUnavailable,
+				Status:  v1.ConditionFalse,
+				Reason:  "CalicoIsUp",
+				Message: "Calico is running on this node",
+			},
+			routesCreated:         true,
+			expectedUpdate:        true,
+			expectedConditionType: v1.ConditionFalse,
+			expectedReason:        "RouteCreated",
+			expectedMessage:       "RouteController created a route",
+		},
+		{
+			description: "Existing condition with Status=False but different reason - should update when routes created",
+			existingCondition: &v1.NodeCondition{
+				Type:    v1.NodeNetworkUnavailable,
+				Status:  v1.ConditionFalse,
+				Reason:  "ExternalCNI",
+				Message: "External CNI configured",
+			},
+			routesCreated:         true,
+			expectedUpdate:        true,
+			expectedConditionType: v1.ConditionFalse,
+			expectedReason:        "RouteCreated",
+			expectedMessage:       "RouteController created a route",
+		},
+		{
+			description: "Existing condition with Status=True and different reason - should update when routes not created",
+			existingCondition: &v1.NodeCondition{
+				Type:    v1.NodeNetworkUnavailable,
+				Status:  v1.ConditionTrue,
+				Reason:  "SomeOtherReason",
+				Message: "Some other message",
+			},
+			routesCreated:         false,
+			expectedUpdate:        true,
+			expectedConditionType: v1.ConditionTrue,
+			expectedReason:        "NoRouteCreated",
+			expectedMessage:       "RouteController failed to create a route",
+		},
+		{
+			description: "Existing condition with Status=False, transitioning to routes not created - should update",
+			existingCondition: &v1.NodeCondition{
+				Type:    v1.NodeNetworkUnavailable,
+				Status:  v1.ConditionFalse,
+				Reason:  "RouteCreated",
+				Message: "RouteController created a route",
+			},
+			routesCreated:         false,
+			expectedUpdate:        true,
+			expectedConditionType: v1.ConditionTrue,
+			expectedReason:        "NoRouteCreated",
+			expectedMessage:       "RouteController failed to create a route",
+		},
+		{
+			description: "Existing condition with Status=True and NoRouteCreated reason - should not update",
+			existingCondition: &v1.NodeCondition{
+				Type:    v1.NodeNetworkUnavailable,
+				Status:  v1.ConditionTrue,
+				Reason:  "NoRouteCreated",
+				Message: "RouteController failed to create a route",
+			},
+			routesCreated:  false,
+			expectedUpdate: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			node := &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-node",
+					UID:  "test-uid",
+				},
+				Spec: v1.NodeSpec{
+					PodCIDR:  "10.244.0.0/24",
+					PodCIDRs: []string{"10.244.0.0/24"},
+				},
+			}
+
+			// Set existing condition if specified
+			if tc.existingCondition != nil {
+				node.Status.Conditions = []v1.NodeCondition{*tc.existingCondition}
+			}
+
+			client := fake.NewSimpleClientset(node)
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+
+			rc, err := New(nil, client, informerFactory.Core().V1().Nodes(), cluster, []*net.IPNet{clusterCIDR})
+			require.NoError(t, err)
+			rc.nodeListerSynced = alwaysReady
+
+			// Call updateNetworkingCondition
+			err = rc.updateNetworkingCondition(node, tc.routesCreated)
+			require.NoError(t, err)
+
+			if tc.expectedUpdate {
+				// Verify that a patch was called
+				actions := client.Actions()
+				patchFound := false
+				for _, action := range actions {
+					if action.GetVerb() == "patch" {
+						patchFound = true
+						break
+					}
+				}
+				assert.True(t, patchFound, "Expected a patch action but none found")
+
+				// Get the updated node
+				updatedNode, err := client.CoreV1().Nodes().Get(context.TODO(), node.Name, metav1.GetOptions{})
+				require.NoError(t, err)
+
+				// Verify the condition was updated correctly
+				_, condition := nodeutil.GetNodeCondition(&updatedNode.Status, v1.NodeNetworkUnavailable)
+				require.NotNil(t, condition, "Expected NodeNetworkUnavailable condition to exist")
+				assert.Equal(t, tc.expectedConditionType, condition.Status, "Unexpected condition status")
+				assert.Equal(t, tc.expectedReason, condition.Reason, "Unexpected condition reason")
+				assert.Equal(t, tc.expectedMessage, condition.Message, "Unexpected condition message")
+			} else {
+				// Verify that no patch was called (or only initial operations)
+				actions := client.Actions()
+				patchCount := 0
+				for _, action := range actions {
+					if action.GetVerb() == "patch" {
+						patchCount++
+					}
+				}
+				assert.Equal(t, 0, patchCount, "Expected no patch action but found %d", patchCount)
+			}
+		})
+	}
+}
+
+func TestUpdateNetworkingConditionWithCalicoScenario(t *testing.T) {
+	// This test specifically covers the bug where Calico sets NetworkUnavailable=False
+	// and RouteController should still be able to update it with its own reason
+	cluster := "test-cluster"
+	_, clusterCIDR, _ := netutils.ParseCIDRSloppy("10.244.0.0/16")
+
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-node",
+			UID:  "test-uid",
+		},
+		Spec: v1.NodeSpec{
+			PodCIDR:  "10.244.0.0/24",
+			PodCIDRs: []string{"10.244.0.0/24"},
+		},
+		Status: v1.NodeStatus{
+			Conditions: []v1.NodeCondition{
+				{
+					Type:    v1.NodeNetworkUnavailable,
+					Status:  v1.ConditionFalse,
+					Reason:  "CalicoIsUp",
+					Message: "Calico is running on this node",
+				},
+			},
+		},
+	}
+
+	client := fake.NewSimpleClientset(node)
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+
+	rc, err := New(nil, client, informerFactory.Core().V1().Nodes(), cluster, []*net.IPNet{clusterCIDR})
+	require.NoError(t, err)
+	rc.nodeListerSynced = alwaysReady
+
+	// Call updateNetworkingCondition with routes created
+	err = rc.updateNetworkingCondition(node, true)
+	require.NoError(t, err)
+
+	// Verify that a patch was called
+	actions := client.Actions()
+	patchFound := false
+	for _, action := range actions {
+		if action.GetVerb() == "patch" {
+			patchFound = true
+			break
+		}
+	}
+	assert.True(t, patchFound, "Expected a patch action to update the condition")
+
+	// Get the updated node
+	updatedNode, err := client.CoreV1().Nodes().Get(context.TODO(), node.Name, metav1.GetOptions{})
+	require.NoError(t, err)
+
+	// Verify the condition was updated with RouteCreated reason
+	_, condition := nodeutil.GetNodeCondition(&updatedNode.Status, v1.NodeNetworkUnavailable)
+	require.NotNil(t, condition, "Expected NodeNetworkUnavailable condition to exist")
+	assert.Equal(t, v1.ConditionFalse, condition.Status, "Expected Status to remain False")
+	assert.Equal(t, "RouteCreated", condition.Reason, "Expected Reason to be updated to RouteCreated")
+	assert.Equal(t, "RouteController created a route", condition.Message, "Expected Message to be updated")
+}
