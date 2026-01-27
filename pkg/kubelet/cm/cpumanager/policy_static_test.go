@@ -582,7 +582,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 	}
 	alignBySocketOptionTestCases := []staticPolicyTest{
 		{
-			description: "Align by socket: true, cpu's within same socket of numa in hint are part of allocation",
+			description: "Align by socket: true, cpu's from preferred NUMA nodes in hint are allocated first",
 			topo:        topoDualSocketMultiNumaPerSocketHT,
 			options: map[string]string{
 				AlignBySocketOption: "true",
@@ -594,7 +594,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 			topologyHint:    &topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0, 2), Preferred: true},
 			expErr:          nil,
 			expCPUAlloc:     true,
-			expCSet:         cpuset.New(2, 11),
+			expCSet:         cpuset.New(2, 21),
 		},
 		{
 			description: "Align by socket: false, cpu's are taken strictly from NUMA nodes in hint",
@@ -610,6 +610,36 @@ func TestStaticPolicyAdd(t *testing.T) {
 			expErr:          nil,
 			expCPUAlloc:     true,
 			expCSet:         cpuset.New(2, 21),
+		},
+		{
+			description: "Align by socket: true, cross-socket allocation prioritizes hint NUMA nodes",
+			topo:        topoDualSocketMultiNumaPerSocketHT,
+			options: map[string]string{
+				AlignBySocketOption: "true",
+			},
+			numReservedCPUs: 1,
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: cpuset.New(11, 21, 22, 31, 32),
+			pod:             makePod("fakePod", "fakeContainer3", "5000m", "5000m"),
+			topologyHint:    &topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(1, 2, 3), Preferred: true},
+			expErr:          nil,
+			expCPUAlloc:     true,
+			expCSet:         cpuset.New(11, 21, 22, 31, 32),
+		},
+		{
+			description: "Align by socket: true, 1:1 NUMA-to-socket falls back to socket-aligned allocation",
+			topo:        topoSmallDualSocketSingleNumaPerSocketNoSMTUncore,
+			options: map[string]string{
+				AlignBySocketOption: "true",
+			},
+			numReservedCPUs: 1,
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: cpuset.New(2, 5, 34, 37),
+			pod:             makePod("fakePod", "fakeContainer4", "2000m", "2000m"),
+			topologyHint:    &topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0), Preferred: true},
+			expErr:          nil,
+			expCPUAlloc:     true,
+			expCSet:         cpuset.New(2, 5),
 		},
 	}
 
