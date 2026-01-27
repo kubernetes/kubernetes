@@ -316,6 +316,12 @@ func (sched *Scheduler) updatePodInSchedulingQueue(oldPod, newPod *v1.Pod) {
 		_ = sched.syncPodWithDispatcher(newPod)
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.OpportunisticBatching) {
+		if podInfo, ok := sched.SchedulingQueue.GetPod(newPod.Name, newPod.Namespace); ok {
+			podInfo.PodSignature = nil
+		}
+	}
+
 	isAssumed, err := sched.Cache.IsAssumedPod(newPod)
 	if err != nil {
 		utilruntime.HandleErrorWithLogger(logger, err, "Failed to check whether pod is assumed", "pod", klog.KObj(newPod))

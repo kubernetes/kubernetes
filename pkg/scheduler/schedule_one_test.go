@@ -1072,7 +1072,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 						}
 						queue.Add(logger, item.sendPod)
 
-						sched.SchedulePod = func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, pod *v1.Pod) (ScheduleResult, error) {
+						sched.SchedulePod = func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, podInfo *framework.QueuedPodInfo) (ScheduleResult, error) {
 							return item.mockScheduleResult, item.injectSchedulingError
 						}
 						sched.FailureHandler = func(ctx context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, ni *fwk.NominatingInfo, start time.Time) {
@@ -1647,7 +1647,7 @@ func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {
 					}
 					queue.Add(logger, item.sendPod)
 
-					sched.SchedulePod = func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, pod *v1.Pod) (ScheduleResult, error) {
+					sched.SchedulePod = func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, podInfo *framework.QueuedPodInfo) (ScheduleResult, error) {
 						return item.mockScheduleResult, item.injectSchedulingError
 					}
 					sched.FailureHandler = func(_ context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, _ *fwk.NominatingInfo, _ time.Time) {
@@ -3542,7 +3542,8 @@ func TestSchedulerSchedulePod(t *testing.T) {
 			informerFactory.Start(ctx.Done())
 			informerFactory.WaitForCacheSync(ctx.Done())
 
-			result, err := sched.SchedulePod(ctx, schedFramework, framework.NewCycleState(), test.pod)
+			podInfo := queuedPodInfoForPod(test.pod)
+			result, err := sched.SchedulePod(ctx, schedFramework, framework.NewCycleState(), podInfo)
 			if err != test.wErr {
 				gotFitErr, gotOK := err.(*framework.FitError)
 				wantFitErr, wantOK := test.wErr.(*framework.FitError)
@@ -3595,7 +3596,8 @@ func TestFindFitAllError(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, diagnosis, _, _, err := scheduler.findNodesThatFitPod(ctx, schedFramework, framework.NewCycleState(), &v1.Pod{})
+	podInfo := queuedPodInfoForPod(&v1.Pod{})
+	_, diagnosis, _, err := scheduler.findNodesThatFitPod(ctx, schedFramework, framework.NewCycleState(), podInfo)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -3641,7 +3643,8 @@ func TestFindFitSomeError(t *testing.T) {
 	}
 
 	pod := st.MakePod().Name("1").UID("1").Obj()
-	_, diagnosis, _, _, err := scheduler.findNodesThatFitPod(ctx, fwk, framework.NewCycleState(), pod)
+	podInfo := queuedPodInfoForPod(pod)
+	_, diagnosis, _, err := scheduler.findNodesThatFitPod(ctx, fwk, framework.NewCycleState(), podInfo)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -3736,7 +3739,8 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 			}
 			schedFramework.AddNominatedPod(logger, podinfo, &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: "1"})
 
-			_, _, _, _, err = scheduler.findNodesThatFitPod(ctx, schedFramework, framework.NewCycleState(), test.pod)
+			podInfo := queuedPodInfoForPod(test.pod)
+			_, _, _, err = scheduler.findNodesThatFitPod(ctx, schedFramework, framework.NewCycleState(), podInfo)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -4259,7 +4263,8 @@ func TestFairEvaluationForNodes(t *testing.T) {
 
 	// Iterating over all nodes more than twice
 	for i := 0; i < 2*(numAllNodes/nodesToFind+1); i++ {
-		nodesThatFit, _, _, _, err := sched.findNodesThatFitPod(ctx, fwk, framework.NewCycleState(), &v1.Pod{})
+		podInfo := queuedPodInfoForPod(&v1.Pod{})
+		nodesThatFit, _, _, err := sched.findNodesThatFitPod(ctx, fwk, framework.NewCycleState(), podInfo)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -4343,7 +4348,8 @@ func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
 			}
 			sched.applyDefaultHandlers()
 
-			_, _, _, _, err = sched.findNodesThatFitPod(ctx, fwk, framework.NewCycleState(), test.pod)
+			podInfo := queuedPodInfoForPod(test.pod)
+			_, _, _, err = sched.findNodesThatFitPod(ctx, fwk, framework.NewCycleState(), podInfo)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -4602,4 +4608,12 @@ func pop(queue clientcache.Queue) interface{} {
 		return nil
 	}
 	return obj
+}
+
+func queuedPodInfoForPod(pod *v1.Pod) *framework.QueuedPodInfo {
+	return &framework.QueuedPodInfo{
+		PodInfo: &framework.PodInfo{
+			Pod: pod,
+		},
+	}
 }
