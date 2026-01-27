@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"slices"
 	"sync"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 
@@ -33,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
@@ -471,9 +473,25 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state *framework.Cycl
 		// Claims (and thus their devices) are treated as "allocated" if they are in the assume cache
 		// or currently their allocation is in-flight. This does not change
 		// during filtering, so we can determine that once.
-		allAllocatedDevices, err := pl.draManager.ResourceClaims().ListAllAllocatedDevices()
+		//
+		// This might have to be retried in the unlikely case that some concurrent modification made
+		// the result invalid.
+		var allAllocatedDevices sets.Set[structured.DeviceID]
+		err = wait.PollUntilContextTimeout(ctx, time.Microsecond, 5*time.Second, true /* immediate */, func(context.Context) (bool, error) {
+			ad, err := pl.draManager.ResourceClaims().ListAllAllocatedDevices()
+			if err != nil {
+				if errors.Is(err, errClaimTrackerConcurrentModification) {
+					logger.V(6).Info("Conflicting modification during ListAllAllocatedDevices, trying again")
+					return false, nil
+				}
+				return false, err
+			}
+			// Done.
+			allAllocatedDevices = ad
+			return true, nil
+		})
 		if err != nil {
-			return nil, statusError(logger, err)
+			return nil, statusError(logger, fmt.Errorf("gather allocation state: %w", err))
 		}
 		slices, err := pl.draManager.ResourceSlices().List()
 		if err != nil {
