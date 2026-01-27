@@ -47,12 +47,11 @@ import (
 )
 
 // expandIPv6ForConntrack expands an IPv6 address to the format used in /proc/net/nf_conntrack.
-// The conntrack file uses fully expanded IPv6 addresses with leading zeros in each group.
 // e.g., "fc00:f853:ccd:e793::3" -> "fc00:f853:0ccd:e793:0000:0000:0000:0003"
 func expandIPv6ForConntrack(ipStr string) string {
 	ip := netutils.ParseIPSloppy(ipStr)
 	if !netutils.IsIPv6(ip) {
-		return ipStr // not IPv6 or invalid, return as-is
+		return ipStr
 	}
 	return fmt.Sprintf("%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x",
 		ip[0], ip[1], ip[2], ip[3], ip[4], ip[5], ip[6], ip[7],
@@ -218,52 +217,56 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 		e2epod.NewPodClient(fr).CreateSync(ctx, clientPodSpec)
 
 		ginkgo.By("Checking conntrack entries for the timeout")
-		// These must be synchronized from the default values set in
-		// pkg/apis/../defaults.go ConntrackTCPCloseWaitTimeout. The
-		// current defaults are hidden in the initialization code.
 		const epsilonSeconds = 60
 		const expectedTimeoutSeconds = 60 * 60
-		// the conntrack file uses the IPv6 expanded format
+
+		// Detect conntrack method and build command
 		ip := serverNodeInfo.nodeIP
+		ipFamily := "ipv4"
 		if netutils.IsIPv6String(ip) {
-			ip = expandIPv6ForConntrack(ip)
+			ipFamily = "ipv6"
 		}
-		// Obtain the corresponding conntrack entry on the host by reading
-		// /proc/net/nf_conntrack directly from the pod e2e-net-exec.
-		// This avoids dependency on the conntrack binary.
-		// It retries in a loop if the entry is not found.
-		cmd := fmt.Sprintf("cat /proc/net/nf_conntrack "+
-			"| grep -m 1 -E 'CLOSE_WAIT.*dst=%v.*dport=%v'",
-			ip, testDaemonTCPPort)
+
+		var cmd, dumpCmd string
+		var timeoutIdx int
+		if _, err := e2epodoutput.RunHostCmd(fr.Namespace.Name, "e2e-net-exec", "test -f /proc/net/nf_conntrack"); err == nil {
+			procIP := ip
+			if ipFamily == "ipv6" {
+				procIP = expandIPv6ForConntrack(ip)
+			}
+			cmd = fmt.Sprintf("cat /proc/net/nf_conntrack | grep -m 1 -E 'CLOSE_WAIT.*dst=%s.*dport=%d'", procIP, testDaemonTCPPort)
+			dumpCmd = "cat /proc/net/nf_conntrack"
+			timeoutIdx = 4 // ipv4 2 tcp 6 <timeout> CLOSE_WAIT ...
+		} else if _, err := e2epodoutput.RunHostCmd(fr.Namespace.Name, "e2e-net-exec", "which conntrack"); err == nil {
+			cmd = fmt.Sprintf("conntrack -L -f %s -d %s 2>/dev/null | grep -m 1 'CLOSE_WAIT.*dport=%d'", ipFamily, ip, testDaemonTCPPort)
+			dumpCmd = "conntrack -L 2>/dev/null"
+			timeoutIdx = 2 // tcp 6 <timeout> CLOSE_WAIT ...
+		} else {
+			e2eskipper.Skipf("Neither /proc/net/nf_conntrack nor conntrack binary available")
+		}
+
 		if err := wait.PollImmediate(2*time.Second, epsilonSeconds*time.Second, func() (bool, error) {
 			result, err := e2epodoutput.RunHostCmd(fr.Namespace.Name, "e2e-net-exec", cmd)
-			// retry if we can't obtain the conntrack entry
 			if err != nil {
-				framework.Logf("failed to obtain conntrack entry: %v %v", result, err)
+				framework.Logf("failed to obtain conntrack entry: %v", err)
 				return false, nil
 			}
-			framework.Logf("conntrack entry for node %v and port %v:  %v", serverNodeInfo.nodeIP, testDaemonTCPPort, result)
-			// /proc/net/nf_conntrack format: ipv4 2 tcp 6 <timeout> <state> src=... dst=...
-			// Timeout in seconds is available as the fifth column (index 4)
-			line := strings.Fields(result)
-			if len(line) < 5 {
-				return false, fmt.Errorf("conntrack entry does not have a timeout field: %v", line)
+			fields := strings.Fields(result)
+			if len(fields) <= timeoutIdx {
+				return false, nil
 			}
-			timeoutSeconds, err := strconv.Atoi(line[4])
+			timeoutSeconds, err := strconv.Atoi(fields[timeoutIdx])
 			if err != nil {
-				return false, fmt.Errorf("failed to convert matched timeout %s to integer: %w", line[4], err)
+				return false, nil
 			}
+			framework.Logf("conntrack timeout for %v:%v = %v", serverNodeInfo.nodeIP, testDaemonTCPPort, timeoutSeconds)
 			if math.Abs(float64(timeoutSeconds-expectedTimeoutSeconds)) < epsilonSeconds {
 				return true, nil
 			}
 			return false, fmt.Errorf("wrong TCP CLOSE_WAIT timeout: %v expected: %v", timeoutSeconds, expectedTimeoutSeconds)
 		}); err != nil {
-			// Dump all conntrack entries for debugging
-			result, err2 := e2epodoutput.RunHostCmd(fr.Namespace.Name, "e2e-net-exec", "cat /proc/net/nf_conntrack")
-			if err2 != nil {
-				framework.Logf("failed to read /proc/net/nf_conntrack: %v %v", result, err2)
-			}
-			framework.Logf("conntrack entries for node %v:  %v", serverNodeInfo.nodeIP, result)
+			result, _ := e2epodoutput.RunHostCmd(fr.Namespace.Name, "e2e-net-exec", dumpCmd)
+			framework.Logf("conntrack entries: %v", result)
 			framework.Failf("no valid conntrack entry for port %d on node %s: %v", testDaemonTCPPort, serverNodeInfo.nodeIP, err)
 		}
 	})
