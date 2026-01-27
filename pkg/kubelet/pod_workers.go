@@ -990,14 +990,16 @@ func (p *podWorkers) UpdatePod(options UpdatePodOptions) {
 	}
 	status.working = true
 	klog.V(4).InfoS("Notifying pod of pending update", "pod", klog.KRef(ns, name), "podUID", uid, "workType", status.WorkType())
-	for _, s := range p.subscribers {
-		switch options.UpdateType {
-		case kubetypes.SyncPodCreate:
+	switch options.UpdateType {
+	case kubetypes.SyncPodCreate:
+		pod := status.pendingUpdate.Pod
+		for _, s := range p.subscribers {
 			s.OnPodAdded(pod)
-		case kubetypes.SyncPodUpdate:
+		}
+	case kubetypes.SyncPodUpdate:
+		pod := status.pendingUpdate.Pod
+		for _, s := range p.subscribers {
 			s.OnPodUpdated(pod)
-		case kubetypes.SyncPodKill:
-			s.OnPodRemoved(pod)
 		}
 	}
 	select {
@@ -1761,6 +1763,7 @@ func (p *podWorkers) requeueLastPodUpdate(podUID types.UID, status *podSyncStatu
 		return
 	}
 	copied := *status.activeUpdate
+	copied.UpdateType = kubetypes.SyncPodSync
 	status.pendingUpdate = &copied
 
 	// notify the pod worker

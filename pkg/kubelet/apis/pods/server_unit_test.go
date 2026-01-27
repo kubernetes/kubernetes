@@ -21,9 +21,12 @@ import (
 	"math/rand"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
@@ -57,15 +60,131 @@ func TestStartEventLoop(t *testing.T) {
 	event := <-clientChannel
 	assert.Equal(t, "ADDED", string(event.Type))
 	assert.Equal(t, pod1.UID, event.UID)
+	assert.Equal(t, pod1, event.Pod)
 
 	event = <-clientChannel
 	assert.Equal(t, "MODIFIED", string(event.Type))
 	assert.Equal(t, pod1.UID, event.UID)
+	expectedPod := *pod1
+	expectedPod.Status = v1.PodStatus{Phase: v1.PodSucceeded}
+	assert.Equal(t, &expectedPod, event.Pod)
 
 	event = <-clientChannel
 	assert.Equal(t, "DELETED", string(event.Type))
 	assert.Equal(t, pod1.UID, event.UID)
 	assert.Equal(t, pod1, event.Pod)
+
+	select {
+	case event := <-clientChannel:
+		t.Errorf("Unexpected event received: %v", event)
+	default:
+	}
+}
+
+type MockWatchPodsServer struct {
+	grpc.ServerStream
+	Ctx     context.Context
+	EventCh chan *podsv1alpha1.WatchPodsEvent
+}
+
+func (m *MockWatchPodsServer) Send(event *podsv1alpha1.WatchPodsEvent) error {
+	select {
+	case m.EventCh <- event:
+		return nil
+	case <-m.Ctx.Done():
+		return m.Ctx.Err()
+	}
+}
+
+func (m *MockWatchPodsServer) Context() context.Context {
+	return m.Ctx
+}
+
+func TestWatchPods(t *testing.T) {
+	broadcaster := podsapi.NewBroadcaster()
+	mockManager := new(kubepodtest.MockManager)
+	server := podsapi.NewPodsServerForTest(broadcaster, mockManager)
+	pod1 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: "pod1-uid", Name: "pod1", Namespace: "ns1"}}
+
+	mockManager.On("GetPods").Return([]*v1.Pod{pod1})
+	mockManager.On("GetPodByUID", types.UID("pod1-uid")).Return(pod1, true)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	mockStream := &MockWatchPodsServer{
+		Ctx:     ctx,
+		EventCh: make(chan *podsv1alpha1.WatchPodsEvent, 10),
+	}
+
+	go func() {
+		server.WatchPods(&podsv1alpha1.WatchPodsRequest{}, mockStream)
+	}()
+
+	// Verify initial ADDED event
+	event := <-mockStream.EventCh
+	assert.Equal(t, podsv1alpha1.EventType_ADDED, event.Type)
+	podOut := &v1.Pod{}
+	err := podOut.Unmarshal(event.Pod)
+	require.NoError(t, err)
+	assert.Equal(t, "pod1", podOut.Name)
+
+	// Verify INITIAL_SYNC event
+	event = <-mockStream.EventCh
+	assert.Equal(t, podsv1alpha1.EventType_INITIAL_SYNC_COMPLETE, event.Type)
+	assert.Empty(t, event.Pod)
+
+	// Trigger an update
+	server.OnPodUpdated(pod1)
+
+	// Verify MODIFIED event
+	event = <-mockStream.EventCh
+	assert.Equal(t, podsv1alpha1.EventType_MODIFIED, event.Type)
+	podOut = &v1.Pod{}
+	err = podOut.Unmarshal(event.Pod)
+	require.NoError(t, err)
+	assert.Equal(t, "pod1", podOut.Name)
+}
+
+func TestOnPodStatusUpdatedOverlaysStatus(t *testing.T) {
+	broadcaster := podsapi.NewBroadcaster()
+	mockManager := new(kubepodtest.MockManager)
+	server := podsapi.NewPodsServerForTest(broadcaster, mockManager)
+
+	// The pod object as it might exist in the manager (or passed by caller)
+	// It has Stale status.
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "pod-1", Name: "pod-1", Namespace: "ns"},
+		Spec:       v1.PodSpec{NodeName: "worker-node"},
+		Status:     v1.PodStatus{Phase: v1.PodPending},
+	}
+
+	// The new status that is being reported
+	newStatus := v1.PodStatus{Phase: v1.PodRunning, Message: "Pod is running"}
+
+	clientChannel := make(chan podsapi.PodWatchEvent, 1)
+	broadcaster.Register(clientChannel)
+	defer broadcaster.Unregister(clientChannel)
+
+	// Trigger the status update
+	server.OnPodStatusUpdated(pod, newStatus)
+
+	select {
+	case event := <-clientChannel:
+		assert.Equal(t, "MODIFIED", string(event.Type))
+		assert.Equal(t, "pod-1", event.Pod.Name)
+
+		// The status in the event should be the New Status (Running)
+		// NOT the status from the pod object (Pending)
+		assert.Equal(t, v1.PodRunning, event.Pod.Status.Phase)
+		assert.Equal(t, "Pod is running", event.Pod.Status.Message)
+
+		// Verify we didn't mutate the original pod
+		assert.Equal(t, v1.PodPending, pod.Status.Phase, "Original pod object should not be mutated")
+
+	case <-time.After(1 * time.Second):
+		t.Fatal("Timeout waiting for event")
+	}
 }
 
 func TestListPods(t *testing.T) {
@@ -214,4 +333,47 @@ func TestSerialize(t *testing.T) {
 			t.Fatal("round-tripped objects were different")
 		}
 	}
+}
+
+type MockStatusProvider struct {
+	mock.Mock
+}
+
+func (m *MockStatusProvider) GetPodStatus(uid types.UID) (v1.PodStatus, bool) {
+	args := m.Called(uid)
+	return args.Get(0).(v1.PodStatus), args.Bool(1)
+}
+
+func TestOnPodUpdatedUsesStatusProvider(t *testing.T) {
+	broadcaster := podsapi.NewBroadcaster()
+	mockManager := new(kubepodtest.MockManager)
+	server := podsapi.NewPodsServerForTest(broadcaster, mockManager)
+	mockStatusProvider := new(MockStatusProvider)
+	server.SetStatusProvider(mockStatusProvider)
+
+	// Pod with "Stale" status
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "pod-1", Name: "pod-1", Namespace: "ns"},
+		Status:     v1.PodStatus{Phase: v1.PodPending},
+	}
+
+	// Status provider has "Fresh" status
+	freshStatus := v1.PodStatus{Phase: v1.PodRunning}
+	mockStatusProvider.On("GetPodStatus", pod.UID).Return(freshStatus, true)
+
+	clientChannel := make(chan podsapi.PodWatchEvent, 1)
+	broadcaster.Register(clientChannel)
+	defer broadcaster.Unregister(clientChannel)
+
+	server.OnPodUpdated(pod)
+
+	select {
+	case event := <-clientChannel:
+		assert.Equal(t, "MODIFIED", string(event.Type))
+		assert.Equal(t, v1.PodRunning, event.Pod.Status.Phase)
+	case <-time.After(1 * time.Second):
+		t.Fatal("Timeout waiting for event")
+	}
+
+	mockStatusProvider.AssertExpectations(t)
 }
