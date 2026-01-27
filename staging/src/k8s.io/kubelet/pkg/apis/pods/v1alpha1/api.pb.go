@@ -40,9 +40,10 @@ const (
 type EventType int32
 
 const (
-	EventType_ADDED    EventType = 0
-	EventType_MODIFIED EventType = 1
-	EventType_DELETED  EventType = 2
+	EventType_ADDED                 EventType = 0
+	EventType_MODIFIED              EventType = 1
+	EventType_DELETED               EventType = 2
+	EventType_INITIAL_SYNC_COMPLETE EventType = 3
 )
 
 // Enum value maps for EventType.
@@ -51,11 +52,13 @@ var (
 		0: "ADDED",
 		1: "MODIFIED",
 		2: "DELETED",
+		3: "INITIAL_SYNC_COMPLETE",
 	}
 	EventType_value = map[string]int32{
-		"ADDED":    0,
-		"MODIFIED": 1,
-		"DELETED":  2,
+		"ADDED":                 0,
+		"MODIFIED":              1,
+		"DELETED":               2,
+		"INITIAL_SYNC_COMPLETE": 3,
 	}
 )
 
@@ -91,7 +94,7 @@ func (EventType) EnumDescriptor() ([]byte, []int) {
 // They are convertable to a pod by calling v1.Pod#Unmarshal().
 type WatchPodsEvent struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// ADDED, MODIFIED, DELETED
+	// ADDED, MODIFIED, DELETED, INITIAL_SYNC_COMPLETE
 	Type          EventType `protobuf:"varint,1,opt,name=type,proto3,enum=v1alpha1.EventType" json:"type,omitempty"`
 	Pod           []byte    `protobuf:"bytes,2,opt,name=pod,proto3" json:"pod,omitempty"`
 	unknownFields protoimpl.UnknownFields

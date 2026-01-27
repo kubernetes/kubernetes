@@ -987,14 +987,16 @@ func (p *podWorkers) UpdatePod(ctx context.Context, options UpdatePodOptions) {
 	}
 	status.working = true
 	updateLogger.V(4).Info("Notifying pod of pending update", "workType", status.WorkType())
-	for _, s := range p.subscribers {
-		switch options.UpdateType {
-		case kubetypes.SyncPodCreate:
+	switch options.UpdateType {
+	case kubetypes.SyncPodCreate:
+		pod := status.pendingUpdate.Pod
+		for _, s := range p.subscribers {
 			s.OnPodAdded(pod)
-		case kubetypes.SyncPodUpdate:
+		}
+	case kubetypes.SyncPodUpdate:
+		pod := status.pendingUpdate.Pod
+		for _, s := range p.subscribers {
 			s.OnPodUpdated(pod)
-		case kubetypes.SyncPodKill:
-			s.OnPodRemoved(pod)
 		}
 	}
 	select {
@@ -1757,6 +1759,7 @@ func (p *podWorkers) requeueLastPodUpdate(podUID types.UID, status *podSyncStatu
 		return
 	}
 	copied := *status.activeUpdate
+	copied.UpdateType = kubetypes.SyncPodSync
 	status.pendingUpdate = &copied
 
 	// notify the pod worker
