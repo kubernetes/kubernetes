@@ -49,6 +49,7 @@ type Features struct {
 	EnableGangScheduling                          bool
 	EnableTaintTolerationComparisonOperators      bool
 	EnableInPlacePodLevelResourcesVerticalScaling bool
+	EnableWorkloadSchedulingCycle                 bool
 }
 
 // NewSchedulerFeaturesFromGates copies the current state of the feature gates into the struct.
@@ -78,5 +79,7 @@ func NewSchedulerFeaturesFromGates(featureGate featuregate.FeatureGate) Features
 		EnableGangScheduling:                          featureGate.Enabled(features.GangScheduling),
 		EnableTaintTolerationComparisonOperators:      featureGate.Enabled(features.TaintTolerationComparisonOperators),
 		EnableInPlacePodLevelResourcesVerticalScaling: featureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling),
+		// DONOTMERGE: fix feature gate
+		EnableWorkloadSchedulingCycle: featureGate.Enabled(features.GenericWorkload),
 	}
 }

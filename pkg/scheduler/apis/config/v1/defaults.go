@@ -246,6 +246,15 @@ func SetDefaults_NodeResourcesFitArgs(obj *configv1.NodeResourcesFitArgs) {
 	}
 }
 
+func SetDefaults_PlacementBinPackingArgs(obj *configv1.PlacementBinPackingArgs) {
+	if obj.ScoringStrategy == nil {
+		obj.ScoringStrategy = &configv1.ScoringStrategy{
+			Type:      configv1.ScoringStrategyType(config.LeastAllocated),
+			Resources: defaultResourceSpec,
+		}
+	}
+}
+
 func SetDefaults_DynamicResourcesArgs(obj *configv1.DynamicResourcesArgs) {
 	if obj.FilterTimeout == nil && feature.DefaultFeatureGate.Enabled(features.DRASchedulerFilterTimeout) {
 		obj.FilterTimeout = &metav1.Duration{Duration: configv1.DynamicResourcesFilterTimeoutDefault}

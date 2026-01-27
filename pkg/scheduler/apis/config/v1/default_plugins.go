@@ -67,6 +67,10 @@ func applyFeatureGates(config *v1.Plugins) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.GangScheduling) {
 		applyGangScheduling(config)
 	}
+	// DONOTMERGE: fix feature gate
+	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
+		config.MultiPoint.Enabled = append(config.MultiPoint.Enabled, v1.Plugin{Name: names.PlacementBinPacking})
+	}
 }
 
 func applyDynamicResources(config *v1.Plugins) {

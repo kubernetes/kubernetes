@@ -1395,6 +1395,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		configv1.NodeAffinityArgs{}.OpenAPIModelName():                                                                  schema_k8sio_kube_scheduler_config_v1_NodeAffinityArgs(ref),
 		configv1.NodeResourcesBalancedAllocationArgs{}.OpenAPIModelName():                                               schema_k8sio_kube_scheduler_config_v1_NodeResourcesBalancedAllocationArgs(ref),
 		configv1.NodeResourcesFitArgs{}.OpenAPIModelName():                                                              schema_k8sio_kube_scheduler_config_v1_NodeResourcesFitArgs(ref),
+		configv1.PlacementBinPackingArgs{}.OpenAPIModelName():                                                           schema_k8sio_kube_scheduler_config_v1_PlacementBinPackingArgs(ref),
 		configv1.Plugin{}.OpenAPIModelName():                                                                            schema_k8sio_kube_scheduler_config_v1_Plugin(ref),
 		configv1.PluginConfig{}.OpenAPIModelName():                                                                      schema_k8sio_kube_scheduler_config_v1_PluginConfig(ref),
 		configv1.PluginSet{}.OpenAPIModelName():                                                                         schema_k8sio_kube_scheduler_config_v1_PluginSet(ref),
@@ -67840,6 +67841,34 @@ func schema_k8sio_kube_scheduler_config_v1_NodeResourcesFitArgs(ref common.Refer
 		},
 		Dependencies: []string{
 			configv1.ScoringStrategy{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_kube_scheduler_config_v1_PlacementBinPackingArgs(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PlacementBinPackingArgs holds arguments used to configure the PlacementBinPacking plugin.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"TypeMeta": {
+						SchemaProps: spec.SchemaProps{
+							Default: map[string]interface{}{},
+							Ref:     ref(metav1.TypeMeta{}.OpenAPIModelName()),
+						},
+					},
+					"ScoringStrategy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ScoringStrategy selects the node resource scoring strategy.",
+							Ref:         ref(configv1.ScoringStrategy{}.OpenAPIModelName()),
+						},
+					},
+				},
+				Required: []string{"TypeMeta", "ScoringStrategy"},
+			},
+		},
+		Dependencies: []string{
+			metav1.TypeMeta{}.OpenAPIModelName(), configv1.ScoringStrategy{}.OpenAPIModelName()},
 	}
 }
 

@@ -466,5 +466,15 @@ type DynamicResourcesArgs struct {
 	BindingTimeout *metav1.Duration `json:"bindingTimeout,omitempty"`
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// PlacementBinPackingArgs holds arguments used to configure the PlacementBinPacking plugin.
+type PlacementBinPackingArgs struct {
+	metav1.TypeMeta
+
+	// ScoringStrategy selects the node resource scoring strategy.
+	ScoringStrategy *ScoringStrategy
+}
+
 const DynamicResourcesFilterTimeoutDefault = 10 * time.Second
 const DynamicResourcesBindingTimeoutDefault = 600 * time.Second

@@ -46,6 +46,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&VolumeBindingArgs{},
 		&NodeAffinityArgs{},
 		&DynamicResourcesArgs{},
+		&PlacementBinPackingArgs{},
 	)
 	return nil
 }
