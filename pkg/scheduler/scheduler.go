@@ -350,7 +350,7 @@ func New(ctx context.Context,
 	}
 	var workloadManager internalworkloadmanager.WorkloadManager
 	if feature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
-		workloadManager = internalworkloadmanager.New()
+		workloadManager = internalworkloadmanager.New(logger)
 	}
 
 	profiles, err := profile.NewMap(ctx, options.profiles, registry, recorderFactory,

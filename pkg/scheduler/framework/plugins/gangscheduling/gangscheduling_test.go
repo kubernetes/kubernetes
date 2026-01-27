@@ -17,7 +17,6 @@ limitations under the License.
 package gangscheduling
 
 import (
-	"context"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -260,11 +259,8 @@ func TestGangSchedulingFlow(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
-			ctx, cancel := context.WithCancel(ctx)
-			defer cancel()
-
-			manager := workloadmanager.New()
+			logger, ctx := ktesting.NewTestContext(t)
+			manager := workloadmanager.New(logger)
 
 			informerFactory := informers.NewSharedInformerFactory(fake.NewClientset(), 0)
 			workloadInformer := informerFactory.Scheduling().V1alpha1().Workloads()

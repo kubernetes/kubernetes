@@ -21,6 +21,7 @@ import (
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 )
 
@@ -46,12 +47,15 @@ type workloadManager struct {
 
 	// podGroupStates stores the runtime state for each known pod group.
 	podGroupStates map[podGroupKey]*podGroupState
+
+	logger klog.Logger
 }
 
 // New initializes a new workload manager and returns it.
-func New() *workloadManager {
+func New(logger klog.Logger) *workloadManager {
 	return &workloadManager{
 		podGroupStates: make(map[podGroupKey]*podGroupState),
+		logger:         logger,
 	}
 }
 
@@ -89,6 +93,7 @@ func (wm *workloadManager) UpdatePod(oldPod, newPod *v1.Pod) {
 		state = newPodGroupState()
 		wm.podGroupStates[key] = state
 		state.addPod(newPod)
+		wm.logger.Error(nil, "UpdatePod found no existing PodGroup for pod. Created new PodGroup for the pod", "pod", klog.KObj(newPod), "podGroupKey", klog.KObj(key))
 		return
 	}
 	state.updatePod(oldPod, newPod)
