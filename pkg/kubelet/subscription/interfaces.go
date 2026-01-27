@@ -29,12 +29,15 @@ type PodUpdate struct {
 
 // PodUpdateSubscriber is an interface for other Kubelet components to subscribe to pod updates.
 type PodUpdateSubscriber interface {
-	// OnPodAdded is called when a pod is added.
-	OnPodAdded(pod *v1.Pod)
-	// OnPodUpdated is called when a pod is updated.
+	// OnPodUpdated is called when a pod spec is updated.
+	// This is called synchronously in the pod worker loop.
+	// It is called only after the update has been successfully processed.
+	// It may be called multiple times for the same pod state.
 	OnPodUpdated(pod *v1.Pod)
-	// OnPodRemoved is called when a pod is removed.
-	OnPodRemoved(pod *v1.Pod)
+	// OnPodAdded is called when a pod is added.
+	// This is called synchronously in the pod worker loop.
+	// It is called only after the update has been successfully processed.
+	OnPodAdded(pod *v1.Pod)
 }
 
 // StatusUpdate is a union of a pod and a pod status.
@@ -45,6 +48,11 @@ type StatusUpdate struct {
 
 // StatusUpdateSubscriber is an interface for other Kubelet components to subscribe to pod status updates.
 type StatusUpdateSubscriber interface {
-	// OnPodStatusUpdated is called when a pod's status is updated.
+	// OnPodStatusUpdated is called after a pod's status is updated
+	// by the StatusManager, but before the API server has been sent
+	// the update.
 	OnPodStatusUpdated(pod *v1.Pod, status v1.PodStatus)
+	// OnPodRemoved is called after the pod termination is successfully processed
+	// by the status manager.
+	OnPodRemoved(pod *v1.Pod)
 }

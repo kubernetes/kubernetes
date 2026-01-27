@@ -700,6 +700,9 @@ func NewMainKubelet(ctx context.Context,
 	}
 
 	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet, kubeDeps.PodStartupLatencyTracker, statusSubscribers)
+	if klet.podsServer != nil {
+		klet.podsServer.SetStatusProvider(klet.statusManager)
+	}
 	klet.allocationManager = allocation.NewManager(
 		klet.getRootDir(),
 		klet.statusManager,

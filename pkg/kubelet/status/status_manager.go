@@ -908,8 +908,14 @@ func (m *manager) updateStatusInternal(logger klog.Logger, pod *v1.Pod, status v
 
 	m.podStatuses[pod.UID] = newStatus
 
-	for _, s := range m.subscribers {
-		s.OnPodStatusUpdated(pod, status)
+	if podIsFinished {
+		for _, s := range m.subscribers {
+			s.OnPodRemoved(pod)
+		}
+	} else if !forceUpdate {
+		for _, s := range m.subscribers {
+			s.OnPodStatusUpdated(pod, status)
+		}
 	}
 
 	select {

@@ -45,8 +45,8 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type PodsClient interface {
 	// WatchPods will initially return an ADDED WatchPodsEvent for each
-	// existing Pod, and then return a WatchPodsEvent whenever a Pod is created,
-	// deleted, or updated.
+	// existing Pod, followed by an INITIAL_SYNC_COMPLETE WatchPodsEvent.
+	// It then returns a WatchPodsEvent whenever a Pod is created, deleted, or updated.
 	WatchPods(ctx context.Context, in *WatchPodsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[WatchPodsEvent], error)
 	// ListPods returns a of List of Pods
 	ListPods(ctx context.Context, in *ListPodsRequest, opts ...grpc.CallOption) (*ListPodsResponse, error)
@@ -106,8 +106,8 @@ func (c *podsClient) GetPod(ctx context.Context, in *GetPodRequest, opts ...grpc
 // for forward compatibility.
 type PodsServer interface {
 	// WatchPods will initially return an ADDED WatchPodsEvent for each
-	// existing Pod, and then return a WatchPodsEvent whenever a Pod is created,
-	// deleted, or updated.
+	// existing Pod, followed by an INITIAL_SYNC_COMPLETE WatchPodsEvent.
+	// It then returns a WatchPodsEvent whenever a Pod is created, deleted, or updated.
 	WatchPods(*WatchPodsRequest, grpc.ServerStreamingServer[WatchPodsEvent]) error
 	// ListPods returns a of List of Pods
 	ListPods(context.Context, *ListPodsRequest) (*ListPodsResponse, error)

@@ -75,17 +75,25 @@ func (b *broadcaster) Broadcast(event PodWatchEvent) {
 		select {
 		case client <- event:
 		default:
-			logger.Info("Watch client channel is full, dropping event.")
+			logger.Info("Watch client channel is full, dropping client.")
 			metrics.PodWatchEventsDroppedTotal.Inc()
+			delete(b.clients, client)
+			close(client)
 		}
 	}
+}
+
+// podStatusProvider is an interface for retrieving the latest pod status.
+type podStatusProvider interface {
+	GetPodStatus(uid types.UID) (v1.PodStatus, bool)
 }
 
 // PodsServer is the gRPC server that provides pod information.
 type PodsServer struct {
 	podsv1alpha1.UnimplementedPodsServer
-	podManager  pod.Manager
-	broadcaster *broadcaster
+	podManager     pod.Manager
+	broadcaster    *broadcaster
+	statusProvider podStatusProvider
 }
 
 // NewPodsServer creates a new PodServer for production use.
@@ -104,30 +112,47 @@ func NewPodsServerForTest(broadcaster *broadcaster, podManager pod.Manager) *Pod
 	}
 }
 
+// SetStatusProvider sets the status provider for the PodsServer.
+func (s *PodsServer) SetStatusProvider(provider podStatusProvider) {
+	s.statusProvider = provider
+}
+
 // OnPodAdded is called when a pod is added.
 func (s *PodsServer) OnPodAdded(pod *v1.Pod) {
-	s.broadcaster.Broadcast(PodWatchEvent{Type: watch.Added, UID: pod.UID})
+	s.broadcaster.Broadcast(PodWatchEvent{Type: watch.Added, UID: pod.UID, Pod: pod})
 	logger := klog.FromContext(context.Background())
-	logger.Info("Pod added to storage", "podUID", pod.UID)
+	logger.Info("Pod added broadcasted", "podUID", pod.UID)
 }
 
 // OnPodUpdated is called when a pod is updated.
 func (s *PodsServer) OnPodUpdated(pod *v1.Pod) {
-	s.broadcaster.Broadcast(PodWatchEvent{Type: watch.Modified, UID: pod.UID})
+	// The pod object passed here comes from the pod worker and has the authoritative Spec.
+	// However, its Status might be stale (from the last config update).
+	// We fetch the latest Status from the statusProvider to ensure only the latest Status.
+	podCopy := *pod
+	if s.statusProvider != nil {
+		if status, ok := s.statusProvider.GetPodStatus(pod.UID); ok {
+			podCopy.Status = status
+		}
+	}
+	s.broadcaster.Broadcast(PodWatchEvent{Type: watch.Modified, UID: pod.UID, Pod: &podCopy})
 	logger := klog.FromContext(context.Background())
-	logger.Info("Pod updated in storage", "podUID", pod.UID)
+	logger.Info("Pod updated broadcasted", "podUID", pod.UID)
 }
 
 // OnPodRemoved is called when a pod is removed.
 func (s *PodsServer) OnPodRemoved(pod *v1.Pod) {
 	s.broadcaster.Broadcast(PodWatchEvent{Type: watch.Deleted, UID: pod.UID, Pod: pod})
 	logger := klog.FromContext(context.Background())
-	logger.Info("Pod removed from storage", "podUID", pod.UID)
+	logger.Info("Pod removed broadcasted", "podUID", pod.UID)
 }
 
 // OnPodStatusUpdated is called when a pod's status is updated.
 func (s *PodsServer) OnPodStatusUpdated(pod *v1.Pod, status v1.PodStatus) {
-	s.broadcaster.Broadcast(PodWatchEvent{Type: watch.Modified, UID: pod.UID})
+	// We need to ensure the event has the latest Status
+	podCopy := *pod
+	podCopy.Status = status
+	s.broadcaster.Broadcast(PodWatchEvent{Type: watch.Modified, UID: pod.UID, Pod: &podCopy})
 	logger := klog.FromContext(context.Background())
 	logger.Info("Pod status updated in storage", "podUID", pod.UID)
 }
@@ -201,7 +226,7 @@ func (s *PodsServer) WatchPods(req *podsv1alpha1.WatchPodsRequest, stream podsv1
 		if err != nil {
 			logger.Error(err, "Error marshalling initial watch event pod")
 			metrics.PodWatchEventsDroppedTotal.Inc()
-			continue
+			return status.Errorf(codes.Internal, "error marshalling initial watch event pod: %v", err)
 		}
 		if err := stream.Send(&podsv1alpha1.WatchPodsEvent{
 			Type: podsv1alpha1.EventType_ADDED,
@@ -212,16 +237,30 @@ func (s *PodsServer) WatchPods(req *podsv1alpha1.WatchPodsRequest, stream podsv1
 		}
 	}
 
+	// Send INITIAL_SYNC_COMPLETE event to indicate that the initial list is complete
+	if err := stream.Send(&podsv1alpha1.WatchPodsEvent{
+		Type: podsv1alpha1.EventType_INITIAL_SYNC_COMPLETE,
+	}); err != nil {
+		logger.Error(err, "Error sending bookmark watch event")
+		return err
+	}
+
 	for {
 		select {
 		case <-stream.Context().Done():
 			logger.Info("Watch context cancelled", "client", clientAddr)
 			return stream.Context().Err()
-		case event := <-clientChannel:
+		case event, ok := <-clientChannel:
+			if !ok {
+				logger.Info("Watch client channel closed", "client", clientAddr)
+				return status.Errorf(codes.ResourceExhausted, "watch client channel closed")
+			}
 			var podToMarshal *v1.Pod
-			if event.Type == watch.Deleted {
+			if event.Pod != nil {
 				podToMarshal = event.Pod
 			} else {
+				// Fallback to looking up the pod if it is not provided in the event.
+				// This should not happen with the current implementation but is kept for safety.
 				p, ok := s.podManager.GetPodByUID(event.UID)
 				if ok {
 					podToMarshal = p
@@ -239,7 +278,7 @@ func (s *PodsServer) WatchPods(req *podsv1alpha1.WatchPodsRequest, stream podsv1
 			if err != nil {
 				logger.Error(err, "Error marshalling watch event pod")
 				metrics.PodWatchEventsDroppedTotal.Inc()
-				continue
+				return status.Errorf(codes.Internal, "error marshalling watch event pod: %v", err)
 			}
 
 			eventType, err := convertWatchEventType(event.Type)
@@ -267,6 +306,8 @@ func convertWatchEventType(watchType watch.EventType) (podsv1alpha1.EventType, e
 		return podsv1alpha1.EventType_MODIFIED, nil
 	case watch.Deleted:
 		return podsv1alpha1.EventType_DELETED, nil
+	case watch.Bookmark:
+		return podsv1alpha1.EventType_INITIAL_SYNC_COMPLETE, nil
 	default:
 		return podsv1alpha1.EventType_ADDED, status.Errorf(codes.Internal, "unknown watch event type: %v", watchType)
 	}
