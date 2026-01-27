@@ -766,7 +766,7 @@ func TestUpdateNetworkingCondition(t *testing.T) {
 				node.Status.Conditions = []v1.NodeCondition{*tc.existingCondition}
 			}
 
-			client := fake.NewSimpleClientset(node)
+			client := fake.NewClientset(node)
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 
 			rc, err := New(nil, client, informerFactory.Core().V1().Nodes(), cluster, []*net.IPNet{clusterCIDR})
@@ -841,7 +841,7 @@ func TestUpdateNetworkingConditionWithCalicoScenario(t *testing.T) {
 		},
 	}
 
-	client := fake.NewSimpleClientset(node)
+	client := fake.NewClientset(node)
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 
 	rc, err := New(nil, client, informerFactory.Core().V1().Nodes(), cluster, []*net.IPNet{clusterCIDR})
