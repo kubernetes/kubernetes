@@ -173,7 +173,7 @@ type Framework interface {
 	// QueueSortFunc returns the function to sort pods in scheduling queue
 	QueueSortFunc() fwk.LessFunc
 
-	// Create a scheduling signature for a given pod, if possible. Two pods with the same signature
+	// SignPod creates a scheduling signature for a given pod, if possible. Two pods with the same signature
 	// should get the same feasibility and scores for any given set of nodes even after one of them gets assigned. If some plugins
 	// are unable to create a signature, the pod may be "unsignable" which disables results caching
 	// and gang scheduling optimizations.
@@ -197,11 +197,11 @@ type Framework interface {
 	// cluster state to make the pod potentially schedulable in a future scheduling cycle.
 	RunPostFilterPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, filteredNodeStatusMap fwk.NodeToStatusReader) (*fwk.PostFilterResult, *fwk.Status)
 
-	// Get a "node hint" for a given pod. A node hint is the name of a node provided by the batching code when information
+	// GetNodeHint returns a "node hint" for a given pod. A node hint is the name of a node provided by the batching code when information
 	// from the previous scheduling cycle can be reused for this cycle.
 	// If the batching code cannot provide a hint, the function returns "".
 	// See git.k8s.io/enhancements/keps/sig-scheduling/5598-opportunistic-batching
-	GetNodeHint(ctx context.Context, pod *v1.Pod, state fwk.CycleState, cycleCount int64) (hint string, signature fwk.PodSignature)
+	GetNodeHint(ctx context.Context, pod *v1.Pod, signature fwk.PodSignature, state fwk.CycleState, cycleCount int64) string
 
 	// StoreScheduleResults stores the results after we have sorted and filtered nodes.
 	StoreScheduleResults(ctx context.Context, signature fwk.PodSignature, hintedNode, chosenNode string, otherNodes SortedScoredNodes, cycleCount int64)
