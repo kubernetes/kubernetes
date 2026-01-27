@@ -895,15 +895,15 @@ func (p *sharedProcessor) distribute(obj interface{}, sync bool) {
 	}
 }
 
-// sharedProcessorRunDelay is used in a synctest bubble to achieve a certain ordering of
-// steps in different goroutines.
-var sharedProcessorRunDelay atomic.Pointer[time.Duration]
+// sharedProcessorRunHook can be used inside tests to execute additional code
+// at the start of sharedProcessor.run.
+var sharedProcessorRunHook atomic.Pointer[func()]
 
 func (p *sharedProcessor) run(ctx context.Context) {
 	func() {
-		delay := sharedProcessorRunDelay.Load()
-		if delay != nil {
-			time.Sleep(*delay)
+		hook := sharedProcessorRunHook.Load()
+		if hook != nil {
+			(*hook)()
 		}
 		// Changing listenersStarted needs a write lock.
 		p.listenersLock.Lock()
