@@ -25,6 +25,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/tools/metrics"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -112,6 +113,7 @@ func (f *mockCallsMetricCounter) Increment(exitCode int, errorType string) {
 }
 
 func TestCallsMetric(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	const (
 		goodOutput = `{
 			"kind": "ExecCredential",
@@ -149,7 +151,7 @@ func TestCallsMetric(t *testing.T) {
 		// Run refresh creds twice so that our test validates that the metrics are set correctly twice
 		// in a row with the same authenticator.
 		refreshCreds := func() {
-			if err := a.refreshCredsLocked(); (err == nil) != (exitCode == 0) {
+			if err := a.refreshCredsLocked(ctx); (err == nil) != (exitCode == 0) {
 				if err != nil {
 					t.Fatalf("wanted no error, but got %q", err.Error())
 				} else {
@@ -179,7 +181,7 @@ func TestCallsMetric(t *testing.T) {
 			t.Fatal(err)
 		}
 		a.stderr = io.Discard
-		if err := a.refreshCredsLocked(); err == nil {
+		if err := a.refreshCredsLocked(ctx); err == nil {
 			t.Fatal("expected the authenticator to fail because the plugin does not exist")
 		}
 		wantCallsMetrics = append(wantCallsMetrics, mockCallsMetric{exitCode: 1, errorType: "plugin_not_found_error"})
@@ -210,6 +212,7 @@ func (f *mockPolicyCallsMetricCounter) Increment(status string) {
 }
 
 func TestPolicyCallsMetric(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	const (
 		goodOutput = `{
 			"kind": "ExecCredential",
@@ -282,7 +285,7 @@ func TestPolicyCallsMetric(t *testing.T) {
 		}
 		a.stderr = io.Discard
 
-		err = a.refreshCredsLocked()
+		err = a.refreshCredsLocked(ctx)
 		if err != nil && !test.wantDenied {
 			t.Fatalf("wanted no error, but got %q", err.Error())
 		}

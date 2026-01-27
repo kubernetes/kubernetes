@@ -18,6 +18,7 @@ package exec
 
 import (
 	"bytes"
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -46,6 +47,7 @@ import (
 	"k8s.io/client-go/pkg/apis/clientauthentication"
 	"k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/transport"
+	"k8s.io/klog/v2/ktesting"
 	testingclock "k8s.io/utils/clock/testing"
 )
 
@@ -794,6 +796,7 @@ func TestRefreshCreds(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
 			c := test.config
 
 			if c.Command == "" {
@@ -817,7 +820,7 @@ func TestRefreshCreds(t *testing.T) {
 			a.stderr = stderr
 			a.environ = func() []string { return nil }
 
-			if err := a.refreshCredsLocked(); err != nil {
+			if err := a.refreshCredsLocked(ctx); err != nil {
 				if !test.wantErr {
 					t.Errorf("get token %v", err)
 				} else if !strings.Contains(err.Error(), test.wantErrSubstr) {
@@ -966,6 +969,7 @@ func TestPluginPolicy(t *testing.T) {
 	tests := matrix.makeTests(t, testdataDir, path)
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
 			c := test.config
 			a, err := newAuthenticator(newCache(), func(_ int) bool { return false }, c, &clientauthentication.Cluster{})
 			if err != nil {
@@ -982,7 +986,7 @@ func TestPluginPolicy(t *testing.T) {
 			a.stderr = stderr
 			a.environ = func() []string { return nil }
 
-			if err := a.refreshCredsLocked(); err != nil {
+			if err := a.refreshCredsLocked(ctx); err != nil {
 				if !test.wantErr {
 					t.Fatalf("unexpected allows plugin error: %v", err)
 				} else if !strings.Contains(err.Error(), test.wantErrSubstr) {
@@ -1354,7 +1358,7 @@ func TestAuthorizationHeaderPresentCancelsExecAction(t *testing.T) {
 
 			// UpdateTransportConfig returns error on existing TLS certificate callback, unless a bearer token is present in the
 			// transport config, in which case it takes precedence
-			cert := func() (*tls.Certificate, error) {
+			cert := func(context.Context) (*tls.Certificate, error) {
 				return nil, nil
 			}
 			tc := &transport.Config{TLS: transport.TLSConfig{Insecure: true, GetCertHolder: &transport.GetCertHolder{GetCert: cert}}}
@@ -1542,6 +1546,7 @@ func TestInstallHintRateLimit(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
 			c := api.ExecConfig{
 				Command:         "does not exist",
 				APIVersion:      "client.authentication.k8s.io/v1beta1",
@@ -1561,7 +1566,7 @@ func TestInstallHintRateLimit(t *testing.T) {
 
 			count := 0
 			for i := 0; i < test.calls; i++ {
-				err := a.refreshCredsLocked()
+				err := a.refreshCredsLocked(ctx)
 				if strings.Contains(err.Error(), c.InstallHint) {
 					count++
 				}
