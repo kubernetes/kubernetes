@@ -139,7 +139,7 @@ func ValidateFlowSchemaPolicyRulesWithSubjects(rule *flowcontrol.PolicyRulesWith
 			allErrs = append(allErrs, ValidateFlowSchemaSubject(&subject, fldPath.Child("subjects").Index(i))...)
 		}
 	} else {
-		allErrs = append(allErrs, field.Required(fldPath.Child("subjects"), "subjects must contain at least one value").MarkCoveredByDeclarative())
+		allErrs = append(allErrs, field.Required(fldPath.Child("subjects"), "subjects must contain at least one value"))
 	}
 
 	if len(rule.ResourceRules) == 0 && len(rule.NonResourceRules) == 0 {
@@ -217,10 +217,10 @@ func ValidateServiceAccountSubject(subject *flowcontrol.ServiceAccountSubject, f
 func ValidateUserSubject(subject *flowcontrol.UserSubject, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if subject == nil {
-		return append(allErrs, field.Required(fldPath, "user is required when subject kind is 'User'"))
+		return append(allErrs, field.Required(fldPath, "user is required when subject kind is 'User'").MarkCoveredByDeclarative())
 	}
 	if len(subject.Name) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "").MarkCoveredByDeclarative())
 	}
 	return allErrs
 }

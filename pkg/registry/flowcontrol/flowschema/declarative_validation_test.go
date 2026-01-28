@@ -26,8 +26,9 @@ import (
 	"k8s.io/kubernetes/pkg/apis/flowcontrol"
 )
 
+var apiVersions = []string{"v1", "v1beta3", "v1beta2", "v1beta1"}
+
 func TestDeclarativeValidate(t *testing.T) {
-	apiVersions := []string{"v1", "v1beta3", "v1beta2", "v1beta1"}
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {
 			testDeclarativeValidate(t, apiVersion)
@@ -48,13 +49,13 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		input        flowcontrol.FlowSchema
 		expectedErrs field.ErrorList
 	}{
-		//"valid": {
-		//	input: mkValidFlowSchema(),
-		//},
-		"invalid": {
+		"valid": {
+			input: mkValidFlowSchema(),
+		},
+		"when subject is required": {
 			input: mkValidFlowSchema(tweakUserSubjectName("")),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec", "rules", "0", "subjects", "0", "user", "name"), ""),
+				field.Required(field.NewPath("spec", "rules").Index(0).Child("subjects").Index(0).Child("user").Child("name"), "").MarkCoveredByDeclarative(),
 			},
 		},
 	}
@@ -71,7 +72,6 @@ func tweakUserSubjectName(name string) func(*flowcontrol.FlowSchema) {
 }
 
 func TestDeclarativeValidateUpdate(t *testing.T) {
-	apiVersions := []string{"v1", "v1beta3", "v1beta2", "v1beta1"}
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {
 			testDeclarativeValidateUpdate(t, apiVersion)
@@ -88,6 +88,12 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		"valid update": {
 			oldObj:    mkValidFlowSchema(),
 			updateObj: mkValidFlowSchema(),
+		},
+		"when subject is required": {
+			updateObj: mkValidFlowSchema(tweakUserSubjectName("")),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "rules").Index(0).Child("subjects").Index(0).Child("user").Child("name"), "").MarkCoveredByDeclarative(),
+			},
 		},
 	}
 	for k, tc := range testCases {
