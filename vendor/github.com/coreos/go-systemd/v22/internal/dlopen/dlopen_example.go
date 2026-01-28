@@ -30,14 +30,13 @@ package dlopen
 import "C"
 
 import (
-	"fmt"
 	"unsafe"
 )
 
 func strlen(libs []string, s string) (int, error) {
 	h, err := GetHandle(libs)
 	if err != nil {
-		return -1, fmt.Errorf(`couldn't get a handle to the library: %v`, err)
+		return -1, err
 	}
 	defer h.Close()
 
@@ -47,7 +46,7 @@ func strlen(libs []string, s string) (int, error) {
 
 	strlen, err := h.GetSymbolPointer(f)
 	if err != nil {
-		return -1, fmt.Errorf(`couldn't get symbol %q: %v`, f, err)
+		return -1, err
 	}
 
 	len := C.my_strlen(strlen, cs)
