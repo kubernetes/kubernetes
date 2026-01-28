@@ -436,6 +436,13 @@ func (m *WorkloadSpec) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.PriorityClassName != nil {
+		i -= len(*m.PriorityClassName)
+		copy(dAtA[i:], *m.PriorityClassName)
+		i = encodeVarintGenerated(dAtA, i, uint64(len(*m.PriorityClassName)))
+		i--
+		dAtA[i] = 0x1a
+	}
 	if len(m.PodGroups) > 0 {
 		for iNdEx := len(m.PodGroups) - 1; iNdEx >= 0; iNdEx-- {
 			{
@@ -622,6 +629,10 @@ func (m *WorkloadSpec) Size() (n int) {
 			n += 1 + l + sovGenerated(uint64(l))
 		}
 	}
+	if m.PriorityClassName != nil {
+		l = len(*m.PriorityClassName)
+		n += 1 + l + sovGenerated(uint64(l))
+	}
 	return n
 }
 
@@ -753,6 +764,7 @@ func (this *WorkloadSpec) String() string {
 	s := strings.Join([]string{`&WorkloadSpec{`,
 		`ControllerRef:` + strings.Replace(this.ControllerRef.String(), "TypedLocalObjectReference", "TypedLocalObjectReference", 1) + `,`,
 		`PodGroups:` + repeatedStringForPodGroups + `,`,
+		`PriorityClassName:` + valueToStringGenerated(this.PriorityClassName) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -1902,6 +1914,39 @@ func (m *WorkloadSpec) Unmarshal(dAtA []byte) error {
 			if err := m.PodGroups[len(m.PodGroups)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field PriorityClassName", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			s := string(dAtA[iNdEx:postIndex])
+			m.PriorityClassName = &s
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

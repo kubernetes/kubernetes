@@ -256,6 +256,11 @@ func (in *WorkloadSpec) DeepCopyInto(out *WorkloadSpec) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.PriorityClassName != nil {
+		in, out := &in.PriorityClassName, &out.PriorityClassName
+		*out = new(string)
+		**out = **in
+	}
 	return
 }
 
