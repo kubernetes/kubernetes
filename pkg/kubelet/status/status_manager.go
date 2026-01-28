@@ -823,7 +823,7 @@ func (m *manager) updateStatusInternal(logger klog.Logger, pod *v1.Pod, status v
 
 	// ensure that the start time does not change across updates.
 	if oldStatus.StartTime != nil && !oldStatus.StartTime.IsZero() {
-		status.StartTime = oldStatus.StartTime
+		status.StartTime = oldStatus.StartTime.DeepCopy()
 	} else if status.StartTime.IsZero() {
 		// if the status has no start time, we need to set an initial time
 		now := metav1.Now()
