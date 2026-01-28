@@ -54,6 +54,12 @@ type DeviceHealthUpdate struct {
 	PoolName   string
 	DeviceName string
 	Health     string
+	Message    string
+}
+
+type deviceHealthInfo struct {
+	status  string
+	message string
 }
 
 type ExamplePlugin struct {
@@ -76,7 +82,7 @@ type ExamplePlugin struct {
 	gRPCCalls []GRPCCall
 
 	healthMutex       sync.Mutex
-	deviceHealth      map[string]string
+	deviceHealth      map[string]deviceHealthInfo
 	HealthControlChan chan DeviceHealthUpdate
 
 	blockPrepareResourcesMutex   sync.Mutex
@@ -205,7 +211,7 @@ func StartPlugin(ctx context.Context, cdiDir, driverName string, kubeClient kube
 		nodeName:          nodeName,
 		prepared:          make(map[ClaimID][]kubeletplugin.Device),
 		cancelMainContext: testOpts.cancelMainContext,
-		deviceHealth:      make(map[string]string),
+		deviceHealth:      make(map[string]deviceHealthInfo),
 		HealthControlChan: make(chan DeviceHealthUpdate, 10),
 	}
 
@@ -631,7 +637,10 @@ func (ex *ExamplePlugin) NodeWatchResources(req *drahealthv1alpha1.NodeWatchReso
 			logger.V(3).Info("Received health update from control channel", "update", update)
 			ex.healthMutex.Lock()
 			key := update.PoolName + "/" + update.DeviceName
-			ex.deviceHealth[key] = update.Health
+			ex.deviceHealth[key] = deviceHealthInfo{
+				status:  update.Health,
+				message: update.Message,
+			}
 			ex.healthMutex.Unlock()
 
 			if err := ex.sendHealthUpdate(srv); err != nil {
@@ -655,7 +664,7 @@ func (ex *ExamplePlugin) sendHealthUpdate(srv drahealthv1alpha1.DRAResourceHealt
 	healthUpdates := []*drahealthv1alpha1.DeviceHealth{}
 
 	ex.healthMutex.Lock()
-	for key, health := range ex.deviceHealth {
+	for key, healthInfo := range ex.deviceHealth {
 		parts := strings.SplitN(key, "/", 2)
 		if len(parts) != 2 {
 			continue
@@ -664,7 +673,7 @@ func (ex *ExamplePlugin) sendHealthUpdate(srv drahealthv1alpha1.DRAResourceHealt
 		deviceName := parts[1]
 
 		var healthEnum drahealthv1alpha1.HealthStatus
-		switch health {
+		switch healthInfo.status {
 		case "Healthy":
 			healthEnum = drahealthv1alpha1.HealthStatus_HEALTHY
 		case "Unhealthy":
@@ -680,6 +689,7 @@ func (ex *ExamplePlugin) sendHealthUpdate(srv drahealthv1alpha1.DRAResourceHealt
 			},
 			Health:          healthEnum,
 			LastUpdatedTime: time.Now().Unix(),
+			Message:         healthInfo.message,
 		})
 	}
 	ex.healthMutex.Unlock()

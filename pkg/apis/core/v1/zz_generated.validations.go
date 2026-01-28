@@ -40,6 +40,22 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *runtime.Scheme) error {
+	// type Pod
+	scheme.AddValidationFunc((*corev1.Pod)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_Pod(ctx, op, nil /* fldPath */, obj.(*corev1.Pod), safe.Cast[*corev1.Pod](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
+	// type PodStatusResult
+	scheme.AddValidationFunc((*corev1.PodStatusResult)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_PodStatusResult(ctx, op, nil /* fldPath */, obj.(*corev1.PodStatusResult), safe.Cast[*corev1.PodStatusResult](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
 	// type ReplicationController
 	scheme.AddValidationFunc((*corev1.ReplicationController)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
 		switch op.Request.SubresourcePath() {
@@ -49,6 +65,143 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
 	return nil
+}
+
+// Validate_ContainerStatus validates an instance of ContainerStatus according
+// to declarative validation rules in the API schema.
+func Validate_ContainerStatus(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *corev1.ContainerStatus) (errs field.ErrorList) {
+	// field corev1.ContainerStatus.Name has no validation
+	// field corev1.ContainerStatus.State has no validation
+	// field corev1.ContainerStatus.LastTerminationState has no validation
+	// field corev1.ContainerStatus.Ready has no validation
+	// field corev1.ContainerStatus.RestartCount has no validation
+	// field corev1.ContainerStatus.Image has no validation
+	// field corev1.ContainerStatus.ImageID has no validation
+	// field corev1.ContainerStatus.ContainerID has no validation
+	// field corev1.ContainerStatus.Started has no validation
+	// field corev1.ContainerStatus.AllocatedResources has no validation
+	// field corev1.ContainerStatus.Resources has no validation
+	// field corev1.ContainerStatus.VolumeMounts has no validation
+	// field corev1.ContainerStatus.User has no validation
+
+	// field corev1.ContainerStatus.AllocatedResourcesStatus
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []corev1.ResourceStatus, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// iterate the list and call the type's validation function
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_ResourceStatus)...)
+			return
+		}(fldPath.Child("allocatedResourcesStatus"), obj.AllocatedResourcesStatus, safe.Field(oldObj, func(oldObj *corev1.ContainerStatus) []corev1.ResourceStatus { return oldObj.AllocatedResourcesStatus }), oldObj != nil)...)
+
+	// field corev1.ContainerStatus.StopSignal has no validation
+	return errs
+}
+
+// Validate_Pod validates an instance of Pod according
+// to declarative validation rules in the API schema.
+func Validate_Pod(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *corev1.Pod) (errs field.ErrorList) {
+	// field corev1.Pod.TypeMeta has no validation
+	// field corev1.Pod.ObjectMeta has no validation
+	// field corev1.Pod.Spec has no validation
+
+	// field corev1.Pod.Status
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *corev1.PodStatus, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_PodStatus(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("status"), &obj.Status, safe.Field(oldObj, func(oldObj *corev1.Pod) *corev1.PodStatus { return &oldObj.Status }), oldObj != nil)...)
+
+	return errs
+}
+
+// Validate_PodStatus validates an instance of PodStatus according
+// to declarative validation rules in the API schema.
+func Validate_PodStatus(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *corev1.PodStatus) (errs field.ErrorList) {
+	// field corev1.PodStatus.ObservedGeneration has no validation
+	// field corev1.PodStatus.Phase has no validation
+	// field corev1.PodStatus.Conditions has no validation
+	// field corev1.PodStatus.Message has no validation
+	// field corev1.PodStatus.Reason has no validation
+	// field corev1.PodStatus.NominatedNodeName has no validation
+	// field corev1.PodStatus.HostIP has no validation
+	// field corev1.PodStatus.HostIPs has no validation
+	// field corev1.PodStatus.PodIP has no validation
+	// field corev1.PodStatus.PodIPs has no validation
+	// field corev1.PodStatus.StartTime has no validation
+
+	// field corev1.PodStatus.InitContainerStatuses
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []corev1.ContainerStatus, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// iterate the list and call the type's validation function
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_ContainerStatus)...)
+			return
+		}(fldPath.Child("initContainerStatuses"), obj.InitContainerStatuses, safe.Field(oldObj, func(oldObj *corev1.PodStatus) []corev1.ContainerStatus { return oldObj.InitContainerStatuses }), oldObj != nil)...)
+
+	// field corev1.PodStatus.ContainerStatuses
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []corev1.ContainerStatus, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// iterate the list and call the type's validation function
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_ContainerStatus)...)
+			return
+		}(fldPath.Child("containerStatuses"), obj.ContainerStatuses, safe.Field(oldObj, func(oldObj *corev1.PodStatus) []corev1.ContainerStatus { return oldObj.ContainerStatuses }), oldObj != nil)...)
+
+	// field corev1.PodStatus.QOSClass has no validation
+
+	// field corev1.PodStatus.EphemeralContainerStatuses
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []corev1.ContainerStatus, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// iterate the list and call the type's validation function
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_ContainerStatus)...)
+			return
+		}(fldPath.Child("ephemeralContainerStatuses"), obj.EphemeralContainerStatuses, safe.Field(oldObj, func(oldObj *corev1.PodStatus) []corev1.ContainerStatus { return oldObj.EphemeralContainerStatuses }), oldObj != nil)...)
+
+	// field corev1.PodStatus.Resize has no validation
+	// field corev1.PodStatus.ResourceClaimStatuses has no validation
+	// field corev1.PodStatus.ExtendedResourceClaimStatus has no validation
+	// field corev1.PodStatus.AllocatedResources has no validation
+	// field corev1.PodStatus.Resources has no validation
+	return errs
+}
+
+// Validate_PodStatusResult validates an instance of PodStatusResult according
+// to declarative validation rules in the API schema.
+func Validate_PodStatusResult(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *corev1.PodStatusResult) (errs field.ErrorList) {
+	// field corev1.PodStatusResult.TypeMeta has no validation
+	// field corev1.PodStatusResult.ObjectMeta has no validation
+
+	// field corev1.PodStatusResult.Status
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *corev1.PodStatus, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_PodStatus(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("status"), &obj.Status, safe.Field(oldObj, func(oldObj *corev1.PodStatusResult) *corev1.PodStatus { return &oldObj.Status }), oldObj != nil)...)
+
+	return errs
 }
 
 // Validate_ReplicationController validates an instance of ReplicationController according
@@ -132,5 +285,46 @@ func Validate_ReplicationControllerSpec(ctx context.Context, op operation.Operat
 
 	// field corev1.ReplicationControllerSpec.Selector has no validation
 	// field corev1.ReplicationControllerSpec.Template has no validation
+	return errs
+}
+
+// Validate_ResourceHealth validates an instance of ResourceHealth according
+// to declarative validation rules in the API schema.
+func Validate_ResourceHealth(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *corev1.ResourceHealth) (errs field.ErrorList) {
+	// field corev1.ResourceHealth.ResourceID has no validation
+	// field corev1.ResourceHealth.Health has no validation
+
+	// field corev1.ResourceHealth.Message
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			errs = append(errs, validate.MaxLength(ctx, op, fldPath, obj, oldObj, 1024)...)
+			return
+		}(fldPath.Child("message"), obj.Message, safe.Field(oldObj, func(oldObj *corev1.ResourceHealth) *string { return oldObj.Message }), oldObj != nil)...)
+
+	return errs
+}
+
+// Validate_ResourceStatus validates an instance of ResourceStatus according
+// to declarative validation rules in the API schema.
+func Validate_ResourceStatus(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *corev1.ResourceStatus) (errs field.ErrorList) {
+	// field corev1.ResourceStatus.Name has no validation
+
+	// field corev1.ResourceStatus.Resources
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []corev1.ResourceHealth, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// iterate the list and call the type's validation function
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_ResourceHealth)...)
+			return
+		}(fldPath.Child("resources"), obj.Resources, safe.Field(oldObj, func(oldObj *corev1.ResourceStatus) []corev1.ResourceHealth { return oldObj.Resources }), oldObj != nil)...)
+
 	return errs
 }

@@ -3128,4 +3128,191 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		multipleDriversContext("using only drapbv1", false, true)
 		multipleDriversContext("using drapbv1beta1 and drapbv1", true, true)
 	})
+
+	// Test for device health reporting with custom messages
+	framework.Context("kubelet", feature.DynamicResourceAllocation, func() {
+		nodes := drautils.NewNodes(f, 1, 1)
+		driver := drautils.NewDriver(f, nodes, drautils.NetworkResources(10, false))
+		b := drautils.NewBuilder(f, driver)
+
+		f.It("should report device health with custom messages", f.WithLabel("KubeletMinVersion:1.36"), framework.WithFeatureGate(features.ResourceHealthStatusMessage), func(ctx context.Context) {
+			claimName := "health-test-claim"
+			claim := b.ExternalClaim()
+			claim.Name = claimName
+			pod := b.PodExternal()
+			pod.Spec.ResourceClaims[0].ResourceClaimName = &claim.Name
+			b.Create(f.TContext(ctx), claim, pod)
+
+			// Wait for pod to start running
+			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod), "start pod")
+
+			// Get the pool name and device name from the allocated claim
+			allocatedClaim, err := f.ClientSet.ResourceV1().ResourceClaims(f.Namespace.Name).Get(ctx, claim.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			gomega.Expect(allocatedClaim.Status.Allocation).ToNot(gomega.BeNil())
+			gomega.Expect(allocatedClaim.Status.Allocation.Devices.Results).To(gomega.HaveLen(1))
+
+			poolName := allocatedClaim.Status.Allocation.Devices.Results[0].Pool
+			deviceName := allocatedClaim.Status.Allocation.Devices.Results[0].Device
+
+			// Get the plugin for the node where the pod is scheduled
+			scheduledPod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			plugin, ok := driver.Nodes[scheduledPod.Spec.NodeName]
+			if !ok {
+				framework.Failf("pod got scheduled to node %s without a plugin", scheduledPod.Spec.NodeName)
+			}
+
+			// Test 1: Set and check initial healthy status with message
+			ginkgo.By("Setting initial healthy status with message")
+			plugin.HealthControlChan <- testdriverapp.DeviceHealthUpdate{
+				PoolName:   poolName,
+				DeviceName: deviceName,
+				Health:     "Healthy",
+				Message:    "Device operating normally, temperature: 45°C",
+			}
+
+			ginkgo.By("Checking initial healthy status with message")
+			gomega.Eventually(ctx, func(ctx context.Context) string {
+				updatedPod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+				if err != nil {
+					return ""
+				}
+
+				for _, cs := range updatedPod.Status.ContainerStatuses {
+					for _, rs := range cs.AllocatedResourcesStatus {
+						if rs.Name == v1.ResourceName(fmt.Sprintf("claim:%s", pod.Spec.ResourceClaims[0].Name)) {
+							for _, rh := range rs.Resources {
+								return ptr.Deref(rh.Message, "")
+							}
+						}
+					}
+				}
+				return ""
+			}).WithTimeout(30 * time.Second).Should(gomega.Equal("Device operating normally, temperature: 45°C"))
+
+			// Test 2: Mark device as unhealthy with error message
+			ginkgo.By("Marking device as unhealthy with error message")
+			plugin.HealthControlChan <- testdriverapp.DeviceHealthUpdate{
+				PoolName:   poolName,
+				DeviceName: deviceName,
+				Health:     "Unhealthy",
+				Message:    "ECC error count exceeded threshold (15 errors in last hour)",
+			}
+
+			// First Eventually: Check health status
+			gomega.Eventually(ctx, func(ctx context.Context) v1.ResourceHealthStatus {
+				updatedPod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+				if err != nil {
+					return ""
+				}
+
+				for _, cs := range updatedPod.Status.ContainerStatuses {
+					for _, rs := range cs.AllocatedResourcesStatus {
+						if rs.Name == v1.ResourceName(fmt.Sprintf("claim:%s", pod.Spec.ResourceClaims[0].Name)) {
+							for _, rh := range rs.Resources {
+								return rh.Health
+							}
+						}
+					}
+				}
+				return ""
+			}).WithTimeout(30 * time.Second).Should(gomega.Equal(v1.ResourceHealthStatusUnhealthy))
+
+			// Second Eventually: Check message
+			gomega.Eventually(ctx, func(ctx context.Context) string {
+				updatedPod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+				if err != nil {
+					return ""
+				}
+
+				for _, cs := range updatedPod.Status.ContainerStatuses {
+					for _, rs := range cs.AllocatedResourcesStatus {
+						if rs.Name == v1.ResourceName(fmt.Sprintf("claim:%s", pod.Spec.ResourceClaims[0].Name)) {
+							for _, rh := range rs.Resources {
+								return ptr.Deref(rh.Message, "")
+							}
+						}
+					}
+				}
+				return ""
+			}).WithTimeout(30 * time.Second).Should(gomega.Equal("ECC error count exceeded threshold (15 errors in last hour)"))
+
+			// Test 3: Update message while still unhealthy
+			ginkgo.By("Updating message while device remains unhealthy")
+			plugin.HealthControlChan <- testdriverapp.DeviceHealthUpdate{
+				PoolName:   poolName,
+				DeviceName: deviceName,
+				Health:     "Unhealthy",
+				Message:    "Critical: Memory corruption detected",
+			}
+
+			gomega.Eventually(ctx, func(ctx context.Context) string {
+				updatedPod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+				if err != nil {
+					return ""
+				}
+
+				for _, cs := range updatedPod.Status.ContainerStatuses {
+					for _, rs := range cs.AllocatedResourcesStatus {
+						if rs.Name == v1.ResourceName(fmt.Sprintf("claim:%s", pod.Spec.ResourceClaims[0].Name)) {
+							for _, rh := range rs.Resources {
+								if rh.Health == v1.ResourceHealthStatusUnhealthy {
+									return ptr.Deref(rh.Message, "")
+								}
+							}
+						}
+					}
+				}
+				return ""
+			}).WithTimeout(30 * time.Second).Should(gomega.Equal("Critical: Memory corruption detected"))
+
+			// Test 4: Mark device as healthy with recovery message
+			ginkgo.By("Marking device as healthy with recovery message")
+			plugin.HealthControlChan <- testdriverapp.DeviceHealthUpdate{
+				PoolName:   poolName,
+				DeviceName: deviceName,
+				Health:     "Healthy",
+				Message:    "Recovered after reset, all diagnostics passed",
+			}
+
+			// First Eventually: Check health status
+			gomega.Eventually(ctx, func(ctx context.Context) v1.ResourceHealthStatus {
+				updatedPod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+				if err != nil {
+					return ""
+				}
+
+				for _, cs := range updatedPod.Status.ContainerStatuses {
+					for _, rs := range cs.AllocatedResourcesStatus {
+						if rs.Name == v1.ResourceName(fmt.Sprintf("claim:%s", pod.Spec.ResourceClaims[0].Name)) {
+							for _, rh := range rs.Resources {
+								return rh.Health
+							}
+						}
+					}
+				}
+				return ""
+			}).WithTimeout(30 * time.Second).Should(gomega.Equal(v1.ResourceHealthStatusHealthy))
+
+			// Second Eventually: Check message
+			gomega.Eventually(ctx, func(ctx context.Context) string {
+				updatedPod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+				if err != nil {
+					return ""
+				}
+
+				for _, cs := range updatedPod.Status.ContainerStatuses {
+					for _, rs := range cs.AllocatedResourcesStatus {
+						if rs.Name == v1.ResourceName(fmt.Sprintf("claim:%s", pod.Spec.ResourceClaims[0].Name)) {
+							for _, rh := range rs.Resources {
+								return ptr.Deref(rh.Message, "")
+							}
+						}
+					}
+				}
+				return ""
+			}).WithTimeout(30 * time.Second).Should(gomega.Equal("Recovered after reset, all diagnostics passed"))
+		})
+	})
 })
