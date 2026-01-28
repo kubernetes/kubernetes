@@ -42,6 +42,8 @@ const (
 	// UnschedulableTimeout is the event when a pod is moved from unschedulablePods
 	// due to the timeout specified at pod-max-in-unschedulable-pods-duration.
 	UnschedulableTimeout = "UnschedulableTimeout"
+	// PassedWorkloadCycle is the event when a pod passed the workload scheduling cycle.
+	PassedWorkloadCycle = "PassedWorkloadCycle"
 )
 
 var (
