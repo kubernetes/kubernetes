@@ -136,40 +136,34 @@ func Init(tb TB, opts ...InitOption) TContext {
 		Deadline() (time.Time, bool)
 	})
 
-	ctx := interruptCtx
+	ctx := defaultProgressReporter.init(tb)
 	var header func() string
 	if c.PerTestOutput {
 		logger := newLogger(tb, c.BufferLogs)
-		ctx = klog.NewContext(interruptCtx, logger)
+		ctx = klog.NewContext(ctx, logger)
 		header = klogHeader
 	}
 
+	var cancelTimeout func(cause string)
 	if deadlineOK {
 		if deadline, ok := deadlineTB.Deadline(); ok {
 			timeLeft := time.Until(deadline)
 			timeLeft -= CleanupGracePeriod
-			ctx, cancel := withTimeout(ctx, tb, timeLeft, fmt.Sprintf("test suite deadline (%s) is close, need to clean up before the %s cleanup grace period", deadline.Truncate(time.Second), CleanupGracePeriod))
-			tc := TC{
-				Context:   ctx,
-				testingTB: testingTB{TB: tb},
-				cancel:    cancel,
-			}
-			return &tc
+			ctx, cancelTimeout = withTimeout(ctx, tb, timeLeft, fmt.Sprintf("test suite deadline (%s) is close, need to clean up before the %s cleanup grace period", deadline.Truncate(time.Second), CleanupGracePeriod))
 		}
 	}
-	tCtx := WithCancel(InitCtx(ctx, tb))
-	tCtx.perTestHeader = header
-	tCtx.Cleanup(func() {
-		tCtx.Cancel(cleanupErr(tCtx.Name()).Error())
-	})
 
-	// Only enable signal handling if we are sure that we are not
-	// in a Ginkgo suite. Only structs from the testing package
-	// can implement this interface because it contains an "internal"
-	// method, so this has to run under `go test`.
-	if _, ok := tb.(testing.TB); ok {
-		initSignalsOnce.Do(initSignals)
+	// Construct new TContext with context and settings as determined above.
+	tCtx := InitCtx(ctx, tb)
+	if cancelTimeout != nil {
+		tCtx.cancel = cancelTimeout
+	} else {
+		tCtx = WithCancel(tCtx)
+		tCtx.Cleanup(func() {
+			tCtx.Cancel(cleanupErr(tCtx.Name()).Error())
+		})
 	}
+	tCtx.perTestHeader = header
 
 	return tCtx
 }
