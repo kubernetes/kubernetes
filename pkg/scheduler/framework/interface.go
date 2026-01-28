@@ -132,7 +132,7 @@ func (m *NodeToStatus) NodesForStatusCode(nodeLister fwk.NodeInfoLister, code fw
 // PodsToActivateKey is a reserved state key for stashing pods.
 // If the stashed pods are present in unschedulablePods or backoffQ，they will be
 // activated (i.e., moved to activeQ) in two phases:
-// - end of a scheduling cycle if it succeeds (will be cleared from `PodsToActivate` if activated)
+// - end of a pod-by-pod scheduling cycle if it succeeds (will be cleared from `PodsToActivate` if activated)
 // - end of a binding cycle if it succeeds
 var PodsToActivateKey fwk.StateKey = "kubernetes.io/pods-to-activate"
 
@@ -237,6 +237,13 @@ type Framework interface {
 	// to a map of currently waiting pods and return status with "Wait" code.
 	// Pod will remain waiting pod for the minimum duration returned by the Permit plugins.
 	RunPermitPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status
+
+	// RunPermitPluginsWithoutWaiting runs the set of configured permit plugins. If any of these
+	// plugins returns a status other than "Success" or "Wait", it does not continue
+	// running the remaining plugins and returns an error. If any of the
+	// plugins returns "Wait", this function will NOT create a waiting pod object,
+	// but just return status with "Wait" code. It's caller's responsibility to act on that code.
+	RunPermitPluginsWithoutWaiting(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status
 
 	// WillWaitOnPermit returns whether this pod will wait on permit by checking if the pod is a waiting pod.
 	WillWaitOnPermit(ctx context.Context, pod *v1.Pod) bool
