@@ -113,30 +113,35 @@ dependencies:
   # Golang
   # TODO: this should really be eliminated and controlled by .go-version
   - name: "golang: upstream version"
-    version: 1.24.11
+    version: 1.24.12
     refPaths:
     - path: .go-version
-    - path: build/build-image/cross/VERSION
     - path: staging/publishing/rules.yaml
       match: 'default-go-version\: \d+.\d+(alpha|beta|rc)?\.?(\d+)?'
+
+  # This should ideally be updated to match the golang version
+  # but we can dynamically fetch go if the base image is out of date.
+  # This allows us to ship go updates more quickly.
+  #
+  # NOTE: To fully patch all binaries, go-runner and the related base images
+  # should also be updated, but go-runner is much harder to exploit and has
+  # far less relevancy to go updates for Kubernetes more generally.
+  - name: "registry.k8s.io/kube-cross: dependents"
+    version: v1.34.0-go1.24.11-bullseye.0
+    refPaths:
+    - path: build/build-image/cross/VERSION
 
   # Golang pre-releases are denoted as `1.y<pre-release stage>`
   # Example: go1.16rc1
   #
   # This entry is a stub of the major version to allow dependency checks to
   # pass when building Kubernetes using a pre-release of Golang.
-
   - name: "golang: 1.<major>"
     version: 1.24
     refPaths:
     - path: build/build-image/cross/VERSION
     - path: hack/lib/golang.sh
       match: minimum_go_version=go([0-9]+\.[0-9]+)
-
-  - name: "registry.k8s.io/kube-cross: dependents"
-    version: v1.34.0-go1.24.11-bullseye.0
-    refPaths:
-    - path: build/build-image/cross/VERSION
 
   # Base images
   - name: "registry.k8s.io/debian-base: dependents"
