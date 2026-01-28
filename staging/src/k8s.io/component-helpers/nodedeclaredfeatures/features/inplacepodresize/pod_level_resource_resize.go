@@ -46,6 +46,11 @@ func (f *podLevelResourcesResizeFeature) Discover(cfg *nodedeclaredfeatures.Node
 	return enabled, nil
 }
 
+func (f *podLevelResourcesResizeFeature) Requirements() *nodedeclaredfeatures.FeatureRequirements {
+	return &nodedeclaredfeatures.FeatureRequirements{
+		EnabledFeatureGates: []string{IPPRPodLevelResourcesFeatureGate},
+	}
+}
 func (f *podLevelResourcesResizeFeature) InferForScheduling(podInfo *nodedeclaredfeatures.PodInfo) bool {
 	// This feature is only relevant for pod updates.
 	return false

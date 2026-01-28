@@ -28,6 +28,14 @@ import (
 	test "k8s.io/component-helpers/nodedeclaredfeatures/testing"
 )
 
+func TestGuaranteedQoSPodCPUResizeFeature_Requirements(t *testing.T) {
+	feature := &guaranteedQoSPodCPUResizeFeature{}
+	reqs := feature.Requirements()
+	assert.NotNil(t, reqs)
+	assert.Equal(t, []string{IPPRExclusiveCPUsFeatureGate}, reqs.EnabledFeatureGates)
+	assert.Equal(t, map[string]string{"CPUManagerPolicy": "static"}, reqs.StaticConfig)
+}
+
 func TestGuaranteedQoSPodCPUResizeFeature_Discover(t *testing.T) {
 	testCases := []struct {
 		name             string

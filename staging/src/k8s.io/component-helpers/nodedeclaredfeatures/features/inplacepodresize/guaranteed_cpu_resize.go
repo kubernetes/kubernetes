@@ -55,6 +55,13 @@ func (f *guaranteedQoSPodCPUResizeFeature) Discover(cfg *nodedeclaredfeatures.No
 	return (featureGateEnabled && cpuManagerPolicy == CPUManagerPolicyStatic) || (cpuManagerPolicy == CPUManagerPolicyNone), nil
 }
 
+func (f *guaranteedQoSPodCPUResizeFeature) Requirements() *nodedeclaredfeatures.FeatureRequirements {
+	return &nodedeclaredfeatures.FeatureRequirements{
+		EnabledFeatureGates: []string{IPPRExclusiveCPUsFeatureGate},
+		StaticConfig:        map[string]string{"CPUManagerPolicy": "static"},
+	}
+}
+
 func (f *guaranteedQoSPodCPUResizeFeature) InferForScheduling(podInfo *nodedeclaredfeatures.PodInfo) bool {
 	// This feature is only relevant for pod updates (resizes).
 	return false

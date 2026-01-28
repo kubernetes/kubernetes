@@ -27,6 +27,14 @@ import (
 	test "k8s.io/component-helpers/nodedeclaredfeatures/testing"
 )
 
+func TestPodLevelResourcesResizeFeature_Requirements(t *testing.T) {
+	feature := &podLevelResourcesResizeFeature{}
+	reqs := feature.Requirements()
+	assert.NotNil(t, reqs)
+	assert.Equal(t, []string{IPPRPodLevelResourcesFeatureGate}, reqs.EnabledFeatureGates)
+	assert.Empty(t, reqs.StaticConfig)
+}
+
 func TestPodLevelResourcesResizeFeatureDiscover(t *testing.T) {
 	tests := []struct {
 		name        string
