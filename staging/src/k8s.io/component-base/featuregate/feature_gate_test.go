@@ -282,6 +282,60 @@ func TestFeatureGateFlag(t *testing.T) {
 	}
 }
 
+func TestFeatureGateCheckEnabled(t *testing.T) {
+	const testAlphaGate Feature = "TestAlpha"
+	const testBetaGate Feature = "TestBeta"
+	const testUnknownGate Feature = "TestUnknown"
+	defaultGates := map[Feature]FeatureSpec{
+		testAlphaGate: {Default: false, PreRelease: Alpha},
+		testBetaGate:  {Default: true, PreRelease: Beta},
+	}
+
+	tests := []struct {
+		name          string
+		featureGate   Feature
+		expectErr     bool
+		expectEnabled bool
+	}{
+		{
+			name:          "Known and enabled by default",
+			featureGate:   testBetaGate,
+			expectErr:     false,
+			expectEnabled: true,
+		},
+		{
+			name:          "Known and disabled by default",
+			featureGate:   testAlphaGate,
+			expectErr:     false,
+			expectEnabled: false,
+		},
+		{
+			name:        "Unknown feature",
+			featureGate: testUnknownGate,
+			expectErr:   true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			f := NewFeatureGate()
+			err := f.Add(defaultGates)
+			require.NoError(t, err)
+			enabled, err := f.CheckEnabled(tc.featureGate)
+
+			if tc.expectErr {
+				require.Error(t, err)
+				if err != nil {
+					assert.Contains(t, err.Error(), "not registered")
+				}
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tc.expectEnabled, enabled)
+			}
+		})
+	}
+}
+
 func TestFeatureGateOverride(t *testing.T) {
 	const testAlphaGate Feature = "TestAlpha"
 	const testBetaGate Feature = "TestBeta"
