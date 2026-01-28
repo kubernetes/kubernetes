@@ -311,6 +311,52 @@ func (_c *MockFeature_Name_Call) RunAndReturn(run func() string) *MockFeature_Na
 	return _c
 }
 
+// Requirements provides a mock function for the type MockFeature
+func (_mock *MockFeature) Requirements() *nodedeclaredfeatures.FeatureRequirements {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for Requirements")
+	}
+
+	var r0 *nodedeclaredfeatures.FeatureRequirements
+	if returnFunc, ok := ret.Get(0).(func() *nodedeclaredfeatures.FeatureRequirements); ok {
+		r0 = returnFunc()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*nodedeclaredfeatures.FeatureRequirements)
+		}
+	}
+	return r0
+}
+
+// MockFeature_Requirements_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Requirements'
+type MockFeature_Requirements_Call struct {
+	*mock.Call
+}
+
+// Requirements is a helper method to define mock.On call
+func (_e *MockFeature_Expecter) Requirements() *MockFeature_Requirements_Call {
+	return &MockFeature_Requirements_Call{Call: _e.mock.On("Requirements")}
+}
+
+func (_c *MockFeature_Requirements_Call) Run(run func()) *MockFeature_Requirements_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockFeature_Requirements_Call) Return(featureRequirements *nodedeclaredfeatures.FeatureRequirements) *MockFeature_Requirements_Call {
+	_c.Call.Return(featureRequirements)
+	return _c
+}
+
+func (_c *MockFeature_Requirements_Call) RunAndReturn(run func() *nodedeclaredfeatures.FeatureRequirements) *MockFeature_Requirements_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // NewMockFeatureGate creates a new instance of MockFeatureGate. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewMockFeatureGate(t interface {
