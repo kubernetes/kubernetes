@@ -55,7 +55,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		"when subject is required": {
 			input: mkValidFlowSchema(tweakUserSubjectName("")),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec", "rules").Index(0).Child("subjects").Index(0).Child("user").Child("name"), "").MarkCoveredByDeclarative(),
+				field.Required(field.NewPath("spec", "rules").Index(0).Child("subjects").Index(0).Child("user.name"), "").MarkCoveredByDeclarative(),
 			},
 		},
 	}
@@ -92,7 +92,7 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		"when subject is required": {
 			updateObj: mkValidFlowSchema(tweakUserSubjectName("")),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec", "rules").Index(0).Child("subjects").Index(0).Child("user").Child("name"), "").MarkCoveredByDeclarative(),
+				field.Required(field.NewPath("spec", "rules").Index(0).Child("subjects").Index(0).Child("user.name"), "").MarkCoveredByDeclarative(),
 			},
 		},
 	}
