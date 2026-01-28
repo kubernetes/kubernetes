@@ -47,6 +47,7 @@ var PluginsV1 = &config.Plugins{
 			{Name: names.NodeResourcesBalancedAllocation, Weight: 1},
 			{Name: names.ImageLocality, Weight: 1},
 			{Name: names.DefaultBinder},
+			{Name: names.NodeDeclaredFeatures},
 		},
 	},
 }
@@ -77,6 +78,7 @@ var ExpandedPluginsV1 = &config.Plugins{
 			{Name: names.PodTopologySpread},
 			{Name: names.InterPodAffinity},
 			{Name: names.DynamicResources},
+			{Name: names.NodeDeclaredFeatures},
 		},
 	},
 	Filter: config.PluginSet{
@@ -94,6 +96,7 @@ var ExpandedPluginsV1 = &config.Plugins{
 			{Name: names.PodTopologySpread},
 			{Name: names.InterPodAffinity},
 			{Name: names.DynamicResources},
+			{Name: names.NodeDeclaredFeatures},
 		},
 	},
 	PostFilter: config.PluginSet{
