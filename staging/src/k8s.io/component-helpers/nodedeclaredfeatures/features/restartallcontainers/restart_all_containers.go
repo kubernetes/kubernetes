@@ -43,6 +43,11 @@ func (f *restartAllContainersFeature) Discover(cfg *nodedeclaredfeatures.NodeCon
 	return cfg.FeatureGates.Enabled(RestartAllContainersOnContainerExits)
 }
 
+func (f *restartAllContainersFeature) Requirements() *nodedeclaredfeatures.FeatureRequirements {
+	return &nodedeclaredfeatures.FeatureRequirements{
+		EnabledFeatureGates: []string{RestartAllContainersOnContainerExits},
+	}
+}
 func (f *restartAllContainersFeature) InferForScheduling(podInfo *nodedeclaredfeatures.PodInfo) bool {
 	for _, c := range podInfo.Spec.Containers {
 		for _, rule := range c.RestartPolicyRules {
