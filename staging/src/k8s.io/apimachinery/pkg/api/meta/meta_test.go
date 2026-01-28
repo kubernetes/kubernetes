@@ -17,6 +17,7 @@ limitations under the License.
 package meta
 
 import (
+	"errors"
 	"math/rand"
 	"reflect"
 	"testing"
@@ -50,15 +51,64 @@ func TestAsPartialObjectMetadata(t *testing.T) {
 	}
 }
 
-func TestAccessor_NilPointer(t *testing.T) {
-	var object metav1.ObjectMeta
-	_, err := Accessor(object)
-	if err != errNotObject {
-		t.Fatalf("expected errNotObject, got: %v", err)
+// A test helper that implements the metav1.ObjectMetaAccessor interface
+type fakeObjectMetaAccessor struct {
+	meta metav1.Object
+}
+
+func (f *fakeObjectMetaAccessor) GetObjectMeta() metav1.Object {
+	return f.meta
+}
+
+func TestAccessor(t *testing.T) {
+	testCases := []struct {
+		name     string
+		input    interface{}
+		expected error
+	}{
+		{
+			name:     "Valid metav1.Object",
+			input:    &metav1.ObjectMeta{},
+			expected: nil,
+		},
+		{
+			name:     "Nil metav1.Object pointer",
+			input:    (*metav1.ObjectMeta)(nil),
+			expected: errNilObject,
+		},
+		{
+			name:     "Nil input",
+			input:    nil,
+			expected: errNilObject,
+		},
+		{
+			name:     "Valid metav1.ObjectMetaAccessor",
+			input:    &fakeObjectMetaAccessor{meta: &metav1.ObjectMeta{}},
+			expected: nil,
+		},
+		{
+			name:     "metav1.ObjectMetaAccessor with nil meta",
+			input:    &fakeObjectMetaAccessor{meta: nil},
+			expected: errNilObject,
+		},
+		{
+			name:     "metav1.ObjectMetaAccessor with nil meta pointer",
+			input:    &fakeObjectMetaAccessor{meta: (*metav1.ObjectMeta)(nil)},
+			expected: errNilObject,
+		},
+		{
+			name:     "Invalid input type",
+			input:    "invalid-input",
+			expected: errNotObject,
+		},
 	}
-	var nilPtr *metav1.ObjectMeta = nil
-	_, err = Accessor(nilPtr)
-	if err != errNilObject {
-		t.Fatalf("expected errNilObject, got: %v", err)
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := Accessor(tc.input)
+			if !errors.Is(err, tc.expected) {
+				t.Errorf("expected error %v, got %v", tc.expected, err)
+			}
+		})
 	}
 }

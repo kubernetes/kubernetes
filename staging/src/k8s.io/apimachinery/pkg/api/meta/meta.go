@@ -92,23 +92,31 @@ var errNotObject = fmt.Errorf("object does not implement the Object interfaces")
 // errNilObject is returned when a nil object is passed to Accessor.
 var errNilObject = fmt.Errorf("nil object passed")
 
+// isNil returns true if the passed interface is nil or is a typed nil.
+func isNil(i interface{}) bool {
+	if i == nil {
+		return true
+	}
+	v := reflect.ValueOf(i)
+	return v.Kind() == reflect.Ptr && v.IsNil()
+}
+
 // Accessor takes an arbitrary object pointer and returns meta.Interface.
 // obj must be a pointer to an API type. An error is returned if the minimum
 // required fields are missing. Fields that are not required return the default
 // value and are a no-op if set.
 func Accessor(obj interface{}) (metav1.Object, error) {
-	// nil pointer check
-	if obj == nil || (reflect.ValueOf(obj).Kind() == reflect.Ptr && reflect.ValueOf(obj).IsNil()) {
+	if isNil(obj) {
 		return nil, errNilObject
 	}
 	switch t := obj.(type) {
 	case metav1.Object:
 		return t, nil
 	case metav1.ObjectMetaAccessor:
-		if m := t.GetObjectMeta(); m != nil {
+		if m := t.GetObjectMeta(); !isNil(m) {
 			return m, nil
 		}
-		return nil, errNotObject
+		return nil, errNilObject
 	default:
 		return nil, errNotObject
 	}
