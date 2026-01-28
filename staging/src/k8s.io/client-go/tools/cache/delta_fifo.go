@@ -202,6 +202,9 @@ const (
 	// SyncAll indicates all known objects should be reprocessed.
 	// This event contains an object of type SyncAllInfo.
 	SyncAll DeltaType = "SyncAll"
+	// Bookmark is emitted on Bookmark calls and Replace calls to pass resource
+	// version information to the consumer.
+	Bookmark DeltaType = "Bookmark"
 )
 
 // Delta is a member of Deltas (a list of Delta objects) which

@@ -76,6 +76,12 @@ type ReflectorStore interface {
 	Resync() error
 }
 
+// ReflectorBookmarkStore is an optional interface that allows a store
+// to be informed of bookmark events received by the reflector.
+type ReflectorBookmarkStore interface {
+	Bookmark(resourceVersion string) error
+}
+
 // TransformingStore is an optional interface that can be implemented by the provided store.
 // If implemented on the provided store reflector will use the same transformer in its internal stores.
 type TransformingStore interface {
@@ -1005,6 +1011,13 @@ loop:
 				eventReceivedBesidesAdded = true
 				if meta.GetAnnotations()[metav1.InitialEventsAnnotationKey] == "true" {
 					watchListBookmarkReceived = true
+				}
+				// Propagate the resource version from the bookmark event to stores which indicate they want it
+				if bookmarkStore, ok := store.(ReflectorBookmarkStore); ok {
+					err := bookmarkStore.Bookmark(resourceVersion)
+					if err != nil {
+						utilruntime.HandleErrorWithContext(ctx, err, "Unable to send bookmark event to store", "reflector", name, "object", event.Object)
+					}
 				}
 			default:
 				utilruntime.HandleErrorWithContext(ctx, err, "Unknown watch event", "reflector", name, "event", event)
