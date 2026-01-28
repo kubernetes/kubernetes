@@ -801,24 +801,24 @@ func PortForwardLocation(
 	connInfo client.ConnectionInfoGetter,
 	name string,
 	opts *api.PodPortForwardOptions,
-) (*url.URL, http.RoundTripper, error) {
+) (*url.URL, http.RoundTripper, *client.ConnectionInfo, error) {
 	pod, err := getPod(ctx, getter, name)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	nodeName := types.NodeName(pod.Spec.NodeName)
 	if len(nodeName) == 0 {
 		// If pod has not been assigned a host, return an empty location
-		return nil, nil, errors.NewBadRequest(fmt.Sprintf("pod %s does not have a host assigned", name))
+		return nil, nil, nil, errors.NewBadRequest(fmt.Sprintf("pod %s does not have a host assigned", name))
 	}
 	nodeInfo, err := connInfo.GetConnectionInfo(ctx, nodeName)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	params := url.Values{}
 	if err := streamParams(params, opts); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	loc := &url.URL{
 		Scheme:   nodeInfo.Scheme,
@@ -826,7 +826,7 @@ func PortForwardLocation(
 		Path:     fmt.Sprintf("/portForward/%s/%s", pod.Namespace, pod.Name),
 		RawQuery: params.Encode(),
 	}
-	return loc, nodeInfo.Transport, nil
+	return loc, nodeInfo.Transport, nodeInfo, nil
 }
 
 // validateContainer validate container is valid for pod, return valid container

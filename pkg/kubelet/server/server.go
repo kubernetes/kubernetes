@@ -959,9 +959,8 @@ func (s *Server) getAttach(request *restful.Request, response *restful.Response)
 		streaming.WriteError(err, response.ResponseWriter)
 		return
 	}
-	// If upgrade request is for v5 websockets, then set up websocket/spdy translation handling.
-	if wsstream.IsWebSocketRequest(request.Request) {
-		klog.Infof("DEBUG_WEBSOCKET: Kubelet creating SPDY translation to CRI at URL: %s", url.String())    //nolint:logcheck
+	// If upgrade request is for V5 websockets, then set up websocket/spdy translation handling.
+	if wsstream.IsWebSocketRequestWithStreamCloseProtocol(request.Request) {
 		klog.Infof("DEBUG_WEBSOCKET: Kubelet translating websocket attach request for pod %s", podFullName) //nolint:logcheck
 		streamOptions := translator.Options{
 			Stdin:  streamOpts.Stdin,
@@ -999,10 +998,9 @@ func (s *Server) getExec(request *restful.Request, response *restful.Response) {
 		streaming.WriteError(err, response.ResponseWriter)
 		return
 	}
-	// If upgrade request is for v5 websockets, then set up websocket/spdy translation handling.
-	if wsstream.IsWebSocketRequest(request.Request) {
-		klog.Infof("DEBUG_WEBSOCKET: Kubelet creating SPDY translation to CRI at URL: %s", url.String())    //nolint:logcheck
-		klog.Infof("DEBUG_WEBSOCKET: Kubelet translating websocket attach request for pod %s", podFullName) //nolint:logcheck
+	// If upgrade request is for V5 websockets, then set up websocket/spdy translation handling.
+	if wsstream.IsWebSocketRequestWithStreamCloseProtocol(request.Request) {
+		klog.Infof("DEBUG_WEBSOCKET: Kubelet translating websocket exec request for pod %s", podFullName) //nolint:logcheck
 		streamOptions := translator.Options{
 			Stdin:  streamOpts.Stdin,
 			Stdout: streamOpts.Stdout,
@@ -1056,12 +1054,17 @@ func writeJSONResponse(logger klog.Logger, response *restful.Response, data []by
 func (s *Server) getPortForward(request *restful.Request, response *restful.Response) {
 	params := getPortForwardRequestParams(request)
 
-	portForwardOptions, err := portforward.NewV4Options(request.Request)
-	if err != nil {
-		utilruntime.HandleError(err)
-		response.WriteError(http.StatusBadRequest, err)
-		return
+	portForwardOptions := &portforward.V4Options{}
+	var err error
+	if !wsstream.IsWebSocketRequestWithTunnelingProtocol(request.Request) {
+		portForwardOptions, err = portforward.NewV4Options(request.Request)
+		if err != nil {
+			utilruntime.HandleError(err)
+			response.WriteError(http.StatusBadRequest, err)
+			return
+		}
 	}
+
 	pod, ok := s.host.GetPodByName(params.podNamespace, params.podName)
 	if !ok {
 		response.WriteError(http.StatusNotFound, fmt.Errorf("pod does not exist"))
@@ -1077,7 +1080,16 @@ func (s *Server) getPortForward(request *restful.Request, response *restful.Resp
 		streaming.WriteError(err, response.ResponseWriter)
 		return
 	}
-	proxyStream(response.ResponseWriter, request.Request, url)
+	// If upgrade request is for tunneling websockets, then set up tunneling handling.
+	if wsstream.IsWebSocketRequestWithTunnelingProtocol(request.Request) {
+		klog.Infof("DEBUG_WEBSOCKET: Kubelet tunneling websocket port-forward request for pod %s", params.podName) //nolint:logcheck
+		spdyHandler := proxy.NewUpgradeAwareHandler(url, nil /*transport*/, false /*wrapTransport*/, true /*upgradeRequired*/, &responder{})
+		tunnelingHandler := translator.NewTunnelingHandler(spdyHandler)
+		handler := translator.NewTranslatingHandler(spdyHandler, tunnelingHandler, wsstream.IsWebSocketRequestWithTunnelingProtocol)
+		handler.ServeHTTP(response.ResponseWriter, request.Request)
+	} else {
+		proxyStream(response.ResponseWriter, request.Request, url)
+	}
 }
 
 // checkpoint handles the checkpoint API request. It checks if the requested

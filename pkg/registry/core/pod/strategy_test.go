@@ -689,7 +689,7 @@ func TestPortForwardLocation(t *testing.T) {
 	for _, tc := range tcs {
 		getter := &mockPodGetter{tc.in}
 		connectionGetter := &mockConnectionInfoGetter{tc.info}
-		loc, _, err := PortForwardLocation(ctx, getter, connectionGetter, "test", tc.opts)
+		loc, _, _, err := PortForwardLocation(ctx, getter, connectionGetter, "test", tc.opts)
 		if !reflect.DeepEqual(err, tc.expectedErr) {
 			t.Errorf("expected %v, got %v", tc.expectedErr, err)
 		}
