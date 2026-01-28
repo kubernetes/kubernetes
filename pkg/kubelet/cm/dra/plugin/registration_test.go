@@ -203,12 +203,12 @@ func TestRegistrationHandler(t *testing.T) {
 			service := drapb.DRAPluginService
 			tmp := t.TempDir()
 			endpointA := path.Join(tmp, socketFileA)
-			teardownA, err := setupFakeGRPCServer(service, endpointA)
+			teardownA, err := setupFakeGRPCServer(tCtx, service, endpointA)
 			require.NoError(t, err)
 			tCtx.Cleanup(teardownA)
 
 			endpoint := path.Join(tmp, test.socketFile)
-			teardown, err := setupFakeGRPCServer(service, endpoint)
+			teardown, err := setupFakeGRPCServer(tCtx, service, endpoint)
 			require.NoError(t, err)
 			tCtx.Cleanup(teardown)
 
@@ -316,7 +316,7 @@ func TestConnectionHandling(t *testing.T) {
 
 			// Run GRPC service.
 			endpoint := path.Join(t.TempDir(), "dra.sock")
-			teardown, err := setupFakeGRPCServer(service, endpoint)
+			teardown, err := setupFakeGRPCServer(tCtx, service, endpoint)
 			require.NoError(t, err)
 			defer teardown()
 
@@ -345,7 +345,7 @@ func TestConnectionHandling(t *testing.T) {
 
 				// Start up gRPC server again.
 				tCtx.Log("Restarting plugin gRPC server")
-				teardown, err = setupFakeGRPCServer(service, endpoint)
+				teardown, err = setupFakeGRPCServer(tCtx, service, endpoint)
 				require.NoError(t, err)
 				defer teardown()
 
