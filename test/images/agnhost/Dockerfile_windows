@@ -23,7 +23,7 @@ RUN go install github.com/google/go-containerregistry/cmd/crane@latest && \
     apt-get update && apt-get install -y jq
 
 COPY fakeregistryserver/prepare_registry.sh /prepare_registry.sh
-COPY fakeregistryserver/images_windows.txt /images.txt
+COPY fakeregistryserver/images.txt /images.txt
 
 RUN chmod +x /prepare_registry.sh
 
