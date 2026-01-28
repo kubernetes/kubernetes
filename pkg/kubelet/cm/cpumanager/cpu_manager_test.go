@@ -99,6 +99,10 @@ func (s *mockState) GetCPUAssignments() state.ContainerCPUAssignments {
 	return s.assignments.Clone()
 }
 
+func (s *mockState) HoldStore() {}
+
+func (s *mockState) Store() {}
+
 type mockPolicy struct {
 	err error
 }
