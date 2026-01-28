@@ -31,6 +31,8 @@ type CrossVersionObjectReference struct {
 	Kind string `json:"kind" protobuf:"bytes,1,opt,name=kind"`
 
 	// name is the name of the referent; More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+	// +required
+	// +k8s:required
 	Name string `json:"name" protobuf:"bytes,2,opt,name=name"`
 
 	// apiVersion is the API version of the referent

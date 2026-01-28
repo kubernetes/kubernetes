@@ -92,7 +92,7 @@ func ValidateCrossVersionObjectReference(ref autoscaling.CrossVersionObjectRefer
 	}
 
 	if len(ref.Name) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "").MarkCoveredByDeclarative())
 	} else {
 		for _, msg := range content.IsPathSegmentName(ref.Name) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), ref.Name, msg))

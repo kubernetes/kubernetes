@@ -72,6 +72,8 @@ message CrossVersionObjectReference {
   optional string kind = 1;
 
   // name is the name of the referent; More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+  // +required
+  // +k8s:required
   optional string name = 2;
 
   // apiVersion is the API version of the referent

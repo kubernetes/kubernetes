@@ -68,6 +68,12 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				field.Required(field.NewPath("spec", "scaleTargetRef", "kind"), ""),
 			},
 		},
+		"invalid: scaleTargetRef.name empty": {
+			input: makeValidHPA(tweakScaleTargetRefName("")),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "scaleTargetRef", "name"), ""),
+			},
+		},
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
@@ -117,6 +123,13 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			updateObj: makeValidHPA(tweakScaleTargetRefKind("")),
 			expectedErrs: field.ErrorList{
 				field.Required(field.NewPath("spec", "scaleTargetRef", "kind"), ""),
+			},
+		},
+		"invalid update: scaleTargetRef.name made empty": {
+			oldObj:    makeValidHPA(),
+			updateObj: makeValidHPA(tweakScaleTargetRefName("")),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "scaleTargetRef", "name"), ""),
 			},
 		},
 	}
@@ -172,5 +185,11 @@ func tweakMaxReplicas(replicas int32) func(*api.HorizontalPodAutoscaler) {
 func tweakScaleTargetRefKind(kind string) func(*api.HorizontalPodAutoscaler) {
 	return func(hpa *api.HorizontalPodAutoscaler) {
 		hpa.Spec.ScaleTargetRef.Kind = kind
+	}
+}
+
+func tweakScaleTargetRefName(name string) func(*api.HorizontalPodAutoscaler) {
+	return func(hpa *api.HorizontalPodAutoscaler) {
+		hpa.Spec.ScaleTargetRef.Name = name
 	}
 }
