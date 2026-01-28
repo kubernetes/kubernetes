@@ -46,6 +46,8 @@ const (
 	Cgroup2MemoryHigh      string = "memory.high"
 	Cgroup2MaxCpuLimit     string = "max"
 	Cgroup2MaxSwapFilename string = "memory.swap.max"
+	// Cgroup2CPUIdle is cpu.idle for cgroup v2
+	Cgroup2CPUIdle string = "cpu.idle"
 )
 
 var RootCgroupName = CgroupName([]string{})
