@@ -35,6 +35,15 @@ func (f *FIFO) List() []interface{} {
 	return list
 }
 
+// LastStoreSyncResourceVersion is unimplemented for FIFO, only used in unit testing.
+func (f *FIFO) LastStoreSyncResourceVersion() string {
+	return ""
+}
+
+// Bookmark is unimplemented for FIFO, only used in unit testing.
+func (f *FIFO) Bookmark(rv string) {
+}
+
 // ListKeys returns a list of all the keys of the objects currently
 // in the FIFO.
 // This function was moved here because it is not consistent with normal list semantics, but is used in unit testing.
