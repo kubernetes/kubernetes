@@ -14878,12 +14878,6 @@
           "type": "integer"
         }
       },
-      "required": [
-        "disruptionsAllowed",
-        "currentHealthy",
-        "desiredHealthy",
-        "expectedPods"
-      ],
       "type": "object"
     },
     "io.k8s.api.rbac.v1.AggregationRule": {
