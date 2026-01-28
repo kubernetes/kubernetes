@@ -129,13 +129,11 @@ func (r *AttachREST) Connect(ctx context.Context, name string, opts runtime.Obje
 	if err != nil {
 		return nil, err
 	}
-
 	nodeSupportsWebsockets := checkNodeSupportsWebsockets(connInfo.NodeFeatures)
-
 	handler := newThrottledUpgradeAwareProxyHandler(location, transport, false, true, responder)
 	if utilfeature.DefaultFeatureGate.Enabled(features.TranslateStreamCloseWebsocketRequests) {
+		// If the node supports websocket translation, revert to legacy proxy, and let kubelet handle it.
 		if utilfeature.DefaultFeatureGate.Enabled(features.ExtendWebSocketsToKubelet) && nodeSupportsWebsockets {
-			// Kubelet supports websockets, so just proxy the request.
 			klog.Infof("DEBUG_WEBSOCKET: API server proxying websocket request for pod %s to node %s", name, connInfo.Hostname)
 			return handler, nil
 		}
@@ -204,16 +202,17 @@ func (r *ExecREST) Connect(ctx context.Context, name string, opts runtime.Object
 	if err != nil {
 		return nil, err
 	}
-
+	klog.Infof("DEBUG_WEBSOCKET: API server exec Connect, Node features: %s", connInfo.NodeFeatures)
 	nodeSupportsWebsockets := checkNodeSupportsWebsockets(connInfo.NodeFeatures)
-
+	klog.Infof("DEBUG_WEBSOCKET: API server exec Connect, Node supports websockets: %t", nodeSupportsWebsockets)
 	handler := newThrottledUpgradeAwareProxyHandler(location, transport, false, true, responder)
 	if utilfeature.DefaultFeatureGate.Enabled(features.TranslateStreamCloseWebsocketRequests) {
+		// If the node supports websocket translation, revert to legacy proxy, and let kubelet handle it.
 		if utilfeature.DefaultFeatureGate.Enabled(features.ExtendWebSocketsToKubelet) && nodeSupportsWebsockets {
-			// Kubelet supports websockets, so just proxy the request.
 			klog.Infof("DEBUG_WEBSOCKET: API server proxying websocket request for pod %s to node %s", name, connInfo.Hostname)
 			return handler, nil
 		}
+		klog.Infoln("DEBUG_WEBSOCKET: API server exec Connect, translation in API server")
 		// Wrap the upgrade aware handler to implement stream translation
 		// for WebSocket/V5 upgrade requests.
 		streamOptions := translator.Options{
@@ -285,12 +284,22 @@ func (r *PortForwardREST) Connect(ctx context.Context, name string, opts runtime
 	if !ok {
 		return nil, fmt.Errorf("invalid options object: %#v", opts)
 	}
-	location, transport, err := pod.PortForwardLocation(ctx, r.Store, r.KubeletConn, name, portForwardOpts)
+	location, transport, connInfo, err := pod.PortForwardLocation(ctx, r.Store, r.KubeletConn, name, portForwardOpts)
 	if err != nil {
 		return nil, err
 	}
+	klog.Infof("DEBUG_WEBSOCKET: API server port forward Connect, Node features: %s", connInfo.NodeFeatures)
+	nodeSupportsWebsockets := checkNodeSupportsWebsockets(connInfo.NodeFeatures)
+	klog.Infof("DEBUG_WEBSOCKET: API server port forward Connect, Node supports websockets: %t", nodeSupportsWebsockets)
 	handler := newThrottledUpgradeAwareProxyHandler(location, transport, false, true, responder)
 	if utilfeature.DefaultFeatureGate.Enabled(features.PortForwardWebsockets) {
+		klog.Infoln("DEBUG_WEBSOCKET: API server port forward Connect, port forward websockets Enabled")
+		// If the node supports websocket tunneling, revert to legacy proxy, and let kubelet handle it.
+		if utilfeature.DefaultFeatureGate.Enabled(features.ExtendWebSocketsToKubelet) && nodeSupportsWebsockets {
+			klog.Infof("DEBUG_WEBSOCKET: API server proxying websocket request for pod %s to node %s", name, connInfo.Hostname)
+			return handler, nil
+		}
+		klog.Infoln("DEBUG_WEBSOCKET: API server port forward Connect, tunneling in API server")
 		tunnelingHandler := translator.NewTunnelingHandler(handler)
 		handler = translator.NewTranslatingHandler(handler, tunnelingHandler, wsstream.IsWebSocketRequestWithTunnelingProtocol)
 	}
@@ -303,11 +312,12 @@ func newThrottledUpgradeAwareProxyHandler(location *url.URL, transport http.Roun
 	return handler
 }
 
+// Given features node supports, return true if kubelet supports websocket
+// translation/tunneling, false otherwise.
 func checkNodeSupportsWebsockets(nodeFeatures []string) bool {
-	// Determine if the node we're connecting to supports websocket translation/tunneling.
 	nodeSupportsWebsockets := false
 	for _, feature := range nodeFeatures {
-		if feature == "ExtendWebSocketsToKubelet" {
+		if feature == string(features.ExtendWebSocketsToKubelet) {
 			nodeSupportsWebsockets = true
 			break
 		}
