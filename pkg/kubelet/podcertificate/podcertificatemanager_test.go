@@ -177,6 +177,7 @@ func TestTransitionInitialToWait(t *testing.T) {
 	gotPCRClone.ObjectMeta.Namespace = gotPCR.ObjectMeta.Namespace
 	gotPCRClone.Spec.PKIXPublicKey = nil
 	gotPCRClone.Spec.ProofOfPossession = nil
+	gotPCRClone.Spec.StubPKCS10Request = nil
 	gotPCRClone.Status = certsv1beta1.PodCertificateRequestStatus{}
 	if diff := cmp.Diff(gotPCRClone, wantPCR); diff != "" {
 		t.Fatalf("PodCertificateManager created a bad PCR; diff (-got +want)\n%s", diff)
@@ -528,6 +529,7 @@ func TestFullFlow(t *testing.T) {
 	gotPCRClone.ObjectMeta.Namespace = gotPCR.ObjectMeta.Namespace
 	gotPCRClone.Spec.PKIXPublicKey = nil
 	gotPCRClone.Spec.ProofOfPossession = nil
+	gotPCRClone.Spec.StubPKCS10Request = nil
 	gotPCRClone.Status = certsv1beta1.PodCertificateRequestStatus{}
 	if diff := cmp.Diff(gotPCRClone, wantPCR); diff != "" {
 		t.Fatalf("PodCertificateManager created a bad PCR; diff (-got +want)\n%s", diff)
