@@ -105,7 +105,7 @@ func getFakeClient(t *testing.T, nodeName, driverName string, slice *resourceapi
 
 func requireNoSlices(tCtx ktesting.TContext) {
 	tCtx.Helper()
-	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) error {
+	tCtx.Eventually(func(tCtx ktesting.TContext) error {
 		slices, err := tCtx.Client().ResourceV1().ResourceSlices().List(tCtx, metav1.ListOptions{})
 		if err != nil {
 			return err
@@ -218,7 +218,7 @@ func TestRegistrationHandler(t *testing.T) {
 			if test.withClient {
 				fakeClient := getFakeClient(t, nodeName, test.driverName, getSlice("test-slice"))
 				client = fakeClient
-				tCtx = ktesting.WithClients(tCtx, nil, nil, client, nil, nil)
+				tCtx = tCtx.WithClients(nil, nil, client, nil, nil)
 			}
 
 			// The DRAPluginManager wipes all slices at startup.
@@ -307,7 +307,7 @@ func TestConnectionHandling(t *testing.T) {
 
 			slice := getSlice(sliceName)
 			client := getFakeClient(t, nodeName, driverName, slice)
-			tCtx = ktesting.WithClients(tCtx, nil, nil, client, nil, nil)
+			tCtx = tCtx.WithClients(nil, nil, client, nil, nil)
 
 			// The handler wipes all slices at startup.
 			draPlugins := NewDRAPluginManager(tCtx, client, getFakeNode, &mockStreamHandler{}, test.delay)

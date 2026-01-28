@@ -215,7 +215,7 @@ func TestRunOp(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			_, tCtx := ktesting.NewTestContext(t)
 			client := fake.NewSimpleClientset()
-			tCtx = ktesting.WithClients(tCtx, nil, nil, client, nil, nil)
+			tCtx = tCtx.WithClients(nil, nil, client, nil, nil)
 
 			exec := &WorkloadExecutor{
 				tCtx:                         tCtx,

@@ -58,7 +58,7 @@ func Step(tCtx TContext, step string, cb func(tCtx TContext)) {
 // context variables and risk of using the wrong one.
 func (tc *TC) Step(step string, cb func(tCtx TContext)) {
 	tc.Helper()
-	cb(WithStep(tc, step))
+	cb(tc.WithStep(step))
 }
 
 // Value intercepts a search for the special "GINKGO_SPEC_CONTEXT" and

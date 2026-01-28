@@ -90,9 +90,9 @@ func (c *Cmd) Start(tCtx ktesting.TContext) {
 	tCtx.Helper()
 	tCtx.Logf("running command %s: %s", c.Name, strings.Join(c.CommandLine, " "))
 	if c.KeepRunning {
-		tCtx = ktesting.WithoutCancel(tCtx)
+		tCtx = tCtx.WithoutCancel()
 	}
-	tCtx = ktesting.WithCancel(tCtx)
+	tCtx = tCtx.WithCancel()
 	c.cancel = tCtx.Cancel
 	c.cmd = exec.CommandContext(tCtx, c.CommandLine[0], c.CommandLine[1:]...)
 	c.gathering = false

@@ -29,7 +29,7 @@ func TestStepContext(t *testing.T) {
 	for name, tc := range map[string]testcase{
 		"output": {
 			cb: func(tCtx TContext) {
-				tCtx = WithStep(tCtx, "step")
+				tCtx = tCtx.WithStep("step")
 				tCtx.Log("Log", "a", "b", 42)
 				tCtx.Logf("Logf %s %s %d", "a", "b", 42)
 				tCtx.Error("Error", "a", "b", 42)
@@ -45,7 +45,7 @@ func TestStepContext(t *testing.T) {
 		},
 		"fatal": {
 			cb: func(tCtx TContext) {
-				tCtx = WithStep(tCtx, "step")
+				tCtx = tCtx.WithStep("step")
 				tCtx.Fatal("Error", "a", "b", 42)
 				// not reached
 				tCtx.Log("Log")
@@ -56,7 +56,7 @@ func TestStepContext(t *testing.T) {
 		},
 		"fatalf": {
 			cb: func(tCtx TContext) {
-				tCtx = WithStep(tCtx, "step")
+				tCtx = tCtx.WithStep("step")
 				tCtx.Fatalf("Error %s %s %d", "a", "b", 42)
 				// not reached
 				tCtx.Log("Log")
@@ -67,7 +67,7 @@ func TestStepContext(t *testing.T) {
 		},
 		"progress": {
 			cb: func(tCtx TContext) {
-				tCtx = WithStep(tCtx, "step")
+				tCtx = tCtx.WithStep("step")
 				var buffer bytes.Buffer
 				oldOut := defaultProgressReporter.setOutput(&buffer)
 				defer defaultProgressReporter.setOutput(oldOut)

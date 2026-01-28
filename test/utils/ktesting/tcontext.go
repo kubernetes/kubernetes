@@ -157,7 +157,8 @@ func Init(tb TB, opts ...InitOption) TContext {
 			return &tc
 		}
 	}
-	tCtx := WithCancel(InitCtx(ctx, tb))
+	tCtx := InitCtx(ctx, tb)
+	tCtx = tCtx.WithCancel()
 	tCtx.perTestHeader = header
 	tCtx.Cleanup(func() {
 		tCtx.Cancel(cleanupErr(tCtx.Name()).Error())
@@ -252,7 +253,7 @@ func (tc *TC) withTB(tb TB) TContext {
 		logger := newLogger(tb, false /* don't buffer logs in sub-test */)
 		tc.Context = klog.NewContext(tc.Context, logger)
 	}
-	tc = WithCancel(tc)
+	tc = tc.WithCancel()
 	return tc
 }
 
@@ -486,7 +487,7 @@ func (tc *TC) CleanupCtx(cb func(TContext)) {
 	if tb, ok := tc.TB().(ContextTB); ok {
 		// Use context from base TB (most likely Ginkgo).
 		tb.CleanupCtx(func(ctx context.Context) {
-			tCtx := WithContext(tc, ctx)
+			tCtx := tc.WithContext(ctx)
 			cb(tCtx)
 		})
 		return
@@ -497,7 +498,7 @@ func (tc *TC) CleanupCtx(cb func(TContext)) {
 		// context then has *no* deadline. In the code path above for
 		// Ginkgo, Ginkgo is more sophisticated and also applies
 		// timeouts to cleanup calls which accept a context.
-		childCtx := WithContext(tc, context.WithoutCancel(tc))
+		childCtx := tc.WithContext(context.WithoutCancel(tc))
 		cb(childCtx)
 	})
 }

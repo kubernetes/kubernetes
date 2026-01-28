@@ -599,7 +599,7 @@ func mustSetupCluster(tCtx ktesting.TContext, config *config.KubeSchedulerConfig
 	// Cleanup will be in reverse order: first the clients by canceling the
 	// child context (happens automatically), then the server.
 	tCtx.Cleanup(server.TearDownFn)
-	tCtx = ktesting.WithCancel(tCtx)
+	tCtx = tCtx.WithCancel()
 
 	// TODO: client connection configuration, such as QPS or Burst is configurable in theory, this could be derived from the `config`, need to
 	// support this when there is any testcase that depends on such configuration.
@@ -616,7 +616,7 @@ func mustSetupCluster(tCtx ktesting.TContext, config *config.KubeSchedulerConfig
 		}
 	}
 
-	tCtx = ktesting.WithRESTConfig(tCtx, cfg)
+	tCtx = tCtx.WithRESTConfig(cfg)
 
 	// Not all config options will be effective but only those mostly related with scheduler performance will
 	// be applied to start a scheduler, most of them are defined in `scheduler.schedulerOptions`.

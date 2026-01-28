@@ -586,7 +586,7 @@ func testCalculateResourceAllocatableRequest(tCtx ktesting.TContext) {
 // newTestDRAManager creates a DefaultDRAManager for testing purposes.
 // Only usable in a syntest bubble.
 func newTestDRAManager(tCtx ktesting.TContext, objects ...apiruntime.Object) *dynamicresources.DefaultDRAManager {
-	tCtx = ktesting.WithCancel(tCtx)
+	tCtx = tCtx.WithCancel()
 	client := fake.NewClientset(objects...)
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	resourceSliceTrackerOpts := tracker.Options{
