@@ -121,7 +121,7 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 func mkValidFlowSchema(tweaks ...func(obj *flowcontrol.FlowSchema)) flowcontrol.FlowSchema {
 	obj := flowcontrol.FlowSchema{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "valid-flow-schema",
+			Name:            "valid-flow-schema",
 			ResourceVersion: "1",
 		},
 		Spec: flowcontrol.FlowSchemaSpec{
