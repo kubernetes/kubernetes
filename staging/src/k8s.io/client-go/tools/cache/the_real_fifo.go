@@ -56,6 +56,10 @@ type RealFIFOOptions struct {
 	// while processing events to allow other goroutines to add items to the queue.
 	// If UnlockWhileProcessing is true, AtomicEvents must be true as well.
 	UnlockWhileProcessing bool
+
+	// EmitDeltaTypeBookmark is used to specify whether the RealFIFO will emit
+	// bookmark deltas or not.
+	EmitDeltaTypeBookmark bool
 }
 
 const (
@@ -151,6 +155,10 @@ func (f *RealFIFO) keyOf(obj interface{}) (string, error) {
 		obj = d.Newest().Object
 	}
 	if d, ok := obj.(Delta); ok {
+		if d.Type == Bookmark {
+			// bookmark deltas don't have a key
+			return "", nil
+		}
 		obj = d.Object
 	}
 	if d, ok := obj.(DeletedFinalStateUnknown); ok {
@@ -178,9 +186,11 @@ func (f *RealFIFO) hasSynced_locked() bool {
 func (f *RealFIFO) addToItems_locked(deltaActionType DeltaType, skipTransform bool, obj interface{}) error {
 	// we must be able to read the keys in order to determine whether the knownObjcts and the items
 	// in this FIFO overlap
-	_, err := f.keyOf(obj)
-	if err != nil {
-		return KeyError{obj, err}
+	if deltaActionType != Bookmark {
+		_, err := f.keyOf(obj)
+		if err != nil {
+			return KeyError{obj, err}
+		}
 	}
 
 	// Every object comes through this code path once, so this is a good
@@ -477,6 +487,12 @@ func (f *RealFIFO) PopBatch(processBatch ProcessBatchFunc, processSingle PopProc
 	})
 }
 
+func (f *RealFIFO) Bookmark(resourceVersion string) error {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	return f.addToItems_locked(Bookmark, true, resourceVersion)
+}
+
 // Replace
 // 1. finds those items in f.items that are not in newItems and creates synthetic deletes for them
 // 2. finds items in knownObjects that are not in newItems and creates synthetic deletes for them
@@ -534,6 +550,9 @@ func reconcileReplacement(
 	queuedKeys := []string{}
 	lastQueuedItemForKey := map[string]Delta{}
 	for _, queuedItem := range queuedItems {
+		if queuedItem.Type == Bookmark {
+			continue
+		}
 		queuedKey, err := keyOf(queuedItem.Object)
 		if err != nil {
 			return KeyError{queuedItem.Object, err}
