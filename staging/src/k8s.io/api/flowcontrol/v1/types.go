@@ -254,6 +254,8 @@ const (
 type UserSubject struct {
 	// `name` is the username that matches, or "*" to match all usernames.
 	// Required.
+	// +required
+	// +k8s:required
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 }
 

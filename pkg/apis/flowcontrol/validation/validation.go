@@ -139,7 +139,7 @@ func ValidateFlowSchemaPolicyRulesWithSubjects(rule *flowcontrol.PolicyRulesWith
 			allErrs = append(allErrs, ValidateFlowSchemaSubject(&subject, fldPath.Child("subjects").Index(i))...)
 		}
 	} else {
-		allErrs = append(allErrs, field.Required(fldPath.Child("subjects"), "subjects must contain at least one value"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("subjects"), "subjects must contain at least one value").MarkCoveredByDeclarative())
 	}
 
 	if len(rule.ResourceRules) == 0 && len(rule.NonResourceRules) == 0 {

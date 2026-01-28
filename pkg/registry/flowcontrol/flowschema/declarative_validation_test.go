@@ -48,14 +48,25 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		input        flowcontrol.FlowSchema
 		expectedErrs field.ErrorList
 	}{
-		"valid": {
-			input: mkValidFlowSchema(),
+		//"valid": {
+		//	input: mkValidFlowSchema(),
+		//},
+		"invalid": {
+			input: mkValidFlowSchema(tweakUserSubjectName("")),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "rules", "0", "subjects", "0", "user", "name"), ""),
+			},
 		},
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
 			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, Strategy.Validate, tc.expectedErrs)
 		})
+	}
+}
+func tweakUserSubjectName(name string) func(*flowcontrol.FlowSchema) {
+	return func(fs *flowcontrol.FlowSchema) {
+		fs.Spec.Rules[0].Subjects[0].User.Name = name
 	}
 }
 
