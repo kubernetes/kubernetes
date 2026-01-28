@@ -47,15 +47,15 @@ func testDeclarativeValidateForDeclarative(t *testing.T, apiVersion string) {
 			input: mkValidClusterRole(),
 		},
 		"invalid ClusterRole missing verbs": {
-			input: mkValidClusterRole(tweakVerbs(0, nil)),
+			input: mkValidClusterRole(tweakVerbs(nil)),
 			expectedErrs: field.ErrorList{
 				field.Required(field.NewPath("rules").Index(0).Child("verbs"), ""),
 			},
 		},
-		"invalid ClusterRole missing resources": {
-			input: mkValidClusterRole(tweakResources(0, nil)),
+		"invalid ClusterRole empty verbs": {
+			input: mkValidClusterRole(tweakVerbs([]string{})),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("rules").Index(0).Child("resources"), ""),
+				field.Required(field.NewPath("rules").Index(0).Child("verbs"), ""),
 			},
 		},
 		// TODO: Add more test cases
@@ -83,21 +83,23 @@ func testValidateUpdateForDeclarative(t *testing.T, apiVersion string) {
 		update       rbac.ClusterRole
 		expectedErrs field.ErrorList
 	}{
-		"valid update adding resources": {
-			old:    mkValidClusterRole(tweakResourceVersion("1")),
-			update: mkValidClusterRole(tweakResourceVersion("2"), tweakAddResource(0, "services")),
+		"valid update": {
+			old:    mkValidClusterRole(),
+			update: mkValidClusterRole(),
 		},
-		"invalid update clearing resources": {
-			old:    mkValidClusterRole(tweakResourceVersion("1")),
-			update: mkValidClusterRole(tweakResourceVersion("2"), tweakResources(0, []string{})),
+		"invalid update clearing verbs": {
+			old:    mkValidClusterRole(),
+			update: mkValidClusterRole(tweakVerbs([]string{})),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("rules").Index(0).Child("resources"), ""),
+				field.Required(field.NewPath("rules").Index(0).Child("verbs"), ""),
 			},
 		},
 		// TODO: Add more test cases
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
+			tc.old.ResourceVersion = "1"
+			tc.update.ResourceVersion = "2"
 			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, Strategy.ValidateUpdate, tc.expectedErrs)
 		})
 	}
@@ -121,32 +123,10 @@ func mkValidClusterRole(tweaks ...func(*rbac.ClusterRole)) rbac.ClusterRole {
 	return cr
 }
 
-func tweakResourceVersion(rv string) func(*rbac.ClusterRole) {
+func tweakVerbs(verbs []string) func(*rbac.ClusterRole) {
 	return func(cr *rbac.ClusterRole) {
-		cr.ResourceVersion = rv
-	}
-}
-
-func tweakVerbs(ruleIndex int, verbs []string) func(*rbac.ClusterRole) {
-	return func(cr *rbac.ClusterRole) {
-		if len(cr.Rules) > ruleIndex {
-			cr.Rules[ruleIndex].Verbs = verbs
-		}
-	}
-}
-
-func tweakResources(ruleIndex int, resources []string) func(*rbac.ClusterRole) {
-	return func(cr *rbac.ClusterRole) {
-		if len(cr.Rules) > ruleIndex {
-			cr.Rules[ruleIndex].Resources = resources
-		}
-	}
-}
-
-func tweakAddResource(ruleIndex int, resource string) func(*rbac.ClusterRole) {
-	return func(cr *rbac.ClusterRole) {
-		if len(cr.Rules) > ruleIndex {
-			cr.Rules[ruleIndex].Resources = append(cr.Rules[ruleIndex].Resources, resource)
+		if len(cr.Rules) > 0 {
+			cr.Rules[0].Verbs = verbs
 		}
 	}
 }

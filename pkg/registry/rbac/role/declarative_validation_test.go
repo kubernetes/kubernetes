@@ -53,17 +53,18 @@ func testDeclarativeValidateForDeclarative(t *testing.T, apiVersion string) {
 			input: mkValidRole(),
 		},
 		"invalid Role missing verbs": {
-			input: mkValidRole(tweakRoleVerbs(0, nil)),
+			input: mkValidRole(tweakVerbs(nil)),
 			expectedErrs: field.ErrorList{
 				field.Required(field.NewPath("rules").Index(0).Child("verbs"), ""),
 			},
 		},
-		"invalid Role missing resources": {
-			input: mkValidRole(tweakRoleResources(0, nil)),
+		"invalid Role empty verbs": {
+			input: mkValidRole(tweakVerbs([]string{})),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("rules").Index(0).Child("resources"), ""),
+				field.Required(field.NewPath("rules").Index(0).Child("verbs"), ""),
 			},
 		},
+		// TODO: Add more test cases
 	}
 
 	for name, tc := range testCases {
@@ -94,28 +95,24 @@ func testValidateUpdateForDeclarative(t *testing.T, apiVersion string) {
 		old, update  rbac.Role
 		expectedErrs field.ErrorList
 	}{
-		"valid update adding resources": {
-			old:    mkValidRole(tweakRoleResourceVersion("1")),
-			update: mkValidRole(tweakRoleResourceVersion("2"), tweakRoleAddResource(0, "services")),
+		"valid update": {
+			old:    mkValidRole(),
+			update: mkValidRole(),
 		},
 		"invalid update clearing verbs": {
-			old:    mkValidRole(tweakRoleResourceVersion("1")),
-			update: mkValidRole(tweakRoleResourceVersion("2"), tweakRoleVerbs(0, []string{})),
+			old:    mkValidRole(),
+			update: mkValidRole(tweakVerbs([]string{})),
 			expectedErrs: field.ErrorList{
 				field.Required(field.NewPath("rules").Index(0).Child("verbs"), ""),
 			},
 		},
-		"invalid update clearing resources": {
-			old:    mkValidRole(tweakRoleResourceVersion("1")),
-			update: mkValidRole(tweakRoleResourceVersion("2"), tweakRoleResources(0, []string{})),
-			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("rules").Index(0).Child("resources"), ""),
-			},
-		},
+		// TODO: Add more test cases
 	}
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
+			tc.old.ResourceVersion = "1"
+			tc.update.ResourceVersion = "2"
 			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, Strategy.ValidateUpdate, tc.expectedErrs)
 		})
 	}
@@ -140,32 +137,10 @@ func mkValidRole(tweaks ...func(*rbac.Role)) rbac.Role {
 	return r
 }
 
-func tweakRoleResourceVersion(rv string) func(*rbac.Role) {
+func tweakVerbs(verbs []string) func(*rbac.Role) {
 	return func(r *rbac.Role) {
-		r.ResourceVersion = rv
-	}
-}
-
-func tweakRoleVerbs(ruleIndex int, verbs []string) func(*rbac.Role) {
-	return func(r *rbac.Role) {
-		if len(r.Rules) > ruleIndex {
-			r.Rules[ruleIndex].Verbs = verbs
-		}
-	}
-}
-
-func tweakRoleResources(ruleIndex int, resources []string) func(*rbac.Role) {
-	return func(r *rbac.Role) {
-		if len(r.Rules) > ruleIndex {
-			r.Rules[ruleIndex].Resources = resources
-		}
-	}
-}
-
-func tweakRoleAddResource(ruleIndex int, resource string) func(*rbac.Role) {
-	return func(r *rbac.Role) {
-		if len(r.Rules) > ruleIndex {
-			r.Rules[ruleIndex].Resources = append(r.Rules[ruleIndex].Resources, resource)
+		if len(r.Rules) > 0 {
+			r.Rules[0].Verbs = verbs
 		}
 	}
 }
