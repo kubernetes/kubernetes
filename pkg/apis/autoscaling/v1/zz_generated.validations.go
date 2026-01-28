@@ -58,6 +58,33 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 	return nil
 }
 
+// Validate_CrossVersionObjectReference validates an instance of CrossVersionObjectReference according
+// to declarative validation rules in the API schema.
+func Validate_CrossVersionObjectReference(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *autoscalingv1.CrossVersionObjectReference) (errs field.ErrorList) {
+	// field autoscalingv1.CrossVersionObjectReference.Kind
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("kind"), &obj.Kind, safe.Field(oldObj, func(oldObj *autoscalingv1.CrossVersionObjectReference) *string { return &oldObj.Kind }), oldObj != nil)...)
+
+	// field autoscalingv1.CrossVersionObjectReference.Name has no validation
+	// field autoscalingv1.CrossVersionObjectReference.APIVersion has no validation
+	return errs
+}
+
 // Validate_HorizontalPodAutoscaler validates an instance of HorizontalPodAutoscaler according
 // to declarative validation rules in the API schema.
 func Validate_HorizontalPodAutoscaler(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *autoscalingv1.HorizontalPodAutoscaler) (errs field.ErrorList) {
@@ -85,7 +112,19 @@ func Validate_HorizontalPodAutoscaler(ctx context.Context, op operation.Operatio
 // Validate_HorizontalPodAutoscalerSpec validates an instance of HorizontalPodAutoscalerSpec according
 // to declarative validation rules in the API schema.
 func Validate_HorizontalPodAutoscalerSpec(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *autoscalingv1.HorizontalPodAutoscalerSpec) (errs field.ErrorList) {
-	// field autoscalingv1.HorizontalPodAutoscalerSpec.ScaleTargetRef has no validation
+	// field autoscalingv1.HorizontalPodAutoscalerSpec.ScaleTargetRef
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *autoscalingv1.CrossVersionObjectReference, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_CrossVersionObjectReference(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("scaleTargetRef"), &obj.ScaleTargetRef, safe.Field(oldObj, func(oldObj *autoscalingv1.HorizontalPodAutoscalerSpec) *autoscalingv1.CrossVersionObjectReference {
+			return &oldObj.ScaleTargetRef
+		}), oldObj != nil)...)
 
 	// field autoscalingv1.HorizontalPodAutoscalerSpec.MinReplicas
 	errs = append(errs,

@@ -62,6 +62,12 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				field.Invalid(field.NewPath("spec", "maxReplicas"), int32(-1), "must be greater than or equal to 1").WithOrigin("minimum"),
 			},
 		},
+		"invalid: scaleTargetRef.kind empty": {
+			input: makeValidHPA(tweakScaleTargetRefKind("")),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "scaleTargetRef", "kind"), ""),
+			},
+		},
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
@@ -104,6 +110,13 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			updateObj: makeValidHPA(tweakMaxReplicas(-1)),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "maxReplicas"), int32(-1), "must be greater than or equal to 1").WithOrigin("minimum"),
+			},
+		},
+		"invalid update: scaleTargetRef.kind made empty": {
+			oldObj:    makeValidHPA(),
+			updateObj: makeValidHPA(tweakScaleTargetRefKind("")),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "scaleTargetRef", "kind"), ""),
 			},
 		},
 	}
@@ -153,5 +166,11 @@ func tweakMinReplicas(replicas int32) func(*api.HorizontalPodAutoscaler) {
 func tweakMaxReplicas(replicas int32) func(*api.HorizontalPodAutoscaler) {
 	return func(hpa *api.HorizontalPodAutoscaler) {
 		hpa.Spec.MaxReplicas = replicas
+	}
+}
+
+func tweakScaleTargetRefKind(kind string) func(*api.HorizontalPodAutoscaler) {
+	return func(hpa *api.HorizontalPodAutoscaler) {
+		hpa.Spec.ScaleTargetRef.Kind = kind
 	}
 }
