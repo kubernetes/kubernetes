@@ -854,6 +854,22 @@ func (f *featureGate) unsafeRecordQueried(key Feature) {
 	f.queriedFeatures.Store(newQueriedFeatures)
 }
 
+func (f *featureGate) ResetFeatureQueriedForTest(feature Feature) {
+	actual := f.queriedFeatures.Load()
+	if actual == nil {
+		return
+	}
+
+	currentSet, ok := actual.(sets.Set[Feature])
+	if !ok || !currentSet.Has(feature) {
+		return
+	}
+
+	newSet := sets.New(currentSet.UnsortedList()...)
+	newSet.Delete(feature)
+	f.queriedFeatures.Store(newSet)
+}
+
 func featureEnabled(key Feature, enabled map[Feature]bool, known map[Feature]VersionedSpecs, emulationVersion, minCompatibilityVersion *version.Version) bool {
 	// check explicitly set enabled list
 	if v, ok := enabled[key]; ok {
