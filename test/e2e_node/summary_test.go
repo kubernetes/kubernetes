@@ -389,7 +389,7 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 
     		ginkgo.By("Waiting for the pod to complete")
     		framework.ExpectNoError(
-        		e2epod.WaitForPodSuccess(ctx, f.ClientSet, pod.Name, f.Namespace.Name),
+        		e2epod.WaitForPodNameSucceededInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name),
     		)
 
     		ginkgo.By("Validating terminated container storage stats appear in summary")
