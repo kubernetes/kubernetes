@@ -106,7 +106,7 @@ func fdIsJournalStream(fd int) (bool, error) {
 	var expectedStat syscall.Stat_t
 	_, err := fmt.Sscanf(journalStream, "%d:%d", &expectedStat.Dev, &expectedStat.Ino)
 	if err != nil {
-		return false, fmt.Errorf("failed to parse JOURNAL_STREAM=%q: %v", journalStream, err)
+		return false, fmt.Errorf("failed to parse JOURNAL_STREAM=%q: %w", journalStream, err)
 	}
 
 	var stat syscall.Stat_t

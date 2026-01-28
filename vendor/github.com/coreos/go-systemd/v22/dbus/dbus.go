@@ -95,7 +95,7 @@ type Conn struct {
 	sigobj  dbus.BusObject
 
 	jobListener struct {
-		jobs map[dbus.ObjectPath]chan<- string
+		jobs map[dbus.ObjectPath][]chan<- string
 		sync.Mutex
 	}
 	subStateSubscriber struct {
@@ -207,7 +207,7 @@ func NewConnection(dialBus func() (*dbus.Conn, error)) (*Conn, error) {
 	}
 
 	c.subStateSubscriber.ignore = make(map[dbus.ObjectPath]int64)
-	c.jobListener.jobs = make(map[dbus.ObjectPath]chan<- string)
+	c.jobListener.jobs = make(map[dbus.ObjectPath][]chan<- string)
 
 	// Setup the listeners on jobs so that we can get completions
 	c.sigconn.BusObject().Call("org.freedesktop.DBus.AddMatch", 0,
