@@ -80,7 +80,7 @@ type TransportCacheMetric interface {
 }
 
 // TransportCreateCallsMetric counts the number of times a transport is created
-// partitioned by the result of the cache: hit, miss, uncacheable
+// partitioned by the result of the cache: hit, miss, miss-gc, uncacheable
 type TransportCreateCallsMetric interface {
 	Increment(result string)
 }
