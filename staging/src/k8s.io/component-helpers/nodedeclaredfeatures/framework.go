@@ -17,6 +17,7 @@ limitations under the License.
 package nodedeclaredfeatures
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 
@@ -66,18 +67,24 @@ func New(registry []Feature) (*Framework, error) {
 
 // DiscoverNodeFeatures determines which features from the registry are enabled
 // for a specific node configuration. It returns a sorted, unique list of feature names.
-func (f *Framework) DiscoverNodeFeatures(cfg *NodeConfiguration) []string {
+func (f *Framework) DiscoverNodeFeatures(cfg *NodeConfiguration) ([]string, error) {
 	var enabledFeatures []string
-	for _, f := range f.registry {
-		if f.Discover(cfg) {
-			if cfg.Version != nil && f.MaxVersion() != nil && cfg.Version.GreaterThan(f.MaxVersion()) {
+	var errs error
+	for _, fr := range f.registry {
+		enabled, err := fr.Discover(cfg)
+		if err != nil {
+			errs = errors.Join(errs, fmt.Errorf("feature %s: %w", fr.Name(), err))
+			continue
+		}
+		if enabled {
+			if cfg.Version != nil && fr.MaxVersion() != nil && cfg.Version.GreaterThan(fr.MaxVersion()) {
 				continue
 			}
-			enabledFeatures = append(enabledFeatures, f.Name())
+			enabledFeatures = append(enabledFeatures, fr.Name())
 		}
 	}
 	slices.Sort(enabledFeatures)
-	return enabledFeatures
+	return enabledFeatures, errs
 }
 
 // InferForPodScheduling determines which features from the registry are required by a pod scheduling for a given target version.

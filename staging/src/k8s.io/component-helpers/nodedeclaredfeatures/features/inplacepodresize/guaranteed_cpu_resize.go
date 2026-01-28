@@ -45,13 +45,14 @@ func (f *guaranteedQoSPodCPUResizeFeature) Name() string {
 	return GuaranteedQoSPodCPUResize
 }
 
-func (f *guaranteedQoSPodCPUResizeFeature) Discover(cfg *nodedeclaredfeatures.NodeConfiguration) bool {
-	featureGateEnabled := cfg.FeatureGates.Enabled(IPPRExclusiveCPUsFeatureGate)
-	cpuManagerPolicy := cfg.StaticConfig.CPUManagerPolicy
-	if (featureGateEnabled && cpuManagerPolicy == CPUManagerPolicyStatic) || (cpuManagerPolicy == CPUManagerPolicyNone) {
-		return true
+func (f *guaranteedQoSPodCPUResizeFeature) Discover(cfg *nodedeclaredfeatures.NodeConfiguration) (bool, error) {
+	featureGateEnabled, err := cfg.FeatureGates.CheckEnabled(IPPRExclusiveCPUsFeatureGate)
+	if err != nil {
+		return false, err
 	}
-	return false
+
+	cpuManagerPolicy := cfg.StaticConfig.CPUManagerPolicy
+	return (featureGateEnabled && cpuManagerPolicy == CPUManagerPolicyStatic) || (cpuManagerPolicy == CPUManagerPolicyNone), nil
 }
 
 func (f *guaranteedQoSPodCPUResizeFeature) InferForScheduling(podInfo *nodedeclaredfeatures.PodInfo) bool {

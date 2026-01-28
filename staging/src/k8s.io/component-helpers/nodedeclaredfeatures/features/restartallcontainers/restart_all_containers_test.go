@@ -20,10 +20,19 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/component-helpers/nodedeclaredfeatures"
 	test "k8s.io/component-helpers/nodedeclaredfeatures/testing"
 )
+
+func TestRequirements(t *testing.T) {
+	feature := &restartAllContainersFeature{}
+	reqs := feature.Requirements()
+	assert.NotNil(t, reqs)
+	assert.Equal(t, []string{RestartAllContainersOnContainerExits}, reqs.EnabledFeatureGates)
+	assert.Empty(t, reqs.StaticConfig)
+}
 
 func TestDiscover(t *testing.T) {
 	tests := []struct {
@@ -47,12 +56,13 @@ func TestDiscover(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			mockFG := test.NewMockFeatureGate(t)
-			mockFG.EXPECT().Enabled(RestartAllContainersOnContainerExits).Return(tc.featureGateEnabled)
+			mockFG.EXPECT().CheckEnabled(RestartAllContainersOnContainerExits).Return(tc.featureGateEnabled, nil)
 
 			config := &nodedeclaredfeatures.NodeConfiguration{
 				FeatureGates: mockFG,
 			}
-			enabled := feature.Discover(config)
+			enabled, err := feature.Discover(config)
+			require.NoError(t, err)
 			assert.Equal(t, tc.expected, enabled)
 		})
 	}

@@ -42,7 +42,7 @@ type Feature interface {
 	Name() string
 
 	// Discover checks if a node provides the feature based on its configuration.
-	Discover(cfg *NodeConfiguration) bool
+	Discover(cfg *NodeConfiguration) (bool, error)
 
 	// InferForScheduling checks if pod scheduling requires the feature.
 	InferForScheduling(podInfo *PodInfo) bool
@@ -59,8 +59,9 @@ type Feature interface {
 
 // FeatureGate is an interface that abstracts feature gate checking.
 type FeatureGate interface {
-	// Enabled returns true if the named feature gate is enabled.
-	Enabled(key string) bool
+	// CheckEnabled returns true if the named feature gate is enabled.
+	// Returns an error if the key is not a known feature gate.
+	CheckEnabled(key string) (bool, error)
 }
 
 // StaticConfiguration provides a view of a node's static configuration.

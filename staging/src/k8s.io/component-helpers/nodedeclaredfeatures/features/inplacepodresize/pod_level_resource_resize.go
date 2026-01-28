@@ -38,8 +38,12 @@ func (f *podLevelResourcesResizeFeature) Name() string {
 	return IPPRPodLevelResourcesFeatureGate
 }
 
-func (f *podLevelResourcesResizeFeature) Discover(cfg *nodedeclaredfeatures.NodeConfiguration) bool {
-	return cfg.FeatureGates.Enabled(IPPRPodLevelResourcesFeatureGate)
+func (f *podLevelResourcesResizeFeature) Discover(cfg *nodedeclaredfeatures.NodeConfiguration) (bool, error) {
+	enabled, err := cfg.FeatureGates.CheckEnabled(IPPRPodLevelResourcesFeatureGate)
+	if err != nil {
+		return false, err
+	}
+	return enabled, nil
 }
 
 func (f *podLevelResourcesResizeFeature) InferForScheduling(podInfo *nodedeclaredfeatures.PodInfo) bool {

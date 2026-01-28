@@ -17,6 +17,7 @@ limitations under the License.
 package nodedeclaredfeatures
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -30,15 +31,15 @@ import (
 // mockFeature is a mock implementation of the Feature interface for testing.
 type mockFeature struct {
 	name               string
-	discover           func(cfg *NodeConfiguration) bool
+	discover           func(cfg *NodeConfiguration) (bool, error)
 	inferForScheduling func(podInfo *PodInfo) bool
 	inferForUpdate     func(oldPodInfo, newPodInfo *PodInfo) bool
 	maxVersion         *version.Version
 }
 
-func (f *mockFeature) Name() string                             { return f.name }
-func (f *mockFeature) Discover(cfg *NodeConfiguration) bool     { return f.discover(cfg) }
-func (f *mockFeature) InferForScheduling(podInfo *PodInfo) bool { return f.inferForScheduling(podInfo) }
+func (f *mockFeature) Name() string                                  { return f.name }
+func (f *mockFeature) Discover(cfg *NodeConfiguration) (bool, error) { return f.discover(cfg) }
+func (f *mockFeature) InferForScheduling(podInfo *PodInfo) bool      { return f.inferForScheduling(podInfo) }
 func (f *mockFeature) InferForUpdate(oldPodInfo, newPodInfo *PodInfo) bool {
 	return f.inferForUpdate(oldPodInfo, newPodInfo)
 }
@@ -46,17 +47,27 @@ func (f *mockFeature) MaxVersion() *version.Version { return f.maxVersion }
 
 type mockFeatureGate struct {
 	features map[string]bool
+	errs     map[string]error
 }
 
-func (m *mockFeatureGate) Enabled(key string) bool {
-	if m.features == nil {
-		return false
+func (m *mockFeatureGate) CheckEnabled(key string) (bool, error) {
+	if m.errs != nil {
+		if err, ok := m.errs[key]; ok {
+			return false, err
+		}
 	}
-	return m.features[key]
+	if m.features == nil {
+		return false, nil
+	}
+	val, ok := m.features[key]
+	if !ok {
+		return false, fmt.Errorf("feature gate %s not found in mock", key)
+	}
+	return val, nil
 }
 
-func newMockFeatureGate(features map[string]bool) *mockFeatureGate {
-	return &mockFeatureGate{features: features}
+func newMockFeatureGate(features map[string]bool, errs map[string]error) *mockFeatureGate {
+	return &mockFeatureGate{features: features, errs: errs}
 }
 
 func TestNewFramework(t *testing.T) {
@@ -72,15 +83,19 @@ func TestDiscoverNodeFeatures(t *testing.T) {
 	registry := []Feature{
 		&mockFeature{
 			name: "FeatureA",
-			discover: func(cfg *NodeConfiguration) bool {
-				return cfg.FeatureGates.Enabled("feature-a")
+			discover: func(cfg *NodeConfiguration) (bool, error) {
+				return cfg.FeatureGates.CheckEnabled("feature-a")
 			},
 			maxVersion: featureMaxVersion,
 		},
 		&mockFeature{
 			name: "FeatureBWithStaticConfig",
-			discover: func(cfg *NodeConfiguration) bool {
-				return cfg.FeatureGates.Enabled("feature-b") && cfg.StaticConfig.CPUManagerPolicy == "static"
+			discover: func(cfg *NodeConfiguration) (bool, error) {
+				enabled, err := cfg.FeatureGates.CheckEnabled("feature-b")
+				if err != nil {
+					return false, err
+				}
+				return enabled && cfg.StaticConfig.CPUManagerPolicy == "static", nil
 			},
 			maxVersion: featureMaxVersion,
 		},
@@ -89,14 +104,15 @@ func TestDiscoverNodeFeatures(t *testing.T) {
 	framework, _ := New(registry)
 
 	testCases := []struct {
-		name     string
-		config   *NodeConfiguration
-		expected []string
+		name      string
+		config    *NodeConfiguration
+		expected  []string
+		expectErr bool
 	}{
 		{
 			name: "Feature Enabled",
 			config: &NodeConfiguration{
-				FeatureGates: newMockFeatureGate(map[string]bool{string("feature-a"): true}),
+				FeatureGates: newMockFeatureGate(map[string]bool{"feature-a": true, "feature-b": false}, nil),
 				StaticConfig: StaticConfiguration{},
 			},
 			expected: []string{"FeatureA"},
@@ -105,9 +121,9 @@ func TestDiscoverNodeFeatures(t *testing.T) {
 			name: "multiple features enabled",
 			config: &NodeConfiguration{
 				FeatureGates: newMockFeatureGate(map[string]bool{
-					string("feature-a"): true,
-					string("feature-b"): true,
-				}),
+					"feature-a": true,
+					"feature-b": true,
+				}, nil),
 				StaticConfig: StaticConfiguration{CPUManagerPolicy: "static"},
 			},
 			expected: []string{"FeatureA", "FeatureBWithStaticConfig"}, // Should be sorted
@@ -116,9 +132,9 @@ func TestDiscoverNodeFeatures(t *testing.T) {
 			name: "no features enabled",
 			config: &NodeConfiguration{
 				FeatureGates: newMockFeatureGate(map[string]bool{
-					string("feature-a"): false,
-					string("feature-b"): true,
-				}),
+					"feature-a": false,
+					"feature-b": true,
+				}, nil),
 				StaticConfig: StaticConfiguration{CPUManagerPolicy: "none"},
 			},
 			expected: []string{},
@@ -126,7 +142,7 @@ func TestDiscoverNodeFeatures(t *testing.T) {
 		{
 			name: "feature past max version",
 			config: &NodeConfiguration{
-				FeatureGates: newMockFeatureGate(map[string]bool{string("feature-a"): true}),
+				FeatureGates: newMockFeatureGate(map[string]bool{"feature-a": true, "feature-b": false}, nil),
 				StaticConfig: StaticConfiguration{},
 				Version:      featureMaxVersion.AddMinor(1),
 			},
@@ -135,17 +151,31 @@ func TestDiscoverNodeFeatures(t *testing.T) {
 		{
 			name: "feature past max version - pre-release version",
 			config: &NodeConfiguration{
-				FeatureGates: newMockFeatureGate(map[string]bool{string("feature-a"): true}),
+				FeatureGates: newMockFeatureGate(map[string]bool{"feature-a": true, "feature-b": false}, nil),
 				StaticConfig: StaticConfiguration{},
 				Version:      version.MustParse("1.39.0-alpha.2.39+049eafd34dfbd2"),
 			},
 			expected: []string{}, // Not published
 		},
+		{
+			name: "error during discovery",
+			config: &NodeConfiguration{
+				FeatureGates: newMockFeatureGate(map[string]bool{"feature-a": true}, map[string]error{"feature-b": fmt.Errorf("gate check failed")}),
+				StaticConfig: StaticConfiguration{CPUManagerPolicy: "static"},
+			},
+			expected:  []string{"FeatureA"},
+			expectErr: true,
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			features := framework.DiscoverNodeFeatures(tc.config)
+			features, err := framework.DiscoverNodeFeatures(tc.config)
+			if tc.expectErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
 			if len(tc.expected) == 0 {
 				assert.Empty(t, features)
 			} else {

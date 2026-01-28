@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/component-helpers/nodedeclaredfeatures"
@@ -47,10 +48,11 @@ func TestPodLevelResourcesResizeFeatureDiscover(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockFG := test.NewMockFeatureGate(t)
-			mockFG.EXPECT().Enabled(IPPRPodLevelResourcesFeatureGate).Return(tt.featureGate)
+			mockFG.EXPECT().CheckEnabled(IPPRPodLevelResourcesFeatureGate).Return(tt.featureGate, nil)
 
 			cfg := &nodedeclaredfeatures.NodeConfiguration{FeatureGates: mockFG}
-			enabled := PodLevelResourcesResizeFeature.Discover(cfg)
+			enabled, err := PodLevelResourcesResizeFeature.Discover(cfg)
+			require.NoError(t, err)
 			assert.Equal(t, tt.expected, enabled)
 		})
 	}
