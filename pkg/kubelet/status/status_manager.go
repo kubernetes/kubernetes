@@ -637,18 +637,25 @@ func (m *manager) TerminatePod(logger klog.Logger, pod *v1.Pod) {
 	m.updateStatusInternal(logger, pod, status, true, true)
 }
 
-// hasPodInitialized returns true if the pod has no evidence of ever starting a regular container, which
-// implies those containers should not be transitioned to terminated status.
+// hasPodInitialized returns true if the pod has evidence of ever starting a regular container, or
+// if initialization has completed. Pods with no evidence of initialization should not have their
+// regular containers transitioned to terminated status.
 func hasPodInitialized(logger klog.Logger, pod *v1.Pod) bool {
-	// a pod without init containers is always initialized
-	if len(pod.Spec.InitContainers) == 0 {
-		return true
-	}
 	// if any container has ever moved out of waiting state, the pod has initialized
 	for _, status := range pod.Status.ContainerStatuses {
 		if status.LastTerminationState.Terminated != nil || status.State.Waiting == nil {
 			return true
 		}
+	}
+
+	// a pod that is running is initialized
+	if pod.Status.Phase == v1.PodRunning {
+		return true
+	}
+
+	// a pod without init containers is initialized if one of its containers started
+	if len(pod.Spec.InitContainers) == 0 {
+		return false
 	}
 	// if the last init container has ever completed with a zero exit code, the pod is initialized
 	if l := len(pod.Status.InitContainerStatuses); l > 0 {
