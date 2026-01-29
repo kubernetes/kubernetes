@@ -48,7 +48,8 @@ const (
 	defaultSpamQPS   = 1. / 300.
 )
 
-// getEventKey builds unique event key based on source, involvedObject, reason, message
+// getEventKey builds unique event key based on source, involvedObject, reason, message.
+// The event parameter must not be nil.
 func getEventKey(event *v1.Event) string {
 	return strings.Join([]string{
 		event.Source.Component,
@@ -66,7 +67,8 @@ func getEventKey(event *v1.Event) string {
 		"")
 }
 
-// getSpamKey builds unique event key based on source, involvedObject
+// getSpamKey builds unique event key based on source, involvedObject.
+// The event parameter must not be nil.
 func getSpamKey(event *v1.Event) string {
 	return strings.Join([]string{
 		event.Source.Component,
@@ -157,7 +159,8 @@ func (f *EventSourceObjectSpamFilter) Filter(event *v1.Event) bool {
 type EventAggregatorKeyFunc func(event *v1.Event) (aggregateKey string, localKey string)
 
 // EventAggregatorByReasonFunc aggregates events by exact match on event.Source, event.InvolvedObject, event.Type,
-// event.Reason, event.ReportingController and event.ReportingInstance
+// event.Reason, event.ReportingController and event.ReportingInstance.
+// The event parameter must not be nil.
 func EventAggregatorByReasonFunc(event *v1.Event) (string, string) {
 	return strings.Join([]string{
 		event.Source.Component,
