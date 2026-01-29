@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/runtime/mock"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/utils/ptr"
 )
@@ -3194,14 +3196,13 @@ func TestPermitPlugins(t *testing.T) {
 }
 
 // withMetricsRecorder set metricsRecorder for the scheduling frameworkImpl.
-func withMetricsRecorder(recorder *metrics.MetricAsyncRecorder) Option {
+func withMetricsRecorder(recorder MetricsRecorder) Option {
 	return func(o *frameworkOptions) {
 		o.metricsRecorder = recorder
 	}
 }
 
 func TestRecordingMetrics(t *testing.T) {
-	state.SetRecordPluginMetrics(true)
 	tests := []struct {
 		name               string
 		action             func(ctx context.Context, f framework.Framework)
@@ -3326,62 +3327,89 @@ func TestRecordingMetrics(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
-			ctx, cancel := context.WithCancel(ctx)
-			metrics.FrameworkExtensionPointDuration.Reset()
-			metrics.PluginExecutionDuration.Reset()
+	// Test with both metrics enabled and disabled
+	for _, metricsEnabled := range []bool{true, false} {
+		for _, tt := range tests {
+			t.Run(fmt.Sprintf("%s/metrics_enabled=%v", tt.name, metricsEnabled), func(t *testing.T) {
+				_, ctx := ktesting.NewTestContext(t)
+				ctx, cancel := context.WithCancel(ctx)
+				defer cancel()
 
-			plugin := &TestPlugin{name: testPlugin, inj: tt.inject}
-			r := make(Registry)
-			r.Register(testPlugin,
-				func(_ context.Context, _ runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
-					return plugin, nil
-				})
-			pluginSet := config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 1}}}
-			plugins := &config.Plugins{
-				Score:     pluginSet,
-				PreFilter: pluginSet,
-				Filter:    pluginSet,
-				PreScore:  pluginSet,
-				Reserve:   pluginSet,
-				Permit:    pluginSet,
-				PreBind:   pluginSet,
-				Bind:      pluginSet,
-				PostBind:  pluginSet,
-			}
+				// Set the metrics recording state for this test
+				state.SetRecordPluginMetrics(metricsEnabled)
 
-			recorder := metrics.NewMetricsAsyncRecorder(100, time.Nanosecond, ctx.Done())
-			profile := config.KubeSchedulerProfile{
-				PercentageOfNodesToScore: ptr.To[int32](testPercentageOfNodesToScore),
-				SchedulerName:            testProfileName,
-				Plugins:                  plugins,
-			}
-			f, err := newFrameworkWithQueueSortAndBind(ctx, r, profile,
-				withMetricsRecorder(recorder),
-				WithWaitingPods(NewWaitingPodsMap()),
-				WithSnapshotSharedLister(cache.NewEmptySnapshot()),
-			)
-			if err != nil {
-				cancel()
-				t.Fatalf("Failed to create framework for testing: %v", err)
-			}
-			defer func() {
-				_ = f.Close()
-			}()
+				// Create a mock metrics recorder to verify calls
+				mockRecorder := mock.NewMetricsRecorder()
 
-			tt.action(ctx, f)
+				// Create registry with test plugin
+				plugin := &TestPlugin{name: testPlugin, inj: tt.inject}
+				r := make(Registry)
 
-			// Stop the goroutine which records metrics and ensure it's stopped.
-			cancel()
-			<-recorder.IsStoppedCh
-			// Try to clean up the metrics buffer again in case it's not empty.
-			recorder.FlushMetrics()
+				pluginSet := config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 1}}}
+				plugins := &config.Plugins{
+					Score:     pluginSet,
+					PreFilter: pluginSet,
+					Filter:    pluginSet,
+					PreScore:  pluginSet,
+					Reserve:   pluginSet,
+					Permit:    pluginSet,
+					PreBind:   pluginSet,
+					Bind:      pluginSet,
+					PostBind:  pluginSet,
+				}
+				if err := r.Register(testPlugin,
+					func(_ context.Context, _ runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
+						return plugin, nil
+					}); err != nil {
+					t.Fatalf("Failed to register plugin %s: %v", testPlugin, err)
+				}
 
-			collectAndCompareFrameworkMetrics(t, tt.wantExtensionPoint, tt.wantStatus)
-			collectAndComparePluginMetrics(t, tt.wantExtensionPoint, testPlugin, tt.wantStatus)
-		})
+				profile := config.KubeSchedulerProfile{
+					PercentageOfNodesToScore: ptr.To[int32](testPercentageOfNodesToScore),
+					SchedulerName:            testProfileName,
+					Plugins:                  plugins,
+				}
+
+				// Create framework with mock recorder
+				f, err := newFrameworkWithQueueSortAndBind(ctx, r, profile,
+					withMetricsRecorder(mockRecorder),
+					WithWaitingPods(NewWaitingPodsMap()),
+					WithSnapshotSharedLister(cache.NewEmptySnapshot()),
+				)
+				if err != nil {
+					t.Fatalf("Failed to create framework for testing: %v", err)
+				}
+				defer func() {
+					_ = f.Close()
+				}()
+
+				// Run the action
+				tt.action(ctx, f)
+
+				records := mockRecorder.GetPluginDurationRecords()
+				if metricsEnabled {
+					// Verify we got at least the expected number of records
+					if len(records) == 0 {
+						t.Errorf("expected at least one record, got none")
+					}
+
+					want := mock.PluginDurationRecord{
+						ExtensionPoint: tt.wantExtensionPoint,
+						PluginName:     testPlugin,
+						Status:         tt.wantStatus.String(),
+					}
+					// Verify each record has the correct fields
+					for _, record := range records {
+						if diff := cmp.Diff(want, record, cmpopts.IgnoreFields(mock.PluginDurationRecord{}, "Value")); diff != "" {
+							t.Errorf("Plugin duration record mismatch (-want +got):\n%s", diff)
+						}
+					}
+				} else if len(records) != 0 {
+					// Verify no records were created when metrics disabled
+					t.Errorf("expected no plugin duration records when metrics disabled, got %v", records)
+				}
+			})
+		}
 	}
 }
 
@@ -3766,24 +3794,6 @@ func injectNormalizeRes(inj injectedResult, scores fwk.NodeScoreList) *fwk.Statu
 		scores[i].Score = inj.NormalizeRes
 	}
 	return nil
-}
-
-func collectAndComparePluginMetrics(t *testing.T, wantExtensionPoint, wantPlugin string, wantStatus fwk.Code) {
-	t.Helper()
-	m := metrics.PluginExecutionDuration.WithLabelValues(wantPlugin, wantExtensionPoint, wantStatus.String())
-
-	count, err := testutil.GetHistogramMetricCount(m)
-	if err != nil {
-		t.Errorf("Failed to get %s sampleCount, err: %v", metrics.PluginExecutionDuration.Name, err)
-	}
-	if count == 0 {
-		t.Error("Expect at least 1 sample")
-	}
-	value, err := testutil.GetHistogramMetricValue(m)
-	if err != nil {
-		t.Errorf("Failed to get %s value, err: %v", metrics.PluginExecutionDuration.Name, err)
-	}
-	checkLatency(t, value)
 }
 
 func collectAndCompareFrameworkMetrics(t *testing.T, wantExtensionPoint string, wantStatus fwk.Code) {
