@@ -150,7 +150,7 @@ func TestAllPrimitiveFieldPaths(t *testing.T) {
 
 var (
 	// KubeletConfiguration fields that contain file paths. If you update this, also update KubeletConfigurationPathRefs!
-	kubeletConfigurationPathFieldPaths = sets.New[string](
+	kubeletConfigurationPathFieldPaths = sets.New(
 		"StaticPodPath",
 		"Authentication.X509.ClientCAFile",
 		"TLSCertFile",
@@ -160,7 +160,7 @@ var (
 	)
 
 	// KubeletConfiguration fields that do not contain file paths.
-	kubeletConfigurationNonPathFieldPaths = sets.New[string](
+	kubeletConfigurationNonPathFieldPaths = sets.New(
 		"Address",
 		"AllowedUnsafeSysctls[*]",
 		"Authentication.Anonymous.Enabled",
@@ -200,6 +200,7 @@ var (
 		"EnforceNodeAllocatable[*]",
 		"EventBurst",
 		"EventRecordQPS",
+		"EventNamespace",
 		"EvictionHard[*]",
 		"EvictionMaxPodGracePeriod",
 		"EvictionMinimumReclaim[*]",
