@@ -255,7 +255,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 	// We can estimate the size based on what we need to allocate.
 	alloc.allocatingDevices = make(map[DeviceID]sets.Set[int], minDevicesTotal)
 
-	alloc.logger.V(5).Info("Gathered information about devices", "allocatedDevices", logAllocatedDevices(alloc.logger, alloc.allocatedDevices), "minDevicesToBeAllocated", minDevicesTotal)
+	alloc.logger.V(5).Info("Gathered information about devices", "numAllocatedDevices", len(alloc.allocatedDevices), "minDevicesToBeAllocated", minDevicesTotal)
 
 	// In practice, there aren't going to be many different CEL
 	// expressions. Most likely, there is going to be handful of different

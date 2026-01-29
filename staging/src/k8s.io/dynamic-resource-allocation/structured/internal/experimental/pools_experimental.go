@@ -19,7 +19,6 @@ package experimental
 import (
 	"context"
 	"fmt"
-	"slices"
 
 	"github.com/go-logr/logr"
 
@@ -524,50 +523,4 @@ func (p *poolsLogger) addDevicesInSlices(devices []string, poolID PoolID, slices
 		}
 	}
 	return devices
-}
-
-// logPools returns a handle for the value in a structured log call which
-// includes varying amounts of information about the allocated devices, depending on
-// the verbosity of the logger.
-func logAllocatedDevices(logger klog.Logger, allocatedDevices sets.Set[DeviceID]) any {
-	// We need to check verbosity here because our caller's source code
-	// location may be relevant (-vmodule !).
-	helper, logger := logger.WithCallStackHelper()
-	helper()
-
-	// We always produce the same output at V <= 5. 6 adds all IDs.
-	verbosity := 5
-	for i := 7; i > verbosity; i-- {
-		if loggerV := logger.V(i); loggerV.Enabled() {
-			verbosity = i
-			break
-		}
-	}
-
-	return &allocatedDevicesLogger{verbosity, allocatedDevices}
-}
-
-type allocatedDevicesLogger struct {
-	verbosity int
-	devices   sets.Set[DeviceID]
-}
-
-var _ logr.Marshaler = &allocatedDevicesLogger{}
-
-func (a *allocatedDevicesLogger) MarshalLog() any {
-	info := map[string]any{"count": len(a.devices)}
-	if a.verbosity >= 6 {
-		ids := make([]string, 0, len(a.devices))
-		for id := range a.devices {
-			if a.verbosity == 6 && len(ids) >= maxDevicesLevel6 {
-				ids = append(ids, "...")
-				break
-			}
-			ids = append(ids, id.String())
-		}
-		slices.Sort(ids)
-		info["devices"] = ids
-
-	}
-	return info
 }

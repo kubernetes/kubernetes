@@ -525,6 +525,11 @@ var (
 	otherAllocatedClaim = st.FromResourceClaim(otherClaim).
 				Allocation(allocationResult).
 				Obj()
+	otherAllocatedClaimOtherDevice = func() *resourceapi.ResourceClaim {
+		claim := otherAllocatedClaim.DeepCopy()
+		claim.Status.Allocation.Devices.Results[0].Device += "-other"
+		return claim
+	}()
 	extendedResourceClaim = st.MakeResourceClaim().
 				Name("my-pod-extended-resources-0").
 				GenerateName("my-pod-extended-resources-").
@@ -970,6 +975,8 @@ type testPluginCase struct {
 	claims  []*resourceapi.ResourceClaim
 	classes []*resourceapi.DeviceClass
 
+	inFlightClaims []*resourceapi.ResourceClaim
+
 	// objs get stored directly in the fake client, without passing
 	// through reactors, in contrast to the types above.
 	objs []apiruntime.Object
@@ -1264,7 +1271,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				unreserveBeforePreBind: &result{},
 			},
 		},
-		"exhausted-resources": {
+		"exhausted-resources-in-informer-cache": {
 			pod:     podWithClaimName,
 			claims:  []*resourceapi.ResourceClaim{pendingClaim, otherAllocatedClaim},
 			classes: []*resourceapi.DeviceClass{deviceClass},
@@ -1277,6 +1284,71 @@ func testPlugin(tCtx ktesting.TContext) {
 				},
 				postfilter: result{
 					status: fwk.NewStatus(fwk.Unschedulable, `still not schedulable`),
+				},
+			},
+		},
+		"exhausted-resources-in-flight-claim": {
+			pod:            podWithClaimName,
+			claims:         []*resourceapi.ResourceClaim{pendingClaim, otherClaim},
+			inFlightClaims: []*resourceapi.ResourceClaim{otherAllocatedClaim},
+			classes:        []*resourceapi.DeviceClass{deviceClass},
+			objs:           []apiruntime.Object{workerNodeSlice},
+			want: want{
+				preenqueue: result{
+					inFlightClaims: []metav1.Object{otherAllocatedClaim},
+				},
+				prefilter: result{
+					inFlightClaims: []metav1.Object{otherAllocatedClaim},
+				},
+				filter: perNodeResult{
+					workerNode.Name: {
+						inFlightClaims: []metav1.Object{otherAllocatedClaim},
+						status:         fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `cannot allocate all claims`),
+					},
+				},
+				postfilter: result{
+					inFlightClaims: []metav1.Object{otherAllocatedClaim},
+					status:         fwk.NewStatus(fwk.Unschedulable, `still not schedulable`),
+				},
+			},
+		},
+		"other-resources-in-flight-claim": {
+			pod:            podWithClaimName,
+			claims:         []*resourceapi.ResourceClaim{pendingClaim, otherClaim},
+			inFlightClaims: []*resourceapi.ResourceClaim{otherAllocatedClaimOtherDevice},
+			classes:        []*resourceapi.DeviceClass{deviceClass},
+			objs:           []apiruntime.Object{workerNodeSlice},
+			want: want{
+				preenqueue: result{
+					inFlightClaims: []metav1.Object{otherAllocatedClaimOtherDevice},
+				},
+				prefilter: result{
+					inFlightClaims: []metav1.Object{otherAllocatedClaimOtherDevice},
+				},
+				filter: perNodeResult{
+					workerNode.Name: {
+						inFlightClaims: []metav1.Object{otherAllocatedClaimOtherDevice},
+					},
+				},
+				reserve: result{
+					inFlightClaims: []metav1.Object{allocatedClaim, otherAllocatedClaimOtherDevice},
+				},
+				prebind: result{
+					inFlightClaims: []metav1.Object{otherAllocatedClaimOtherDevice},
+					assumedClaim:   reserve(allocatedClaim, podWithClaimName),
+					changes: change{
+						claim: func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							if claim.Name == claimName {
+								claim = claim.DeepCopy()
+								claim.Status = inUseClaim.Status
+							}
+							return claim
+						},
+					},
+				},
+				postbind: result{
+					inFlightClaims: []metav1.Object{allocatedClaim, otherAllocatedClaimOtherDevice},
+					assumedClaim:   reserve(allocatedClaim, podWithClaimName),
 				},
 			},
 		},
@@ -2485,6 +2557,10 @@ func testPlugin(tCtx ktesting.TContext) {
 
 			featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, tc.enableDRAExtendedResource)
 			testCtx := setup(tCtx, tc.args, nodes, tc.claims, tc.classes, tc.objs, feats, tc.failPatch, tc.reactors)
+			for _, claim := range tc.inFlightClaims {
+				tCtx.ExpectNoError(testCtx.draManager.ResourceClaims().SignalClaimPendingAllocation(claim.UID, claim))
+			}
+
 			initialObjects := testCtx.listAll(tCtx)
 			var registry compbasemetrics.KubeRegistry
 			if tc.metrics != nil {
