@@ -40,7 +40,7 @@ func (lw fakePodLW) Watch(options metav1.ListOptions) (watch.Interface, error) {
 	return lw.watchResp, nil
 }
 
-// IsWatchListSemanticsSupported informs the reflector that this client
+// IsWatchListSemanticsUnSupported informs the reflector that this client
 // doesn't support WatchList semantics.
 //
 // This is a synthetic method whose sole purpose is to satisfy the optional
