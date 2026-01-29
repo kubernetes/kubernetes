@@ -75,6 +75,7 @@
       initPods: 0
       measurePods: 2000
       maxClaimsPerNode: 20
+    threshold: 240
   - name: 5000pods_500nodes
     featureGates:
       DRAExtendedResource: true
@@ -86,3 +87,4 @@
       initPods: 0
       measurePods: 5000
       maxClaimsPerNode: 20
+    threshold: 130
