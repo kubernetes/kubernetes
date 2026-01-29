@@ -1173,6 +1173,21 @@ func (m *ListOptions) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	i -= len(m.ShardRangeEnd)
+	copy(dAtA[i:], m.ShardRangeEnd)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.ShardRangeEnd)))
+	i--
+	dAtA[i] = 0x72
+	i -= len(m.ShardRangeStart)
+	copy(dAtA[i:], m.ShardRangeStart)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.ShardRangeStart)))
+	i--
+	dAtA[i] = 0x6a
+	i -= len(m.ShardingStrategy)
+	copy(dAtA[i:], m.ShardingStrategy)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.ShardingStrategy)))
+	i--
+	dAtA[i] = 0x62
 	if m.SendInitialEvents != nil {
 		i--
 		if *m.SendInitialEvents {
@@ -2613,6 +2628,12 @@ func (m *ListOptions) Size() (n int) {
 	if m.SendInitialEvents != nil {
 		n += 2
 	}
+	l = len(m.ShardingStrategy)
+	n += 1 + l + sovGenerated(uint64(l))
+	l = len(m.ShardRangeStart)
+	n += 1 + l + sovGenerated(uint64(l))
+	l = len(m.ShardRangeEnd)
+	n += 1 + l + sovGenerated(uint64(l))
 	return n
 }
 
@@ -3236,6 +3257,9 @@ func (this *ListOptions) String() string {
 		`AllowWatchBookmarks:` + fmt.Sprintf("%v", this.AllowWatchBookmarks) + `,`,
 		`ResourceVersionMatch:` + fmt.Sprintf("%v", this.ResourceVersionMatch) + `,`,
 		`SendInitialEvents:` + valueToStringGenerated(this.SendInitialEvents) + `,`,
+		`ShardingStrategy:` + fmt.Sprintf("%v", this.ShardingStrategy) + `,`,
+		`ShardRangeStart:` + fmt.Sprintf("%v", this.ShardRangeStart) + `,`,
+		`ShardRangeEnd:` + fmt.Sprintf("%v", this.ShardRangeEnd) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -7157,6 +7181,102 @@ func (m *ListOptions) Unmarshal(dAtA []byte) error {
 			}
 			b := bool(v != 0)
 			m.SendInitialEvents = &b
+		case 12:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ShardingStrategy", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ShardingStrategy = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 13:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ShardRangeStart", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ShardRangeStart = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 14:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ShardRangeEnd", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ShardRangeEnd = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])

@@ -643,6 +643,18 @@ message ListOptions {
   // compatibility reasons) and to false otherwise.
   // +optional
   optional bool sendInitialEvents = 11;
+
+  // shardingStrategy Instructs the server to shard based on the object's unique ID.
+  // +optional
+  optional string shardingStrategy = 12;
+
+  // shardRangeStart Defines the inclusive range (<=) of virtual buckets this client wants to receive
+  // +optional
+  optional string shardRangeStart = 13;
+
+  // shardRangeEnd Defines the inclusive range (>=) of virtual buckets this client wants to receive
+  // +optional
+  optional string shardRangeEnd = 14;
 }
 
 // ManagedFieldsEntry is a workflow-id, a FieldSet and the group version of the resource

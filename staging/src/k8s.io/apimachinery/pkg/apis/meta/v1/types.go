@@ -430,6 +430,18 @@ type ListOptions struct {
 	// compatibility reasons) and to false otherwise.
 	// +optional
 	SendInitialEvents *bool `json:"sendInitialEvents,omitempty" protobuf:"varint,11,opt,name=sendInitialEvents"`
+
+	// shardingStrategy Instructs the server to shard based on the object's unique ID.
+	// +optional
+	ShardingStrategy string `json:"shardingStrategy,omitempty" protobuf:"bytes,12,opt,name=shardingStrategy"`
+
+	// shardRangeStart Defines the inclusive range (<=) of virtual buckets this client wants to receive
+	// +optional
+	ShardRangeStart string `json:"shardRangeStart,omitempty" protobuf:"bytes,13,opt,name=shardRangeStart"`
+
+	// shardRangeEnd Defines the inclusive range (>=) of virtual buckets this client wants to receive
+	// +optional
+	ShardRangeEnd string `json:"shardRangeEnd,omitempty" protobuf:"bytes,14,opt,name=shardRangeEnd"`
 }
 
 const (
