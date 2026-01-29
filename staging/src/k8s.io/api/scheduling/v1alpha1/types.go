@@ -181,6 +181,7 @@ type PodGroup struct {
 }
 
 // PodGroupPolicy defines the scheduling configuration for a PodGroup.
+// +union
 type PodGroupPolicy struct {
 	// Basic specifies that the pods in this group should be scheduled using
 	// standard Kubernetes scheduling behavior.

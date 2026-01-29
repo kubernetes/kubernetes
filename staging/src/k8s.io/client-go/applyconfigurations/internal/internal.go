@@ -14363,6 +14363,12 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: gang
       type:
         namedType: io.k8s.api.scheduling.v1alpha1.GangSchedulingPolicy
+    unions:
+    - fields:
+      - fieldName: basic
+        discriminatorValue: Basic
+      - fieldName: gang
+        discriminatorValue: Gang
 - name: io.k8s.api.scheduling.v1alpha1.PriorityClass
   map:
     fields:
