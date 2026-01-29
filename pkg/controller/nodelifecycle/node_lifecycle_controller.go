@@ -1086,6 +1086,11 @@ func (nc *Controller) handleDisruption(ctx context.Context, zoneToNodeConditions
 
 func (nc *Controller) podUpdated(oldPod, newPod *v1.Pod) {
 	if newPod == nil {
+		if oldPod == nil {
+			return
+		}
+		podItem := podUpdateItem{oldPod.Namespace, oldPod.Name}
+		nc.podUpdateQueue.Add(podItem)
 		return
 	}
 	if len(newPod.Spec.NodeName) != 0 && (oldPod == nil || newPod.Spec.NodeName != oldPod.Spec.NodeName) {
