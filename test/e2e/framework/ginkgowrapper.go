@@ -254,13 +254,37 @@ func init() {
 }
 
 func transformGinkgoNodeArgs(nodeType types.NodeType, offset ginkgo.Offset, text string, args []any) (string, []any, []error) {
-	text, args = expandGinkgoArgs(offset+1, text, args)
+	text, args = expandGinkgoArgs(nodeType == types.NodeTypeIt, offset+1, text, args)
 	return text, args, nil
 }
 
+// leafNodeLabels contains labels that
+// - might get added multiple times while constructing the spec tree and
+// - only need to be shown once and
+// - is very likely not considered part of the full test name string.
+//
+// Injecting their tag multiple times directly into the text at the place which
+// triggers their addition, they get only added as label (not visible) and the
+// text then gets added at the end of the leaf node text (= ginkgo.It name)
+// based on the previously added labels.
+//
+// The initial set contains the labels defined in the E2E framework. Feature
+// gate stability texts (Alpha, Beta, etc.) get added when we encounter them
+// to avoid making assumptions about what those strings are.
+var leafNodeLabels = sets.New[string](
+	"Conformance",
+	"Disruptive",
+	"Feature:OffByDefault",
+	"Flaky",
+	"NodeConformance",
+	"Serial",
+	"Slow",
+)
+
 // expandGinkgoArgs concatenates all strings and translates our custom
-// arguments into something that Ginkgo can handle.
-func expandGinkgoArgs(offset ginkgo.Offset, text string, args []any) (string, []any) {
+// arguments into something that Ginkgo can handle. It gets called
+// through ginkgo.AddTreeConstructionNodeArgsTransformer.
+func expandGinkgoArgs(leafNode bool, offset ginkgo.Offset, text string, args []any) (string, []any) {
 	var ginkgoArgs []interface{}
 	var texts []string
 
@@ -268,9 +292,16 @@ func expandGinkgoArgs(offset ginkgo.Offset, text string, args []any) (string, []
 		texts = append(texts, text)
 	}
 
+	// All labels for a leaf node, from parent and added in this call.
+	allLabels := sets.New[string]()
+	if leafNode {
+		// May only be called during tree construction, i.e. not for the top-level node,
+		// so we have to be a bit careful.
+		allLabels = sets.New[string](ginkgo.CurrentTreeConstructionNodeReport().Labels()...)
+	}
 	addLabel := func(label string) {
-		texts = append(texts, fmt.Sprintf("[%s]", label))
 		ginkgoArgs = append(ginkgoArgs, ginkgo.Label(label))
+		allLabels.Insert(label)
 	}
 
 	haveEmptyStrings := false
@@ -279,16 +310,19 @@ func expandGinkgoArgs(offset ginkgo.Offset, text string, args []any) (string, []
 		case label:
 			fullLabel := strings.Join(arg.parts, ":")
 			addLabel(fullLabel)
+			if !leafNodeLabels.Has(fullLabel) {
+				texts = append(texts, fmt.Sprintf("[%s]", fullLabel))
+			}
 			if arg.alphaBetaLevel != "" {
-				texts = append(texts, fmt.Sprintf("[%[1]s]", arg.alphaBetaLevel))
-				ginkgoArgs = append(ginkgoArgs, ginkgo.Label(arg.alphaBetaLevel))
+				leafNodeLabels.Insert(arg.alphaBetaLevel)
+				addLabel(arg.alphaBetaLevel)
 			}
 			if arg.offByDefault {
-				texts = append(texts, "[Feature:OffByDefault]")
-				ginkgoArgs = append(ginkgoArgs, ginkgo.Label("Feature:OffByDefault"))
+				addLabel("Feature:OffByDefault")
 				// Alphas are always off by default but we may want to select
 				// betas based on defaulted-ness.
 				if arg.alphaBetaLevel == "Beta" {
+					// Not embedded in text, only as Ginkgo label!
 					ginkgoArgs = append(ginkgoArgs, ginkgo.Label("BetaOffByDefault"))
 				}
 			}
@@ -320,6 +354,25 @@ func expandGinkgoArgs(offset ginkgo.Offset, text string, args []any) (string, []
 	for _, text := range texts {
 		if strings.HasPrefix(text, " ") || strings.HasSuffix(text, " ") {
 			RecordBug(NewBug(fmt.Sprintf("trailing or leading spaces are unnecessary and need to be removed: %q", text), int(offset)))
+		}
+	}
+
+	// Ensure that each leaf node text contains all additional labels collected so far.
+	// We get those labels from the set of labels associated with the container node(s).
+	if leafNode {
+		var delayedLabels []string
+
+		for label := range allLabels {
+			if leafNodeLabels.Has(label) {
+				delayedLabels = append(delayedLabels, label)
+			}
+		}
+
+		slices.Sort(delayedLabels)
+		for _, label := range delayedLabels {
+			texts = append(texts, fmt.Sprintf("[%s]", label))
+			// This keeps validateText happy.
+			ginkgoArgs = append(ginkgoArgs, ginkgo.Label(label))
 		}
 	}
 
