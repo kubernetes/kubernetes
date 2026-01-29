@@ -928,6 +928,9 @@ func podresourcesGetTests(ctx context.Context, f *framework.Framework, cli kubel
 
 	tpd = newTestPodData()
 	ginkgo.By("checking the output when only pods which don't require resources are present")
+
+	expectListAndGetConsistent(ctx, cli, "pod-00", f.Namespace.Name)
+
 	expected = []podDesc{
 		{
 			podName: "pod-00",
@@ -945,6 +948,9 @@ func podresourcesGetTests(ctx context.Context, f *framework.Framework, cli kubel
 
 	tpd = newTestPodData()
 	ginkgo.By("checking the output when only pod require CPU")
+
+	expectListAndGetConsistent(ctx, cli, "pod-01", f.Namespace.Name)
+
 	expected = []podDesc{
 		{
 			podName:    "pod-01",
@@ -963,6 +969,9 @@ func podresourcesGetTests(ctx context.Context, f *framework.Framework, cli kubel
 
 	tpd = newTestPodData()
 	ginkgo.By("checking the output when a pod has multiple containers and only one of them requires exclusive CPUs")
+
+	expectListAndGetConsistent(ctx, cli, "pod-01", f.Namespace.Name)
+
 	expected = []podDesc{
 		{
 			podName:    "pod-01",
@@ -995,7 +1004,8 @@ func podresourcesGetTests(ctx context.Context, f *framework.Framework, cli kubel
 
 	restartNever := v1.RestartPolicyNever
 	tpd = newTestPodData()
-	ginkgo.By("checking the output when only pod require CPU is terminated")
+	ginkgo.By("checking Get() returns an error for a terminated pod")
+
 	expected = []podDesc{
 		{
 			podName:        "pod-01",
@@ -1006,12 +1016,21 @@ func podresourcesGetTests(ctx context.Context, f *framework.Framework, cli kubel
 		},
 	}
 	tpd.createPodsForTest(ctx, f, expected)
+
+	// Wait for the pod to complete to avoid races.
+	err = e2epod.WaitForPodCondition(ctx, f.ClientSet, f.Namespace.Name, "pod-01", "Pod Succeeded", 2*time.Minute, testutils.PodSucceeded)
+	framework.ExpectNoError(err, "pod did not succeed as expected")
+
 	resp, err = cli.Get(ctx, &kubeletpodresourcesv1.GetPodResourcesRequest{PodName: "pod-01", PodNamespace: f.Namespace.Name})
-	podResourceList = []*kubeletpodresourcesv1.PodResources{resp.GetPodResources()}
-	gomega.Expect(err).To(gomega.HaveOccurred(), "pod not found")
-	res = convertToMap(podResourceList)
-	err = matchPodDescWithResources(expected, res)
-	framework.ExpectNoError(err, "matchPodDescWithResources() failed err %v", err)
+	gomega.Expect(err).To(gomega.HaveOccurred(), "expected Get() to return an error for a terminated pod")
+
+	// Returned PodResources for a terminated pod must be empty.
+	pr := resp.GetPodResources()
+	if pr != nil {
+		gomega.Expect(pr.GetContainers()).To(gomega.BeEmpty(),
+			"expected no container resources in response for terminated pod; got: %#v", pr.GetContainers())
+	}
+
 	tpd.deletePodsForTest(ctx, f)
 
 	if sidecarContainersEnabled {
@@ -2126,4 +2145,113 @@ func timelessSampleAtLeast(lower interface{}) types.GomegaMatcher {
 		"Timestamp": gstruct.Ignore(),
 		"Histogram": gstruct.Ignore(),
 	}))
+}
+
+func getPodResourcesFromList(ctx context.Context, cli kubeletpodresourcesv1.PodResourcesListerClient, podName, podNamespace string) (*kubeletpodresourcesv1.PodResources, error) {
+	resp, err := cli.List(ctx, &kubeletpodresourcesv1.ListPodResourcesRequest{})
+	if err != nil {
+		return nil, err
+	}
+	for _, pr := range resp.GetPodResources() {
+		if pr.GetName() == podName && pr.GetNamespace() == podNamespace {
+			return pr, nil
+		}
+	}
+	return nil, fmt.Errorf("pod %s/%s not found in List() response", podNamespace, podName)
+}
+
+func comparePodResourcesListVsGet(listPR, getPR *kubeletpodresourcesv1.PodResources) error {
+	if listPR == nil || getPR == nil {
+		return fmt.Errorf("nil PodResources: list=%v get=%v", listPR, getPR)
+	}
+	if listPR.GetName() != getPR.GetName() || listPR.GetNamespace() != getPR.GetNamespace() {
+		return fmt.Errorf("pod identity mismatch: list=%s/%s get=%s/%s",
+			listPR.GetNamespace(), listPR.GetName(), getPR.GetNamespace(), getPR.GetName())
+	}
+
+	// compare containers by name.
+	listContainers := make(map[string]*kubeletpodresourcesv1.ContainerResources)
+	for _, c := range listPR.GetContainers() {
+		listContainers[c.GetName()] = c
+	}
+	getContainers := make(map[string]*kubeletpodresourcesv1.ContainerResources)
+	for _, c := range getPR.GetContainers() {
+		getContainers[c.GetName()] = c
+	}
+
+	if len(listContainers) != len(getContainers) {
+		return fmt.Errorf("container count mismatch: list=%d get=%d", len(listContainers), len(getContainers))
+	}
+
+	for name, lc := range listContainers {
+		gc, ok := getContainers[name]
+		if !ok {
+			return fmt.Errorf("container %q present in List but missing in Get", name)
+		}
+
+		// compare by cpu ids.
+		if len(lc.GetCpuIds()) != len(gc.GetCpuIds()) {
+			return fmt.Errorf("container %q cpu_ids length mismatch: list=%v get=%v", name, lc.GetCpuIds(), gc.GetCpuIds())
+		}
+		for i := range lc.GetCpuIds() {
+			if lc.GetCpuIds()[i] != gc.GetCpuIds()[i] {
+				return fmt.Errorf("container %q cpu_ids mismatch: list=%v get=%v", name, lc.GetCpuIds(), gc.GetCpuIds())
+			}
+		}
+
+		// compare devices as sets by resource name and device IDs.
+		listDevs := make(map[string]map[string]struct{})
+		for _, d := range lc.GetDevices() {
+			ids := make(map[string]struct{})
+			for _, id := range d.GetDeviceIds() {
+				ids[id] = struct{}{}
+			}
+			listDevs[d.GetResourceName()] = ids
+		}
+		getDevs := make(map[string]map[string]struct{})
+		for _, d := range gc.GetDevices() {
+			ids := make(map[string]struct{})
+			for _, id := range d.GetDeviceIds() {
+				ids[id] = struct{}{}
+			}
+			getDevs[d.GetResourceName()] = ids
+		}
+
+		if len(listDevs) != len(getDevs) {
+			return fmt.Errorf("container %q devices length mismatch: list=%v get=%v", name, lc.GetDevices(), gc.GetDevices())
+		}
+		for rname, lids := range listDevs {
+			gids, ok := getDevs[rname]
+			if !ok {
+				return fmt.Errorf("container %q resource %q present in List devices but missing in Get devices", name, rname)
+			}
+			if len(lids) != len(gids) {
+				return fmt.Errorf("container %q resource %q device_ids count mismatch: list=%d get=%d", name, rname, len(lids), len(gids))
+			}
+			for id := range lids {
+				if _, ok := gids[id]; !ok {
+					return fmt.Errorf("container %q resource %q device_id %q present in List but missing in Get", name, rname, id)
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+func expectListAndGetConsistent(ctx context.Context, cli kubeletpodresourcesv1.PodResourcesListerClient, podName, podNamespace string) {
+	gomega.Eventually(ctx, func(ctx context.Context) error {
+		listPR, err := getPodResourcesFromList(ctx, cli, podName, podNamespace)
+		if err != nil {
+			return err
+		}
+		getResp, err := cli.Get(ctx, &kubeletpodresourcesv1.GetPodResourcesRequest{
+			PodName:      podName,
+			PodNamespace: podNamespace,
+		})
+		if err != nil {
+			return err
+		}
+		return comparePodResourcesListVsGet(listPR, getResp.GetPodResources())
+	}, time.Minute, 5*time.Second).Should(gomega.Succeed())
 }
