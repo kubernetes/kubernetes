@@ -48,6 +48,8 @@ const (
 // about who the rule applies to or which namespace the rule applies to.
 type PolicyRule struct {
 	// Verbs is a list of Verbs that apply to ALL the ResourceKinds contained in this rule. '*' represents all verbs.
+	// +required
+	// +k8s:required
 	// +listType=atomic
 	Verbs []string `json:"verbs" protobuf:"bytes,1,rep,name=verbs"`
 

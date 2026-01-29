@@ -97,6 +97,8 @@ message ClusterRoleList {
 // about who the rule applies to or which namespace the rule applies to.
 message PolicyRule {
   // Verbs is a list of Verbs that apply to ALL the ResourceKinds contained in this rule. '*' represents all verbs.
+  // +required
+  // +k8s:required
   // +listType=atomic
   repeated string verbs = 1;
 
