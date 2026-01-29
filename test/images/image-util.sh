@@ -21,20 +21,10 @@ set -o pipefail
 TASK=${1}
 WHAT=${2}
 
-# docker buildx command is still experimental as of Docker 19.03.0
-export DOCKER_CLI_EXPERIMENTAL="enabled"
-
-# Connecting to a Remote Docker requires certificates for authentication, which can be found
-# at this path. By default, they can be found in the ${HOME} folder. We're expecting to find
-# here ".docker-${os_version}" folders which contains the necessary certificates.
-DOCKER_CERT_BASE_PATH="${DOCKER_CERT_BASE_PATH:-${HOME}}"
-
 KUBE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 source "${KUBE_ROOT}/hack/lib/logging.sh"
 source "${KUBE_ROOT}/hack/lib/util.sh"
-
-# Mapping of go ARCH to actual architectures shipped part of multiarch/qemu-user-static project
-declare -A QEMUARCHS=( ["amd64"]="x86_64" ["arm"]="arm" ["arm64"]="aarch64" ["ppc64le"]="ppc64le" ["s390x"]="s390x" )
+declare -a DEFAULT_IMAGE_PLATFORMS=("linux/amd64" "linux/arm64" "linux/ppc64le" "linux/s390x")
 
 # NOTE(claudiub): In the test image build jobs, this script is not being run in a git repository,
 # which would cause git log to fail. Instead, we can use the GIT_COMMIT_ID set in cloudbuild.yaml.
@@ -95,13 +85,12 @@ build() {
   local image=${1}
   local img_folder=${1}
   local output_type=${2}
-  docker_version_check
+  local -a os_archs=()
 
   if [[ -f "${img_folder}/BASEIMAGE" ]]; then
-    os_archs=$(listOsArchs "$image")
+    kube::util::read-array os_archs < <(listOsArchs "$image")
   else
-    # prepend linux/ to the QEMUARCHS items.
-    os_archs=$(printf 'linux/%s\n' "${!QEMUARCHS[@]}")
+    os_archs=("${DEFAULT_IMAGE_PLATFORMS[@]}")
   fi
 
   # image tag
@@ -116,7 +105,7 @@ build() {
   kube::util::ensure-gnu-sed
   kube::util::ensure-docker-buildx
 
-  for os_arch in ${os_archs}; do
+  for os_arch in "${os_archs[@]}"; do
     splitOsArch "${image}" "${os_arch}"
     if [[ "${os_name}" == "windows" && "${output_type}" == "docker" ]]; then
       echo "Cannot build the image '${image}' for ${os_arch}. Built Windows container images need to be pushed to a registry."
@@ -150,73 +139,31 @@ build() {
     base_image=""
     if [[ -f BASEIMAGE ]]; then
       base_image=$(getBaseImage "${os_arch}" | "${SED}" "s|REGISTRY|${REGISTRY}|g")
-      "${SED}" -i "s|BASEARCH|${arch}|g" $dockerfile_name
-    fi
-
-    # Only the cross-build on x86 is guaranteed by far, other arches like aarch64 doesn't support cross-build
-    # thus, there is no need to tackle a disability feature on those platforms, and also help to prevent from
-    # ending up a wrong image tag on non-amd64 platforms.
-    build_arch=$(uname -m)
-    if [[ ${build_arch} = 'x86_64' ]]; then
-        # copy the qemu-*-static binary to docker image to build the multi architecture image on x86 platform
-        if grep -q 'CROSS_BUILD_' Dockerfile; then
-          if [[ "${arch}" = 'amd64' ]]; then
-            "${SED}" -i '/CROSS_BUILD_/d' Dockerfile
-          else
-            "${SED}" -i "s|QEMUARCH|${QEMUARCHS[$arch]}|g" Dockerfile
-            # Register qemu-*-static for all supported processors except the current one
-            echo 'Registering qemu-*-static binaries in the kernel'
-            local sudo=""
-            if [[ $(id -u) -ne 0 ]]; then
-	            sudo="sudo"
-            fi
-            ${sudo} docker run --rm --privileged tonistiigi/binfmt:latest --install all
-            curl -sSL https://github.com/multiarch/qemu-user-static/releases/download/"${QEMUVERSION}"/x86_64_qemu-"${QEMUARCHS[$arch]}"-static.tar.gz | tar -xz -C "${temp_dir}"
-            # Ensure we don't get surprised by umask settings
-            chmod 0755 "${temp_dir}/qemu-${QEMUARCHS[$arch]}-static"
-            "${SED}" -i 's/CROSS_BUILD_//g' Dockerfile
-          fi
-        fi
-    elif [[ "${QEMUARCHS[$arch]}" != "${build_arch}" ]]; then
-		echo "skip cross-build $arch on non-supported platform ${build_arch}."
-		popd
-        continue
     else
-        "${SED}" -i '/CROSS_BUILD_/d' Dockerfile
+      # If no BASEIMAGE file is found, extract base image from Dockerfile
+      # The build-arg can't be empty
+      base_image=$(sed -n 's/^ARG BASEIMAGE=//p' "${dockerfile_name}")
     fi
 
-    # `--provenance=false --sbom=false` is set to avoid creating a manifest list: https://github.com/kubernetes/kubernetes/issues/123266
-    docker buildx build --progress=plain --no-cache --pull --output=type="${output_type}" --platform "${os_name}/${arch}" --provenance=false --sbom=false \
+    docker buildx build --progress=plain --no-cache --pull --output=type="${output_type}" --platform "${os_name}/${arch}" \
         --build-arg BASEIMAGE="${base_image}" --build-arg REGISTRY="${REGISTRY}" --build-arg OS_VERSION="${os_version}" --build-arg GOLANG_VERSION="${GOLANG_VERSION}" \
         -t "${REGISTRY}/${image}:${TAG}-${suffix}" -f "${dockerfile_name}" \
-	--label "image_version=${TAG}" --label "commit_id=${GIT_COMMIT_ID}" \
-	--label "git_url=https://github.com/kubernetes/kubernetes/tree/${GIT_COMMIT_ID}/test/images/${img_folder}" .
-
+        --label "image_version=${TAG}" --label "commit_id=${GIT_COMMIT_ID}" \
+        --label "git_url=https://github.com/kubernetes/kubernetes/tree/${GIT_COMMIT_ID}/test/images/${img_folder}" .
     popd
   done
-}
-
-docker_version_check() {
-  # docker manifest annotate --os-version has been introduced in 20.10.0,
-  # so we need to make sure we have it.
-  docker_version=$(docker version --format '{{.Client.Version}}' | cut -d"-" -f1)
-  if [[ ${docker_version} != 20.10.0 && ${docker_version} < 20.10.0 ]]; then
-    echo "Minimum docker version 20.10.0 is required for annotating the OS Version in the manifest list images: ${docker_version}]"
-    exit 1
-  fi
 }
 
 # This function will push the docker images
 push() {
   local image=${1}
-  docker_version_check
 
   TAG=$(<"${image}"/VERSION)
+  local -a os_archs=()
   if [[ -f ${image}/BASEIMAGE ]]; then
-    os_archs=$(listOsArchs "$image")
+    kube::util::read-array os_archs < <(listOsArchs "$image")
   else
-    # prepend linux/ to the QEMUARCHS items.
-    os_archs=$(printf 'linux/%s\n' "${!QEMUARCHS[@]}")
+    os_archs=("${DEFAULT_IMAGE_PLATFORMS[@]}")
   fi
 
   pushd "${image}"
@@ -231,10 +178,10 @@ push() {
   # reset manifest list; needed in case multiple images are being built / pushed.
   manifest=()
   # Make os_archs list into image manifest. Eg: 'linux/amd64 linux/ppc64le' to '${REGISTRY}/${image}:${TAG}-linux-amd64 ${REGISTRY}/${image}:${TAG}-linux-ppc64le'
-  while IFS='' read -r line; do manifest+=("$line"); done < <(echo "$os_archs" | "${SED}" "s~\/~-~g" | "${SED}" -e "s~[^ ]*~$REGISTRY\/$image:$TAG\-&~g")
+  while IFS='' read -r line; do manifest+=("$line"); done < <(echo "${os_archs[@]}" | "${SED}" "s~\/~-~g" | "${SED}" -e "s~[^ ]*~$REGISTRY\/$image:$TAG\-&~g")
   docker manifest create --amend "${REGISTRY}/${image}:${TAG}" "${manifest[@]}"
 
-  for os_arch in ${os_archs}; do
+  for os_arch in "${os_archs[@]}"; do
     splitOsArch "${image}" "${os_arch}"
 
     # For Windows images, we also need to include the "os.version" in the manifest list, so the Windows node

@@ -124,7 +124,7 @@ bin/wincat-windows-${ARCH}: windows/wincat/wincat.go
 
 container: .container-${OS}-$(ARCH)
 .container-linux-$(ARCH): bin/$(BIN)-$(OS)-$(ARCH)
-	docker buildx build --provenance=false --sbom=false --pull --output=type=${OUTPUT_TYPE} --platform ${OS}/$(ARCH) \
+	docker buildx build --pull --output=type=${OUTPUT_TYPE} --platform ${OS}/$(ARCH) \
 		-t $(IMAGE):$(TAG)-${OS}-$(ARCH) --build-arg BASE=${BASE} --build-arg ARCH=$(ARCH) .
 	touch $@
 

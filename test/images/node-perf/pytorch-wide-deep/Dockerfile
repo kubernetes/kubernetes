@@ -15,8 +15,6 @@
 ARG BASEIMAGE
 FROM $BASEIMAGE
 
-CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
-
 # Install time, curl, and g++ (g++ required for torch.compile() inductor backend)
 RUN apt-get update && apt-get install -y --no-install-recommends time curl g++ && \
     rm -rf /var/lib/apt/lists/*

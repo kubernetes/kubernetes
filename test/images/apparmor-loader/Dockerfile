@@ -12,10 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ARG BASEIMAGE
+ARG BASEIMAGE=alpine:3.22
 FROM $BASEIMAGE
-
-CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
 
 RUN apk add apparmor libapparmor --update-cache --repository http://dl-cdn.alpinelinux.org/alpine/edge/community/ --allow-untrusted
 
