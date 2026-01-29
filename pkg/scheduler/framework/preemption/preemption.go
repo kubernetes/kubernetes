@@ -176,13 +176,24 @@ func NewEvaluator(pluginName string, fh fwk.Handle, i Interface, enableAsyncPree
 	// to prevent the misuse of the PreemptPod function.
 	ev.PreemptPod = func(ctx context.Context, c Candidate, preemptor, victim *v1.Pod, pluginName string) error {
 		logger := klog.FromContext(ctx)
+		skipAPICall := false
 
 		// If the victim is a WaitingPod, send a reject message to the PermitPlugin.
 		// Otherwise we should delete the victim.
 		if waitingPod := ev.Handler.GetWaitingPod(victim.UID); waitingPod != nil {
 			waitingPod.Reject(pluginName, "preempted")
 			logger.V(2).Info("Preemptor pod rejected a waiting pod", "preemptor", klog.KObj(preemptor), "waitingPod", klog.KObj(victim), "node", c.Name())
-		} else {
+			skipAPICall = true
+		} else if podInPreBind := ev.Handler.GetPodInPreBind(victim.UID); podInPreBind != nil {
+			// If the victim is in the preBind cancel the binding process.
+			if podInPreBind.CancelPod(fmt.Sprintf("preempted by %s", pluginName)) {
+				logger.V(2).Info("Preemptor pod rejected a pod in preBind", "preemptor", klog.KObj(preemptor), "podInPreBind", klog.KObj(victim), "node", c.Name())
+				skipAPICall = true
+			} else {
+				logger.V(5).Info("Failed to reject a pod in preBind, falling back to deletion via api call", "preemptor", klog.KObj(preemptor), "podInPreBind", klog.KObj(victim), "node", c.Name())
+			}
+		}
+		if !skipAPICall {
 			condition := &v1.PodCondition{
 				Type:               v1.DisruptionTarget,
 				ObservedGeneration: apipod.CalculatePodConditionObservedGeneration(&victim.Status, victim.Generation, v1.DisruptionTarget),
