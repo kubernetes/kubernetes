@@ -4537,7 +4537,6 @@ type EphemeralContainer struct {
 // state of a system.
 type PodStatus struct {
 	// If set, this represents the .metadata.generation that the pod status was set based upon.
-	// The PodObservedGenerationTracking feature gate must be enabled to use this field.
 	// +featureGate=PodObservedGenerationTracking
 	// +optional
 	ObservedGeneration int64

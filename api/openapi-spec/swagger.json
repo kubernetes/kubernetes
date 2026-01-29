@@ -9773,7 +9773,7 @@
           "type": "string"
         },
         "observedGeneration": {
-          "description": "If set, this represents the .metadata.generation that the pod condition was set based upon. The PodObservedGenerationTracking feature gate must be enabled to use this field.",
+          "description": "If set, this represents the .metadata.generation that the pod condition was set based upon.",
           "format": "int64",
           "type": "integer"
         },
