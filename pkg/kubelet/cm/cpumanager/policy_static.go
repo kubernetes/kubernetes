@@ -449,19 +449,63 @@ func (p *staticPolicy) allocateCPUs(logger logr.Logger, s state.State, numCPUs i
 	// If there are aligned CPUs in numaAffinity, attempt to take those first.
 	result := topology.EmptyAllocation()
 	if numaAffinity != nil {
-		alignedCPUs := p.getAlignedCPUs(numaAffinity, allocatableCPUs)
+		if p.options.AlignBySocket {
+			// First, try to allocate from the exact NUMA nodes in the hint
+			numaBits := numaAffinity.GetBits()
+			preferredCPUs := cpuset.New()
+			for _, numaNodeID := range numaBits {
+				preferredCPUs = preferredCPUs.Union(allocatableCPUs.Intersection(p.topology.CPUDetails.CPUsInNUMANodes(numaNodeID)))
+			}
 
-		numAlignedToAlloc := alignedCPUs.Size()
-		if numCPUs < numAlignedToAlloc {
-			numAlignedToAlloc = numCPUs
+			numPreferredToAlloc := preferredCPUs.Size()
+			if numCPUs < numPreferredToAlloc {
+				numPreferredToAlloc = numCPUs
+			}
+
+			if numPreferredToAlloc > 0 {
+				allocatedCPUs, err := p.takeByTopology(logger, preferredCPUs, numPreferredToAlloc)
+				if err != nil {
+					return topology.EmptyAllocation(), err
+				}
+				result.CPUs = result.CPUs.Union(allocatedCPUs)
+				logger.Info("AllocateCPUs from preferred NUMA nodes", "allocated", allocatedCPUs.String(), "numAllocated", allocatedCPUs.Size())
+			}
+
+			// If we still need more CPUs, expand to socket-aligned CPUs
+			if result.CPUs.Size() < numCPUs {
+				alignedCPUs := p.getAlignedCPUs(numaAffinity, allocatableCPUs)
+				// Remove already allocated CPUs
+				remainingAlignedCPUs := alignedCPUs.Difference(result.CPUs)
+
+				numRemainingToAlloc := numCPUs - result.CPUs.Size()
+				if remainingAlignedCPUs.Size() < numRemainingToAlloc {
+					numRemainingToAlloc = remainingAlignedCPUs.Size()
+				}
+
+				if numRemainingToAlloc > 0 {
+					allocatedCPUs, err := p.takeByTopology(logger, remainingAlignedCPUs, numRemainingToAlloc)
+					if err != nil {
+						return topology.EmptyAllocation(), err
+					}
+					result.CPUs = result.CPUs.Union(allocatedCPUs)
+					logger.Info("AllocateCPUs from socket-aligned NUMA nodes", "allocated", allocatedCPUs.String(), "numAllocated", allocatedCPUs.Size())
+				}
+			}
+		} else {
+			alignedCPUs := p.getAlignedCPUs(numaAffinity, allocatableCPUs)
+
+			numAlignedToAlloc := alignedCPUs.Size()
+			if numCPUs < numAlignedToAlloc {
+				numAlignedToAlloc = numCPUs
+			}
+
+			allocatedCPUs, err := p.takeByTopology(logger, alignedCPUs, numAlignedToAlloc)
+			if err != nil {
+				return topology.EmptyAllocation(), err
+			}
+
+			result.CPUs = result.CPUs.Union(allocatedCPUs)
 		}
-
-		allocatedCPUs, err := p.takeByTopology(logger, alignedCPUs, numAlignedToAlloc)
-		if err != nil {
-			return topology.EmptyAllocation(), err
-		}
-
-		result.CPUs = result.CPUs.Union(allocatedCPUs)
 	}
 
 	// Get any remaining CPUs from what's leftover after attempting to grab aligned ones.
