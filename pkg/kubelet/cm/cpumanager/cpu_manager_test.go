@@ -47,9 +47,21 @@ import (
 	"k8s.io/utils/cpuset"
 )
 
+type mockStateStats struct {
+	SetCPUSet         int
+	SetDefaultCPUSet  int
+	SetCPUAssignments int
+	Delete            int
+	ClearState        int
+	HoldStore         int
+	Store             int
+}
+
 type mockState struct {
 	assignments   state.ContainerCPUAssignments
 	defaultCPUSet cpuset.CPUSet
+	hold          int
+	callStats     [2]mockStateStats
 }
 
 func (s *mockState) GetCPUSet(podUID string, containerName string) (cpuset.CPUSet, bool) {
@@ -69,6 +81,7 @@ func (s *mockState) GetCPUSetOrDefault(podUID string, containerName string) cpus
 }
 
 func (s *mockState) SetCPUSet(podUID string, containerName string, cset cpuset.CPUSet) {
+	s.callStats[s.hold].SetCPUSet++
 	if _, exists := s.assignments[podUID]; !exists {
 		s.assignments[podUID] = make(map[string]cpuset.CPUSet)
 	}
@@ -76,10 +89,12 @@ func (s *mockState) SetCPUSet(podUID string, containerName string, cset cpuset.C
 }
 
 func (s *mockState) SetDefaultCPUSet(cset cpuset.CPUSet) {
+	s.callStats[s.hold].SetDefaultCPUSet++
 	s.defaultCPUSet = cset
 }
 
 func (s *mockState) Delete(podUID string, containerName string) {
+	s.callStats[s.hold].Delete++
 	delete(s.assignments[podUID], containerName)
 	if len(s.assignments[podUID]) == 0 {
 		delete(s.assignments, podUID)
@@ -87,11 +102,13 @@ func (s *mockState) Delete(podUID string, containerName string) {
 }
 
 func (s *mockState) ClearState() {
+	s.callStats[s.hold].ClearState++
 	s.defaultCPUSet = cpuset.CPUSet{}
 	s.assignments = make(state.ContainerCPUAssignments)
 }
 
 func (s *mockState) SetCPUAssignments(a state.ContainerCPUAssignments) {
+	s.callStats[s.hold].SetCPUAssignments++
 	s.assignments = a.Clone()
 }
 
@@ -99,9 +116,15 @@ func (s *mockState) GetCPUAssignments() state.ContainerCPUAssignments {
 	return s.assignments.Clone()
 }
 
-func (s *mockState) HoldStore() {}
+func (s *mockState) HoldStore() {
+	s.callStats[s.hold].HoldStore++
+	s.hold = 1
+}
 
-func (s *mockState) Store() {}
+func (s *mockState) Store() {
+	s.callStats[s.hold].Store++
+	s.hold = 0
+}
 
 type mockPolicy struct {
 	err error
