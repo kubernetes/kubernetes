@@ -278,6 +278,7 @@ type PolicyRule struct {
 type GroupResources struct {
 	// Group is the name of the API group that contains the resources.
 	// The empty string represents the core API group.
+	// `*` matches all groups
 	// +optional
 	Group string `json:"group,omitempty" protobuf:"bytes,1,opt,name=group"`
 	// Resources is a list of resources this rule applies to.
