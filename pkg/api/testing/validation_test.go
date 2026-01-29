@@ -65,6 +65,18 @@ func TestVersionedValidationByFuzzing(t *testing.T) {
 		{Group: "admissionregistration.k8s.io", Version: "v1alpha1"},
 	}
 
+	// subresourceOnly specifies the subresource path for types that can only be validated
+	// as subresources (e.g. autoscaling/Scale) and do not support root-level validation.
+	// For GVKs not in this map, the test defaults to fuzzing the root resource ("").
+	// Other resources with subresources (e.g. Pod status, exec) share validation logic with
+	// the root resource, so fuzzing the root is sufficient to verify validation equivalence.
+	subresourceOnly := map[schema.GroupVersionKind]string{
+		{Group: "autoscaling", Version: "v1", Kind: "Scale"}:      "scale",
+		{Group: "autoscaling", Version: "v1beta1", Kind: "Scale"}: "scale",
+		{Group: "autoscaling", Version: "v1beta2", Kind: "Scale"}: "scale",
+		{Group: "autoscaling", Version: "v2", Kind: "Scale"}:      "scale",
+	}
+
 	fuzzIters := *roundtrip.FuzzIters / 10 // TODO: Find a better way to manage test running time
 	f := fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(rand.Int63()), legacyscheme.Codecs)
 
@@ -77,7 +89,11 @@ func TestVersionedValidationByFuzzing(t *testing.T) {
 					if err != nil {
 						t.Fatalf("could not create a %v: %s", kind, err)
 					}
-					f.Fill(obj)
+
+					subresource := ""
+					if specific, ok := subresourceOnly[gvk]; ok {
+						subresource = specific
+					}
 
 					var opts []ValidationTestConfig
 					// TODO(API group level configuration): Consider configuring normalization rules at the
@@ -85,9 +101,9 @@ func TestVersionedValidationByFuzzing(t *testing.T) {
 					// This would allow each API group to register its own normalization rules independently.
 					allRules := append([]field.NormalizationRule{}, resourcevalidation.ResourceNormalizationRules...)
 					allRules = append(allRules, nodevalidation.NodeNormalizationRules...)
-					opts = append(opts, WithNormalizationRules(allRules...))
-					if gv.Group == "autoscaling" {
-						opts = append(opts, WithIgnoreObjectConversionErrors())
+					opts = append(opts, WithNormalizationRules(allRules...), WithFuzzer(f))
+					if subresource != "" {
+						opts = append(opts, WithSubResources(subresource))
 					}
 
 					VerifyVersionedValidationEquivalence(t, obj, nil, opts...)
@@ -96,7 +112,7 @@ func TestVersionedValidationByFuzzing(t *testing.T) {
 					if err != nil {
 						t.Fatalf("could not create a %v: %s", kind, err)
 					}
-					f.Fill(old)
+
 					VerifyVersionedValidationEquivalence(t, obj, old, opts...)
 				}
 			})
