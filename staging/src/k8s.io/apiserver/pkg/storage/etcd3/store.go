@@ -26,6 +26,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"go.etcd.io/etcd/api/v3/mvccpb"
@@ -95,6 +96,22 @@ type store struct {
 
 	collectorMux          sync.RWMutex
 	resourceSizeEstimator *resourceSizeEstimator
+
+	prefetch    atomic.Pointer[prefetchFuture]
+	// Can refactor this into feature gate?
+	UsePrefetch bool
+}
+
+type prefetchFuture struct {
+	resp kubernetes.ListResponse
+	err  error
+	done chan struct{}
+
+	// Validation fields to ensure the prefetch matches the consumption parameters
+	key       string
+	revision  int64
+	limit     int64
+	recursive bool
 }
 
 var _ storage.Interface = (*store)(nil)
@@ -780,11 +797,33 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 
 	aggregator := s.listErrAggrFactory()
 	for {
-		getResp, err = s.getList(ctx, keyPrefix, opts.Recursive, kubernetes.ListOptions{
-			Revision: withRev,
-			Limit:    limit,
-			Continue: continueKey,
-		})
+		var prefetch *prefetchFuture
+		if cached := s.prefetch.Load(); cached != nil && cached.key == continueKey && continueKey != "" && s.UsePrefetch && storage.AllowPrefetch(ctx) {
+			if s.prefetch.CompareAndSwap(cached, nil) {
+				// Validate options match
+				// Technically list requests that don't go through cache can still
+				// go through this code path but with speculative prefetch disabled.
+				if cached.revision == withRev && cached.limit == limit && cached.recursive == opts.Recursive {
+					prefetch = cached
+				}
+			}
+		}
+
+		if prefetch != nil {
+			select {
+			case <-prefetch.done:
+				getResp = prefetch.resp
+				err = prefetch.err
+			case <-ctx.Done():
+				err = ctx.Err()
+			}
+		} else {
+			getResp, err = s.getList(ctx, keyPrefix, opts.Recursive, kubernetes.ListOptions{
+				Revision: withRev,
+				Limit:    limit,
+				Continue: continueKey,
+			})
+		}
 		if err != nil {
 			if errors.Is(err, etcdrpc.ErrFutureRev) {
 				currentRV, getRVErr := s.GetCurrentResourceVersion(ctx)
@@ -796,6 +835,43 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 			}
 			return interpretListError(err, len(opts.Predicate.Continue) > 0, continueKey, keyPrefix)
 		}
+
+		// Speculative Prefetch
+		if hasMore := int64(len(getResp.Kvs)) < getResp.Count; hasMore && len(getResp.Kvs) > 0 && s.UsePrefetch && storage.AllowPrefetch(ctx) {
+			lastKey := getResp.Kvs[len(getResp.Kvs)-1].Key
+			nextKey := string(lastKey) + "\x00"
+
+			// Only prefetch if not already present
+			if current := s.prefetch.Load(); current == nil || current.key != nextKey {
+				future := &prefetchFuture{
+					done:      make(chan struct{}),
+					key:       nextKey,
+					revision:  getResp.Revision,
+					limit:     limit,
+					recursive: opts.Recursive,
+				}
+				s.prefetch.Store(future)
+
+				// Arbitrary number, can change later
+				// Ideally we use a different context that isn't tied to this request though
+				bgCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+
+				go func(ctx context.Context, f *prefetchFuture, cKey string, rev int64, limit int64) {
+					defer cancel()
+					defer close(f.done)
+
+					r, e := s.getList(ctx, keyPrefix, opts.Recursive, kubernetes.ListOptions{
+						Revision: rev,
+						Limit:    limit,
+						Continue: cKey,
+					})
+					f.resp = r
+					f.err = e
+				}(bgCtx, future, nextKey, getResp.Revision, limit)
+			}
+
+		}
+
 		numFetched += len(getResp.Kvs)
 		if err = s.validateMinimumResourceVersion(opts.ResourceVersion, uint64(getResp.Revision)); err != nil {
 			return err
