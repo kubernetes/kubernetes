@@ -19,6 +19,7 @@ package options
 import (
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -506,11 +507,16 @@ func (o *AuditLogOptions) getWriter() (io.Writer, error) {
 		return nil, fmt.Errorf("ensureLogFile: %w", err)
 	}
 
+	maxSize := o.MaxSize
+	if maxSize == 0 {
+		maxSize = math.MaxInt32
+	}
+
 	return &lumberjack.Logger{
 		Filename:   o.Path,
 		MaxAge:     o.MaxAge,
 		MaxBackups: o.MaxBackups,
-		MaxSize:    o.MaxSize,
+		MaxSize:    maxSize,
 		Compress:   o.Compress,
 	}, nil
 }

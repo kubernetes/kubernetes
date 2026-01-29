@@ -19,6 +19,7 @@ package options
 import (
 	stdjson "encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"testing"
@@ -178,11 +179,41 @@ func TestAuditValidOptions(t *testing.T) {
 				assert.Equal(t, os.Stdout, w)
 				assert.NoFileExists(t, options.LogOptions.Path)
 			} else {
-				assert.IsType(t, (*lumberjack.Logger)(nil), w)
+				logger, ok := w.(*lumberjack.Logger)
+				assert.True(t, ok, "Writer should be of type *lumberjack.Logger")
 				assert.FileExists(t, options.LogOptions.Path)
+
+				// Special check for MaxSize behavior
+				if options.LogOptions.MaxSize == 0 {
+					// Expecting MaxInt32 when MaxSize is 0 to avoid lumberjack default (100MB)
+					assert.Equal(t, int(math.MaxInt32), logger.MaxSize)
+				} else {
+					assert.Equal(t, options.LogOptions.MaxSize, logger.MaxSize)
+				}
 			}
 		})
 	}
+}
+
+func TestAuditLogMaxSizeZero(t *testing.T) {
+	tmpDir := t.TempDir()
+	auditPath := filepath.Join(tmpDir, "audit")
+	policy := makeTmpPolicy(t)
+	defer os.Remove(policy)
+
+	o := NewAuditOptions()
+	o.LogOptions.Path = auditPath
+	o.PolicyFile = policy
+	o.LogOptions.MaxSize = 0
+
+	w, err := o.LogOptions.getWriter()
+	require.NoError(t, err)
+	require.NotNil(t, w)
+
+	logger, ok := w.(*lumberjack.Logger)
+	require.True(t, ok)
+
+	assert.Equal(t, int(math.MaxInt32), logger.MaxSize, "MaxSize should be effectively unlimited (MaxInt32)")
 }
 
 func TestAuditInvalidOptions(t *testing.T) {
