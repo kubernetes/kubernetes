@@ -48,6 +48,14 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 		}
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
+	// type ServiceAccount
+	scheme.AddValidationFunc((*corev1.ServiceAccount)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_ServiceAccount(ctx, op, nil /* fldPath */, obj.(*corev1.ServiceAccount), safe.Cast[*corev1.ServiceAccount](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
 	return nil
 }
 
@@ -132,5 +140,37 @@ func Validate_ReplicationControllerSpec(ctx context.Context, op operation.Operat
 
 	// field corev1.ReplicationControllerSpec.Selector has no validation
 	// field corev1.ReplicationControllerSpec.Template has no validation
+	return errs
+}
+
+// Validate_ServiceAccount validates an instance of ServiceAccount according
+// to declarative validation rules in the API schema.
+func Validate_ServiceAccount(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *corev1.ServiceAccount) (errs field.ErrorList) {
+	// field corev1.ServiceAccount.TypeMeta has no validation
+
+	// field corev1.ServiceAccount.ObjectMeta
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *metav1.ObjectMeta, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			func() { // cohort name
+				earlyReturn := false
+				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "name", func(o *metav1.ObjectMeta) *string { return &o.Name }, validate.DirectEqualPtr, validate.OptionalValue); len(e) != 0 {
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
+				errs = append(errs, validate.Subfield(ctx, op, fldPath, obj, oldObj, "name", func(o *metav1.ObjectMeta) *string { return &o.Name }, validate.DirectEqualPtr, validate.LongName)...)
+			}()
+			return
+		}(fldPath.Child("metadata"), &obj.ObjectMeta, safe.Field(oldObj, func(oldObj *corev1.ServiceAccount) *metav1.ObjectMeta { return &oldObj.ObjectMeta }), oldObj != nil)...)
+
+	// field corev1.ServiceAccount.Secrets has no validation
+	// field corev1.ServiceAccount.ImagePullSecrets has no validation
+	// field corev1.ServiceAccount.AutomountServiceAccountToken has no validation
 	return errs
 }
