@@ -34,6 +34,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -63,7 +64,6 @@ import (
 	kubeapiserverapptesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/kubeapiserver/options"
-	"k8s.io/kubernetes/pkg/util/slice"
 	"k8s.io/kubernetes/test/integration/framework"
 	utilsoidc "k8s.io/kubernetes/test/utils/oidc"
 	"k8s.io/kubernetes/test/utils/oidc/handlers"
@@ -1859,7 +1859,7 @@ jwt:
 	adminClient := kubernetes.NewForConfigOrDie(apiServer.ClientConfig)
 	gotMetricStrings := getMetrics(t, ctx, adminClient, "apiserver_authentication_jwt_authenticator_jwks_")
 
-	wantMetricStrings = slice.SortStrings(wantMetricStrings)
+	slices.Sort(wantMetricStrings)
 
 	if diff := cmp.Diff(wantMetricStrings, gotMetricStrings); diff != "" {
 		t.Errorf("unexpected metrics diff (-want +got): %s", diff)
@@ -1980,7 +1980,7 @@ jwt:
 	}
 	gotMetricStrings := getMetrics(t, ctx, adminClient, "apiserver_authentication_jwt_authenticator_jwks_")
 
-	wantMetricStrings = slice.SortStrings(wantMetricStrings)
+	slices.Sort(wantMetricStrings)
 	if diff := cmp.Diff(wantMetricStrings, gotMetricStrings); diff != "" {
 		t.Errorf("unexpected metrics before reload diff (-want +got): %s", diff)
 	}
@@ -2034,7 +2034,7 @@ jwt:
 		fmt.Sprintf(`apiserver_authentication_jwt_authenticator_jwks_fetch_last_key_set_info{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",hash="%s",jwt_issuer_hash="%s"} 1`, keySetHash1, jwtIssuerHash1),
 		fmt.Sprintf(`apiserver_authentication_jwt_authenticator_jwks_fetch_last_timestamp_seconds{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",jwt_issuer_hash="%s",result="success"} FP`, jwtIssuerHash1),
 	}
-	wantMetricStringsAfterReload = slice.SortStrings(wantMetricStringsAfterReload)
+	slices.Sort(wantMetricStringsAfterReload)
 
 	err = wait.PollUntilContextTimeout(ctx, time.Second, 120*time.Second, true, func(ctx context.Context) (done bool, err error) {
 		gotMetricStrings := getMetrics(t, ctx, adminClient, "apiserver_authentication_jwt_authenticator_jwks_")
@@ -2096,7 +2096,9 @@ func getMetrics(t *testing.T, ctx context.Context, adminClient *kubernetes.Clien
 		}
 	}
 
-	return slice.SortStrings(gotMetricStrings)
+	slices.Sort(gotMetricStrings)
+
+	return gotMetricStrings
 }
 
 func rsaGenerateKey(t *testing.T) (*rsa.PrivateKey, *rsa.PublicKey) {
