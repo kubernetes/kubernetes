@@ -26,9 +26,13 @@ import (
 // +structType=atomic
 type CrossVersionObjectReference struct {
 	// kind is the kind of the referent; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+	// +required
+	// +k8s:required
 	Kind string `json:"kind" protobuf:"bytes,1,opt,name=kind"`
 
 	// name is the name of the referent; More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+	// +required
+	// +k8s:required
 	Name string `json:"name" protobuf:"bytes,2,opt,name=name"`
 
 	// apiVersion is the API version of the referent
@@ -206,6 +210,7 @@ type MetricSpec struct {
 	// object refers to a metric describing a single kubernetes object
 	// (for example, hits-per-second on an Ingress object).
 	// +optional
+	// +k8s:optional
 	Object *ObjectMetricSource `json:"object,omitempty" protobuf:"bytes,2,opt,name=object"`
 
 	// pods refers to a metric describing each pod in the current scale target
