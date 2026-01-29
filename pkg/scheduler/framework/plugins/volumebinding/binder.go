@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"sort"
-	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -30,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/storage"
 	coreinformers "k8s.io/client-go/informers/core/v1"
@@ -41,7 +39,6 @@ import (
 	"k8s.io/component-helpers/storage/ephemeral"
 	"k8s.io/component-helpers/storage/volume"
 	csitrans "k8s.io/csi-translation-lib"
-	csiplugins "k8s.io/csi-translation-lib/plugins"
 	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
@@ -210,10 +207,9 @@ type volumeBinder struct {
 	kubeClient                  clientset.Interface
 	enableVolumeAttributesClass bool
 
-	classLister   storagelisters.StorageClassLister
-	podLister     corelisters.PodLister
-	nodeLister    corelisters.NodeLister
-	csiNodeLister storagelisters.CSINodeLister
+	classLister storagelisters.StorageClassLister
+	podLister   corelisters.PodLister
+	nodeLister  corelisters.NodeLister
 
 	pvcCache PVCAssumeCache
 	pvCache  PVAssumeCache
@@ -246,7 +242,6 @@ func NewVolumeBinder(
 	fts feature.Features,
 	podInformer coreinformers.PodInformer,
 	nodeInformer coreinformers.NodeInformer,
-	csiNodeInformer storageinformers.CSINodeInformer,
 	pvcInformer coreinformers.PersistentVolumeClaimInformer,
 	pvInformer coreinformers.PersistentVolumeInformer,
 	storageClassInformer storageinformers.StorageClassInformer,
@@ -264,7 +259,6 @@ func NewVolumeBinder(
 		podLister:                   podInformer.Lister(),
 		classLister:                 storageClassInformer.Lister(),
 		nodeLister:                  nodeInformer.Lister(),
-		csiNodeLister:               csiNodeInformer.Lister(),
 		pvcCache:                    pvcCache,
 		pvCache:                     pvCache,
 		bindTimeout:                 bindTimeout,
@@ -604,12 +598,6 @@ func (b *volumeBinder) checkBindings(logger klog.Logger, pod *v1.Pod, bindings [
 		return false, fmt.Errorf("failed to get node %q: %w", pod.Spec.NodeName, err)
 	}
 
-	csiNode, err := b.csiNodeLister.Get(node.Name)
-	if err != nil {
-		// TODO: return the error once CSINode is created by default
-		logger.V(4).Info("Could not get a CSINode object for the node", "node", klog.KObj(node), "err", err)
-	}
-
 	// Check for any conditions that might require scheduling retry
 
 	// When pod is deleted, binding operation should be cancelled. There is no
@@ -639,7 +627,7 @@ func (b *volumeBinder) checkBindings(logger klog.Logger, pod *v1.Pod, bindings [
 			return false, nil
 		}
 
-		pv, err = b.tryTranslatePVToCSI(logger, pv, csiNode)
+		pv, err = b.tryTranslatePVToCSI(logger, pv)
 		if err != nil {
 			return false, fmt.Errorf("failed to translate pv to csi: %w", err)
 		}
@@ -698,7 +686,7 @@ func (b *volumeBinder) checkBindings(logger klog.Logger, pod *v1.Pod, bindings [
 				return false, fmt.Errorf("failed to get pv %q from cache: %w", pvc.Spec.VolumeName, err)
 			}
 
-			pv, err = b.tryTranslatePVToCSI(logger, pv, csiNode)
+			pv, err = b.tryTranslatePVToCSI(logger, pv)
 			if err != nil {
 				return false, err
 			}
@@ -835,12 +823,6 @@ func (b *volumeBinder) GetPodVolumeClaims(logger klog.Logger, pod *v1.Pod) (podV
 }
 
 func (b *volumeBinder) checkBoundClaims(logger klog.Logger, claims []*v1.PersistentVolumeClaim, node *v1.Node, pod *v1.Pod) (bool, bool, error) {
-	csiNode, err := b.csiNodeLister.Get(node.Name)
-	if err != nil {
-		// TODO: return the error once CSINode is created by default
-		logger.V(5).Info("Could not get a CSINode object for the node", "node", klog.KObj(node), "err", err)
-	}
-
 	for _, pvc := range claims {
 		pvName := pvc.Spec.VolumeName
 		pv, err := b.pvCache.Get(pvName)
@@ -851,7 +833,7 @@ func (b *volumeBinder) checkBoundClaims(logger klog.Logger, claims []*v1.Persist
 			return true, false, err
 		}
 
-		pv, err = b.tryTranslatePVToCSI(logger, pv, csiNode)
+		pv, err = b.tryTranslatePVToCSI(logger, pv)
 		if err != nil {
 			return false, true, err
 		}
@@ -1063,62 +1045,9 @@ func (a byPVCSize) Less(i, j int) bool {
 	return iSize.Cmp(jSize) == -1
 }
 
-// isCSIMigrationOnForPlugin checks if CSI migration is enabled for a given plugin.
-func isCSIMigrationOnForPlugin(pluginName string) bool {
-	switch pluginName {
-	case csiplugins.AWSEBSInTreePluginName:
-		return true
-	case csiplugins.GCEPDInTreePluginName:
-		return true
-	case csiplugins.AzureDiskInTreePluginName:
-		return true
-	case csiplugins.CinderInTreePluginName:
-		return true
-	case csiplugins.PortworxVolumePluginName:
-		return true
-	}
-	return false
-}
-
-// isPluginMigratedToCSIOnNode checks if an in-tree plugin has been migrated to a CSI driver on the node.
-func isPluginMigratedToCSIOnNode(pluginName string, csiNode *storagev1.CSINode) bool {
-	if csiNode == nil {
-		return false
-	}
-
-	csiNodeAnn := csiNode.GetAnnotations()
-	if csiNodeAnn == nil {
-		return false
-	}
-
-	var mpaSet sets.Set[string]
-	mpa := csiNodeAnn[v1.MigratedPluginsAnnotationKey]
-	if len(mpa) == 0 {
-		mpaSet = sets.New[string]()
-	} else {
-		tok := strings.Split(mpa, ",")
-		mpaSet = sets.New(tok...)
-	}
-
-	return mpaSet.Has(pluginName)
-}
-
 // tryTranslatePVToCSI will translate the in-tree PV to CSI if it meets the criteria. If not, it returns the unmodified in-tree PV.
-func (b *volumeBinder) tryTranslatePVToCSI(logger klog.Logger, pv *v1.PersistentVolume, csiNode *storagev1.CSINode) (*v1.PersistentVolume, error) {
+func (b *volumeBinder) tryTranslatePVToCSI(logger klog.Logger, pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
 	if !b.translator.IsPVMigratable(pv) {
-		return pv, nil
-	}
-
-	pluginName, err := b.translator.GetInTreePluginNameFromSpec(pv, nil)
-	if err != nil {
-		return nil, fmt.Errorf("could not get plugin name from pv: %v", err)
-	}
-
-	if !isCSIMigrationOnForPlugin(pluginName) {
-		return pv, nil
-	}
-
-	if !isPluginMigratedToCSIOnNode(pluginName, csiNode) {
 		return pv, nil
 	}
 
