@@ -557,6 +557,10 @@ func (p *csiPlugin) NewUnmounter(specName string, podUID types.UID) (volume.Unmo
 	dataDir := filepath.Dir(dir) // dropoff /mount at end
 	data, err := loadVolumeData(dataDir, volDataFileName)
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			klog.Info(log("unmounter skipped because volume data file [%s] does not exist", dataDir))
+			return unmounter, nil
+		}
 		return nil, errors.New(log("unmounter failed to load volume data file [%s]: %v", dir, err))
 	}
 	unmounter.driverName = csiDriverName(data[volDataKey.driverName])

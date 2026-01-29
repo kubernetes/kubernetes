@@ -432,6 +432,10 @@ func (c *csiMountMgr) TearDown() error {
 func (c *csiMountMgr) TearDownAt(dir string) error {
 	klog.V(4).Info(log("Unmounter.TearDownAt(%s)", dir))
 
+	if c.driverName == "" && c.volumeID == "" {
+		klog.Info(log("Unmounter.TearDownAt skipped because driverName and volumeID could not be retrieved from volume data file"))
+		return nil
+	}
 	volID := c.volumeID
 	csi, err := c.csiClientGetter.Get()
 	if err != nil {
