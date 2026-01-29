@@ -48,8 +48,9 @@ import (
 )
 
 type mockState struct {
-	assignments   state.ContainerCPUAssignments
-	defaultCPUSet cpuset.CPUSet
+	assignments    state.ContainerCPUAssignments
+	podAssignments state.PodCPUAssignments
+	defaultCPUSet  cpuset.CPUSet
 }
 
 func (s *mockState) GetCPUSet(podUID string, containerName string) (cpuset.CPUSet, bool) {
@@ -68,11 +69,26 @@ func (s *mockState) GetCPUSetOrDefault(podUID string, containerName string) cpus
 	return s.GetDefaultCPUSet()
 }
 
+func (s *mockState) GetPodCPUSet(podUID string) (cpuset.CPUSet, bool) {
+	res, ok := s.podAssignments[podUID]
+	return res.CPUSet.Clone(), ok
+}
+
 func (s *mockState) SetCPUSet(podUID string, containerName string, cset cpuset.CPUSet) {
 	if _, exists := s.assignments[podUID]; !exists {
 		s.assignments[podUID] = make(map[string]cpuset.CPUSet)
 	}
 	s.assignments[podUID][containerName] = cset
+}
+
+func (s *mockState) SetPodCPUSet(podUID string, cset cpuset.CPUSet) {
+	if s.podAssignments == nil {
+		s.podAssignments = make(state.PodCPUAssignments)
+	}
+
+	podAssigments := s.podAssignments[podUID]
+	podAssigments.CPUSet = cset
+	s.podAssignments[podUID] = podAssigments
 }
 
 func (s *mockState) SetDefaultCPUSet(cset cpuset.CPUSet) {
@@ -89,14 +105,27 @@ func (s *mockState) Delete(podUID string, containerName string) {
 func (s *mockState) ClearState() {
 	s.defaultCPUSet = cpuset.CPUSet{}
 	s.assignments = make(state.ContainerCPUAssignments)
+	s.podAssignments = make(state.PodCPUAssignments)
+}
+
+func (s *mockState) DeletePod(podUID string) {
+	delete(s.podAssignments, podUID)
 }
 
 func (s *mockState) SetCPUAssignments(a state.ContainerCPUAssignments) {
 	s.assignments = a.Clone()
 }
 
+func (s *mockState) SetPodCPUAssignments(a state.PodCPUAssignments) {
+	s.podAssignments = a.Clone()
+}
+
 func (s *mockState) GetCPUAssignments() state.ContainerCPUAssignments {
 	return s.assignments.Clone()
+}
+
+func (s *mockState) GetPodCPUAssignments() state.PodCPUAssignments {
+	return s.podAssignments.Clone()
 }
 
 type mockPolicy struct {
@@ -125,6 +154,10 @@ func (p *mockPolicy) GetTopologyHints(_ logr.Logger, s state.State, pod *v1.Pod,
 
 func (p *mockPolicy) GetPodTopologyHints(_ logr.Logger, s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
 	return nil
+}
+
+func (p *mockPolicy) AllocatePod(_ logr.Logger, s state.State, pod *v1.Pod) error {
+	return p.err
 }
 
 func (p *mockPolicy) GetAllocatableCPUs(m state.State) cpuset.CPUSet {
@@ -249,37 +282,62 @@ func makeMultiContainerPodWithOptions(initCPUs, appCPUs []*containerOptions) *v1
 		},
 	}
 
-	for i, cpu := range initCPUs {
-		pod.Spec.InitContainers = append(pod.Spec.InitContainers, v1.Container{
+	for i, opts := range initCPUs {
+		container := v1.Container{
 			Name: "initContainer-" + strconv.Itoa(i),
-			Resources: v1.ResourceRequirements{
+		}
+		if opts.request != "" {
+			container.Resources = v1.ResourceRequirements{
 				Requests: v1.ResourceList{
-					v1.ResourceName(v1.ResourceCPU):    resource.MustParse(cpu.request),
-					v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
+					v1.ResourceCPU:    resource.MustParse(opts.request),
+					v1.ResourceMemory: resource.MustParse("1G"),
 				},
 				Limits: v1.ResourceList{
-					v1.ResourceName(v1.ResourceCPU):    resource.MustParse(cpu.limit),
-					v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
+					v1.ResourceCPU:    resource.MustParse(opts.limit),
+					v1.ResourceMemory: resource.MustParse("1G"),
 				},
-			},
-			RestartPolicy: &cpu.restartPolicy,
-		})
+			}
+		}
+		if opts.restartPolicy != "" {
+			container.RestartPolicy = &opts.restartPolicy
+		}
+		pod.Spec.InitContainers = append(pod.Spec.InitContainers, container)
 	}
 
-	for i, cpu := range appCPUs {
-		pod.Spec.Containers = append(pod.Spec.Containers, v1.Container{
+	for i, opts := range appCPUs {
+		container := v1.Container{
 			Name: "appContainer-" + strconv.Itoa(i),
-			Resources: v1.ResourceRequirements{
+		}
+		if opts.request != "" {
+			container.Resources = v1.ResourceRequirements{
 				Requests: v1.ResourceList{
-					v1.ResourceName(v1.ResourceCPU):    resource.MustParse(cpu.request),
-					v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
+					v1.ResourceCPU:    resource.MustParse(opts.request),
+					v1.ResourceMemory: resource.MustParse("1G"),
 				},
 				Limits: v1.ResourceList{
-					v1.ResourceName(v1.ResourceCPU):    resource.MustParse(cpu.limit),
-					v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
+					v1.ResourceCPU:    resource.MustParse(opts.limit),
+					v1.ResourceMemory: resource.MustParse("1G"),
 				},
-			},
-		})
+			}
+		}
+		pod.Spec.Containers = append(pod.Spec.Containers, container)
+	}
+
+	return pod
+}
+
+func makeMultiContainerPodWithOptionsAndPodLevelResources(podLevelCPUs string, initCPUs, appCPUs []*containerOptions) *v1.Pod {
+	pod := makeMultiContainerPodWithOptions(initCPUs, appCPUs)
+
+	pod.Spec.Resources = &v1.ResourceRequirements{
+		Requests: v1.ResourceList{
+			v1.ResourceName(v1.ResourceCPU):    resource.MustParse(podLevelCPUs),
+			v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
+		},
+		Limits: v1.ResourceList{
+			v1.ResourceName(v1.ResourceCPU):    resource.MustParse(podLevelCPUs),
+			v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
+		},
 	}
 
 	return pod

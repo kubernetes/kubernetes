@@ -28,24 +28,24 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/kubelet/cm"
-	"k8s.io/kubernetes/pkg/kubelet/types"
-
 	libcontainercgroups "github.com/opencontainers/cgroups"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/utils/cpuset"
 	"k8s.io/utils/ptr"
 )
 
@@ -177,6 +177,8 @@ func TestGenerateLinuxContainerConfigResources(t *testing.T) {
 		name               string
 		containerResources v1.ResourceRequirements
 		podResources       *v1.ResourceRequirements
+		cpuSets            map[string]cpuset.CPUSet
+		enableFeatures     map[featuregate.Feature]bool
 		expected           *runtimeapi.LinuxContainerResources
 	}{
 		{
@@ -227,6 +229,9 @@ func TestGenerateLinuxContainerConfigResources(t *testing.T) {
 					v1.ResourceCPU:    resource.MustParse("3"),
 				},
 			},
+			enableFeatures: map[featuregate.Feature]bool{
+				features.PodLevelResources: true,
+			},
 			expected: &runtimeapi.LinuxContainerResources{
 				CpuPeriod:          100000,
 				CpuQuota:           300000,
@@ -234,40 +239,149 @@ func TestGenerateLinuxContainerConfigResources(t *testing.T) {
 				MemoryLimitInBytes: 256 * 1024 * 1024,
 			},
 		},
+		// The implementation of ContainerManager (containerManagerImpl) and its internal
+		// cpuManager field are not accessible from outside the cm package. Not possible
+		// to create a real containerManagerImpl and inject our mock CPU sets into it,
+		// so we are not able to test the disabled quota (-1). Only quota enabled tests were added.
+		{
+			name: "No exclusive CPUs, DisableCPUQuotaWithExclusiveCPUs feature gate enabled",
+			containerResources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+				Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+			},
+			cpuSets: map[string]cpuset.CPUSet{},
+			enableFeatures: map[featuregate.Feature]bool{
+				features.DisableCPUQuotaWithExclusiveCPUs: true,
+			},
+			expected: &runtimeapi.LinuxContainerResources{
+				CpuPeriod: 100000,
+				CpuQuota:  100000,
+				CpuShares: 1024,
+			},
+		},
+		{
+			name: "Exclusive CPUs, DisableCPUQuotaWithExclusiveCPUs feature gate disabled",
+			containerResources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+				Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+			},
+			cpuSets: map[string]cpuset.CPUSet{"12345678/foo": cpuset.New(1)},
+			enableFeatures: map[featuregate.Feature]bool{
+				features.DisableCPUQuotaWithExclusiveCPUs: false,
+			},
+			expected: &runtimeapi.LinuxContainerResources{
+				CpuPeriod: 100000,
+				CpuQuota:  100000,
+				CpuShares: 1024,
+			},
+		},
+		{
+			name: "PodLevelResourceManagers enabled, Exclusive CPUs, Guaranteed container, non integer CPUs",
+			podResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+				Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+			},
+			containerResources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m")},
+				Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m")},
+			},
+			cpuSets: map[string]cpuset.CPUSet{},
+			enableFeatures: map[featuregate.Feature]bool{
+				features.PodLevelResources:                true,
+				features.PodLevelResourceManagers:         true,
+				features.DisableCPUQuotaWithExclusiveCPUs: true,
+			},
+			expected: &runtimeapi.LinuxContainerResources{
+				CpuPeriod: 100000,
+				CpuQuota:  50000,
+				CpuShares: 512,
+			},
+		},
+		{
+			name: "PodLevelResourceManagers enabled, Exclusive CPUs, non-Guaranteed container",
+			podResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+				Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+			},
+			containerResources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+				Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+			},
+			cpuSets: map[string]cpuset.CPUSet{},
+			enableFeatures: map[featuregate.Feature]bool{
+				features.PodLevelResources:                true,
+				features.PodLevelResourceManagers:         true,
+				features.DisableCPUQuotaWithExclusiveCPUs: true,
+			},
+			expected: &runtimeapi.LinuxContainerResources{
+				CpuPeriod: 100000,
+				CpuQuota:  200000,
+				CpuShares: 1024,
+			},
+		},
+		{
+			name: "PodLevelResourceManagers disabled, Exclusive CPUs, Guaranteed container",
+			podResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+				Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+			},
+			containerResources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("100Mi")},
+				Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("100Mi")},
+			},
+			cpuSets: map[string]cpuset.CPUSet{},
+			enableFeatures: map[featuregate.Feature]bool{
+				features.PodLevelResources:                true,
+				features.PodLevelResourceManagers:         false,
+				features.DisableCPUQuotaWithExclusiveCPUs: true,
+			},
+			expected: &runtimeapi.LinuxContainerResources{
+				CpuPeriod:          100000,
+				CpuQuota:           100000,
+				CpuShares:          1024,
+				MemoryLimitInBytes: 100 * 1024 * 1024,
+			},
+		},
 	}
 
 	for _, test := range tests {
-		pod := &v1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				UID:       "12345678",
-				Name:      "bar",
-				Namespace: "new",
-			},
-			Spec: v1.PodSpec{
-				Containers: []v1.Container{
-					{
-						Name:            "foo",
-						Image:           "busybox",
-						ImagePullPolicy: v1.PullIfNotPresent,
-						Command:         []string{"testCommand"},
-						WorkingDir:      "testWorkingDir",
-						Resources:       test.containerResources,
+		t.Run(test.name, func(t *testing.T) {
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:       "12345678",
+					Name:      "bar",
+					Namespace: "new",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:            "foo",
+							Image:           "busybox",
+							ImagePullPolicy: v1.PullIfNotPresent,
+							Command:         []string{"testCommand"},
+							WorkingDir:      "testWorkingDir",
+							Resources:       test.containerResources,
+						},
 					},
 				},
-			},
-		}
+			}
 
-		if test.podResources != nil {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
-			pod.Spec.Resources = test.podResources
-		}
+			for feature, enabled := range test.enableFeatures {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, enabled)
 
-		linuxConfig, err := m.generateLinuxContainerConfig(tCtx, &pod.Spec.Containers[0], pod, new(int64), "", nil, false)
-		assert.NoError(t, err)
-		assert.Equal(t, test.expected.CpuPeriod, linuxConfig.GetResources().CpuPeriod, test.name)
-		assert.Equal(t, test.expected.CpuQuota, linuxConfig.GetResources().CpuQuota, test.name)
-		assert.Equal(t, test.expected.CpuShares, linuxConfig.GetResources().CpuShares, test.name)
-		assert.Equal(t, test.expected.MemoryLimitInBytes, linuxConfig.GetResources().MemoryLimitInBytes, test.name)
+				if feature == features.PodLevelResources && test.podResources != nil {
+					pod.Spec.Resources = test.podResources
+				}
+			}
+
+			linuxConfig, err := m.generateLinuxContainerConfig(tCtx, &pod.Spec.Containers[0], pod, new(int64), "", nil, false)
+			require.NoError(t, err)
+
+			assert.Equal(t, test.expected.CpuPeriod, linuxConfig.GetResources().CpuPeriod, test.name)
+			assert.Equal(t, test.expected.CpuQuota, linuxConfig.GetResources().CpuQuota, test.name)
+			assert.Equal(t, test.expected.CpuShares, linuxConfig.GetResources().CpuShares, test.name)
+			assert.Equal(t, test.expected.MemoryLimitInBytes, linuxConfig.GetResources().MemoryLimitInBytes, test.name)
+		})
 	}
 }
 
