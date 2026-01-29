@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"reflect"
 	goruntime "runtime"
+	"runtime/debug"
 	"slices"
 	"strconv"
 	"sync"
@@ -2060,14 +2061,18 @@ func TestReflectorReplacesStoreOnUnsafeDelete(t *testing.T) {
 
 func TestReflectorRespectStoreTransformer(t *testing.T) {
 	for name, test := range map[string]struct {
-		storeBuilder func(counter *atomic.Int32) ReflectorStore
+		storeBuilder func(t *testing.T, counter *atomic.Int32) ReflectorStore
 		items        func(rs ReflectorStore) []interface{}
 	}{
 		"real-fifo": {
-			storeBuilder: func(counter *atomic.Int32) ReflectorStore {
+			storeBuilder: func(t *testing.T, counter *atomic.Int32) ReflectorStore {
 				return NewRealFIFO(MetaNamespaceKeyFunc, NewStore(MetaNamespaceKeyFunc), func(i interface{}) (interface{}, error) {
 					counter.Add(1)
 					cast := i.(*v1.Pod)
+					if cast.Spec.Hostname == "transformed" {
+						t.Error("already transformed")
+						t.Log(string(debug.Stack()))
+					}
 					cast.Spec.Hostname = "transformed"
 					return cast, nil
 				})
@@ -2087,12 +2092,16 @@ func TestReflectorRespectStoreTransformer(t *testing.T) {
 			},
 		},
 		"delta-fifo": {
-			storeBuilder: func(counter *atomic.Int32) ReflectorStore {
+			storeBuilder: func(t *testing.T, counter *atomic.Int32) ReflectorStore {
 				return NewDeltaFIFOWithOptions(DeltaFIFOOptions{
 					KeyFunction: MetaNamespaceKeyFunc,
 					Transformer: func(i interface{}) (interface{}, error) {
 						counter.Add(1)
 						cast := i.(*v1.Pod)
+						if cast.Spec.Hostname == "transformed" {
+							t.Error("already transformed")
+							t.Log(string(debug.Stack()))
+						}
 						cast.Spec.Hostname = "transformed"
 						return cast, nil
 					},
@@ -2133,7 +2142,7 @@ func TestReflectorRespectStoreTransformer(t *testing.T) {
 			}
 
 			var transformerInvoked atomic.Int32
-			s := test.storeBuilder(&transformerInvoked)
+			s := test.storeBuilder(t, &transformerInvoked)
 
 			var once sync.Once
 			lw := &ListWatch{
@@ -2189,9 +2198,9 @@ func TestReflectorRespectStoreTransformer(t *testing.T) {
 				}
 			}
 
-			// Transformer should have been invoked twice for the initial sync in the informer on the temporary store,
+			// Transformer should have been invoked zero times for the initial sync in the informer on the temporary store,
 			// then twice on replace, then once on the following update.
-			if want, got := 5, int(transformerInvoked.Load()); want != got {
+			if want, got := 3, int(transformerInvoked.Load()); want != got {
 				t.Errorf("expected transformer to be invoked %d times, but got: %d", want, got)
 			}
 
