@@ -320,27 +320,33 @@ func ParseQuantity(str string) (Quantity, error) {
 		if scale >= int32(Nano) {
 			shifted := num + denom
 
+			// Special case for math.MinInt64: its absolute value (9223372036854775808) exceeds
+			// math.MaxInt64 (9223372036854775807), causing strconv.ParseInt to overflow.
+			// Handle it explicitly when there's no denominator and mantissa is 1.
+			if !positive && shifted == "9223372036854775808" && mantissa == 1 && len(denom) == 0 {
+				return Quantity{i: int64Amount{value: mostNegative, scale: Scale(scale)}, Format: format}, nil
+			}
+
 			var value int64
 			value, err := strconv.ParseInt(shifted, 10, 64)
-			if err != nil {
-				return Quantity{}, ErrNumeric
-			}
-			if result, ok := int64Multiply(value, int64(mantissa)); ok {
-				if !positive {
-					result = -result
-				}
-				// if the number is in canonical form, reuse the string
-				switch format {
-				case BinarySI:
-					if exponent%10 == 0 && (value&0x07 != 0) {
-						return Quantity{i: int64Amount{value: result, scale: Scale(scale)}, Format: format, s: str}, nil
+			if err == nil {
+				if result, ok := int64Multiply(value, int64(mantissa)); ok {
+					if !positive {
+						result = -result
 					}
-				default:
-					if scale%3 == 0 && !strings.HasSuffix(shifted, "000") && shifted[0] != '0' {
-						return Quantity{i: int64Amount{value: result, scale: Scale(scale)}, Format: format, s: str}, nil
+					// if the number is in canonical form, reuse the string
+					switch format {
+					case BinarySI:
+						if exponent%10 == 0 && (value&0x07 != 0) {
+							return Quantity{i: int64Amount{value: result, scale: Scale(scale)}, Format: format, s: str}, nil
+						}
+					default:
+						if scale%3 == 0 && !strings.HasSuffix(shifted, "000") && shifted[0] != '0' {
+							return Quantity{i: int64Amount{value: result, scale: Scale(scale)}, Format: format, s: str}, nil
+						}
 					}
+					return Quantity{i: int64Amount{value: result, scale: Scale(scale)}, Format: format}, nil
 				}
-				return Quantity{i: int64Amount{value: result, scale: Scale(scale)}, Format: format}, nil
 			}
 		}
 	}
