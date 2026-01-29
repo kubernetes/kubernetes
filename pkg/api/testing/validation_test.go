@@ -77,7 +77,6 @@ func TestVersionedValidationByFuzzing(t *testing.T) {
 					if err != nil {
 						t.Fatalf("could not create a %v: %s", kind, err)
 					}
-					f.Fill(obj)
 
 					var opts []ValidationTestConfig
 					// TODO(API group level configuration): Consider configuring normalization rules at the
@@ -85,9 +84,11 @@ func TestVersionedValidationByFuzzing(t *testing.T) {
 					// This would allow each API group to register its own normalization rules independently.
 					allRules := append([]field.NormalizationRule{}, resourcevalidation.ResourceNormalizationRules...)
 					allRules = append(allRules, nodevalidation.NodeNormalizationRules...)
-					opts = append(opts, WithNormalizationRules(allRules...))
-					if gv.Group == "autoscaling" {
-						opts = append(opts, WithIgnoreObjectConversionErrors())
+					opts = append(opts, WithNormalizationRules(allRules...), WithFuzzer(f))
+
+					// Scale subresource needs to be specified explicitly.
+					if gv.Group == "autoscaling" && kind == "Scale" {
+						opts = append(opts, WithSubResources("scale"))
 					}
 
 					VerifyVersionedValidationEquivalence(t, obj, nil, opts...)
@@ -96,7 +97,7 @@ func TestVersionedValidationByFuzzing(t *testing.T) {
 					if err != nil {
 						t.Fatalf("could not create a %v: %s", kind, err)
 					}
-					f.Fill(old)
+
 					VerifyVersionedValidationEquivalence(t, obj, old, opts...)
 				}
 			})
