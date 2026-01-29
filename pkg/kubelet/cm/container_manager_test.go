@@ -20,6 +20,7 @@ package cm
 
 import (
 	"testing"
+	
 	"github.com/stretchr/testify/require"
 )
 
@@ -74,7 +75,7 @@ func TestParsePercentage(t *testing.T) {
 			expectErr: true,
 		},
 	}
-  
+	
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			result, err := parsePercentage(testCase.input)
