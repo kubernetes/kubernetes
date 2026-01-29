@@ -25,6 +25,7 @@ import (
 	apiresourcev1alpha3 "k8s.io/api/resource/v1alpha3"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
@@ -44,52 +45,83 @@ type deviceTaintRuleInformer struct {
 	tweakListOptions internalinterfaces.TweakListOptionsFunc
 }
 
+// DeviceTaintRuleInformerOptions holds the options for creating a DeviceTaintRule informer.
+type DeviceTaintRuleInformerOptions struct {
+	// ResyncPeriod is the resync period for this informer.
+	// If not set, defaults to 0 (no resync).
+	ResyncPeriod time.Duration
+
+	// Indexers are the indexers for this informer.
+	Indexers cache.Indexers
+
+	// InformerName is used to uniquely identify this informer for metrics.
+	// If not set, metrics will not be published for this informer.
+	// Use cache.NewInformerName() to create an InformerName at startup.
+	InformerName *cache.InformerName
+
+	// TweakListOptions is an optional function to modify the list options.
+	TweakListOptions internalinterfaces.TweakListOptionsFunc
+}
+
 // NewDeviceTaintRuleInformer constructs a new informer for DeviceTaintRule type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewDeviceTaintRuleInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredDeviceTaintRuleInformer(client, resyncPeriod, indexers, nil)
+	return NewDeviceTaintRuleInformerWithOptions(client, DeviceTaintRuleInformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
 }
 
 // NewFilteredDeviceTaintRuleInformer constructs a new informer for DeviceTaintRule type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredDeviceTaintRuleInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformer(
+	return NewDeviceTaintRuleInformerWithOptions(client, DeviceTaintRuleInformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewDeviceTaintRuleInformerWithOptions constructs a new informer for DeviceTaintRule type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewDeviceTaintRuleInformerWithOptions(client kubernetes.Interface, options DeviceTaintRuleInformerOptions) cache.SharedIndexInformer {
+	gvr := schema.GroupVersionResource{Group: "resource.k8s.io", Version: "v1alpha3", Resource: "devicetaintrules"}
+	identifier := options.InformerName.WithResource(gvr)
+	tweakListOptions := options.TweakListOptions
+	return cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+			ListFunc: func(opts v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.ResourceV1alpha3().DeviceTaintRules().List(context.Background(), options)
+				return client.ResourceV1alpha3().DeviceTaintRules().List(context.Background(), opts)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(opts v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.ResourceV1alpha3().DeviceTaintRules().Watch(context.Background(), options)
+				return client.ResourceV1alpha3().DeviceTaintRules().Watch(context.Background(), opts)
 			},
-			ListWithContextFunc: func(ctx context.Context, options v1.ListOptions) (runtime.Object, error) {
+			ListWithContextFunc: func(ctx context.Context, opts v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.ResourceV1alpha3().DeviceTaintRules().List(ctx, options)
+				return client.ResourceV1alpha3().DeviceTaintRules().List(ctx, opts)
 			},
-			WatchFuncWithContext: func(ctx context.Context, options v1.ListOptions) (watch.Interface, error) {
+			WatchFuncWithContext: func(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.ResourceV1alpha3().DeviceTaintRules().Watch(ctx, options)
+				return client.ResourceV1alpha3().DeviceTaintRules().Watch(ctx, opts)
 			},
 		}, client),
 		&apiresourcev1alpha3.DeviceTaintRule{},
-		resyncPeriod,
-		indexers,
+		cache.SharedIndexInformerOptions{
+			ResyncPeriod: options.ResyncPeriod,
+			Indexers:     options.Indexers,
+			Identifier:   identifier,
+		},
 	)
 }
 
 func (f *deviceTaintRuleInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredDeviceTaintRuleInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	return NewDeviceTaintRuleInformerWithOptions(client, DeviceTaintRuleInformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *deviceTaintRuleInformer) Informer() cache.SharedIndexInformer {

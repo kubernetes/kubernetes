@@ -63,6 +63,7 @@ func (g *factoryInterfaceGenerator) GenerateType(c *generator.Context, t *types.
 	klog.V(5).Infof("processing type %v", t)
 
 	m := map[string]interface{}{
+		"cacheInformerName":        c.Universe.Type(cacheInformerName),
 		"cacheSharedIndexInformer": c.Universe.Type(cacheSharedIndexInformer),
 		"clientSetPackage":         c.Universe.Type(types.Name{Package: g.clientSetPackage, Name: "Interface"}),
 		"runtimeObject":            c.Universe.Type(runtimeObject),
@@ -83,6 +84,7 @@ type NewInformerFunc func({{.clientSetPackage|raw}}, {{.timeDuration|raw}}) cach
 type SharedInformerFactory interface {
 	Start(stopCh <-chan struct{})
 	InformerFor(obj {{.runtimeObject|raw}}, newFunc NewInformerFunc) {{.cacheSharedIndexInformer|raw}}
+	InformerName() *{{.cacheInformerName|raw}}
 }
 
 // TweakListOptionsFunc is a function that transforms a {{.v1ListOptions|raw}}.

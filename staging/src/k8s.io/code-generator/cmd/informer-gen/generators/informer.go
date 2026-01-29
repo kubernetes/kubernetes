@@ -84,12 +84,16 @@ func (g *informerGenerator) GenerateType(c *generator.Context, t *types.Type, w 
 		"cacheMetaNamespaceIndexFunc":              c.Universe.Function(cacheMetaNamespaceIndexFunc),
 		"cacheNamespaceIndex":                      c.Universe.Variable(cacheNamespaceIndex),
 		"cacheNewSharedIndexInformer":              c.Universe.Function(cacheNewSharedIndexInformer),
+		"cacheNewSharedIndexInformerWithOptions":   c.Universe.Function(cacheNewSharedIndexInformerWithOptions),
 		"cacheSharedIndexInformer":                 c.Universe.Type(cacheSharedIndexInformer),
+		"cacheSharedIndexInformerOptions":          c.Universe.Type(cacheSharedIndexInformerOptions),
 		"cacheToListWatcherWithWatchListSemantics": c.Universe.Function(cacheToListWatcherWithWatchListSemanticsFunc),
+		"cacheInformerName":                        c.Universe.Type(cacheInformerName),
 		"clientSetInterface":                       clientSetInterface,
 		"contextContext":                           c.Universe.Type(contextContext),
 		"contextBackground":                        c.Universe.Function(contextBackgroundFunc),
 		"group":                                    namer.IC(g.groupGoName),
+		"groupName":                                g.groupVersion.Group.String(),
 		"informerFor":                              informerFor,
 		"interfacesTweakListOptionsFunc":           c.Universe.Type(types.Name{Package: g.internalInterfacesPackage, Name: "TweakListOptionsFunc"}),
 		"interfacesSharedInformerFactory":          c.Universe.Type(types.Name{Package: g.internalInterfacesPackage, Name: "SharedInformerFactory"}),
@@ -98,18 +102,23 @@ func (g *informerGenerator) GenerateType(c *generator.Context, t *types.Type, w 
 		"namespaceAll":                             c.Universe.Type(metav1NamespaceAll),
 		"namespaced":                               !tags.NonNamespaced,
 		"newLister":                                c.Universe.Function(types.Name{Package: listerPackage, Name: "New" + t.Name.Name + "Lister"}),
+		"resourceName":                             strings.ToLower(t.Name.Name) + "s",
 		"runtimeObject":                            c.Universe.Type(runtimeObject),
+		"schemaGroupVersionResource":               c.Universe.Type(schemaGroupVersionResource),
 		"timeDuration":                             c.Universe.Type(timeDuration),
 		"type":                                     t,
 		"v1ListOptions":                            c.Universe.Type(v1ListOptions),
 		"version":                                  namer.IC(g.groupVersion.Version.String()),
+		"versionName":                              g.groupVersion.Version.String(),
 		"watchInterface":                           c.Universe.Type(watchInterface),
 	}
 
 	sw.Do(typeInformerInterface, m)
 	sw.Do(typeInformerStruct, m)
+	sw.Do(typeInformerOptions, m)
 	sw.Do(typeInformerPublicConstructor, m)
 	sw.Do(typeFilteredInformerPublicConstructor, m)
+	sw.Do(typeInformerPublicConstructorWithOptions, m)
 	sw.Do(typeInformerConstructor, m)
 	sw.Do(typeInformerInformer, m)
 	sw.Do(typeInformerLister, m)
@@ -134,12 +143,32 @@ type $.type|private$Informer struct {
 }
 `
 
+var typeInformerOptions = `
+// $.type|public$InformerOptions holds the options for creating a $.type|public$ informer.
+type $.type|public$InformerOptions struct {
+	// ResyncPeriod is the resync period for this informer.
+	// If not set, defaults to 0 (no resync).
+	ResyncPeriod $.timeDuration|raw$
+
+	// Indexers are the indexers for this informer.
+	Indexers $.cacheIndexers|raw$
+
+	// InformerName is used to uniquely identify this informer for metrics.
+	// If not set, metrics will not be published for this informer.
+	// Use cache.NewInformerName() to create an InformerName at startup.
+	InformerName *$.cacheInformerName|raw$
+
+	// TweakListOptions is an optional function to modify the list options.
+	TweakListOptions $.interfacesTweakListOptionsFunc|raw$
+}
+`
+
 var typeInformerPublicConstructor = `
 // New$.type|public$Informer constructs a new informer for $.type|public$ type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func New$.type|public$Informer(client $.clientSetInterface|raw$$if .namespaced$, namespace string$end$, resyncPeriod $.timeDuration|raw$, indexers $.cacheIndexers|raw$) $.cacheSharedIndexInformer|raw$ {
-	return NewFiltered$.type|public$Informer(client$if .namespaced$, namespace$end$, resyncPeriod, indexers, nil)
+	return New$.type|public$InformerWithOptions(client$if .namespaced$, namespace$end$, $.type|public$InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
 }
 `
 
@@ -148,43 +177,58 @@ var typeFilteredInformerPublicConstructor = `
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewFiltered$.type|public$Informer(client $.clientSetInterface|raw$$if .namespaced$, namespace string$end$, resyncPeriod $.timeDuration|raw$, indexers $.cacheIndexers|raw$, tweakListOptions $.interfacesTweakListOptionsFunc|raw$) $.cacheSharedIndexInformer|raw$ {
-	return $.cacheNewSharedIndexInformer|raw$(
+	return New$.type|public$InformerWithOptions(client$if .namespaced$, namespace$end$, $.type|public$InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+`
+
+var typeInformerPublicConstructorWithOptions = `
+// New$.type|public$InformerWithOptions constructs a new informer for $.type|public$ type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func New$.type|public$InformerWithOptions(client $.clientSetInterface|raw$$if .namespaced$, namespace string$end$, options $.type|public$InformerOptions) $.cacheSharedIndexInformer|raw$ {
+	gvr := $.schemaGroupVersionResource|raw${Group: "$.groupName$", Version: "$.versionName$", Resource: "$.resourceName$"}
+	identifier := options.InformerName.WithResource(gvr)
+	tweakListOptions := options.TweakListOptions
+	return $.cacheNewSharedIndexInformerWithOptions|raw$(
 		$.cacheToListWatcherWithWatchListSemantics|raw$(&$.cacheListWatch|raw${
-			ListFunc: func(options $.v1ListOptions|raw$) ($.runtimeObject|raw$, error) {
+			ListFunc: func(opts $.v1ListOptions|raw$) ($.runtimeObject|raw$, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.$.group$$.version$().$.type|publicPlural$($if .namespaced$namespace$end$).List($.contextBackground|raw$(), options)
+				return client.$.group$$.version$().$.type|publicPlural$($if .namespaced$namespace$end$).List($.contextBackground|raw$(), opts)
 			},
-			WatchFunc: func(options $.v1ListOptions|raw$) ($.watchInterface|raw$, error) {
+			WatchFunc: func(opts $.v1ListOptions|raw$) ($.watchInterface|raw$, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.$.group$$.version$().$.type|publicPlural$($if .namespaced$namespace$end$).Watch($.contextBackground|raw$(), options)
+				return client.$.group$$.version$().$.type|publicPlural$($if .namespaced$namespace$end$).Watch($.contextBackground|raw$(), opts)
 			},
-			ListWithContextFunc: func(ctx $.contextContext|raw$, options $.v1ListOptions|raw$) ($.runtimeObject|raw$, error) {
+			ListWithContextFunc: func(ctx $.contextContext|raw$, opts $.v1ListOptions|raw$) ($.runtimeObject|raw$, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.$.group$$.version$().$.type|publicPlural$($if .namespaced$namespace$end$).List(ctx, options)
+				return client.$.group$$.version$().$.type|publicPlural$($if .namespaced$namespace$end$).List(ctx, opts)
 			},
-			WatchFuncWithContext: func(ctx $.contextContext|raw$, options $.v1ListOptions|raw$) ($.watchInterface|raw$, error) {
+			WatchFuncWithContext: func(ctx $.contextContext|raw$, opts $.v1ListOptions|raw$) ($.watchInterface|raw$, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.$.group$$.version$().$.type|publicPlural$($if .namespaced$namespace$end$).Watch(ctx, options)
+				return client.$.group$$.version$().$.type|publicPlural$($if .namespaced$namespace$end$).Watch(ctx, opts)
 			},
 		}, client),
 		&$.type|raw${},
-		resyncPeriod,
-		indexers,
+		$.cacheSharedIndexInformerOptions|raw${
+			ResyncPeriod: options.ResyncPeriod,
+			Indexers:     options.Indexers,
+			Identifier:   identifier,
+		},
 	)
 }
 `
 
 var typeInformerConstructor = `
 func (f *$.type|private$Informer) defaultInformer(client $.clientSetInterface|raw$, resyncPeriod $.timeDuration|raw$) $.cacheSharedIndexInformer|raw$ {
-	return NewFiltered$.type|public$Informer(client$if .namespaced$, f.namespace$end$, resyncPeriod, $.cacheIndexers|raw${$.cacheNamespaceIndex|raw$: $.cacheMetaNamespaceIndexFunc|raw$}, f.tweakListOptions)
+	return New$.type|public$InformerWithOptions(client$if .namespaced$, f.namespace$end$, $.type|public$InformerOptions{ResyncPeriod: resyncPeriod, Indexers: $.cacheIndexers|raw${$.cacheNamespaceIndex|raw$: $.cacheMetaNamespaceIndexFunc|raw$}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 `
 

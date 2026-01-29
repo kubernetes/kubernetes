@@ -34,6 +34,7 @@ type NewInformerFunc func(clientset.Interface, time.Duration) cache.SharedIndexI
 type SharedInformerFactory interface {
 	Start(stopCh <-chan struct{})
 	InformerFor(obj runtime.Object, newFunc NewInformerFunc) cache.SharedIndexInformer
+	InformerName() *cache.InformerName
 }
 
 // TweakListOptionsFunc is a function that transforms a v1.ListOptions.
