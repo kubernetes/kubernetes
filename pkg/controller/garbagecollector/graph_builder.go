@@ -589,7 +589,7 @@ func referencesDiffs(old []metav1.OwnerReference, new []metav1.OwnerReference) (
 	return added, removed, changed
 }
 
-func deletionStartsWithFinalizer(oldObj interface{}, newAccessor metav1.Object, matchingFinalizer string) bool {
+func deletionStartsWithFinalizer(logger klog.Logger, oldObj interface{}, newAccessor metav1.Object, matchingFinalizer string) bool {
 	// if the new object isn't being deleted, or doesn't have the finalizer we're interested in, return false
 	if !beingDeleted(newAccessor) || !hasFinalizer(newAccessor, matchingFinalizer) {
 		return false
@@ -601,7 +601,7 @@ func deletionStartsWithFinalizer(oldObj interface{}, newAccessor metav1.Object, 
 	}
 	oldAccessor, err := meta.Accessor(oldObj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("cannot access oldObj: %v", err))
+		utilruntime.HandleErrorWithLogger(logger, err, "Cannot access meta data", "oldObj", oldObj)
 		return false
 	}
 	return !beingDeleted(oldAccessor) || !hasFinalizer(oldAccessor, matchingFinalizer)
@@ -631,14 +631,14 @@ func hasFinalizer(accessor metav1.Object, matchingFinalizer string) bool {
 
 // this function takes newAccessor directly because the caller already
 // instantiates an accessor for the newObj.
-func startsWaitingForDependentsDeleted(oldObj interface{}, newAccessor metav1.Object) bool {
-	return deletionStartsWithFinalizer(oldObj, newAccessor, metav1.FinalizerDeleteDependents)
+func startsWaitingForDependentsDeleted(logger klog.Logger, oldObj interface{}, newAccessor metav1.Object) bool {
+	return deletionStartsWithFinalizer(logger, oldObj, newAccessor, metav1.FinalizerDeleteDependents)
 }
 
 // this function takes newAccessor directly because the caller already
 // instantiates an accessor for the newObj.
-func startsWaitingForDependentsOrphaned(oldObj interface{}, newAccessor metav1.Object) bool {
-	return deletionStartsWithFinalizer(oldObj, newAccessor, metav1.FinalizerOrphanDependents)
+func startsWaitingForDependentsOrphaned(logger klog.Logger, oldObj interface{}, newAccessor metav1.Object) bool {
+	return deletionStartsWithFinalizer(logger, oldObj, newAccessor, metav1.FinalizerOrphanDependents)
 }
 
 // if an blocking ownerReference points to an object gets removed, or gets set to
@@ -669,12 +669,12 @@ func (gb *GraphBuilder) addUnblockedOwnersToDeleteQueue(logger klog.Logger, remo
 }
 
 func (gb *GraphBuilder) processTransitions(logger klog.Logger, oldObj interface{}, newAccessor metav1.Object, n *node) {
-	if startsWaitingForDependentsOrphaned(oldObj, newAccessor) {
+	if startsWaitingForDependentsOrphaned(logger, oldObj, newAccessor) {
 		logger.V(5).Info("add item to attemptToOrphan", "item", n.identity)
 		gb.attemptToOrphan.Add(n)
 		return
 	}
-	if startsWaitingForDependentsDeleted(oldObj, newAccessor) {
+	if startsWaitingForDependentsDeleted(logger, oldObj, newAccessor) {
 		logger.V(2).Info("add item to attemptToDelete, because it's waiting for its dependents to be deleted", "item", n.identity)
 		// if the n is added as a "virtual" node, its deletingDependents field is not properly set, so always set it here.
 		n.markDeletingDependents()
@@ -713,7 +713,7 @@ func (gb *GraphBuilder) processGraphChanges(logger klog.Logger) bool {
 	obj := item.obj
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("cannot access obj: %v", err))
+		utilruntime.HandleErrorWithLogger(logger, err, "Cannot access meta data", "obj", obj)
 		return true
 	}
 

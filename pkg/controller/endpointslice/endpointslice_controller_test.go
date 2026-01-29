@@ -1393,7 +1393,7 @@ func TestPodAddsBatching(t *testing.T) {
 			stopCh := make(chan struct{})
 			defer close(stopCh)
 
-			_, ctx := ktesting.NewTestContext(t)
+			logger, ctx := ktesting.NewTestContext(t)
 			go esController.Run(ctx, 1)
 
 			esController.serviceStore.Add(&v1.Service{
@@ -1410,7 +1410,7 @@ func TestPodAddsBatching(t *testing.T) {
 
 				p := newPod(i, ns, true, 0, false)
 				esController.podStore.Add(p)
-				esController.onPodUpdate(nil, p)
+				esController.onPodUpdate(logger, nil, p)
 			}
 
 			time.Sleep(tc.finalDelay)
@@ -1528,7 +1528,7 @@ func TestPodUpdatesBatching(t *testing.T) {
 			stopCh := make(chan struct{})
 			defer close(stopCh)
 
-			_, ctx := ktesting.NewTestContext(t)
+			logger, ctx := ktesting.NewTestContext(t)
 			go esController.Run(ctx, 1)
 
 			addPods(t, esController, ns, tc.podsCount)
@@ -1559,7 +1559,7 @@ func TestPodUpdatesBatching(t *testing.T) {
 				resourceVersion++
 
 				esController.podStore.Update(newPod)
-				esController.onPodUpdate(oldPod, newPod)
+				esController.onPodUpdate(logger, oldPod, newPod)
 			}
 
 			time.Sleep(tc.finalDelay)
@@ -1666,7 +1666,7 @@ func TestPodDeleteBatching(t *testing.T) {
 			stopCh := make(chan struct{})
 			defer close(stopCh)
 
-			_, ctx := ktesting.NewTestContext(t)
+			logger, ctx := ktesting.NewTestContext(t)
 			go esController.Run(ctx, 1)
 
 			addPods(t, esController, ns, tc.podsCount)
@@ -1687,7 +1687,7 @@ func TestPodDeleteBatching(t *testing.T) {
 				require.NoError(t, err, "error while retrieving old value of %q: %v", update.podName, err)
 				assert.True(t, exists, "pod should exist")
 				esController.podStore.Delete(old)
-				esController.onPodUpdate(old, nil)
+				esController.onPodUpdate(logger, old, nil)
 			}
 
 			time.Sleep(tc.finalDelay)

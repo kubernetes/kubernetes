@@ -229,7 +229,7 @@ func NewBaseController(logger klog.Logger, rsInformer appsinformers.ReplicaSetIn
 
 // Run begins watching and syncing.
 func (rsc *ReplicaSetController) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	// Start events processing pipeline.
 	rsc.eventBroadcaster.StartStructuredLogging(3)
@@ -264,13 +264,13 @@ func (rsc *ReplicaSetController) Run(ctx context.Context, workers int) {
 func (rsc *ReplicaSetController) getReplicaSetsWithSameController(logger klog.Logger, rs *apps.ReplicaSet) []*apps.ReplicaSet {
 	controllerRef := metav1.GetControllerOf(rs)
 	if controllerRef == nil {
-		utilruntime.HandleError(fmt.Errorf("ReplicaSet has no controller: %v", rs))
+		utilruntime.HandleErrorWithLogger(logger, nil, "ReplicaSet has no controller", "replicaset", klog.KObj(rs))
 		return nil
 	}
 
 	objects, err := rsc.rsIndexer.ByIndex(controllerUIDIndex, string(controllerRef.UID))
 	if err != nil {
-		utilruntime.HandleError(err)
+		utilruntime.HandleErrorWithLogger(logger, err, "Unable to look up ReplicaSets by controller UID")
 		return nil
 	}
 	relatedRSs := make([]*apps.ReplicaSet, 0, len(objects))
@@ -286,7 +286,7 @@ func (rsc *ReplicaSetController) getReplicaSetsWithSameController(logger klog.Lo
 }
 
 // getPodReplicaSets returns a list of ReplicaSets matching the given pod.
-func (rsc *ReplicaSetController) getPodReplicaSets(pod *v1.Pod) []*apps.ReplicaSet {
+func (rsc *ReplicaSetController) getPodReplicaSets(logger klog.Logger, pod *v1.Pod) []*apps.ReplicaSet {
 	rss, err := rsc.rsLister.GetPodReplicaSets(pod)
 	if err != nil {
 		return nil
@@ -294,7 +294,7 @@ func (rsc *ReplicaSetController) getPodReplicaSets(pod *v1.Pod) []*apps.ReplicaS
 	if len(rss) > 1 {
 		// ControllerRef will ensure we don't do anything crazy, but more than one
 		// item in this list nevertheless constitutes user error.
-		utilruntime.HandleError(fmt.Errorf("user error! more than one %v is selecting pods with labels: %+v", rsc.Kind, pod.Labels))
+		utilruntime.HandleErrorWithLogger(logger, nil, "User error! More than one ReplicaSet is selecting pods with labels", "rsc", rsc.Kind, "labels", pod.Labels)
 	}
 	return rss
 }
@@ -320,20 +320,20 @@ func (rsc *ReplicaSetController) resolveControllerRef(namespace string, controll
 	return rs
 }
 
-func (rsc *ReplicaSetController) enqueueRS(rs *apps.ReplicaSet) {
+func (rsc *ReplicaSetController) enqueueRS(logger klog.Logger, rs *apps.ReplicaSet) {
 	key, err := controller.KeyFunc(rs)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", rs, err))
+		utilruntime.HandleErrorWithLogger(logger, err, "Couldn't get key for object", "object", klog.KObj(rs))
 		return
 	}
 
 	rsc.queue.Add(key)
 }
 
-func (rsc *ReplicaSetController) enqueueRSAfter(rs *apps.ReplicaSet, duration time.Duration) {
+func (rsc *ReplicaSetController) enqueueRSAfter(logger klog.Logger, rs *apps.ReplicaSet, duration time.Duration) {
 	key, err := controller.KeyFunc(rs)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", rs, err))
+		utilruntime.HandleErrorWithLogger(logger, err, "Couldn't get key for object", "object", klog.KObj(rs))
 		return
 	}
 
@@ -343,7 +343,7 @@ func (rsc *ReplicaSetController) enqueueRSAfter(rs *apps.ReplicaSet, duration ti
 func (rsc *ReplicaSetController) addRS(logger klog.Logger, obj interface{}) {
 	rs := obj.(*apps.ReplicaSet)
 	logger.V(4).Info("Adding", "replicaSet", klog.KObj(rs))
-	rsc.enqueueRS(rs)
+	rsc.enqueueRS(logger, rs)
 }
 
 // callback when RS is updated
@@ -355,7 +355,7 @@ func (rsc *ReplicaSetController) updateRS(logger klog.Logger, old, cur interface
 	if curRS.UID != oldRS.UID {
 		key, err := controller.KeyFunc(oldRS)
 		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", oldRS, err))
+			utilruntime.HandleErrorWithLogger(logger, err, "Couldn't get key for object", "object", klog.KObj(oldRS))
 			return
 		}
 		rsc.deleteRS(logger, cache.DeletedFinalStateUnknown{
@@ -379,7 +379,7 @@ func (rsc *ReplicaSetController) updateRS(logger klog.Logger, old, cur interface
 	if *(oldRS.Spec.Replicas) != *(curRS.Spec.Replicas) {
 		logger.V(4).Info("replicaSet updated. Desired pod count change.", "replicaSet", klog.KObj(oldRS), "oldReplicas", *(oldRS.Spec.Replicas), "newReplicas", *(curRS.Spec.Replicas))
 	}
-	rsc.enqueueRS(curRS)
+	rsc.enqueueRS(logger, curRS)
 }
 
 func (rsc *ReplicaSetController) deleteRS(logger klog.Logger, obj interface{}) {
@@ -387,19 +387,19 @@ func (rsc *ReplicaSetController) deleteRS(logger klog.Logger, obj interface{}) {
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
+			utilruntime.HandleErrorWithLogger(logger, nil, "Couldn't get object from tombstone", "obj", obj)
 			return
 		}
 		rs, ok = tombstone.Obj.(*apps.ReplicaSet)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a ReplicaSet %#v", obj))
+			utilruntime.HandleErrorWithLogger(logger, nil, "Tombstone contained object that is not a ReplicaSet", "type", fmt.Sprintf("%T", obj))
 			return
 		}
 	}
 
 	key, err := controller.KeyFunc(rs)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", rs, err))
+		utilruntime.HandleErrorWithLogger(logger, err, "Couldn't get key for object", "object", klog.KObj(rs))
 		return
 	}
 
@@ -442,13 +442,13 @@ func (rsc *ReplicaSetController) addPod(logger klog.Logger, obj interface{}) {
 	// them to see if anyone wants to adopt it.
 	// DO NOT observe creation because no controller should be waiting for an
 	// orphan.
-	rss := rsc.getPodReplicaSets(pod)
+	rss := rsc.getPodReplicaSets(logger, pod)
 	if len(rss) == 0 {
 		return
 	}
 	logger.V(4).Info("Orphan Pod created", "pod", klog.KObj(pod), "detail", pod)
 	for _, rs := range rss {
-		rsc.enqueueRS(rs)
+		rsc.enqueueRS(logger, rs)
 	}
 }
 
@@ -485,7 +485,7 @@ func (rsc *ReplicaSetController) updatePod(logger klog.Logger, old, cur interfac
 	if controllerRefChanged && oldControllerRef != nil {
 		// The ControllerRef was changed. Sync the old controller, if any.
 		if rs := rsc.resolveControllerRef(oldPod.Namespace, oldControllerRef); rs != nil {
-			rsc.enqueueRS(rs)
+			rsc.enqueueRS(logger, rs)
 		}
 	}
 
@@ -496,7 +496,7 @@ func (rsc *ReplicaSetController) updatePod(logger klog.Logger, old, cur interfac
 			return
 		}
 		logger.V(4).Info("Pod objectMeta updated.", "pod", klog.KObj(oldPod), "oldObjectMeta", oldPod.ObjectMeta, "curObjectMeta", curPod.ObjectMeta)
-		rsc.enqueueRS(rs)
+		rsc.enqueueRS(logger, rs)
 		// TODO: MinReadySeconds in the Pod will generate an Available condition to be added in
 		// the Pod status which in turn will trigger a requeue of the owning replica set thus
 		// having its status updated with the newly available replica. For now, we can fake the
@@ -509,7 +509,7 @@ func (rsc *ReplicaSetController) updatePod(logger klog.Logger, old, cur interfac
 		// "closer" to kubelet (from the deployment to the replica set controller).
 		if !podutil.IsPodReady(oldPod) && podutil.IsPodReady(curPod) && rs.Spec.MinReadySeconds > 0 {
 			logger.V(2).Info("pod will be enqueued after a while for availability check", "duration", rs.Spec.MinReadySeconds, "kind", rsc.Kind, "pod", klog.KObj(oldPod))
-			rsc.enqueueRSAfter(rs, time.Duration(rs.Spec.MinReadySeconds)*time.Second)
+			rsc.enqueueRSAfter(logger, rs, time.Duration(rs.Spec.MinReadySeconds)*time.Second)
 		}
 		return
 	}
@@ -517,13 +517,13 @@ func (rsc *ReplicaSetController) updatePod(logger klog.Logger, old, cur interfac
 	// Otherwise, it's an orphan. If anything changed, sync matching controllers
 	// to see if anyone wants to adopt it now.
 	if labelChanged || controllerRefChanged {
-		rss := rsc.getPodReplicaSets(curPod)
+		rss := rsc.getPodReplicaSets(logger, curPod)
 		if len(rss) == 0 {
 			return
 		}
 		logger.V(4).Info("Orphan Pod objectMeta updated.", "pod", klog.KObj(oldPod), "oldObjectMeta", oldPod.ObjectMeta, "curObjectMeta", curPod.ObjectMeta)
 		for _, rs := range rss {
-			rsc.enqueueRS(rs)
+			rsc.enqueueRS(logger, rs)
 		}
 	}
 }
@@ -540,12 +540,12 @@ func (rsc *ReplicaSetController) deletePod(logger klog.Logger, obj interface{}) 
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %+v", obj))
+			utilruntime.HandleErrorWithLogger(logger, nil, "Couldn't get object from tombstone", "obj", obj)
 			return
 		}
 		pod, ok = tombstone.Obj.(*v1.Pod)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a pod %#v", obj))
+			utilruntime.HandleErrorWithLogger(logger, nil, "Tombstone contained object that is not a pod", "type", fmt.Sprintf("%T", obj))
 			return
 		}
 	}
@@ -561,7 +561,7 @@ func (rsc *ReplicaSetController) deletePod(logger klog.Logger, obj interface{}) 
 	}
 	rsKey, err := controller.KeyFunc(rs)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", rs, err))
+		utilruntime.HandleErrorWithLogger(logger, err, "Couldn't get key for object", "object", klog.KObj(rs))
 		return
 	}
 	logger.V(4).Info("Pod deleted", "delete_by", utilruntime.GetCaller(), "deletion_timestamp", pod.DeletionTimestamp, "pod", klog.KObj(pod))
@@ -589,7 +589,7 @@ func (rsc *ReplicaSetController) processNextWorkItem(ctx context.Context) bool {
 		return true
 	}
 
-	utilruntime.HandleError(fmt.Errorf("sync %q failed with %v", key, err))
+	utilruntime.HandleErrorWithContext(ctx, err, "Sync failed", "key", key)
 	rsc.queue.AddRateLimited(key)
 
 	return true
@@ -602,7 +602,7 @@ func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, activePods 
 	diff := len(activePods) - int(*(rs.Spec.Replicas))
 	rsKey, err := controller.KeyFunc(rs)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("couldn't get key for %v %#v: %v", rsc.Kind, rs, err))
+		utilruntime.HandleErrorWithContext(ctx, err, fmt.Sprintf("Couldn't get key for %s", rsc.Kind), rsc.Kind, klog.KObj(rs)) // The key here is dynamic based on the kind.
 		return nil
 	}
 	logger := klog.FromContext(ctx)
@@ -656,7 +656,7 @@ func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, activePods 
 		logger.V(2).Info("Too many replicas", "replicaSet", klog.KObj(rs), "need", *(rs.Spec.Replicas), "deleting", diff)
 
 		relatedPods, err := rsc.getIndirectlyRelatedPods(logger, rs)
-		utilruntime.HandleError(err)
+		utilruntime.HandleErrorWithContext(ctx, err, "Unable to get indirectly related pods")
 
 		// Choose which Pods to delete, preferring those in earlier phases of startup.
 		podsToDelete := getPodsToDelete(activePods, relatedPods, diff)
@@ -728,7 +728,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 	rsNeedsSync := rsc.expectations.SatisfiedExpectations(logger, key)
 	selector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("error converting pod selector to selector for rs %v/%v: %v", namespace, name, err))
+		utilruntime.HandleErrorWithContext(ctx, err, "Error converting pod selector to selector for rs", "rs", klog.KRef(namespace, name))
 		return nil
 	}
 

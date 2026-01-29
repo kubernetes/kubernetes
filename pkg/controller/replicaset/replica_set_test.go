@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/onsi/gomega"
 	"math/rand"
 	"net/http/httptest"
 	"net/url"
@@ -30,6 +29,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/onsi/gomega"
 
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -530,11 +531,12 @@ func TestPodControllerLookup(t *testing.T) {
 			outRSName: "bar",
 		},
 	}
+	logger, _ := ktesting.NewTestContext(t)
 	for _, c := range testCases {
 		for _, r := range c.inRSs {
 			informers.Apps().V1().ReplicaSets().Informer().GetIndexer().Add(r)
 		}
-		if rss := manager.getPodReplicaSets(c.pod); rss != nil {
+		if rss := manager.getPodReplicaSets(logger, c.pod); rss != nil {
 			if len(rss) != 1 {
 				t.Errorf("len(rss) = %v, want %v", len(rss), 1)
 				continue
@@ -855,7 +857,7 @@ func TestUpdatePods(t *testing.T) {
 }
 
 func TestControllerUpdateRequeue(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	// This server should force a requeue of the controller because it fails to update status.Replicas.
 	labelMap := map[string]string{"foo": "bar"}
 	rs := newReplicaSet(1, labelMap)
@@ -880,7 +882,7 @@ func TestControllerUpdateRequeue(t *testing.T) {
 
 	// Enqueue once. Then process it. Disable rate-limiting for this.
 	manager.queue = workqueue.NewTypedRateLimitingQueue(workqueue.NewTypedMaxOfRateLimiter[string]())
-	manager.enqueueRS(rs)
+	manager.enqueueRS(logger, rs)
 	manager.processNextWorkItem(ctx)
 	// It should have been requeued.
 	if got, want := manager.queue.Len(), 1; got != want {

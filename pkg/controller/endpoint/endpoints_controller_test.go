@@ -197,17 +197,18 @@ func makeBlockingEndpointTestServer(t *testing.T, controller *endpointController
 			blockNextAction <- struct{}{}
 		}
 
+		logger, _ := ktesting.NewTestContext(t)
 		if req.Method == "DELETE" {
 			if blockDelete != nil {
 				go func() {
 					// Delay the deletion of endpoints to make endpoints cache out of sync
 					<-blockDelete
 					_ = controller.endpointsStore.Delete(endpoint)
-					controller.onEndpointsDelete(endpoint)
+					controller.onEndpointsDelete(logger, endpoint)
 				}()
 			} else {
 				_ = controller.endpointsStore.Delete(endpoint)
-				controller.onEndpointsDelete(endpoint)
+				controller.onEndpointsDelete(logger, endpoint)
 			}
 			blockNextAction <- struct{}{}
 		}
@@ -462,7 +463,9 @@ func TestCheckLeftoverEndpoints(t *testing.T) {
 			Ports:     []v1.EndpointPort{{Port: 1000}},
 		}},
 	})
-	endpoints.checkLeftoverEndpoints()
+
+	logger, _ := ktesting.NewTestContext(t)
+	endpoints.checkLeftoverEndpoints(logger)
 	if e, a := 1, endpoints.queue.Len(); e != a {
 		t.Fatalf("Expected %v, got %v", e, a)
 	}
@@ -1257,7 +1260,8 @@ func TestWaitsForAllInformersToBeSynced2(t *testing.T) {
 				},
 			}
 			endpoints.serviceStore.Add(service)
-			endpoints.onServiceUpdate(service)
+			logger, _ := ktesting.NewTestContext(t)
+			endpoints.onServiceUpdate(logger, service)
 			endpoints.podsSynced = test.podsSynced
 			endpoints.servicesSynced = test.servicesSynced
 			endpoints.endpointsSynced = test.endpointsSynced
@@ -1969,6 +1973,7 @@ func TestPodUpdatesBatching(t *testing.T) {
 				},
 			})
 
+			logger, _ := ktesting.NewTestContext(t)
 			for _, update := range tc.updates {
 				time.Sleep(update.delay)
 
@@ -1987,7 +1992,7 @@ func TestPodUpdatesBatching(t *testing.T) {
 				resourceVersion++
 
 				endpoints.podStore.Update(newPod)
-				endpoints.onPodUpdate(oldPod, newPod)
+				endpoints.onPodUpdate(logger, oldPod, newPod)
 			}
 
 			time.Sleep(tc.finalDelay)
@@ -2090,13 +2095,13 @@ func TestPodAddsBatching(t *testing.T) {
 					IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
 				},
 			})
-
+			logger, _ := ktesting.NewTestContext(t)
 			for i, add := range tc.adds {
 				time.Sleep(add.delay)
 
 				p := testPod(ns, i, 1, true, ipv4only)
 				endpoints.podStore.Add(p)
-				endpoints.onPodUpdate(nil, p)
+				endpoints.onPodUpdate(logger, nil, p)
 			}
 
 			time.Sleep(tc.finalDelay)
@@ -2215,7 +2220,7 @@ func TestPodDeleteBatching(t *testing.T) {
 					IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
 				},
 			})
-
+			logger, _ := ktesting.NewTestContext(t)
 			for _, update := range tc.deletes {
 				time.Sleep(update.delay)
 
@@ -2227,7 +2232,7 @@ func TestPodDeleteBatching(t *testing.T) {
 					t.Fatalf("Pod %q doesn't exist", update.podName)
 				}
 				endpoints.podStore.Delete(old)
-				endpoints.onPodUpdate(old, nil)
+				endpoints.onPodUpdate(logger, old, nil)
 			}
 
 			time.Sleep(tc.finalDelay)
@@ -2558,20 +2563,20 @@ func TestMultipleServiceChanges(t *testing.T) {
 			IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
 		},
 	}
-
+	logger, _ := ktesting.NewTestContext(t)
 	controller.serviceStore.Add(svc)
-	controller.onServiceUpdate(svc)
+	controller.onServiceUpdate(logger, svc)
 	// blockNextAction should eventually unblock once server gets endpoint request.
 	waitForChanReceive(t, 1*time.Second, blockNextAction, "Service Add should have caused a request to be sent to the test server")
 
 	controller.serviceStore.Delete(svc)
-	controller.onServiceDelete(svc)
+	controller.onServiceDelete(logger, svc)
 	waitForChanReceive(t, 1*time.Second, blockNextAction, "Service Delete should have caused a request to be sent to the test server")
 
 	// If endpoints cache has not updated before service update is registered
 	// Services add will not trigger a Create endpoint request.
 	controller.serviceStore.Add(svc)
-	controller.onServiceUpdate(svc)
+	controller.onServiceUpdate(logger, svc)
 
 	// Ensure the work queue has been processed by looping for up to a second to prevent flakes.
 	wait.PollImmediate(50*time.Millisecond, 1*time.Second, func() (bool, error) {
@@ -2639,7 +2644,8 @@ func TestMultiplePodChanges(t *testing.T) {
 	pod2.ResourceVersion = "2"
 	pod2.Status.Conditions[0].Status = v1.ConditionFalse
 	_ = controller.podStore.Update(pod2)
-	controller.onPodUpdate(pod, pod2)
+	logger, _ := ktesting.NewTestContext(t)
+	controller.onPodUpdate(logger, pod, pod2)
 	// blockNextAction should eventually unblock once server gets endpoints request.
 	waitForChanReceive(t, 1*time.Second, blockNextAction, "Pod Update should have caused a request to be sent to the test server")
 	// The endpoints update hasn't been applied to the cache yet.
@@ -2647,7 +2653,7 @@ func TestMultiplePodChanges(t *testing.T) {
 	pod3.ResourceVersion = "3"
 	pod3.Status.Conditions[0].Status = v1.ConditionTrue
 	_ = controller.podStore.Update(pod3)
-	controller.onPodUpdate(pod2, pod3)
+	controller.onPodUpdate(logger, pod2, pod3)
 	// It shouldn't get endpoints request as the endpoints in the cache is out-of-date.
 	timer := time.NewTimer(100 * time.Millisecond)
 	select {
@@ -2914,7 +2920,8 @@ func TestEndpointsDeletionEvents(t *testing.T) {
 
 	// Test Unexpected and Expected Deletes
 	store.Delete(ep1)
-	controller.onEndpointsDelete(ep1)
+	logger, _ := ktesting.NewTestContext(t)
+	controller.onEndpointsDelete(logger, ep1)
 
 	if controller.queue.Len() != 1 {
 		t.Errorf("Expected one service to be in the queue, found %d", controller.queue.Len())
