@@ -39,7 +39,7 @@ import (
 const (
 	maxTTL    = 24 * time.Hour
 	gcPeriod  = time.Minute
-	maxJitter = 10 * time.Second
+	maxJitter = 5 * time.Minute
 )
 
 // NewManager returns a new token manager.
@@ -181,9 +181,16 @@ func (m *Manager) requiresRefresh(ctx context.Context, tr *authenticationv1.Toke
 	}
 	now := m.clock.Now()
 	exp := tr.Status.ExpirationTimestamp.Time
+	ttl := time.Duration(*tr.Spec.ExpirationSeconds) * time.Second
 	iat := exp.Add(-1 * time.Duration(*tr.Spec.ExpirationSeconds) * time.Second)
+	effectiveMaxJitter := maxJitter
+	maxJitterCap := ttl / 10
 
-	jitter := time.Duration(rand.Float64()*maxJitter.Seconds()) * time.Second
+	if maxJitterCap < effectiveMaxJitter {
+		effectiveMaxJitter = maxJitterCap
+	}
+
+	jitter := time.Duration(rand.Float64() * float64(effectiveMaxJitter))
 	if now.After(iat.Add(maxTTL - jitter)) {
 		return true
 	}
