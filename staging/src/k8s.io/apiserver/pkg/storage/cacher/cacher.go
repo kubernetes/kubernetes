@@ -247,7 +247,7 @@ func (t *watcherBookmarkTimeBuckets) popExpiredWatchersThreadUnsafe() [][]*cache
 	return expiredWatchers
 }
 
-type filterWithAttrsFunc func(key string, l labels.Set, f fields.Set) bool
+type filterWithAttrsFunc func(key string, l labels.Set, f fields.Set, obj runtime.Object) bool
 
 type indexedTriggerFunc struct {
 	indexName   string
@@ -511,6 +511,9 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		return nil, err
 	}
 	pred := opts.Predicate
+	pred.ShardingStrategy = opts.ShardingStrategy
+	pred.ShardRangeStart = opts.ShardRangeStart
+	pred.ShardRangeEnd = opts.ShardRangeEnd
 	requestedWatchRV, err := c.versioner.ParseResourceVersion(opts.ResourceVersion)
 	if err != nil {
 		return nil, err
@@ -1200,8 +1203,11 @@ func forgetWatcher(c *Cacher, w *cacheWatcher, index int, scope namespacedName, 
 }
 
 func filterWithAttrsAndPrefixFunction(key string, p storage.SelectionPredicate) filterWithAttrsFunc {
-	filterFunc := func(objKey string, label labels.Set, field fields.Set) bool {
+	filterFunc := func(objKey string, label labels.Set, field fields.Set, obj runtime.Object) bool {
 		if !hasPathPrefix(objKey, key) {
+			return false
+		}
+		if matches, _ := p.MatchesSharding(obj); !matches {
 			return false
 		}
 		return p.MatchesObjectAttributes(label, field)

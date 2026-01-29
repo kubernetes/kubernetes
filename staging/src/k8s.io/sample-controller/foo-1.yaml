@@ -1,0 +1,7 @@
+apiVersion: samplecontroller.k8s.io/v1alpha1
+kind: Foo
+metadata:
+  name: foo-1
+spec:
+  deploymentName: foo-1
+  replicas: 1

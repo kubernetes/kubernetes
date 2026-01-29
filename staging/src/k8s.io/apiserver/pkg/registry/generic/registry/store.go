@@ -400,6 +400,9 @@ func (e *Store) ListPredicate(ctx context.Context, p storage.SelectionPredicate,
 		ResourceVersionMatch: options.ResourceVersionMatch,
 		Predicate:            p,
 		Recursive:            true,
+		ShardingStrategy:     options.ShardingStrategy,
+		ShardRangeStart:      options.ShardRangeStart,
+		ShardRangeEnd:        options.ShardRangeEnd,
 	}
 
 	// if we're not already namespace-scoped, see if the field selector narrows the scope of the watch
@@ -1430,12 +1433,20 @@ func (e *Store) Watch(ctx context.Context, options *metainternalversion.ListOpti
 		resourceVersion = options.ResourceVersion
 		predicate.AllowWatchBookmarks = options.AllowWatchBookmarks
 	}
-	return e.WatchPredicate(ctx, predicate, resourceVersion, options.SendInitialEvents)
+	return e.WatchPredicate(ctx, predicate, resourceVersion, options.SendInitialEvents, options.ShardingStrategy, options.ShardRangeStart, options.ShardRangeEnd)
 }
 
 // WatchPredicate starts a watch for the items that matches.
-func (e *Store) WatchPredicate(ctx context.Context, p storage.SelectionPredicate, resourceVersion string, sendInitialEvents *bool) (watch.Interface, error) {
-	storageOpts := storage.ListOptions{ResourceVersion: resourceVersion, Predicate: p, Recursive: true, SendInitialEvents: sendInitialEvents}
+func (e *Store) WatchPredicate(ctx context.Context, p storage.SelectionPredicate, resourceVersion string, sendInitialEvents *bool, shardingStrategy, shardRangeStart, shardRangeEnd string) (watch.Interface, error) {
+	storageOpts := storage.ListOptions{
+		ResourceVersion:   resourceVersion,
+		Predicate:         p,
+		Recursive:         true,
+		SendInitialEvents: sendInitialEvents,
+		ShardingStrategy:  shardingStrategy,
+		ShardRangeStart:   shardRangeStart,
+		ShardRangeEnd:     shardRangeEnd,
+	}
 
 	// if we're not already namespace-scoped, see if the field selector narrows the scope of the watch
 	if requestNamespace, _ := genericapirequest.NamespaceFrom(ctx); len(requestNamespace) == 0 {

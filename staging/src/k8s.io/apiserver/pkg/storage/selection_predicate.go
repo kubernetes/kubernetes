@@ -18,6 +18,8 @@ package storage
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/fields"
@@ -82,6 +84,9 @@ type SelectionPredicate struct {
 	Limit               int64
 	Continue            string
 	AllowWatchBookmarks bool
+	ShardingStrategy    string
+	ShardRangeStart     string
+	ShardRangeEnd       string
 }
 
 // Matches returns true if the given object's labels and fields (as
@@ -166,6 +171,42 @@ func (s *SelectionPredicate) MatcherIndex(ctx context.Context) []MatchValue {
 		}
 	}
 	return result
+}
+
+// MatchesSharding returns true if the given object matches the sharding configuration
+// defined in s.ShardingStrategy, s.ShardRangeStart and s.ShardRangeEnd.
+// If ShardingStrategy is empty, it returns true (no sharding).
+func (s *SelectionPredicate) MatchesSharding(obj runtime.Object) (bool, error) {
+	if s.ShardingStrategy == "" {
+		return true, nil
+	}
+	// Currently only support UID sharding
+	if s.ShardingStrategy != "uid" {
+		// Assume misconfigurations are not filtered as POC
+		return true, nil
+	}
+
+	metaAccessor, err := meta.Accessor(obj)
+	if err != nil {
+		return false, err
+	}
+	uid := metaAccessor.GetUID()
+	hash := hashUID(string(uid))
+
+	if s.ShardRangeStart != "" && hash < s.ShardRangeStart {
+		return false, nil
+	}
+	if s.ShardRangeEnd != "" && hash >= s.ShardRangeEnd {
+		return false, nil
+	}
+	return true, nil
+}
+
+// hashUID computes a hash of the UID for sharding.
+// By explicitly hashing, we control the distribution algorithm
+func hashUID(uid string) string {
+	h := sha256.Sum256([]byte(uid))
+	return hex.EncodeToString(h[:])
 }
 
 func isNamespaceScopedRequest(ctx context.Context) (string, bool) {
