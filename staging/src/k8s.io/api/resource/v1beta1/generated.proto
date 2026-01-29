@@ -78,6 +78,10 @@ message AllocatedDeviceStatus {
   // +optional
   // +listType=map
   // +listMapKey=type
+  // +k8s:optional
+  // +k8s:listType=map
+  // +k8s:listMapKey=type
+  // +k8s:maxItems=8
   repeated .k8s.io.apimachinery.pkg.apis.meta.v1.Condition conditions = 4;
 
   // Data contains arbitrary driver-specific data.
@@ -198,6 +202,7 @@ message BasicDevice {
   // +optional
   // +listType=atomic
   // +featureGate=DRADeviceTaints
+  // +k8s:maxItems=16
   repeated DeviceTaint taints = 7;
 
   // BindsToNode indicates if the usage of an allocation involving this device
