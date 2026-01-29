@@ -774,7 +774,7 @@
   - 204.8
   - 409.6
   - 819.2
-- name: volume_operation_total_errors
+- name: volume_operation_errors_total
   help: Total volume operation errors
   type: Counter
   stabilityLevel: ALPHA
