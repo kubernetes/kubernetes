@@ -123,6 +123,10 @@ var (
 const (
 	numNodes       = 8
 	maxPodsPerNode = 5000 // This should never be the limiting factor, no matter how many tests run in parallel.
+
+	// schedulingTimeout is the time we grant the scheduler for one scheduling attempt,
+	// whether it's successful or not.
+	schedulingTimeout = 30 * time.Second
 )
 
 func TestDRA(t *testing.T) {
@@ -630,7 +634,7 @@ func testPrioritizedList(tCtx ktesting.TContext, enabled bool) {
 	))
 	tCtx.Eventually(func(tCtx ktesting.TContext) (*v1.Pod, error) {
 		return tCtx.Client().CoreV1().Pods(namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
-	}).WithTimeout(10 * time.Second).WithPolling(time.Second).Should(schedulingAttempted)
+	}).WithTimeout(schedulingTimeout).WithPolling(time.Second).Should(schedulingAttempted)
 }
 
 type nodeInfo struct {
@@ -699,7 +703,7 @@ func testPrioritizedListScoring(tCtx ktesting.TContext) {
 		expectedSelectedRequest := fmt.Sprintf("%s/%s", claim.Spec.Devices.Requests[0].Name, claim.Spec.Devices.Requests[0].FirstAvailable[0].Name)
 		tCtx.Eventually(func(tCtx ktesting.TContext) (*resourceapi.ResourceClaim, error) {
 			return tCtx.Client().ResourceV1().ResourceClaims(namespace).Get(tCtx, claim.Name, metav1.GetOptions{})
-		}).WithTimeout(10 * time.Second).WithPolling(time.Second).Should(expectedAllocatedClaim(expectedSelectedRequest, nodeInfos[0]))
+		}).WithTimeout(schedulingTimeout).WithPolling(time.Second).Should(expectedAllocatedClaim(expectedSelectedRequest, nodeInfos[0]))
 	})
 
 	tCtx.Run("multi-claim", func(tCtx ktesting.TContext) {
@@ -759,13 +763,13 @@ func testPrioritizedListScoring(tCtx ktesting.TContext) {
 		expectedSelectedRequest := fmt.Sprintf("%s/%s", claim1.Spec.Devices.Requests[0].Name, claim1.Spec.Devices.Requests[0].FirstAvailable[1].Name)
 		tCtx.Eventually(func(tCtx ktesting.TContext) (*resourceapi.ResourceClaim, error) {
 			return tCtx.Client().ResourceV1().ResourceClaims(namespace).Get(tCtx, claimPrioritizedList1.Name, metav1.GetOptions{})
-		}).WithTimeout(10 * time.Second).WithPolling(time.Second).Should(expectedAllocatedClaim(expectedSelectedRequest, nodeInfos[2]))
+		}).WithTimeout(schedulingTimeout).WithPolling(time.Second).Should(expectedAllocatedClaim(expectedSelectedRequest, nodeInfos[2]))
 
 		// The first subrequest in claim2 is for nodeInfos[2], so it should be chosen.
 		expectedSelectedRequest = fmt.Sprintf("%s/%s", claim2.Spec.Devices.Requests[0].Name, claim2.Spec.Devices.Requests[0].FirstAvailable[0].Name)
 		tCtx.Eventually(func(tCtx ktesting.TContext) (*resourceapi.ResourceClaim, error) {
 			return tCtx.Client().ResourceV1().ResourceClaims(namespace).Get(tCtx, claimPrioritizedList2.Name, metav1.GetOptions{})
-		}).WithTimeout(10 * time.Second).WithPolling(time.Second).Should(expectedAllocatedClaim(expectedSelectedRequest, nodeInfos[2]))
+		}).WithTimeout(schedulingTimeout).WithPolling(time.Second).Should(expectedAllocatedClaim(expectedSelectedRequest, nodeInfos[2]))
 	})
 }
 
@@ -1721,13 +1725,13 @@ func testInvalidResourceSlices(tCtx ktesting.TContext) {
 			))
 			tCtx.Eventually(func(tCtx ktesting.TContext) (*v1.Pod, error) {
 				return tCtx.Client().CoreV1().Pods(namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
-			}).WithTimeout(10 * time.Second).WithPolling(time.Second).Should(schedulingAttempted)
+			}).WithTimeout(schedulingTimeout).WithPolling(time.Second).Should(schedulingAttempted)
 
 			// Only check the ResourceClaim if we expected the Pod to schedule.
 			if tc.expectPodToSchedule {
 				tCtx.Eventually(func(tCtx ktesting.TContext) (*resourceapi.ResourceClaim, error) {
 					return tCtx.Client().ResourceV1().ResourceClaims(namespace).Get(tCtx, claim.Name, metav1.GetOptions{})
-				}).WithTimeout(10 * time.Second).WithPolling(time.Second).Should(gomega.HaveField("Status.Allocation", gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+				}).WithTimeout(schedulingTimeout).WithPolling(time.Second).Should(gomega.HaveField("Status.Allocation", gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
 					"Devices": gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
 						"Results": gomega.HaveExactElements(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
 							"Driver": gomega.Equal(driverName),
