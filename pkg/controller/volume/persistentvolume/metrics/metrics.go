@@ -137,7 +137,7 @@ var (
 		&metrics.CounterOpts{
 			Name:           "volume_operation_total_errors",
 			Help:           "Total volume operation errors",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		},
 		[]string{"plugin_name", "operation_name"})
 
