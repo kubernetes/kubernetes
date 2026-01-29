@@ -266,12 +266,14 @@ func MatchTopologySelectorTerms(topologySelectorTerms []v1.TopologySelectorTerm,
 func AddOrUpdateTolerationInPodSpec(spec *v1.PodSpec, toleration *v1.Toleration) bool {
 	podTolerations := spec.Tolerations
 
-	var newTolerations []v1.Toleration
+	// do not grow the slice in runtime, the length is already known (PodSpec.Tolerations + toleration)
+	newTolerations := make([]v1.Toleration, 0, len(podTolerations) + 1)
+
 	updated := false
 	for i := range podTolerations {
 		if toleration.MatchToleration(&podTolerations[i]) {
-			if helper.Semantic.DeepEqual(toleration, podTolerations[i]) {
-				return false
+			if helper.Semantic.DeepEqual(*toleration, podTolerations[i]) {
+				return updated
 			}
 			newTolerations = append(newTolerations, *toleration)
 			updated = true
@@ -283,10 +285,11 @@ func AddOrUpdateTolerationInPodSpec(spec *v1.PodSpec, toleration *v1.Toleration)
 
 	if !updated {
 		newTolerations = append(newTolerations, *toleration)
+		updated = true
 	}
 
 	spec.Tolerations = newTolerations
-	return true
+	return updated
 }
 
 // GetMatchingTolerations returns true and list of Tolerations matching all Taints if all are tolerated, or false otherwise.
