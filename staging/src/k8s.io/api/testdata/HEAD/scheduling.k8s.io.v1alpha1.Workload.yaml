@@ -43,3 +43,4 @@ spec:
       basic: {}
       gang:
         minCount: 1
+  priorityClassName: priorityClassNameValue

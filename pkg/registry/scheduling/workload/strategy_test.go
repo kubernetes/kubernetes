@@ -17,11 +17,16 @@ limitations under the License.
 package workload
 
 import (
+	"reflect"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/ptr"
 )
 
 var workload = &scheduling.Workload{
@@ -52,87 +57,133 @@ func TestWorkloadStrategy(t *testing.T) {
 	}
 }
 
-func TestPodSchedulingStrategyCreate(t *testing.T) {
-	t.Run("simple", func(t *testing.T) {
-		ctx := genericapirequest.NewDefaultContext()
-		workload := workload.DeepCopy()
+func TestWorkloadStrategyCreate(t *testing.T) {
+	testCases := []struct {
+		name                           string
+		workload                       func(*scheduling.Workload)
+		workloadAwarePreemptionEnabled bool
+		expectPriorityClassName        *string
+		expectValidationErrors         bool
+	}{
+		{
+			name:                           "simple",
+			workload:                       func(w *scheduling.Workload) {},
+			workloadAwarePreemptionEnabled: false,
+			expectPriorityClassName:        nil,
+			expectValidationErrors:         false,
+		},
+		{
+			name:                           "failed validation",
+			workload:                       func(w *scheduling.Workload) { w.Spec.PodGroups[0].Policy.Gang.MinCount = -1 },
+			workloadAwarePreemptionEnabled: false,
+			expectValidationErrors:         true,
+		},
+		{
+			name:                           "workload with a priorityClassName and workload-aware-preemption enabled, preserve",
+			workload:                       func(w *scheduling.Workload) { w.Spec.PriorityClassName = ptr.To("high-priority") },
+			workloadAwarePreemptionEnabled: true,
+			expectPriorityClassName:        ptr.To("high-priority"),
+			expectValidationErrors:         false,
+		},
+		{
+			name:                           "workload with a priorityClassName and workload-aware-preemption disabled, clear",
+			workload:                       func(w *scheduling.Workload) { w.Spec.PriorityClassName = ptr.To("high-priority") },
+			workloadAwarePreemptionEnabled: false,
+			expectPriorityClassName:        nil,
+			expectValidationErrors:         false,
+		},
+	}
 
-		Strategy.PrepareForCreate(ctx, workload)
-		errs := Strategy.Validate(ctx, workload)
-		if len(errs) != 0 {
-			t.Errorf("Unexpected validation error: %v", errs)
-		}
-	})
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:         true,
+				features.WorkloadAwarePreemption: tt.workloadAwarePreemptionEnabled,
+			})
 
-	t.Run("failed validation", func(t *testing.T) {
-		ctx := genericapirequest.NewDefaultContext()
-		workload := workload.DeepCopy()
-		workload.Spec.PodGroups[0].Policy.Gang.MinCount = -1
+			ctx := genericapirequest.NewDefaultContext()
+			w := workload.DeepCopy()
+			tt.workload(w)
 
-		Strategy.PrepareForCreate(ctx, workload)
-		errs := Strategy.Validate(ctx, workload)
-		if len(errs) == 0 {
-			t.Errorf("Expected validation error")
-		}
-	})
+			Strategy.PrepareForCreate(ctx, w)
+			errs := Strategy.Validate(ctx, w)
+
+			if (len(errs) != 0) != tt.expectValidationErrors {
+				t.Errorf("Expected validation error = %v, got %v", tt.expectValidationErrors, errs)
+			}
+
+			if !reflect.DeepEqual(tt.expectPriorityClassName, w.Spec.PriorityClassName) {
+				t.Errorf("Expected priorityClassName = %v, got %v", tt.expectPriorityClassName, w.Spec.PriorityClassName)
+			}
+		})
+	}
 }
 
-func TestPodSchedulingStrategyUpdate(t *testing.T) {
-	t.Run("no changes", func(t *testing.T) {
-		ctx := genericapirequest.NewDefaultContext()
-		workload := workload.DeepCopy()
-		newWorkload := workload.DeepCopy()
-		newWorkload.ResourceVersion = "4"
+func TestWorkloadStrategyUpdate(t *testing.T) {
 
-		Strategy.PrepareForUpdate(ctx, newWorkload, workload)
-		errs := Strategy.ValidateUpdate(ctx, newWorkload, workload)
-		if len(errs) != 0 {
-			t.Errorf("Unexpected validation error: %v", errs)
-		}
-	})
+	testCases := []struct {
+		name                    string
+		oldWorkload             func(*scheduling.Workload)
+		newWorkload             func(*scheduling.Workload)
+		expectValidationErrors  bool
+		expectPriorityClassName *string
+	}{
+		{
+			name:                   "no changes",
+			oldWorkload:            func(w *scheduling.Workload) {},
+			newWorkload:            func(w *scheduling.Workload) {},
+			expectValidationErrors: false,
+		},
+		{
+			name:                   "name update",
+			oldWorkload:            func(w *scheduling.Workload) {},
+			newWorkload:            func(w *scheduling.Workload) { w.Name += "bar" },
+			expectValidationErrors: true,
+		},
+		{
+			name:                   "spec update",
+			oldWorkload:            func(w *scheduling.Workload) {},
+			newWorkload:            func(w *scheduling.Workload) { w.ObjectMeta.Labels = map[string]string{"test-key": "test-value"} },
+			expectValidationErrors: false,
+		},
+		{
+			name:                   "invalid spec update",
+			oldWorkload:            func(w *scheduling.Workload) {},
+			newWorkload:            func(w *scheduling.Workload) { w.Spec.PodGroups[0].Policy.Gang.MinCount = 4 },
+			expectValidationErrors: true,
+		},
+		{
+			name:                    "priorityClassName is immutable",
+			oldWorkload:             func(w *scheduling.Workload) { w.Spec.PriorityClassName = ptr.To("high-priority") },
+			newWorkload:             func(w *scheduling.Workload) { w.Spec.PriorityClassName = ptr.To("low-priority") },
+			expectValidationErrors:  false,
+			expectPriorityClassName: ptr.To("high-priority"),
+		},
+	}
 
-	t.Run("name update", func(t *testing.T) {
-		ctx := genericapirequest.NewDefaultContext()
-		workload := workload.DeepCopy()
-		newWorkload := workload.DeepCopy()
-		newWorkload.Name += "bar"
-		newWorkload.ResourceVersion = "4"
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload: true,
+			})
 
-		Strategy.PrepareForUpdate(ctx, newWorkload, workload)
-		errs := Strategy.ValidateUpdate(ctx, newWorkload, workload)
-		if len(errs) == 0 {
-			t.Errorf("Expected validation error")
-		}
-	})
+			ctx := genericapirequest.NewDefaultContext()
+			old := workload.DeepCopy()
+			new := workload.DeepCopy()
+			new.ResourceVersion = "4"
+			tt.oldWorkload(old)
+			tt.newWorkload(new)
 
-	t.Run("spec update", func(t *testing.T) {
-		ctx := genericapirequest.NewDefaultContext()
-		workload := workload.DeepCopy()
-		newWorkload := workload.DeepCopy()
-		newWorkload.Spec.ControllerRef = &scheduling.TypedLocalObjectReference{
-			Kind: "foo",
-			Name: "baz",
-		}
-		newWorkload.ResourceVersion = "4"
+			Strategy.PrepareForUpdate(ctx, new, old)
+			errs := Strategy.ValidateUpdate(ctx, new, old)
 
-		Strategy.PrepareForUpdate(ctx, newWorkload, workload)
-		errs := Strategy.ValidateUpdate(ctx, newWorkload, workload)
-		if len(errs) != 0 {
-			t.Errorf("Unexpected validation error: %v", errs)
-		}
-	})
+			if (len(errs) != 0) != tt.expectValidationErrors {
+				t.Errorf("Expected validation error = %v, got %v", tt.expectValidationErrors, errs)
+			}
 
-	t.Run("invalid spec update", func(t *testing.T) {
-		ctx := genericapirequest.NewDefaultContext()
-		workload := workload.DeepCopy()
-		newWorkload := workload.DeepCopy()
-		newWorkload.Spec.PodGroups[0].Policy.Gang.MinCount = 4
-		newWorkload.ResourceVersion = "4"
-
-		Strategy.PrepareForUpdate(ctx, newWorkload, workload)
-		errs := Strategy.ValidateUpdate(ctx, newWorkload, workload)
-		if len(errs) == 0 {
-			t.Errorf("Expected validation error")
-		}
-	})
+			if !reflect.DeepEqual(tt.expectPriorityClassName, new.Spec.PriorityClassName) {
+				t.Errorf("Expected priorityClassName = %v, got %v", tt.expectPriorityClassName, new.Spec.PriorityClassName)
+			}
+		})
+	}
 }
