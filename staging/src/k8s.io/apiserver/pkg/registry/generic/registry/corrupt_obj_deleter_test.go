@@ -61,7 +61,6 @@ func (w deleteWant) verify(t *testing.T, got result) {
 	if w.deleted != got.deleted {
 		t.Errorf("Expected deleted to be: %t, but got: %t", w.deleted, got.deleted)
 	}
-
 }
 
 func TestUnsafeDeletePrecondition(t *testing.T) {
@@ -299,7 +298,6 @@ func TestUnsafeDeleteWithAdmissionShouldBeSkipped(t *testing.T) {
 	}, &metav1.DeleteOptions{
 		IgnoreStoreReadErrorWithClusterBreakingPotential: ptr.To[bool](true),
 	})
-
 	if err != nil {
 		t.Errorf("Unexpected error from Delete: %v", err)
 	}
@@ -329,4 +327,81 @@ func (s *corruptStorage) Delete(ctx context.Context, key string, out runtime.Obj
 		s.unsafeDeleteInvoked++
 	}
 	return s.Interface.Delete(ctx, key, out, preconditions, deleteValidation, cachedExistingObject, opts)
+}
+
+func TestUnsafeDeleteDryRun(t *testing.T) {
+	tests := []struct {
+		name             string
+		storageError     error
+		wantDeleted      bool
+		errShouldContain string
+	}{
+		{
+			name:             "dry run with non-corrupt object should fail",
+			storageError:     nil, // No error means object is readable (not corrupt)
+			errShouldContain: "is exclusively used to delete corrupt object(s)",
+		},
+		{
+			name:             "dry run with non-corrupt error should fail",
+			storageError:     fmt.Errorf("some generic storage error"),
+			errShouldContain: "is exclusively used to delete corrupt object(s)",
+		},
+		{
+			name:         "dry run with corrupt object should succeed",
+			storageError: storage.NewCorruptObjError("foo", fmt.Errorf("object not decodable")),
+			wantDeleted:  true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+			destroyFunc, registry := NewTestGenericStoreRegistry(t)
+			defer destroyFunc()
+
+			object := &example.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Spec:       example.PodSpec{NodeName: "machine"},
+			}
+
+			_, err := registry.Create(ctx, object, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("Unexpected error from Create: %v", err)
+			}
+
+			cs := &corruptStorage{
+				Interface: registry.Storage.Storage,
+				err:       test.storageError,
+			}
+			registry.Storage.Storage = cs
+			deleter := NewCorruptObjectDeleter(registry)
+
+			_, deleted, err := deleter.Delete(ctx, "foo", rest.ValidateAllObjectFunc, &metav1.DeleteOptions{
+				IgnoreStoreReadErrorWithClusterBreakingPotential: ptr.To(true),
+				DryRun: []string{"All"},
+			})
+
+			// Verify if deletion would have succeeded
+			if want, got := test.wantDeleted, deleted; want != got {
+				t.Errorf("Expected deleted=%t, got=%t", test.wantDeleted, deleted)
+			}
+
+			// Verify unsafe delete was not actually invoked
+			if want, got := 0, cs.unsafeDeleteInvoked; want != got {
+				t.Errorf("Expected unsafe delete invoked %d time(s), got: %d", want, got)
+			}
+
+			// Verify error expectations
+			switch test.errShouldContain {
+			case "":
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+			default:
+				if err == nil || !strings.Contains(err.Error(), test.errShouldContain) {
+					t.Errorf("expected error containing %q, got: %v", test.errShouldContain, err)
+				}
+			}
+		})
+	}
 }
