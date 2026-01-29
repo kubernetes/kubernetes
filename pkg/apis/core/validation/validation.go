@@ -9558,7 +9558,7 @@ func validateLinuxContainerUser(linuxContainerUser *core.LinuxContainerUser, fld
 
 func validateImageVolumeSource(imageVolume *core.ImageVolumeSource, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if opts.ResourceIsPod && len(imageVolume.Reference) == 0 {
+	if len(imageVolume.Reference) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("reference"), ""))
 	}
 	allErrs = append(allErrs, validatePullPolicy(imageVolume.PullPolicy, fldPath.Child("pullPolicy"))...)
