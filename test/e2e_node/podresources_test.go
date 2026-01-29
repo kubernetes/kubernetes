@@ -21,15 +21,18 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/gstruct"
 	"github.com/onsi/gomega/types"
 
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/proto"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -928,6 +931,9 @@ func podresourcesGetTests(ctx context.Context, f *framework.Framework, cli kubel
 
 	tpd = newTestPodData()
 	ginkgo.By("checking the output when only pods which don't require resources are present")
+
+	expectListAndGetConsistent(ctx, cli, "pod-00", f.Namespace.Name)
+
 	expected = []podDesc{
 		{
 			podName: "pod-00",
@@ -945,6 +951,9 @@ func podresourcesGetTests(ctx context.Context, f *framework.Framework, cli kubel
 
 	tpd = newTestPodData()
 	ginkgo.By("checking the output when only pod require CPU")
+
+	expectListAndGetConsistent(ctx, cli, "pod-01", f.Namespace.Name)
+
 	expected = []podDesc{
 		{
 			podName:    "pod-01",
@@ -963,6 +972,9 @@ func podresourcesGetTests(ctx context.Context, f *framework.Framework, cli kubel
 
 	tpd = newTestPodData()
 	ginkgo.By("checking the output when a pod has multiple containers and only one of them requires exclusive CPUs")
+
+	expectListAndGetConsistent(ctx, cli, "pod-01", f.Namespace.Name)
+
 	expected = []podDesc{
 		{
 			podName:    "pod-01",
@@ -995,7 +1007,8 @@ func podresourcesGetTests(ctx context.Context, f *framework.Framework, cli kubel
 
 	restartNever := v1.RestartPolicyNever
 	tpd = newTestPodData()
-	ginkgo.By("checking the output when only pod require CPU is terminated")
+	ginkgo.By("checking Get() returns an error for a terminated pod")
+
 	expected = []podDesc{
 		{
 			podName:        "pod-01",
@@ -1006,12 +1019,21 @@ func podresourcesGetTests(ctx context.Context, f *framework.Framework, cli kubel
 		},
 	}
 	tpd.createPodsForTest(ctx, f, expected)
+
+	// Wait for the pod to complete to avoid races.
+	err = e2epod.WaitForPodCondition(ctx, f.ClientSet, f.Namespace.Name, "pod-01", "Pod Succeeded", 2*time.Minute, testutils.PodSucceeded)
+	framework.ExpectNoError(err, "pod did not succeed as expected")
+
 	resp, err = cli.Get(ctx, &kubeletpodresourcesv1.GetPodResourcesRequest{PodName: "pod-01", PodNamespace: f.Namespace.Name})
-	podResourceList = []*kubeletpodresourcesv1.PodResources{resp.GetPodResources()}
-	gomega.Expect(err).To(gomega.HaveOccurred(), "pod not found")
-	res = convertToMap(podResourceList)
-	err = matchPodDescWithResources(expected, res)
-	framework.ExpectNoError(err, "matchPodDescWithResources() failed err %v", err)
+	gomega.Expect(err).To(gomega.HaveOccurred(), "expected Get() to return an error for a terminated pod")
+
+	// Returned PodResources for a terminated pod must be empty.
+	pr := resp.GetPodResources()
+	if pr != nil {
+		gomega.Expect(pr.GetContainers()).To(gomega.BeEmpty(),
+			"expected no container resources in response for terminated pod; got: %#v", pr.GetContainers())
+	}
+
 	tpd.deletePodsForTest(ctx, f)
 
 	if sidecarContainersEnabled {
@@ -2126,4 +2148,94 @@ func timelessSampleAtLeast(lower interface{}) types.GomegaMatcher {
 		"Timestamp": gstruct.Ignore(),
 		"Histogram": gstruct.Ignore(),
 	}))
+}
+
+func getPodResourcesFromList(ctx context.Context, cli kubeletpodresourcesv1.PodResourcesListerClient, podName, podNamespace string) (*kubeletpodresourcesv1.PodResources, error) {
+	resp, err := cli.List(ctx, &kubeletpodresourcesv1.ListPodResourcesRequest{})
+	if err != nil {
+		return nil, err
+	}
+	for _, pr := range resp.GetPodResources() {
+		if pr.GetName() == podName && pr.GetNamespace() == podNamespace {
+			return pr, nil
+		}
+	}
+	return nil, fmt.Errorf("pod %s/%s not found in List() response", podNamespace, podName)
+}
+
+func preparePodResourcesListVsGet(pr *kubeletpodresourcesv1.PodResources) *kubeletpodresourcesv1.PodResources {
+	if pr == nil {
+		return nil
+	}
+
+	out := proto.Clone(pr).(*kubeletpodresourcesv1.PodResources)
+
+	// sort containers by name.
+	sort.Slice(out.Containers, func(i, j int) bool {
+		return out.Containers[i].GetName() < out.Containers[j].GetName()
+	})
+
+	for _, c := range out.Containers {
+		// sort CPU IDs.
+		sort.Slice(c.CpuIds, func(i, j int) bool {
+			return c.CpuIds[i] < c.CpuIds[j]
+		})
+
+		// sort devices by resource name, then sort device IDs.
+		sort.Slice(c.Devices, func(i, j int) bool {
+			return c.Devices[i].GetResourceName() < c.Devices[j].GetResourceName()
+		})
+		for _, d := range c.Devices {
+			sort.Strings(d.DeviceIds)
+			// Topology isn't part of the List/Get consistency check.
+			d.Topology = nil
+		}
+
+		// also ignore memory and DRA checks for a lightweight comparison.
+		c.Memory = nil
+		c.DynamicResources = nil
+	}
+
+	return out
+}
+
+func comparePodResourcesListVsGet(listPR, getPR *kubeletpodresourcesv1.PodResources) error {
+	if listPR == nil || getPR == nil {
+		return fmt.Errorf("nil PodResources: list=%v get=%v", listPR, getPR)
+	}
+	if listPR.GetName() != getPR.GetName() || listPR.GetNamespace() != getPR.GetNamespace() {
+		return fmt.Errorf("pod identity mismatch: list=%s/%s get=%s/%s",
+			listPR.GetNamespace(), listPR.GetName(), getPR.GetNamespace(), getPR.GetName())
+	}
+
+	lPR := preparePodResourcesListVsGet(listPR)
+	gPR := preparePodResourcesListVsGet(getPR)
+
+	if diff := cmp.Diff(lPR, gPR); diff != "" {
+		return fmt.Errorf("List() vs Get() PodResources mismatch (-list +get):\n%s", diff)
+	}
+	return nil
+}
+
+func expectListAndGetConsistent(ctx context.Context, cli kubeletpodresourcesv1.PodResourcesListerClient, podName, podNamespace string) {
+	gomega.Eventually(func(ctx context.Context) error {
+		listPR, err := getPodResourcesFromList(ctx, cli, podName, podNamespace)
+		if err != nil {
+			return err
+		}
+
+		getResp, err := cli.Get(ctx, &kubeletpodresourcesv1.GetPodResourcesRequest{
+			PodName:      podName,
+			PodNamespace: podNamespace,
+		})
+		if err != nil {
+			return err
+		}
+
+		return comparePodResourcesListVsGet(listPR, getResp.GetPodResources())
+	}).
+		WithContext(ctx).
+		WithPolling(5 * time.Second).
+		WithTimeout(1 * time.Minute).
+		Should(gomega.Succeed())
 }
