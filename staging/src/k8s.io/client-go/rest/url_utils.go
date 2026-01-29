@@ -40,7 +40,7 @@ func DefaultServerURL(host, apiPath string, groupVersion schema.GroupVersion, de
 		}
 		hostURL, err = url.Parse(scheme + base)
 		if err != nil {
-			return nil, "", err
+			return nil, "", fmt.Errorf("invalid host %q: %w", base, err)
 		}
 		if hostURL.Path != "" && hostURL.Path != "/" {
 			return nil, "", fmt.Errorf("host must be a URL or a host:port pair: %q", base)
