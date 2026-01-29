@@ -33,4 +33,7 @@ func RecommendedDefaultDaemonSetControllerConfiguration(obj *kubectrlmgrconfigv1
 	if obj.ConcurrentDaemonSetSyncs == 0 {
 		obj.ConcurrentDaemonSetSyncs = 2
 	}
+	if obj.BurstReplicas == 0 {
+		obj.BurstReplicas = daemon.DefaultBurstReplicas
+	}
 }
