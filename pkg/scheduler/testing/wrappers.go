@@ -1614,3 +1614,75 @@ func (wrapper *PodGroupWrapper) BasicPolicy() *PodGroupWrapper {
 	wrapper.Policy.Basic = &schedulingapi.BasicSchedulingPolicy{}
 	return wrapper
 }
+
+// Pool sets the pool name of the inner object.
+func (wrapper *ResourceSliceWrapper) Pool(name string) *ResourceSliceWrapper {
+	wrapper.Spec.Pool.Name = name
+	return wrapper
+}
+
+// NodeSelector sets the NodeSelector of the inner object based on simple labels (In operator).
+func (wrapper *ResourceSliceWrapper) NodeSelector(labels map[string]string) *ResourceSliceWrapper {
+	wrapper.Spec.NodeName = nil
+	wrapper.Spec.AllNodes = ptr.To(false)
+	if wrapper.Spec.NodeSelector == nil {
+		wrapper.Spec.NodeSelector = &v1.NodeSelector{}
+	}
+	for k, v := range labels {
+		term := v1.NodeSelectorTerm{
+			MatchExpressions: []v1.NodeSelectorRequirement{
+				{
+					Key:      k,
+					Operator: v1.NodeSelectorOpIn,
+					Values:   []string{v},
+				},
+			},
+		}
+		wrapper.Spec.NodeSelector.NodeSelectorTerms = append(wrapper.Spec.NodeSelector.NodeSelectorTerms, term)
+	}
+	return wrapper
+}
+
+// RequestExact adds one device request with exact match and optional selectors
+func (wrapper *ResourceClaimWrapper) RequestExact(name, deviceClassName string, count int64, selectors ...string) *ResourceClaimWrapper {
+	req := resourceapi.DeviceRequest{
+		Name: name,
+		Exactly: &resourceapi.ExactDeviceRequest{
+			AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+			Count:           count,
+			DeviceClassName: deviceClassName,
+		},
+	}
+	for _, s := range selectors {
+		req.Exactly.Selectors = append(req.Exactly.Selectors, resourceapi.DeviceSelector{
+			CEL: &resourceapi.CELDeviceSelector{Expression: s},
+		})
+	}
+	wrapper.Spec.Devices.Requests = append(wrapper.Spec.Devices.Requests, req)
+	return wrapper
+}
+
+// DeviceClassWrapper wraps a DeviceClass inside.
+type DeviceClassWrapper struct{ resourceapi.DeviceClass }
+
+// MakeDeviceClass creates a DeviceClass wrapper.
+func MakeDeviceClass(name string) *DeviceClassWrapper {
+	w := &DeviceClassWrapper{}
+	w.Name = name
+	return w
+}
+
+// Obj returns the inner DeviceClass.
+func (d *DeviceClassWrapper) Obj() *resourceapi.DeviceClass {
+	return &d.DeviceClass
+}
+
+// Selector adds a device selector to the inner DeviceClass.
+func (d *DeviceClassWrapper) Selector(expression string) *DeviceClassWrapper {
+	d.Spec.Selectors = append(d.Spec.Selectors, resourceapi.DeviceSelector{
+		CEL: &resourceapi.CELDeviceSelector{
+			Expression: expression,
+		},
+	})
+	return d
+}
