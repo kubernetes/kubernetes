@@ -149,7 +149,7 @@ func (p *mockPolicy) ReleaseLeakedCPUs(logger logr.Logger, s state.State, pod *v
 						// Sidecar containers keep all their CPUs, no leakage
 						continue
 					}
-					
+
 					// Simulate some leaked CPUs (remove some from the assignment)
 					if cset.Size() > 2 {
 						// Get the first 2 CPUs to keep, release the rest
@@ -1551,7 +1551,7 @@ func TestReleasePodUnallocatedCPUs(t *testing.T) {
 			podStatus: v1.PodStatus{
 				InitContainerStatuses: []v1.ContainerStatus{
 					{
-						Name: "init-1",
+						Name:  "init-1",
 						State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{}},
 					},
 				},
@@ -1589,7 +1589,7 @@ func TestReleasePodUnallocatedCPUs(t *testing.T) {
 			podStatus: v1.PodStatus{
 				InitContainerStatuses: []v1.ContainerStatus{
 					{
-						Name: "init-1",
+						Name:  "init-1",
 						State: v1.ContainerState{Running: &v1.ContainerStateRunning{}},
 					},
 				},
@@ -1621,7 +1621,7 @@ func TestReleasePodUnallocatedCPUs(t *testing.T) {
 					Spec: v1.PodSpec{
 						InitContainers: []v1.Container{
 							{
-								Name:         "init-1",
+								Name:          "init-1",
 								RestartPolicy: &[]v1.ContainerRestartPolicy{v1.ContainerRestartPolicyAlways}[0],
 							},
 						},
@@ -1632,7 +1632,7 @@ func TestReleasePodUnallocatedCPUs(t *testing.T) {
 			podStatus: v1.PodStatus{
 				InitContainerStatuses: []v1.ContainerStatus{
 					{
-						Name: "init-1",
+						Name:  "init-1",
 						State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{}},
 					},
 				},
@@ -1687,7 +1687,7 @@ func TestReleasePodUnallocatedCPUs(t *testing.T) {
 		{
 			description:     "No active pods - no changes",
 			activePods:      []*v1.Pod{},
-			stAssignments: state.ContainerCPUAssignments{},
+			stAssignments:   state.ContainerCPUAssignments{},
 			stDefaultCPUSet: cpuset.New(3, 7),
 			expAssignments:  state.ContainerCPUAssignments{},
 			expDefaultSet:   cpuset.New(3, 7),
@@ -1727,7 +1727,6 @@ func TestReleasePodUnallocatedCPUs(t *testing.T) {
 		})
 	}
 }
-
 
 func TestCPUManagerGetAllocatableCPUs(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)

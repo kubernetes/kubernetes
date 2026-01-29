@@ -2126,7 +2126,7 @@ func TestReleaseLeakedCPUs(t *testing.T) {
 				},
 			},
 			stDefaultCPUSet: cpuset.New(2, 3, 6, 7),
-			expLeakedCPUs:   cpuset.New(0, 4), // init container CPUs are released
+			expLeakedCPUs:   cpuset.New(0, 4),             // init container CPUs are released
 			expDefaultSet:   cpuset.New(0, 2, 3, 4, 6, 7), // leaked CPUs returned to default
 		},
 		{
@@ -2145,7 +2145,7 @@ func TestReleaseLeakedCPUs(t *testing.T) {
 				},
 			},
 			stDefaultCPUSet: cpuset.New(3, 7),
-			expLeakedCPUs:   cpuset.New(2, 6), // 2 CPUs leaked from init container
+			expLeakedCPUs:   cpuset.New(2, 6),       // 2 CPUs leaked from init container
 			expDefaultSet:   cpuset.New(2, 3, 6, 7), // leaked CPUs returned to default
 		},
 		{
@@ -2160,11 +2160,12 @@ func TestReleaseLeakedCPUs(t *testing.T) {
 			stAssignments: state.ContainerCPUAssignments{
 				"test-pod-4": map[string]cpuset.CPUSet{
 					"initContainer-0": cpuset.New(0, 4),
-					"appContainer-0":  cpuset.New(1, 5, 2, 6), 
+					"appContainer-0":  cpuset.New(1, 5, 2, 6),
+					"appContainer-0":  cpuset.New(1, 5, 2, 6),
 				},
 			},
 			stDefaultCPUSet: cpuset.New(3, 7),
-			expLeakedCPUs:   cpuset.New(0, 4), 
+			expLeakedCPUs:   cpuset.New(0, 4),
 			expDefaultSet:   cpuset.New(0, 3, 4, 7),
 		},
 		{
@@ -2179,7 +2180,7 @@ func TestReleaseLeakedCPUs(t *testing.T) {
 				}), "test-pod-3"),
 			stAssignments: state.ContainerCPUAssignments{
 				"test-pod-3": map[string]cpuset.CPUSet{
-					"initContainer-0": cpuset.New(0, 4, 2, 6), 
+					"initContainer-0": cpuset.New(0, 4, 2, 6),
 					"initContainer-1": cpuset.New(3, 7),
 					"appContainer-0":  cpuset.New(1, 5),
 				},
@@ -2243,7 +2244,7 @@ func TestUpdateCPUsForInitC(t *testing.T) {
 			stAssignments: state.ContainerCPUAssignments{
 				"test-pod-1": map[string]cpuset.CPUSet{
 					"init-1": cpuset.New(0, 4, 2, 6),
-					"app-1": cpuset.New(1, 5),
+					"app-1":  cpuset.New(1, 5),
 				},
 			},
 			stDefaultCPUSet: cpuset.New(3, 7),
@@ -2329,17 +2330,17 @@ func TestUpdateCPUsForInitC(t *testing.T) {
 
 func TestGetSidecarCPUsBeforeInit(t *testing.T) {
 	testCases := []struct {
-		description     string
-		pod             *v1.Pod
-		containerName   string
-		stAssignments   state.ContainerCPUAssignments
-		expSidecarCPUs  cpuset.CPUSet
+		description    string
+		pod            *v1.Pod
+		containerName  string
+		stAssignments  state.ContainerCPUAssignments
+		expSidecarCPUs cpuset.CPUSet
 	}{
 		{
 			description: "No sidecar containers before init container",
 			pod: WithPodUID(makeMultiContainerPodWithOptions(
 				[]*containerOptions{
-					{request: "2000m", limit: "2000m"}, // regular init container					
+					{request: "2000m", limit: "2000m"},                                                 // regular init container					
 					{request: "2000m", limit: "2000m", restartPolicy: v1.ContainerRestartPolicyAlways}, // sidecar init container
 				},
 				[]*containerOptions{
@@ -2359,7 +2360,7 @@ func TestGetSidecarCPUsBeforeInit(t *testing.T) {
 			description: "One sidecar container before init container",
 			pod: WithPodUID(makeMultiContainerPodWithOptions(
 				[]*containerOptions{
-					{request: "1000m", limit: "1000m", restartPolicy: v1.ContainerRestartPolicyAlways}, // sidecar init container
+					{request: "1000m", limit: "1000m", restartPolicy: v1.ContainerRestartPolicyAlways},    // sidecar init container
 					{request: "1000m", limit: "1000m", restartPolicy: v1.ContainerRestartPolicyOnFailure}, // regular init container	
 				},
 				[]*containerOptions{
@@ -2379,8 +2380,8 @@ func TestGetSidecarCPUsBeforeInit(t *testing.T) {
 			description: "Multiple sidecar containers before init container",
 			pod: WithPodUID(makeMultiContainerPodWithOptions(
 				[]*containerOptions{
-					{request: "1000m", limit: "1000m", restartPolicy: v1.ContainerRestartPolicyAlways}, // sidecar init container 1
-					{request: "1000m", limit: "1000m", restartPolicy: v1.ContainerRestartPolicyAlways}, // sidecar init container 2
+					{request: "1000m", limit: "1000m", restartPolicy: v1.ContainerRestartPolicyAlways},    // sidecar init container 1
+					{request: "1000m", limit: "1000m", restartPolicy: v1.ContainerRestartPolicyAlways},    // sidecar init container 2
 					{request: "1000m", limit: "1000m", restartPolicy: v1.ContainerRestartPolicyOnFailure}, // regular init container
 				},
 				[]*containerOptions{
@@ -2401,9 +2402,9 @@ func TestGetSidecarCPUsBeforeInit(t *testing.T) {
 			description: "Init container after some sidecars",
 			pod: WithPodUID(makeMultiContainerPodWithOptions(
 				[]*containerOptions{
-					{request: "1000m", limit: "1000m", restartPolicy: v1.ContainerRestartPolicyAlways}, // sidecar init container 1
+					{request: "1000m", limit: "1000m", restartPolicy: v1.ContainerRestartPolicyAlways},    // sidecar init container 1
 					{request: "1000m", limit: "1000m", restartPolicy: v1.ContainerRestartPolicyOnFailure}, // regular init container
-					{request: "1000m", limit: "1000m", restartPolicy: v1.ContainerRestartPolicyAlways}, // sidecar init container 2
+					{request: "1000m", limit: "1000m", restartPolicy: v1.ContainerRestartPolicyAlways},    // sidecar init container 2
 				},
 				[]*containerOptions{
 					{request: "1000m", limit: "1000m"}, // regular app container
