@@ -500,6 +500,7 @@ message Subject {
 
   // `user` matches based on username.
   // +optional
+  // +k8s:optional
   optional UserSubject user = 2;
 
   // `group` matches based on user group name.
@@ -515,6 +516,8 @@ message Subject {
 message UserSubject {
   // `name` is the username that matches, or "*" to match all usernames.
   // Required.
+  // +required
+  // +k8s:required
   optional string name = 1;
 }
 
