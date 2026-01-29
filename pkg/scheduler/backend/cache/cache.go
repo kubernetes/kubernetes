@@ -204,6 +204,9 @@ func (cache *cacheImpl) UpdateSnapshot(logger klog.Logger, nodeSnapshot *Snapsho
 	// last snapshot generation.
 	updateUsedPVCSet := false
 
+	// Forget all assumed pods from a previous snapshot version.
+	nodeSnapshot.forgetAllAssumedPods(logger)
+
 	// Start from the head of the NodeInfo doubly linked list and update snapshot
 	// of NodeInfos updated after the last snapshot.
 	for node := cache.headNode; node != nil; node = node.next {
