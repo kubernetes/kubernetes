@@ -188,15 +188,8 @@ var _ = SIGDescribe("Mount propagation", func() {
 		}
 
 		// Find the kubelet PID to ensure we're working with the kubelet's mount namespace
-		cmd = "pidof kubelet"
-		kubeletPid, err := hostExec.IssueCommandWithResult(ctx, cmd, node)
-		framework.ExpectNoError(err, "Checking kubelet pid")
-		framework.Logf("pidof kubelet returns %s", kubeletPid)
-		// In rare cases in the CI, we are seeing two pids for kubelet.
-		// We did some investigating and the last entry of this list is the one that we want
-		// Higher pids are more likely to be created after the first one
-		kubeletPids := strings.Split(strings.TrimSuffix(kubeletPid, "\n"), " ")
-		enterKubeletMountNS := fmt.Sprintf("nsenter -t %s -m", kubeletPids[len(kubeletPids)-1])
+		kubeletPid := pidOfKubelet(ctx, hostExec, node)
+		enterKubeletMountNS := fmt.Sprintf("nsenter -t %d -m", kubeletPid)
 
 		// Check that the master and host mounts are propagated to the container runtime's mount namespace
 		for _, mountName := range []string{"host", master.Name} {
