@@ -20,16 +20,21 @@ import (
 	"k8s.io/utils/cpuset"
 )
 
+type ContainerCPUAssignment struct {
+	Original cpuset.CPUSet
+	Resized  cpuset.CPUSet
+}
+
 // ContainerCPUAssignments type used in cpu manager state
-type ContainerCPUAssignments map[string]map[string]cpuset.CPUSet
+type ContainerCPUAssignments map[string]map[string]ContainerCPUAssignment
 
 // Clone returns a copy of ContainerCPUAssignments
 func (as ContainerCPUAssignments) Clone() ContainerCPUAssignments {
 	ret := make(ContainerCPUAssignments, len(as))
 	for pod := range as {
-		ret[pod] = make(map[string]cpuset.CPUSet, len(as[pod]))
-		for container, cset := range as[pod] {
-			ret[pod][container] = cset
+		ret[pod] = make(map[string]ContainerCPUAssignment, len(as[pod]))
+		for container, containerCPUAssignment := range as[pod] {
+			ret[pod][container] = containerCPUAssignment
 		}
 	}
 	return ret
@@ -37,6 +42,7 @@ func (as ContainerCPUAssignments) Clone() ContainerCPUAssignments {
 
 // Reader interface used to read current cpu/pod assignment state
 type Reader interface {
+	GetOriginalCPUSet(podUID string, containerName string) (cpuset.CPUSet, bool)
 	GetCPUSet(podUID string, containerName string) (cpuset.CPUSet, bool)
 	GetDefaultCPUSet() cpuset.CPUSet
 	GetCPUSetOrDefault(podUID string, containerName string) cpuset.CPUSet
