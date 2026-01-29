@@ -66,7 +66,7 @@ func newDialMetrics() *DialMetrics {
 			Subsystem:      subsystem,
 			Name:           "dial_start_total",
 			Help:           "Dial starts, labeled by the protocol (http-connect or grpc) and transport (tcp or uds).",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		},
 		[]string{"protocol", "transport"},
 	)
@@ -78,7 +78,7 @@ func newDialMetrics() *DialMetrics {
 			Name:           "dial_duration_seconds",
 			Help:           "Dial latency histogram in seconds, labeled by the protocol (http-connect or grpc), transport (tcp or uds)",
 			Buckets:        latencyBuckets,
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		},
 		[]string{"protocol", "transport"},
 	)
@@ -89,7 +89,7 @@ func newDialMetrics() *DialMetrics {
 			Subsystem:      subsystem,
 			Name:           "dial_failure_count",
 			Help:           "Dial failure count, labeled by the protocol (http-connect or grpc), transport (tcp or uds), and stage (connect or proxy). The stage indicates at which stage the dial failed",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		},
 		[]string{"protocol", "transport", "stage"},
 	)

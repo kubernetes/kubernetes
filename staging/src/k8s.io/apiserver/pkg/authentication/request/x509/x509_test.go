@@ -27,6 +27,7 @@ import (
 	"os"
 	"regexp"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -39,6 +40,7 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/legacyregistry"
 )
 
 const (
@@ -1276,5 +1278,32 @@ func TestCertificateIdentifier(t *testing.T) {
 				t.Errorf("expected %q, got %q", tc.expectedIdentifier, got)
 			}
 		})
+	}
+}
+
+func TestClientCertificateExpirationMetric(t *testing.T) {
+	// Test that the metric is registered with BETA stability level
+	// The metric is observed during AuthenticateRequest, so we verify registration
+	// by checking the metric exists in the registry with correct help text
+	metrics, err := legacyregistry.DefaultGatherer.Gather()
+	if err != nil {
+		t.Fatalf("Failed to gather metrics: %v", err)
+	}
+
+	found := false
+	for _, mf := range metrics {
+		if mf.GetName() == "apiserver_client_certificate_expiration_seconds" {
+			found = true
+			// Verify the help text contains [BETA]
+			help := mf.GetHelp()
+			if !strings.Contains(help, "[BETA]") {
+				t.Errorf("Expected help text to contain [BETA], got: %s", help)
+			}
+			break
+		}
+	}
+
+	if !found {
+		t.Error("Metric apiserver_client_certificate_expiration_seconds not found in registry")
 	}
 }

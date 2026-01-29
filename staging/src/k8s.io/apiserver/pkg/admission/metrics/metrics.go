@@ -198,7 +198,7 @@ func newAdmissionMetrics() *AdmissionMetrics {
 			Subsystem:      subsystem,
 			Name:           "webhook_rejection_count",
 			Help:           "Admission webhook rejection count, identified by name and broken out for each admission type (validating or admit) and operation. Additional labels specify an error type (calling_webhook_error or apiserver_internal_error if an error occurred; no_error otherwise) and optionally a non-zero rejection code if the webhook rejects the request with an HTTP status code (honored by the apiserver when the code is greater or equal to 400). Codes greater than 600 are truncated to 600, to keep the metrics cardinality bounded.",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		},
 		[]string{"name", "type", "operation", "error_type", "rejection_code"})
 
@@ -218,7 +218,7 @@ func newAdmissionMetrics() *AdmissionMetrics {
 			Subsystem:      subsystem,
 			Name:           "webhook_request_total",
 			Help:           "Admission webhook request total, identified by name and broken out for each admission type (validating or admit) and operation. Additional labels specify whether the request was rejected or not and an HTTP status code. Codes greater than 600 are truncated to 600, to keep the metrics cardinality bounded.",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		},
 		[]string{"name", "type", "operation", "code", "rejected"})
 
