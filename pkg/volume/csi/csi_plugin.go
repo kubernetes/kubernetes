@@ -387,8 +387,8 @@ func initializeCSINode(host volume.VolumeHost, csiDriverInformer cache.SharedInd
 		// after max retry steps.
 		initBackoff := wait.Backoff{
 			Steps:    6,
-			Duration: 15 * time.Millisecond,
-			Factor:   6.0,
+			Duration: 30 * time.Millisecond,
+			Factor:   8.0,
 			Jitter:   0.1,
 		}
 		err = wait.ExponentialBackoff(initBackoff, func() (bool, error) {
