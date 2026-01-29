@@ -231,3 +231,228 @@ func TestEventedPLEG_getPodIPs(t *testing.T) {
 		})
 	}
 }
+
+func TestEventedPLEGUsageFlag(t *testing.T) {
+	orig := isEventedPLEGInUse()
+	defer setEventedPLEGUsage(orig)
+
+	setEventedPLEGUsage(false)
+	assert.False(t, isEventedPLEGInUse(), "expected false initially")
+
+	setEventedPLEGUsage(true)
+	assert.True(t, isEventedPLEGInUse(), "expected true after setting")
+
+	setEventedPLEGUsage(false)
+	assert.False(t, isEventedPLEGInUse(), "expected false after resetting")
+}
+
+func TestProcessCRIEvent(t *testing.T) {
+	testCases := []struct {
+		name           string
+		eventType      v1.ContainerEventType
+		expectedEvents []PodLifeCycleEventType
+	}{
+		{
+			name:           "container started event",
+			eventType:      v1.ContainerEventType_CONTAINER_STARTED_EVENT,
+			expectedEvents: []PodLifeCycleEventType{ContainerStarted},
+		},
+		{
+			name:           "container stopped event",
+			eventType:      v1.ContainerEventType_CONTAINER_STOPPED_EVENT,
+			expectedEvents: []PodLifeCycleEventType{ContainerDied},
+		},
+		{
+			name:           "container deleted event sends both died and removed",
+			eventType:      v1.ContainerEventType_CONTAINER_DELETED_EVENT,
+			expectedEvents: []PodLifeCycleEventType{ContainerDied, ContainerRemoved},
+		},
+		{
+			name:           "container created event sends no lifecycle event",
+			eventType:      v1.ContainerEventType_CONTAINER_CREATED_EVENT,
+			expectedEvents: []PodLifeCycleEventType{},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			pleg := newTestEventedPLEG()
+
+			event := &v1.ContainerEventResponse{
+				ContainerId:        "test-container-id",
+				ContainerEventType: tc.eventType,
+				PodSandboxStatus: &v1.PodSandboxStatus{
+					Metadata: &v1.PodSandboxMetadata{
+						Uid: "test-pod-uid",
+					},
+				},
+			}
+
+			pleg.processCRIEvent(event)
+
+			var receivedEvents []PodLifeCycleEventType
+			for len(pleg.eventChannel) > 0 {
+				e := <-pleg.eventChannel
+				receivedEvents = append(receivedEvents, e.Type)
+			}
+
+			require.Len(t, receivedEvents, len(tc.expectedEvents), "unexpected number of events")
+
+			for i, expected := range tc.expectedEvents {
+				assert.Equal(t, expected, receivedEvents[i], "event %d mismatch", i)
+			}
+		})
+	}
+}
+
+func TestSendPodLifecycleEvent(t *testing.T) {
+	t.Run("event sent when channel has capacity", func(t *testing.T) {
+		pleg := newTestEventedPLEG()
+
+		event := &PodLifecycleEvent{
+			ID:   "test-pod",
+			Type: ContainerStarted,
+			Data: "test-container",
+		}
+
+		pleg.sendPodLifecycleEvent(event)
+
+		require.Len(t, pleg.eventChannel, 1)
+		received := <-pleg.eventChannel
+		assert.Equal(t, event.ID, received.ID)
+		assert.Equal(t, event.Type, received.Type)
+	})
+
+	t.Run("event discarded when channel is full", func(t *testing.T) {
+		pleg := &EventedPLEG{
+			eventChannel: make(chan *PodLifecycleEvent, 1),
+		}
+
+		pleg.eventChannel <- &PodLifecycleEvent{ID: "first", Type: ContainerStarted}
+		pleg.sendPodLifecycleEvent(&PodLifecycleEvent{ID: "second", Type: ContainerDied})
+
+		require.Len(t, pleg.eventChannel, 1)
+		received := <-pleg.eventChannel
+		assert.Equal(t, types.UID("first"), received.ID)
+	})
+}
+
+func TestGetContainerStateCount(t *testing.T) {
+	testCases := []struct {
+		name     string
+		status   *kubecontainer.PodStatus
+		expected map[kubecontainer.State]int
+	}{
+		{
+			name:     "empty pod status",
+			status:   &kubecontainer.PodStatus{},
+			expected: map[kubecontainer.State]int{},
+		},
+		{
+			name: "single running container",
+			status: &kubecontainer.PodStatus{
+				ContainerStatuses: []*kubecontainer.Status{
+					{State: kubecontainer.ContainerStateRunning},
+				},
+			},
+			expected: map[kubecontainer.State]int{
+				kubecontainer.ContainerStateRunning: 1,
+			},
+		},
+		{
+			name: "multiple containers in different states",
+			status: &kubecontainer.PodStatus{
+				ContainerStatuses: []*kubecontainer.Status{
+					{State: kubecontainer.ContainerStateRunning},
+					{State: kubecontainer.ContainerStateRunning},
+					{State: kubecontainer.ContainerStateExited},
+					{State: kubecontainer.ContainerStateUnknown},
+				},
+			},
+			expected: map[kubecontainer.State]int{
+				kubecontainer.ContainerStateRunning: 2,
+				kubecontainer.ContainerStateExited:  1,
+				kubecontainer.ContainerStateUnknown: 1,
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			result := getContainerStateCount(tc.status)
+			assert.Equal(t, tc.expected, result)
+		})
+	}
+}
+
+func TestGetPodSandboxState(t *testing.T) {
+	testCases := []struct {
+		name     string
+		status   *kubecontainer.PodStatus
+		expected kubecontainer.State
+	}{
+		{
+			name: "sandbox is running",
+			status: &kubecontainer.PodStatus{
+				SandboxStatuses: []*v1.PodSandboxStatus{
+					{Id: "sandbox-1"},
+				},
+				ContainerStatuses: []*kubecontainer.Status{
+					{
+						ID:    kubecontainer.ContainerID{ID: "sandbox-1"},
+						State: kubecontainer.ContainerStateRunning,
+					},
+				},
+			},
+			expected: kubecontainer.ContainerStateRunning,
+		},
+		{
+			name: "sandbox is exited",
+			status: &kubecontainer.PodStatus{
+				SandboxStatuses: []*v1.PodSandboxStatus{
+					{Id: "sandbox-1"},
+				},
+				ContainerStatuses: []*kubecontainer.Status{
+					{
+						ID:    kubecontainer.ContainerID{ID: "sandbox-1"},
+						State: kubecontainer.ContainerStateExited,
+					},
+				},
+			},
+			expected: kubecontainer.ContainerStateExited,
+		},
+		{
+			name: "no sandbox status returns exited",
+			status: &kubecontainer.PodStatus{
+				SandboxStatuses:   []*v1.PodSandboxStatus{},
+				ContainerStatuses: []*kubecontainer.Status{},
+			},
+			expected: kubecontainer.ContainerStateExited,
+		},
+		{
+			name: "sandbox not found in container statuses returns exited",
+			status: &kubecontainer.PodStatus{
+				SandboxStatuses: []*v1.PodSandboxStatus{
+					{Id: "sandbox-1"},
+				},
+				ContainerStatuses: []*kubecontainer.Status{
+					{
+						ID:    kubecontainer.ContainerID{ID: "different-container"},
+						State: kubecontainer.ContainerStateRunning,
+					},
+				},
+			},
+			expected: kubecontainer.ContainerStateExited,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			result := getPodSandboxState(tc.status)
+			assert.Equal(t, tc.expected, result)
+		})
+	}
+}
