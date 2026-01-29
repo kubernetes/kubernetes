@@ -1438,6 +1438,7 @@ func (p *PriorityQueue) newQueuedPodInfo(pod *v1.Pod, plugins ...string) *framew
 		PodInfo:                 podInfo,
 		Timestamp:               now,
 		InitialAttemptTimestamp: nil,
+		PodSignature:            nil,
 		UnschedulablePlugins:    sets.New(plugins...),
 	}
 }
