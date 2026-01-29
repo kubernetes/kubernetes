@@ -17,8 +17,8 @@ limitations under the License.
 package hash
 
 import (
-	"fmt"
 	"hash"
+	"io"
 
 	"k8s.io/apimachinery/pkg/util/dump"
 )
@@ -28,5 +28,6 @@ import (
 // ensuring the hash does not change when a pointer changes.
 func DeepHashObject(hasher hash.Hash, objectToWrite interface{}) {
 	hasher.Reset()
-	fmt.Fprintf(hasher, "%v", dump.ForHash(objectToWrite))
+	// Write directly to the hash to avoid fmt overhead on hot paths.
+	_, _ = io.WriteString(hasher, dump.ForHash(objectToWrite))
 }
