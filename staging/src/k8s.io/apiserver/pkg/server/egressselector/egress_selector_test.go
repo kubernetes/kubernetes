@@ -21,6 +21,8 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -29,6 +31,7 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/apis/apiserver"
 	"k8s.io/apiserver/pkg/server/egressselector/metrics"
+	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 	testingclock "k8s.io/utils/clock/testing"
@@ -339,6 +342,66 @@ konnectivity_network_proxy_client_client_connections{status="dialing"} 1
 			tc.trigger()
 			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tc.want), tc.metrics...); err != nil {
 				t.Errorf("GatherAndCompare error: %v", err)
+			}
+		})
+	}
+}
+
+func TestGetTLSConfig(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// Generate self-signed cert and key using Kubernetes test utilities
+	certPEM, keyPEM, err := certutil.GenerateSelfSignedCertKey("localhost", nil, nil)
+	if err != nil {
+		t.Fatalf("Failed to generate test certificates: %v", err)
+	}
+
+	// Write cert and key to temp files (getTLSConfig reads from disk)
+	certPath := filepath.Join(tempDir, "cert.crt")
+	keyPath := filepath.Join(tempDir, "cert.key")
+	if err := os.WriteFile(certPath, certPEM, 0600); err != nil {
+		t.Fatalf("Failed to write cert file: %v", err)
+	}
+	if err := os.WriteFile(keyPath, keyPEM, 0600); err != nil {
+		t.Fatalf("Failed to write key file: %v", err)
+	}
+
+	testcases := []struct {
+		name               string
+		tlsConfig          *apiserver.TLSConfig
+		expectedServerName string
+	}{
+		{
+			name: "with TLSServerName set",
+			tlsConfig: &apiserver.TLSConfig{
+				CABundle:      certPath,
+				ClientCert:    certPath,
+				ClientKey:     keyPath,
+				TLSServerName: "custom-server.example.com",
+			},
+			expectedServerName: "custom-server.example.com",
+		},
+		{
+			name: "without TLSServerName (empty)",
+			tlsConfig: &apiserver.TLSConfig{
+				CABundle:      certPath,
+				ClientCert:    certPath,
+				ClientKey:     keyPath,
+				TLSServerName: "",
+			},
+			expectedServerName: "",
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			tlsConfig, err := getTLSConfig(tc.tlsConfig)
+			if err != nil {
+				t.Fatalf("getTLSConfig returned unexpected error: %v", err)
+			}
+
+			if tlsConfig.ServerName != tc.expectedServerName {
+				t.Errorf("expected ServerName %q, got %q", tc.expectedServerName, tlsConfig.ServerName)
 			}
 		})
 	}

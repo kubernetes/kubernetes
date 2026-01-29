@@ -147,6 +147,10 @@ type TLSConfig struct {
 	// Must be configured if TCPTransport.URL is prefixed with https://
 	// +optional
 	ClientCert string `json:"clientCert,omitempty"`
+
+	// tlsServerName is used to check server certificate. If TLSServerName is empty, the hostname used to contact the server is used.
+	// +optional
+	TLSServerName string `json:"tlsServerName,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
