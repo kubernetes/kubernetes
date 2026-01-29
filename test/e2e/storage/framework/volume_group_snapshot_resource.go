@@ -25,8 +25,10 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -113,38 +115,14 @@ func CreateVolumeGroupSnapshot(ctx context.Context, sDriver VolumeGroupSnapshott
 	return gsclass, volumeGroupSnapshot, vgsc
 }
 
-// CleanupVGS deletes the VolumeGroupSnapshot and ensures the bound VolumeGroupSnapshotContent has Delete policy.
-// It waits for the VolumeGroupSnapshot, its owned VolumeSnapshots, VolumeSnapshotContents, and the bound
-// VolumeGroupSnapshotContent to be fully deleted to prevent resource leaks.
-func (r *VolumeGroupSnapshotResource) CleanupVGS(ctx context.Context, timeouts *framework.TimeoutContext) error {
-	if r.VGS == nil {
-		return nil
-	}
-
-	var cleanupErrs []error
-	dc := r.Config.Framework.DynamicClient
-	vgsNamespace := r.VGS.GetNamespace()
-	vgsName := r.VGS.GetName()
-	vgsUID := r.VGS.GetUID()
-	framework.Logf("deleting groupSnapshot %q/%q and ensuring content has Delete policy", vgsNamespace, vgsName)
-
-	vgs, err := dc.Resource(utils.VolumeGroupSnapshotGVR).Namespace(vgsNamespace).Get(ctx, vgsName, metav1.GetOptions{})
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			// Hope that the underlying snapshot contents and resources are gone already
-			return nil
-		}
-		return fmt.Errorf("failed to get VGS %q: %w", vgsName, err)
-	}
-	r.VGS = vgs
-
-	// Filter snapshots owned by this VGS
+// getVolumeSnapshotContentNames returns the set of VolumeSnapshotContent names bound to VolumeSnapshots owned by the given VGS
+func (r *VolumeGroupSnapshotResource) getVolumeSnapshotContentNames(ctx context.Context, dc dynamic.Interface, vgsNamespace string, vgsUID types.UID) (sets.Set[string], error) {
 	vss, err := dc.Resource(utils.SnapshotGVR).Namespace(vgsNamespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	contentNamesSet := sets.NewString()
+	contentNamesSet := sets.New[string]()
 	for _, vs := range vss.Items {
 		for _, owner := range vs.GetOwnerReferences() {
 			if owner.Kind == "VolumeGroupSnapshot" && owner.UID == vgsUID {
@@ -156,7 +134,125 @@ func (r *VolumeGroupSnapshotResource) CleanupVGS(ctx context.Context, timeouts *
 			}
 		}
 	}
+	return contentNamesSet, nil
+}
 
+// cleanupRetainedVolumeSnapshotContents forcibly deletes VolumeSnapshotContents with Retain policy
+func (r *VolumeGroupSnapshotResource) cleanupRetainedVolumeSnapshotContents(ctx context.Context, dc dynamic.Interface, contentNames sets.Set[string], timeouts *framework.TimeoutContext) {
+	// Update deletion policy and delete each VolumeSnapshotContent
+	for _, contentName := range contentNames.UnsortedList() {
+		vsc, err := dc.Resource(utils.SnapshotContentGVR).Get(ctx, contentName, metav1.GetOptions{})
+		if err != nil {
+			if !apierrors.IsNotFound(err) {
+				framework.Logf("Warning: failed to get VolumeSnapshotContent %q: %v", contentName, err)
+			}
+			continue
+		}
+
+		// Update deletion policy to Delete
+		vscSpec := vsc.Object["spec"].(map[string]interface{})
+		vscSpec["deletionPolicy"] = "Delete"
+		_, err = dc.Resource(utils.SnapshotContentGVR).Update(ctx, vsc, metav1.UpdateOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			framework.Logf("Warning: failed to update VolumeSnapshotContent %q deletion policy: %v", contentName, err)
+		}
+
+		// Delete VolumeSnapshotContent
+		err = dc.Resource(utils.SnapshotContentGVR).Delete(ctx, contentName, metav1.DeleteOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			framework.Logf("Warning: failed to delete VolumeSnapshotContent %q: %v", contentName, err)
+		}
+	}
+
+	// Wait for all VolumeSnapshotContents to be deleted
+	framework.Logf("Waiting for VolumeSnapshotContents to be deleted")
+	for _, contentName := range contentNames.UnsortedList() {
+		if err := utils.WaitForGVRDeletion(ctx, dc, utils.SnapshotContentGVR, contentName, framework.Poll, timeouts.SnapshotDelete); err != nil {
+			framework.Logf("Warning: VolumeSnapshotContent %q may not be fully deleted: %v", contentName, err)
+		}
+	}
+}
+
+// cleanupRetainedVGSContent forcibly deletes VolumeGroupSnapshotContent with Retain policy
+func (r *VolumeGroupSnapshotResource) cleanupRetainedVGSContent(ctx context.Context, dc dynamic.Interface, vgscName string, timeouts *framework.TimeoutContext) {
+	framework.Logf("Deleting VGSContent %q", vgscName)
+
+	// Refetch the latest version to avoid resource conflict
+	boundVGSContent, err := dc.Resource(utils.VolumeGroupSnapshotContentGVR).Get(ctx, vgscName, metav1.GetOptions{})
+	if err != nil && !apierrors.IsNotFound(err) {
+		framework.Logf("Warning: failed to refetch VGSContent %q: %v", vgscName, err)
+	}
+
+	// Update deletion policy to Delete if we successfully fetched it
+	if boundVGSContent != nil && err == nil {
+		spec := boundVGSContent.Object["spec"].(map[string]interface{})
+		spec["deletionPolicy"] = "Delete"
+		_, err = dc.Resource(utils.VolumeGroupSnapshotContentGVR).Update(ctx, boundVGSContent, metav1.UpdateOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			framework.Logf("Warning: failed to update VGSContent %q deletion policy: %v", vgscName, err)
+		}
+	}
+
+	// Delete VGSContent
+	err = dc.Resource(utils.VolumeGroupSnapshotContentGVR).Delete(ctx, vgscName, metav1.DeleteOptions{})
+	if err != nil && !apierrors.IsNotFound(err) {
+		framework.Logf("Warning: failed to delete VGSContent %q: %v", vgscName, err)
+	}
+
+	// Wait for VGSContent to be deleted
+	framework.Logf("Waiting for VGSContent %q to be deleted", vgscName)
+	err = utils.WaitForGVRDeletion(ctx, dc, utils.VolumeGroupSnapshotContentGVR, vgscName, framework.Poll, timeouts.SnapshotDelete)
+	if err != nil && !apierrors.IsNotFound(err) {
+		framework.Logf("Warning: VGSContent %q may not be fully deleted: %v", vgscName, err)
+	}
+}
+
+// verifyVolumeSnapshotContentsDeletion verifies that all VolumeSnapshotContents have been deleted
+func (r *VolumeGroupSnapshotResource) verifyVolumeSnapshotContentsDeletion(ctx context.Context, dc dynamic.Interface, contentNames sets.Set[string], timeouts *framework.TimeoutContext) {
+	ginkgo.By("Verifying all VolumeSnapshotContents have been deleted")
+	var verifyErrs []error
+	for _, contentName := range contentNames.UnsortedList() {
+		err := utils.EnsureGVRDeletion(ctx, dc, utils.SnapshotContentGVR, contentName, framework.Poll, timeouts.SnapshotDelete, "")
+		if err != nil {
+			verifyErrs = append(verifyErrs, fmt.Errorf("VolumeSnapshotContent %q should be deleted: %w", contentName, err))
+		}
+	}
+	if len(verifyErrs) > 0 {
+		framework.ExpectNoError(utilerrors.NewAggregate(verifyErrs), "Failed to verify VolumeSnapshotContents deletion")
+	}
+}
+
+// CleanupVGS deletes the VolumeGroupSnapshot and ensures the bound VolumeGroupSnapshotContent has Delete policy.
+// It waits for the VolumeGroupSnapshot, its owned VolumeSnapshots, VolumeSnapshotContents, and the bound
+// VolumeGroupSnapshotContent to be fully deleted to prevent resource leaks.
+func (r *VolumeGroupSnapshotResource) CleanupVGS(ctx context.Context, timeouts *framework.TimeoutContext) error {
+	if r.VGS == nil {
+		return nil
+	}
+
+	dc := r.Config.Framework.DynamicClient
+	vgsNamespace := r.VGS.GetNamespace()
+	vgsName := r.VGS.GetName()
+	vgsUID := r.VGS.GetUID()
+	framework.Logf("deleting groupSnapshot %q/%q and ensuring content has Delete policy", vgsNamespace, vgsName)
+
+	// Get the VGS to ensure it exists
+	vgs, err := dc.Resource(utils.VolumeGroupSnapshotGVR).Namespace(vgsNamespace).Get(ctx, vgsName, metav1.GetOptions{})
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return fmt.Errorf("failed to get VGS %q: %w", vgsName, err)
+	}
+	r.VGS = vgs
+
+	// Get all VolumeSnapshotContent names owned by this VGS
+	contentNamesSet, err := r.getVolumeSnapshotContentNames(ctx, dc, vgsNamespace, vgsUID)
+	if err != nil {
+		return err
+	}
+
+	// Get the bound VolumeGroupSnapshotContent
 	groupSnapshotStatus := r.VGS.Object["status"].(map[string]interface{})
 	groupSnapshotContentName := groupSnapshotStatus["boundVolumeGroupSnapshotContentName"].(string)
 	framework.Logf("received groupSnapshotStatus %v", groupSnapshotStatus)
@@ -164,11 +260,12 @@ func (r *VolumeGroupSnapshotResource) CleanupVGS(ctx context.Context, timeouts *
 
 	boundVGSContent, err := dc.Resource(utils.VolumeGroupSnapshotContentGVR).Get(ctx, groupSnapshotContentName, metav1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
-		return fmt.Errorf("failed to get bound VGSContent %q: %w", boundVGSContent.GetName(), err)
+		return fmt.Errorf("failed to get bound VGSContent %q: %w", groupSnapshotContentName, err)
 	}
 
-	// Ensure deletion policy is set to Delete to prevent leaks
-	if boundVGSContent != nil {
+	// For Delete policy, ensure deletion policy is set to Delete to prevent leaks
+	// For Retain policy, we'll update it after verifying retention behavior
+	if boundVGSContent != nil && r.Pattern.SnapshotDeletionPolicy == DeleteSnapshot {
 		spec := boundVGSContent.Object["spec"].(map[string]interface{})
 		if spec["deletionPolicy"] != "Delete" {
 			spec["deletionPolicy"] = "Delete"
@@ -190,30 +287,43 @@ func (r *VolumeGroupSnapshotResource) CleanupVGS(ctx context.Context, timeouts *
 		return fmt.Errorf("failed waiting for VGS %q deletion: %w", vgsName, err)
 	}
 
-	// Wait for VolumeSnapshots owned by this group to be gone
-	if err := utils.WaitForOwnedResourcesDeleted(ctx, dc, utils.SnapshotGVR, vgsNamespace, vgsUID, framework.Poll, timeouts.SnapshotDelete); err != nil {
-		return fmt.Errorf("failed waiting for owned snapshots deletion of VGS %q: %w", vgsName, err)
-	}
-
-	// Wait for all VolumeSnapshotsContents owned by this group to be gone
-	for _, contentName := range contentNamesSet.List() {
-		if err := utils.WaitForGVRDeletion(ctx, dc, utils.SnapshotContentGVR, contentName, framework.Poll, timeouts.SnapshotDelete); err != nil {
-			cleanupErrs = append(cleanupErrs, fmt.Errorf("failed waiting for VSC %q deletion: %w", contentName, err))
+	// Wait for VolumeSnapshots owned by this VGS to be cascade-deleted
+	// This happens regardless of deletion policy because VGS owns VolumeSnapshots via owner references
+	if vgsUID != "" {
+		if err := utils.WaitForOwnedResourcesDeleted(ctx, dc, utils.SnapshotGVR, vgsNamespace, vgsUID, framework.Poll, timeouts.SnapshotDelete); err != nil {
+			return fmt.Errorf("failed waiting for owned snapshots deletion of VGS %q: %w", vgsName, err)
 		}
 	}
-	if len(cleanupErrs) > 0 {
-		return utilerrors.NewAggregate(cleanupErrs)
-	}
 
-	// Wait for VolumeGroupSnapshotContent deleted
+	// Verify deletion policy behavior for VolumeGroupSnapshotContent
 	if boundVGSContent != nil {
-		err = utils.WaitForGVRDeletion(ctx, dc, utils.VolumeGroupSnapshotContentGVR, boundVGSContent.GetName(), framework.Poll, timeouts.SnapshotDelete)
-		if err == nil {
+		vgscName := boundVGSContent.GetName()
+
+		switch r.Pattern.SnapshotDeletionPolicy {
+		case DeleteSnapshot:
+			ginkgo.By(fmt.Sprintf("Verifying VolumeGroupSnapshotContent %q has been deleted per Delete policy", vgscName))
+			err = utils.EnsureGVRDeletion(ctx, dc, utils.VolumeGroupSnapshotContentGVR, vgscName, framework.Poll, timeouts.SnapshotDelete, "")
+			framework.ExpectNoError(err, "VolumeGroupSnapshotContent should be deleted with Delete policy")
 			r.VGSContent = nil
-		} else {
-			return fmt.Errorf("failed waiting for VGSContent %q deletion: %w", vgsName, err)
+		case RetainSnapshot:
+			ginkgo.By(fmt.Sprintf("Verifying VolumeGroupSnapshotContent %q has been retained per Retain policy", vgscName))
+			err = utils.EnsureNoGVRDeletion(ctx, dc, utils.VolumeGroupSnapshotContentGVR, vgscName, framework.Poll, 20*framework.Poll, "")
+			framework.ExpectNoError(err, "VolumeGroupSnapshotContent should be retained with Retain policy")
+
+			// Force cleanup to prevent leaks
+			// Cleanup order:
+			// 1. VolumeSnapshotContents (update policy + delete + wait)
+			// 2. VGSContent (update policy + delete + wait)
+			framework.Logf("Retain policy verified, now forcing cleanup to prevent leaks")
+			r.cleanupRetainedVolumeSnapshotContents(ctx, dc, contentNamesSet, timeouts)
+			r.cleanupRetainedVGSContent(ctx, dc, vgscName, timeouts)
+			r.VGSContent = nil
 		}
 	}
+
+	// Verify all VolumeSnapshotContents have been deleted
+	r.verifyVolumeSnapshotContentsDeletion(ctx, dc, contentNamesSet, timeouts)
+
 	return nil
 }
 
