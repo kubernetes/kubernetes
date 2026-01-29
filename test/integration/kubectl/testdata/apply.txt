@@ -1,0 +1,253 @@
+# Copyright The Kubernetes Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+## kubectl apply should create the resource that doesn't exist yet
+# Pre-Condition: no POD exists
+exec kubectl get pods --namespace ${NAMESPACE}
+stderr 'No resources found in'
+
+# Command: apply a pod "test-pod" (doesn't exist) should create this pod
+exec kubectl apply -f ${K8S_ROOT}/hack/testdata/pod.yaml --namespace ${NAMESPACE}
+# Post-Condition: pod "test-pod" is created
+exec kubectl get pods/test-pod --namespace ${NAMESPACE} -o=jsonpath='{.metadata.labels}'
+stdout 'test-pod-label'
+# Post-Condition: pod "test-pod" has configuration annotation
+exec kubectl get pods test-pod --namespace ${NAMESPACE} -o=jsonpath='{.metadata.annotations}'
+stdout 'kubectl.kubernetes.io/last-applied-configuration'
+# pod has field manager for kubectl client-side apply
+exec kubectl get --show-managed-fields -f ${K8S_ROOT}/hack/testdata/pod.yaml -o=jsonpath='{.metadata.managedFields[*].manager}' --namespace ${NAMESPACE}
+stdout 'kubectl-client-side-apply'
+# Clean up
+exec kubectl delete pods test-pod --namespace ${NAMESPACE}
+
+### set-last-applied
+# Pre-Condition: no POD exists
+exec kubectl get pods --namespace ${NAMESPACE}
+stderr 'No resources found in'
+# Command: create "test-pod" (doesn't exist) should create this pod without last-applied annotation
+exec kubectl create --namespace ${NAMESPACE} -f ${K8S_ROOT}/hack/testdata/pod.yaml
+# Post-Condition: pod "test-pod" is created
+exec kubectl get pods/test-pod --namespace ${NAMESPACE} -o=jsonpath='{.metadata.labels}'
+stdout 'test-pod-label'
+# Pre-Condition: pod "test-pod" does not have configuration annotation
+exec kubectl get pods test-pod --namespace ${NAMESPACE} -o=jsonpath='{.metadata.annotations}'
+! stdout 'kubectl.kubernetes.io/last-applied-configuration'
+# Dry-run set-last-applied
+exec kubectl apply set-last-applied --namespace ${NAMESPACE} --dry-run=client -f ${K8S_ROOT}/hack/testdata/pod.yaml --create-annotation=true
+exec kubectl apply set-last-applied --namespace ${NAMESPACE} --dry-run=server -f ${K8S_ROOT}/hack/testdata/pod.yaml --create-annotation=true
+exec kubectl get pods test-pod --namespace ${NAMESPACE} -o=jsonpath='{.metadata.annotations}'
+! stdout 'kubectl.kubernetes.io/last-applied-configuration'
+# Command
+exec kubectl apply set-last-applied --namespace ${NAMESPACE} -f ${K8S_ROOT}/hack/testdata/pod.yaml --create-annotation=true
+# Post-Condition: pod "test-pod" has configuration annotation
+exec kubectl get pods test-pod --namespace ${NAMESPACE} -o=jsonpath='{.metadata.annotations}'
+stdout 'kubectl.kubernetes.io/last-applied-configuration'
+# Clean up
+exec kubectl delete pods test-pod --namespace ${NAMESPACE}
+
+## kubectl apply should be able to clear defaulted fields.
+# Pre-Condition: no deployment exists
+exec kubectl get deployments --namespace ${NAMESPACE}
+stderr 'No resources found in'
+# Command: apply a deployment "test-deployment-retainkeys" (doesn't exist) should create this deployment
+exec kubectl apply --namespace ${NAMESPACE} -f ${K8S_ROOT}/hack/testdata/retainKeys/deployment/deployment-before.yaml
+# Post-Condition: deployment "test-deployment-retainkeys" created
+exec kubectl get deployments/test-deployment-retainkeys --namespace ${NAMESPACE}
+stdout 'test-deployment-retainkeys'
+# Post-Condition: deployment "test-deployment-retainkeys" has defaulted fields
+exec kubectl get deployments test-deployment-retainkeys --namespace ${NAMESPACE} -o yaml
+stdout 'RollingUpdate'
+stdout 'maxSurge'
+stdout 'maxUnavailable'
+stdout 'emptyDir'
+# Command: apply a deployment "test-deployment-retainkeys" should clear
+# defaulted fields and successfully update the deployment
+exec kubectl apply --namespace ${NAMESPACE} -f ${K8S_ROOT}/hack/testdata/retainKeys/deployment/deployment-after.yaml
+# Post-Condition: deployment "test-deployment-retainkeys" has updated fields
+exec kubectl get deployments test-deployment-retainkeys --namespace ${NAMESPACE} -o yaml
+stdout 'Recreate'
+! stdout 'RollingUpdate'
+stdout 'hostPath'
+! stdout 'emptyDir'
+# Clean up
+exec kubectl delete deployments test-deployment-retainkeys --namespace ${NAMESPACE}
+
+## kubectl apply -f with label selector should only apply matching objects
+# Pre-Condition: no POD exists
+exec kubectl get pods --namespace ${NAMESPACE}
+stderr 'No resources found in'
+# apply
+exec kubectl apply -l unique-label=bingbang --namespace ${NAMESPACE} -f ${K8S_ROOT}/hack/testdata/filter
+# check right pod exists
+exec kubectl get pods selector-test-pod --namespace ${NAMESPACE}
+stdout 'selector-test-pod'
+# check wrong pod doesn't exist
+! exec kubectl get pods selector-test-pod-dont-apply --namespace ${NAMESPACE}
+stderr 'pods "selector-test-pod-dont-apply" not found'
+# cleanup
+exec kubectl delete pods selector-test-pod --namespace ${NAMESPACE}
+
+# Create a deployment
+exec kubectl apply --namespace ${NAMESPACE} -f ${K8S_ROOT}/hack/testdata/null-propagation/deployment-null.yml
+# resources.limits.cpu should be nil.
+exec kubectl get deployment/my-dep-null --namespace ${NAMESPACE} -ojsonpath='{.spec.template.spec.containers[0].resources.requests.cpu}'
+stdout ''
+exec kubectl get deployment/my-dep-null --namespace ${NAMESPACE} -ojsonpath='{.spec.template.spec.containers[0].resources.requests.memory}'
+stdout '64Mi'
+# The default value of the terminationMessagePolicy field is `File`, so the result will not be changed.
+exec kubectl get deployment/my-dep-null --namespace ${NAMESPACE} -ojsonpath='{.spec.template.spec.containers[0].terminationMessagePolicy}'
+stdout 'File'
+
+# kubectl apply on create should do what kubectl apply on update will accomplish.
+exec kubectl apply --namespace ${NAMESPACE} -f ${K8S_ROOT}/hack/testdata/null-propagation/deployment-null.yml
+exec kubectl get deployment/my-dep-null --namespace ${NAMESPACE} -ojsonpath='{.spec.template.spec.containers[0].resources.requests.cpu}'
+stdout ''
+exec kubectl get deployment/my-dep-null --namespace ${NAMESPACE} -ojsonpath='{.spec.template.spec.containers[0].resources.requests.memory}'
+stdout '64Mi'
+exec kubectl get deployment/my-dep-null --namespace ${NAMESPACE} -ojsonpath='{.spec.template.spec.containers[0].terminationMessagePolicy}'
+stdout 'File'
+
+# hard.limits.cpu should be nil.
+exec kubectl apply --namespace ${NAMESPACE} -f ${K8S_ROOT}/hack/testdata/null-propagation/resourcesquota-null.yml
+exec kubectl get resourcequota/my-rq --namespace ${NAMESPACE} -ojsonpath='{.spec}'
+stdout '{}'
+
+# kubectl apply on create should do what kubectl apply on update will accomplish.
+exec kubectl apply --namespace ${NAMESPACE} -f ${K8S_ROOT}/hack/testdata/null-propagation/resourcesquota-null.yml
+exec kubectl get resourcequota/my-rq --namespace ${NAMESPACE} -ojsonpath='{.spec}'
+stdout '{}'
+
+# cleanup
+exec kubectl delete deployment my-dep-null --namespace ${NAMESPACE}
+exec kubectl delete resourcequota my-rq --namespace ${NAMESPACE}
+
+## kubectl apply --dry-run=server
+# Pre-Condition: no POD exists
+exec kubectl get pods --namespace ${NAMESPACE}
+stderr 'No resources found in'
+
+# apply dry-run
+exec kubectl apply --dry-run=client -f ${K8S_ROOT}/hack/testdata/pod.yaml --namespace ${NAMESPACE}
+exec kubectl apply --dry-run=server -f ${K8S_ROOT}/hack/testdata/pod.yaml --namespace ${NAMESPACE}
+# No pod exists
+exec kubectl get pods --namespace ${NAMESPACE}
+stderr 'No resources found in'
+# apply non dry-run creates the pod
+exec kubectl apply -f ${K8S_ROOT}/hack/testdata/pod.yaml --namespace ${NAMESPACE}
+exec kubectl get -f ${K8S_ROOT}/hack/testdata/pod.yaml --namespace ${NAMESPACE} -o go-template='{{ .metadata.resourceVersion }}'
+cp stdout initialResourceVersion
+# apply changes
+exec kubectl apply --dry-run=client -f ${K8S_ROOT}/hack/testdata/pod-apply.yaml --namespace ${NAMESPACE}
+exec kubectl apply --dry-run=server -f ${K8S_ROOT}/hack/testdata/pod-apply.yaml --namespace ${NAMESPACE}
+# Post-Condition: label still has initial value
+exec kubectl get pods/test-pod --namespace ${NAMESPACE} -o=jsonpath='{.metadata.labels}'
+stdout 'test-pod-label'
+# Ensure dry-run doesn't persist change
+exec kubectl get -f ${K8S_ROOT}/hack/testdata/pod.yaml -o go-template='{{ .metadata.resourceVersion }}' --namespace ${NAMESPACE}
+cmp stdout initialResourceVersion
+
+# clean-up
+exec kubectl delete -f ${K8S_ROOT}/hack/testdata/pod.yaml --namespace ${NAMESPACE}
+
+## kubectl apply dry-run on CR
+# Create CRD
+exec kubectl create -f crd1.json
+# Ensure the API server has recognized and started serving the associated CR API
+exec kubectl wait --for=condition=available apiservices/v1alpha1.mygroup.example.com
+# Dry-run create the CR
+exec kubectl apply --dry-run=server -f ${K8S_ROOT}/hack/testdata/CRD/resource.yaml --namespace ${NAMESPACE}
+# Make sure that the CR doesn't exist
+! exec kubectl get resource/myobj
+stderr 'NotFound'
+
+# clean-up
+exec kubectl delete customresourcedefinition resources.mygroup.example.com
+
+## kubectl apply --prune
+# Pre-Condition: namespace nsb exists; no POD exists
+exec kubectl create ns nsb
+exec kubectl get pods --namespace nsb
+stderr 'No resources found in'
+# apply a into namespace nsb
+exec kubectl apply --namespace nsb -l prune-group=true -f ${K8S_ROOT}/hack/testdata/prune/a.yaml
+exec kubectl get pods a --namespace nsb
+stdout 'a'
+# apply b with namespace
+exec kubectl apply --namespace nsb --prune -l prune-group=true -f ${K8S_ROOT}/hack/testdata/prune/b.yaml
+# check right pod exists and wrong pod doesn't exist
+exec kubectl get pods -n nsb
+stdout 'b'
+! stdout 'a'
+
+# cleanup
+exec kubectl delete pods b -n nsb
+
+# same thing without prune for a sanity check
+# Pre-Condition: no POD exists
+exec kubectl get pods --namespace ${NAMESPACE}
+stderr 'No resources found in'
+
+# apply a
+exec kubectl apply -l prune-group=true -f ${K8S_ROOT}/hack/testdata/prune/a.yaml --namespace ${NAMESPACE}
+# check right pod exists
+exec kubectl get pods --namespace ${NAMESPACE}
+stdout 'a'
+# check wrong pod doesn't exist
+exec kubectl get pods -n nsb
+! stdout b
+
+# apply b
+exec kubectl apply -l prune-group=true -f ${K8S_ROOT}/hack/testdata/prune/b.yaml
+# check both pods exist
+exec kubectl get pods --namespace ${NAMESPACE}
+stdout 'a'
+exec kubectl get pods -n nsb
+stdout 'b'
+
+# cleanup
+exec kubectl delete pod/a --namespace ${NAMESPACE}
+exec kubectl delete pod/b -n nsb
+
+
+-- crd1.json --
+{
+  "kind": "CustomResourceDefinition",
+  "apiVersion": "apiextensions.k8s.io/v1",
+  "metadata": {
+    "name": "resources.mygroup.example.com"
+  },
+  "spec": {
+    "group": "mygroup.example.com",
+    "scope": "Namespaced",
+    "names": {
+      "plural": "resources",
+      "singular": "resource",
+      "kind": "Kind",
+      "listKind": "KindList"
+    },
+    "versions": [
+      {
+        "name": "v1alpha1",
+        "served": true,
+        "storage": true,
+        "schema": {
+          "openAPIV3Schema": {
+            "x-kubernetes-preserve-unknown-fields": true,
+            "type": "object"
+          }
+        }
+      }
+    ]
+  }
+}
