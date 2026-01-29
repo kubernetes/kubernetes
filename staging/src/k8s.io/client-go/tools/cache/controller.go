@@ -626,6 +626,12 @@ func processDeltas(
 				return err
 			}
 			handler.OnDelete(obj)
+		case Bookmark:
+			resourceVersion, ok := obj.(string)
+			if !ok {
+				return fmt.Errorf("bookmark delta did not contain string: %T", obj)
+			}
+			clientState.ObserveResourceVersion(resourceVersion)
 		}
 	}
 	return nil
@@ -801,8 +807,9 @@ func newInformer(clientState Store, options InformerOptions, keyFunc KeyFunc) Co
 func newQueueFIFO(clientState Store, transform TransformFunc) Queue {
 	if clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.InOrderInformers) {
 		options := RealFIFOOptions{
-			KeyFunction: MetaNamespaceKeyFunc,
-			Transformer: transform,
+			KeyFunction:           MetaNamespaceKeyFunc,
+			Transformer:           transform,
+			EmitDeltaTypeBookmark: true,
 		}
 		// If atomic events are enabled, unset clientState in the case of atomic events as we cannot pass a
 		// store to an atomic fifo.
