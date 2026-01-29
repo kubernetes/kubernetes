@@ -36,6 +36,7 @@ import (
 	"k8s.io/klog/v2/ktesting"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	"k8s.io/utils/ptr"
 )
 
 func TestGetPodFullName(t *testing.T) {
@@ -123,39 +124,90 @@ func TestGetEarliestPodStartTime(t *testing.T) {
 	}
 }
 
-func TestMoreImportantPod(t *testing.T) {
-	currentTime := time.Now()
-	pod1 := newPriorityPodWithStartTime("pod1", 1, currentTime)
-	pod2 := newPriorityPodWithStartTime("pod2", 2, currentTime.Add(time.Second))
-	pod3 := newPriorityPodWithStartTime("pod3", 2, currentTime)
-
-	tests := map[string]struct {
-		p1       *v1.Pod
-		p2       *v1.Pod
-		expected bool
+func TestMoreImportantPodGroup(t *testing.T) {
+	epochTime := ptr.To(metav1.Now())
+	epochTime1 := ptr.To(metav1.NewTime(epochTime.Time.Add(time.Second)))
+	tests := []struct {
+		name                           string
+		g1                             *VictimGroup
+		g2                             *VictimGroup
+		workloadAwarePreemptionEnabled bool
+		want                           bool
 	}{
-		"Pod with higher priority": {
-			p1:       pod1,
-			p2:       pod2,
-			expected: false,
+		{
+			name: "g1 has higher priority",
+			g1:   &VictimGroup{Priority: 10},
+			g2:   &VictimGroup{Priority: 5},
+			want: true,
 		},
-		"Pod with older created time": {
-			p1:       pod2,
-			p2:       pod3,
-			expected: false,
+		{
+			name: "g2 has higher priority",
+			g1:   &VictimGroup{Priority: 5},
+			g2:   &VictimGroup{Priority: 10},
+			want: false,
 		},
-		"Pods with same start time": {
-			p1:       pod3,
-			p2:       pod1,
-			expected: true,
+		{
+			name:                           "same priority, workload-aware disabled, g1 started earlier",
+			g1:                             &VictimGroup{Priority: 5, StartTime: epochTime},
+			g2:                             &VictimGroup{Priority: 5, StartTime: epochTime1},
+			workloadAwarePreemptionEnabled: false,
+			want:                           true,
+		},
+		{
+			name:                           "same priority, workload-aware disabled, g2 started earlier",
+			g1:                             &VictimGroup{Priority: 5, StartTime: epochTime1},
+			g2:                             &VictimGroup{Priority: 5, StartTime: epochTime},
+			workloadAwarePreemptionEnabled: false,
+			want:                           false,
+		},
+		{
+			name:                           "same priority, workload-aware enabled, g1 is gang, g2 is not",
+			g1:                             &VictimGroup{Priority: 5, IsGang: true},
+			g2:                             &VictimGroup{Priority: 5, IsGang: false},
+			workloadAwarePreemptionEnabled: true,
+			want:                           true,
+		},
+		{
+			name:                           "same priority, workload-aware enabled, g2 is gang, g1 is not",
+			g1:                             &VictimGroup{Priority: 5, IsGang: false},
+			g2:                             &VictimGroup{Priority: 5, IsGang: true},
+			workloadAwarePreemptionEnabled: true,
+			want:                           false,
+		},
+		{
+			name:                           "both gangs, g1 has more pods",
+			g1:                             &VictimGroup{Priority: 5, IsGang: true, Pods: []*v1.Pod{{}, {}}},
+			g2:                             &VictimGroup{Priority: 5, IsGang: true, Pods: []*v1.Pod{{}}},
+			workloadAwarePreemptionEnabled: true,
+			want:                           true,
+		},
+		{
+			name:                           "both gangs, g2 has more pods",
+			g1:                             &VictimGroup{Priority: 5, IsGang: true, Pods: []*v1.Pod{{}}},
+			g2:                             &VictimGroup{Priority: 5, IsGang: true, Pods: []*v1.Pod{{}, {}}},
+			workloadAwarePreemptionEnabled: true,
+			want:                           false,
+		},
+		{
+			name:                           "both gangs, same size, g1 started earlier",
+			g1:                             &VictimGroup{Priority: 5, IsGang: true, Pods: []*v1.Pod{{}}, StartTime: epochTime},
+			g2:                             &VictimGroup{Priority: 5, IsGang: true, Pods: []*v1.Pod{{}}, StartTime: epochTime1},
+			workloadAwarePreemptionEnabled: true,
+			want:                           true,
+		},
+		{
+			name:                           "neither is gang, g1 started earlier",
+			g1:                             &VictimGroup{Priority: 5, IsGang: false, StartTime: epochTime},
+			g2:                             &VictimGroup{Priority: 5, IsGang: false, StartTime: epochTime1},
+			workloadAwarePreemptionEnabled: true,
+			want:                           true,
 		},
 	}
 
-	for k, v := range tests {
-		t.Run(k, func(t *testing.T) {
-			got := MoreImportantPod(v.p1, v.p2)
-			if got != v.expected {
-				t.Errorf("expected %t but got %t", v.expected, got)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := MoreImportantPodGroup(tt.g1, tt.g2, tt.workloadAwarePreemptionEnabled); got != tt.want {
+				t.Errorf("MoreImportantPodGroup() = %v, want %v", got, tt.want)
 			}
 		})
 	}

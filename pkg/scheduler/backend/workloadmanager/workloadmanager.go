@@ -23,6 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 )
 
 // WorkloadManager is the central source of truth for the state of pods belonging to Workload objects.
@@ -46,7 +47,7 @@ type workloadManager struct {
 	lock sync.RWMutex
 
 	// podGroupStates stores the runtime state for each known pod group.
-	podGroupStates map[podGroupKey]*podGroupState
+	podGroupStates map[helper.PodGroupKey]*podGroupState
 
 	logger klog.Logger
 }
@@ -54,7 +55,7 @@ type workloadManager struct {
 // New initializes a new workload manager and returns it.
 func New(logger klog.Logger) *workloadManager {
 	return &workloadManager{
-		podGroupStates: make(map[podGroupKey]*podGroupState),
+		podGroupStates: make(map[helper.PodGroupKey]*podGroupState),
 		logger:         logger,
 	}
 }
@@ -68,7 +69,7 @@ func (wm *workloadManager) AddPod(pod *v1.Pod) {
 	wm.lock.Lock()
 	defer wm.lock.Unlock()
 
-	key := newPodGroupKey(pod.Namespace, pod.Spec.WorkloadRef)
+	key := helper.NewPodGroupKey(pod.Namespace, pod.Spec.WorkloadRef)
 	state, ok := wm.podGroupStates[key]
 	if !ok {
 		state = newPodGroupState()
@@ -86,14 +87,14 @@ func (wm *workloadManager) UpdatePod(oldPod, newPod *v1.Pod) {
 	wm.lock.Lock()
 	defer wm.lock.Unlock()
 
-	key := newPodGroupKey(newPod.Namespace, newPod.Spec.WorkloadRef)
+	key := helper.NewPodGroupKey(newPod.Namespace, newPod.Spec.WorkloadRef)
 	state, ok := wm.podGroupStates[key]
 	if !ok {
 		// Shouldn't happen, but handling this case gracefully.
 		state = newPodGroupState()
 		wm.podGroupStates[key] = state
 		state.addPod(newPod)
-		wm.logger.Error(nil, "UpdatePod found no existing PodGroup for pod. Created new PodGroup for the pod", "pod", klog.KObj(newPod), "podGroupKey", klog.KObj(key))
+		wm.logger.Error(nil, "UpdatePod found no existing PodGroup for pod. Created new PodGroup for the pod", "pod", klog.KObj(newPod), "podGroupKey", klog.KObj(&key))
 		return
 	}
 	state.updatePod(oldPod, newPod)
@@ -108,7 +109,7 @@ func (wm *workloadManager) DeletePod(pod *v1.Pod) {
 	wm.lock.Lock()
 	defer wm.lock.Unlock()
 
-	key := newPodGroupKey(pod.Namespace, pod.Spec.WorkloadRef)
+	key := helper.NewPodGroupKey(pod.Namespace, pod.Spec.WorkloadRef)
 	state, ok := wm.podGroupStates[key]
 	if !ok {
 		// The pod group may have already been cleaned up, or the pod was never added.
@@ -126,7 +127,7 @@ func (wm *workloadManager) PodGroupState(namespace string, workloadRef *v1.Workl
 	wm.lock.RLock()
 	defer wm.lock.RUnlock()
 
-	state, ok := wm.podGroupStates[newPodGroupKey(namespace, workloadRef)]
+	state, ok := wm.podGroupStates[helper.NewPodGroupKey(namespace, workloadRef)]
 	if !ok {
 		return nil, fmt.Errorf("internal pod group state doesn't exist for a pod's workload")
 	}

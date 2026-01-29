@@ -26,6 +26,13 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	schedulingapiv1 "k8s.io/kubernetes/pkg/apis/scheduling/v1"
+	ptr "k8s.io/utils/ptr"
+)
+
+var (
+	podDisruptionMode      = ptr.To(scheduling.DisruptionModePod)
+	podGroupDisruptionMode = ptr.To(scheduling.DisruptionModePodGroup)
+	invalidDisruptionMode  = ptr.To(scheduling.DisruptionMode("Invalid"))
 )
 
 func TestValidatePriorityClass(t *testing.T) {
@@ -191,6 +198,12 @@ func TestValidateWorkload(t *testing.T) {
 		}),
 		"no controllerRef apiGroup": mkWorkload(func(w *scheduling.Workload) {
 			w.Spec.ControllerRef.APIGroup = ""
+		}),
+		"pod disruption mode": mkWorkload(func(w *scheduling.Workload) {
+			w.Spec.PodGroups[1].Policy.Gang.DisruptionMode = podDisruptionMode
+		}),
+		"pod group disruption mode": mkWorkload(func(w *scheduling.Workload) {
+			w.Spec.PodGroups[1].Policy.Gang.DisruptionMode = podGroupDisruptionMode
 		}),
 	}
 	for name, workload := range successCases {
@@ -400,6 +413,14 @@ func TestValidateWorkload(t *testing.T) {
 				field.Invalid(field.NewPath("spec", "podGroups").Index(1).Child("policy", "gang", "minCount"), int64(-1), "must be greater than zero").WithOrigin("minimum").MarkCoveredByDeclarative(),
 			},
 		},
+		"invalid disruption mode in gang": {
+			workload: mkWorkload(func(w *scheduling.Workload) {
+				w.Spec.PodGroups[1].Policy.Gang.DisruptionMode = invalidDisruptionMode
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "podGroups").Index(1).Child("policy", "gang", "disruptionMode"), "Invalid", "must be one of: `Pod`, `PodGroup`").MarkCoveredByDeclarative(),
+			},
+		},
 	}
 
 	for name, tc := range failureCases {
@@ -508,6 +529,26 @@ func TestValidateWorkloadUpdate(t *testing.T) {
 			update: mkWorkload(func(w *scheduling.Workload) {
 				w.Spec.ControllerRef = nil
 			}),
+		},
+		"set disruption mode": {
+			old: mkWorkload(),
+			update: mkWorkload(func(w *scheduling.Workload) {
+				w.Spec.PodGroups[1].Policy.Gang.DisruptionMode = podGroupDisruptionMode
+			}),
+		},
+		"change disruption mode": {
+			old: mkWorkload(func(w *scheduling.Workload) {
+				w.Spec.PodGroups[1].Policy.Gang.DisruptionMode = podGroupDisruptionMode
+			}),
+			update: mkWorkload(func(w *scheduling.Workload) {
+				w.Spec.PodGroups[1].Policy.Gang.DisruptionMode = podDisruptionMode
+			}),
+		},
+		"delete disruption mode": {
+			old: mkWorkload(func(w *scheduling.Workload) {
+				w.Spec.PodGroups[1].Policy.Gang.DisruptionMode = podGroupDisruptionMode
+			}),
+			update: mkWorkload(),
 		},
 	}
 	for name, tc := range failureCases {

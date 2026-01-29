@@ -73,6 +73,26 @@ func Validate_GangSchedulingPolicy(ctx context.Context, op operation.Operation, 
 			return
 		}(fldPath.Child("minCount"), &obj.MinCount, safe.Field(oldObj, func(oldObj *schedulingv1alpha1.GangSchedulingPolicy) *int32 { return &oldObj.MinCount }), oldObj != nil)...)
 
+	// field schedulingv1alpha1.GangSchedulingPolicy.DisruptionMode
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *schedulingv1alpha1.DisruptionMode, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("disruptionMode"), obj.DisruptionMode, safe.Field(oldObj, func(oldObj *schedulingv1alpha1.GangSchedulingPolicy) *schedulingv1alpha1.DisruptionMode {
+			return oldObj.DisruptionMode
+		}), oldObj != nil)...)
+
 	return errs
 }
 
@@ -155,7 +175,7 @@ func Validate_PodGroupPolicy(ctx context.Context, op operation.Operation, fldPat
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *schedulingv1alpha1.GangSchedulingPolicy, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// call field-attached validations

@@ -17,14 +17,13 @@ limitations under the License.
 package workloadmanager
 
 import (
-	"fmt"
 	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
 )
 
@@ -32,36 +31,6 @@ import (
 // Permit stage for a quorum before being rejected.
 // Variable is exported only for testing purposes.
 var DefaultSchedulingTimeoutDuration = 5 * time.Minute
-
-// podGroupKey uniquely identifies a specific instance of a PodGroup.
-type podGroupKey struct {
-	namespace    string
-	workloadName string
-	podGroupName string
-	replicaKey   string
-}
-
-func (pgk podGroupKey) GetName() string {
-	if pgk.replicaKey == "" {
-		return fmt.Sprintf("%s-%s", pgk.workloadName, pgk.podGroupName)
-	}
-	return fmt.Sprintf("%s-%s-%s", pgk.workloadName, pgk.podGroupName, pgk.replicaKey)
-}
-
-func (pgk podGroupKey) GetNamespace() string {
-	return pgk.namespace
-}
-
-var _ klog.KMetadata = &podGroupKey{}
-
-func newPodGroupKey(namespace string, workloadRef *v1.WorkloadReference) podGroupKey {
-	return podGroupKey{
-		namespace:    namespace,
-		workloadName: workloadRef.Name,
-		podGroupName: workloadRef.PodGroup,
-		replicaKey:   workloadRef.PodGroupReplicaKey,
-	}
-}
 
 // podGroupState holds the runtime state of a pod group.
 type podGroupState struct {
@@ -79,6 +48,8 @@ type podGroupState struct {
 	// schedulingDeadline stores the time at which the gang will time out.
 	// It is initialized when the first pod from the group enters the Permit stage.
 	schedulingDeadline *time.Time
+	// startTime stores the start time of the earliest pod in the group.
+	startTime *metav1.Time
 }
 
 func newPodGroupState() *podGroupState {
@@ -116,6 +87,9 @@ func (pgs *podGroupState) updatePod(oldPod, newPod *v1.Pod) {
 		// Clear pod from unscheduled and assumed when it is assigned.
 		pgs.unscheduledPods.Delete(newPod.UID)
 		pgs.assumedPods.Delete(newPod.UID)
+	}
+	if pgs.startTime == nil && oldPod.Status.StartTime == nil && newPod.Status.StartTime != nil {
+		pgs.startTime = newPod.Status.StartTime
 	}
 }
 
@@ -176,6 +150,28 @@ func (pgs *podGroupState) AssignedPods() sets.Set[types.UID] {
 	defer pgs.lock.RUnlock()
 
 	return pgs.assignedPods.Clone()
+}
+
+// ScheduledPods returns the set of all pods for this group that are either assumed or assigned.
+func (pgs *podGroupState) ScheduledPods() sets.Set[*v1.Pod] {
+	pgs.lock.RLock()
+	defer pgs.lock.RUnlock()
+
+	pods := sets.New[*v1.Pod]()
+	for _, pod := range pgs.allPods {
+		if pgs.assumedPods.Has(pod.UID) || pgs.assignedPods.Has(pod.UID) {
+			pods.Insert(pod)
+		}
+	}
+	return pods
+}
+
+// StartTime returns the start time of the earliest pod in the group, or nil if no pods have started yet.
+func (pgs *podGroupState) StartTime() *metav1.Time {
+	pgs.lock.RLock()
+	defer pgs.lock.RUnlock()
+
+	return pgs.startTime
 }
 
 // SchedulingTimeout returns the remaining time until the pod group scheduling times out.

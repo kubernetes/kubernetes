@@ -27,6 +27,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
+	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha1"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
@@ -34,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/framework/preemption"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -50,15 +54,15 @@ const Name = names.DefaultPreemption
 // problems if system pods are unable to find space.
 type IsEligiblePodFunc func(nodeInfo fwk.NodeInfo, victim fwk.PodInfo, preemptor *v1.Pod) bool
 
-// MoreImportantPodFunc is a function which may be assigned to the DefaultPreemption plugin.
-// Implementations should return true if the first pod is more important than the second pod
-// and the second one should be considered for preemption before the first one.
+// MoreImportantPodGroupFunc is a function which may be assigned to the DefaultPreemption plugin.
+// Implementations should return true if the first victim pod group is more important than the second
+// victim group (and thus the second should be considered for preemption before the first).
 // For performance reasons, the search for nodes eligible for preemption is done by omitting all
 // eligible victims from a node then checking whether the preemptor fits on the node without them,
-// before adding back victims (starting from the most important) that still fit with the preemptor.
+// before adding back the victims (starting from the most important) that still fit with the preemptor.
 // The default behavior is to not consider pod affinity between the preemptor and the victims,
 // as affinity between pods that are eligible to preempt each other isn't recommended.
-type MoreImportantPodFunc func(pod1, pod2 *v1.Pod) bool
+type MoreImportantPodGroupFunc func(g1, g2 *util.VictimGroup, workloadAwarePreemptionEnabled bool) bool
 
 // DefaultPreemption is a PostFilter plugin implements the preemption logic.
 type DefaultPreemption struct {
@@ -67,17 +71,23 @@ type DefaultPreemption struct {
 	args      config.DefaultPreemptionArgs
 	Evaluator *preemption.Evaluator
 
+	wm fwk.WorkloadManager
+	wl schedulinglisters.WorkloadLister
+
 	// IsEligiblePod returns whether a victim pod is allowed to be preempted by a preemptor pod.
 	// This filtering is in addition to the internal requirement that the victim pod have lower
 	// priority than the preemptor pod. Any customizations should always allow system services
 	// to preempt normal pods, to avoid problems if system pods are unable to find space.
 	IsEligiblePod IsEligiblePodFunc
 
-	// MoreImportantPod is used to sort eligible victims in-place in descending order of highest to
-	// lowest importance. Pods with higher importance are less likely to be preempted.
-	// The default behavior is to order pods by descending priority, then descending runtime duration
-	// for pods with equal priority.
-	MoreImportantPod MoreImportantPodFunc
+	// MoreImportantPodGroup is used to sort eligible victim groups in-place in descending order of
+	// highest to lowest importance. Victim groups with higher importance are less likely to be
+	// preempted. The default behavior depends on whether or not workload-aware preemption is enabled:
+	// - if workload-aware preemption is disabled, victim groups are simply wrappers for the victim pods
+	//   and are sorted by descending priority, then descending runtime duration for pods with equal priority.
+	// - if workload-aware preemption is enabled, victim groups are sorted by descending priority, then
+	//   descending "importance" as calculated by the workload-aware preemption evaluator.
+	MoreImportantPodGroup MoreImportantPodGroupFunc
 }
 
 var _ fwk.PostFilterPlugin = &DefaultPreemption{}
@@ -105,6 +115,11 @@ func New(_ context.Context, dpArgs runtime.Object, fh fwk.Handle, fts feature.Fe
 	}
 	pl.Evaluator = preemption.NewEvaluator(Name, fh, &pl, fts.EnableAsyncPreemption)
 
+	if fts.EnableWorkloadAwarePreemption {
+		pl.wm = fh.WorkloadManager()
+		pl.wl = fh.SharedInformerFactory().Scheduling().V1alpha1().Workloads().Lister()
+	}
+
 	// Default behavior: No additional filtering, beyond the internal requirement that the victim pod
 	// have lower priority than the preemptor pod.
 	pl.IsEligiblePod = func(nodeInfo fwk.NodeInfo, victim fwk.PodInfo, preemptor *v1.Pod) bool {
@@ -112,7 +127,7 @@ func New(_ context.Context, dpArgs runtime.Object, fh fwk.Handle, fts feature.Fe
 	}
 
 	// Default behavior: Sort by descending priority, then by descending runtime duration as secondary ordering.
-	pl.MoreImportantPod = util.MoreImportantPod
+	pl.MoreImportantPodGroup = util.MoreImportantPodGroup
 
 	return &pl, nil
 }
@@ -211,7 +226,7 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 	nodeInfo fwk.NodeInfo,
 	pdbs []*policy.PodDisruptionBudget) ([]*v1.Pod, int, *fwk.Status) {
 	logger := klog.FromContext(ctx)
-	var potentialVictims []fwk.PodInfo
+	potentialVictimsOnNode := make(map[types.UID]fwk.PodInfo)
 	removePod := func(rpi fwk.PodInfo) error {
 		if err := nodeInfo.RemovePod(logger, rpi.GetPod()); err != nil {
 			return err
@@ -222,11 +237,29 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 		}
 		return nil
 	}
-	addPod := func(api fwk.PodInfo) error {
-		nodeInfo.AddPodInfo(api)
-		status := pl.fh.RunPreFilterExtensionAddPod(ctx, state, pod, api, nodeInfo)
-		if !status.IsSuccess() {
-			return status.AsError()
+	removePodGroup := func(vg *util.VictimGroup) error {
+		for _, p := range vg.Pods {
+			pi, ok := potentialVictimsOnNode[p.UID]
+			if !ok {
+				continue
+			}
+			if err := removePod(pi); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	addPodGroup := func(vg *util.VictimGroup) error {
+		for _, p := range vg.Pods {
+			pi, ok := potentialVictimsOnNode[p.UID]
+			if !ok {
+				continue
+			}
+			nodeInfo.AddPodInfo(pi)
+			status := pl.fh.RunPreFilterExtensionAddPod(ctx, state, pod, pi, nodeInfo)
+			if !status.IsSuccess() {
+				return status.AsError()
+			}
 		}
 		return nil
 	}
@@ -234,17 +267,17 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 	// check if the given pod can be scheduled without them present.
 	for _, pi := range nodeInfo.GetPods() {
 		if pl.isPreemptionAllowed(nodeInfo, pi, pod) {
-			potentialVictims = append(potentialVictims, pi)
+			potentialVictimsOnNode[pi.GetPod().UID] = pi
 		}
 	}
-	for _, pi := range potentialVictims {
+	for _, pi := range potentialVictimsOnNode {
 		if err := removePod(pi); err != nil {
 			return nil, 0, fwk.AsStatus(err)
 		}
 	}
 
 	// No potential victims are found, and so we don't need to evaluate the node again since its state didn't change.
-	if len(potentialVictims) == 0 {
+	if len(potentialVictimsOnNode) == 0 {
 		return nil, 0, fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "No preemption victims found for incoming pod")
 	}
 
@@ -257,55 +290,65 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 	if status := pl.fh.RunFilterPluginsWithNominatedPods(ctx, state, pod, nodeInfo); !status.IsSuccess() {
 		return nil, 0, status
 	}
-	var victims []fwk.PodInfo
-	numViolatingVictim := 0
-	// Sort potentialVictims by descending importance, which ensures reprieve of
-	// higher importance pods first.
-	sort.Slice(potentialVictims, func(i, j int) bool {
-		return pl.MoreImportantPod(potentialVictims[i].GetPod(), potentialVictims[j].GetPod())
+	potentialVictimPodGroups := pl.preparePotentialVictimPodGroups(potentialVictimsOnNode, logger)
+	// Sort potentialVictimGroups by descending importance, which ensures reprieve of
+	// higher importance pod groups first.
+	sort.Slice(potentialVictimPodGroups, func(i, j int) bool {
+		return pl.MoreImportantPodGroup(potentialVictimPodGroups[i], potentialVictimPodGroups[j], pl.fts.EnableWorkloadAwarePreemption)
 	})
-	// Try to reprieve as many pods as possible. We first try to reprieve the PDB
-	// violating victims and then other non-violating ones. In both cases, we start
-	// from the highest importance victims.
-	violatingVictims, nonViolatingVictims := filterPodsWithPDBViolation(potentialVictims, pdbs)
-	reprievePod := func(pi fwk.PodInfo) (bool, error) {
-		if err := addPod(pi); err != nil {
+
+	var victimPodGroups []*util.VictimGroup
+	numViolatingVictim := 0
+	// Try to reprieve as many victim pod groups as possible. We first try to reprieve
+	// the PDB violating victim groups and then other non-violating ones. In both cases,
+	// we start from the highest importance victim groups.
+	violatingVictimGroups, nonViolatingVictimGroups := filterPodsGroupsWithPDBViolation(potentialVictimPodGroups, pdbs)
+	reprievePodGroup := func(vg *util.VictimGroup) (bool, error) {
+		if err := addPodGroup(vg); err != nil {
 			return false, err
 		}
 		status := pl.fh.RunFilterPluginsWithNominatedPods(ctx, state, pod, nodeInfo)
 		fits := status.IsSuccess()
 		if !fits {
-			if err := removePod(pi); err != nil {
+			if err := removePodGroup(vg); err != nil {
 				return false, err
 			}
-			victims = append(victims, pi)
-			logger.V(5).Info("Pod is a potential preemption victim on node", "pod", klog.KObj(pi.GetPod()), "node", klog.KObj(nodeInfo.Node()))
+			victimPodGroups = append(victimPodGroups, vg)
+			if !pl.fts.EnableWorkloadAwarePreemption || !vg.IsGang {
+				logger.V(5).Info("Pod is a potential preemption victim on node", "pod", klog.KObj(vg.Pods[0]), "node", klog.KObj(nodeInfo.Node()))
+			} else {
+				podGroupKey := helper.GetPodGroupKey(vg.Pods[0])
+				logger.V(5).Info("Pod group is a potential preemption victim on node", "pod group", *podGroupKey, "node", klog.KObj(nodeInfo.Node()))
+			}
 		}
 		return fits, nil
 	}
-	for _, p := range violatingVictims {
-		if fits, err := reprievePod(p); err != nil {
+	for _, vg := range violatingVictimGroups {
+		if fits, err := reprievePodGroup(vg); err != nil {
 			return nil, 0, fwk.AsStatus(err)
 		} else if !fits {
 			numViolatingVictim++
 		}
 	}
+
 	// Now we try to reprieve non-violating victims.
-	for _, p := range nonViolatingVictims {
-		if _, err := reprievePod(p); err != nil {
+	for _, vg := range nonViolatingVictimGroups {
+		if _, err := reprievePodGroup(vg); err != nil {
 			return nil, 0, fwk.AsStatus(err)
 		}
 	}
 
 	// Sort victims after reprieving pods to keep the pods in the victims sorted in order of importance from high to low.
-	if len(violatingVictims) != 0 && len(nonViolatingVictims) != 0 {
-		sort.Slice(victims, func(i, j int) bool { return pl.MoreImportantPod(victims[i].GetPod(), victims[j].GetPod()) })
+	if len(violatingVictimGroups) != 0 && len(nonViolatingVictimGroups) != 0 {
+		sort.Slice(victimPodGroups, func(i, j int) bool {
+			return pl.MoreImportantPodGroup(victimPodGroups[i], victimPodGroups[j], pl.fts.EnableWorkloadAwarePreemption)
+		})
 	}
-	var victimPods []*v1.Pod
-	for _, pi := range victims {
-		victimPods = append(victimPods, pi.GetPod())
+	var victims []*v1.Pod
+	for _, vg := range victimPodGroups {
+		victims = append(victims, vg.Pods...)
 	}
-	return victimPods, numViolatingVictim, fwk.NewStatus(fwk.Success)
+	return victims, numViolatingVictim, fwk.NewStatus(fwk.Success)
 }
 
 // PodEligibleToPreemptOthers returns one bool and one string. The bool
@@ -367,22 +410,25 @@ func podTerminatingByPreemption(p *v1.Pod) bool {
 	return false
 }
 
-// filterPodsWithPDBViolation groups the given "pods" into two groups of "violatingPods"
-// and "nonViolatingPods" based on whether their PDBs will be violated if they are
-// preempted.
-// This function is stable and does not change the order of received pods. So, if it
-// receives a sorted list, grouping will preserve the order of the input list.
-func filterPodsWithPDBViolation(podInfos []fwk.PodInfo, pdbs []*policy.PodDisruptionBudget) (violatingPodInfos, nonViolatingPodInfos []fwk.PodInfo) {
+// filterPodsGroupsWithPDBViolation groups the given "victim groups" into two
+// separate sets of "violatingPodGroups" and "nonViolatingPodGroups" based on
+// whether their PDBs will be violated if they are preempted.
+// This function is stable and does not change the order of received groups.
+// So, if it receives a sorted list, grouping will preserve the order of the
+// input list.
+func filterPodsGroupsWithPDBViolation(victimGroups []*util.VictimGroup, pdbs []*policy.PodDisruptionBudget) (violatingPodGroups, nonViolatingPodGroups []*util.VictimGroup) {
 	pdbsAllowed := make([]int32, len(pdbs))
 	for i, pdb := range pdbs {
 		pdbsAllowed[i] = pdb.Status.DisruptionsAllowed
 	}
 
-	for _, podInfo := range podInfos {
-		pod := podInfo.GetPod()
-		pdbForPodIsViolated := false
-		// A pod with no labels will not match any PDB. So, no need to check.
-		if len(pod.Labels) != 0 {
+	for _, vg := range victimGroups {
+		pdbForPodGroupIsViolated := false
+		for _, pod := range vg.Pods {
+			// A pod with no labels will not match any PDB. So, no need to check.
+			if len(pod.Labels) == 0 {
+				continue
+			}
 			for i, pdb := range pdbs {
 				if pdb.Namespace != pod.Namespace {
 					continue
@@ -407,15 +453,68 @@ func filterPodsWithPDBViolation(podInfos []fwk.PodInfo, pdbs []*policy.PodDisrup
 				pdbsAllowed[i]--
 				// We have found a matching PDB.
 				if pdbsAllowed[i] < 0 {
-					pdbForPodIsViolated = true
+					pdbForPodGroupIsViolated = true
 				}
 			}
 		}
-		if pdbForPodIsViolated {
-			violatingPodInfos = append(violatingPodInfos, podInfo)
+		if pdbForPodGroupIsViolated {
+			violatingPodGroups = append(violatingPodGroups, vg)
 		} else {
-			nonViolatingPodInfos = append(nonViolatingPodInfos, podInfo)
+			nonViolatingPodGroups = append(nonViolatingPodGroups, vg)
 		}
 	}
-	return violatingPodInfos, nonViolatingPodInfos
+	return violatingPodGroups, nonViolatingPodGroups
+}
+
+func (pl *DefaultPreemption) preparePotentialVictimPodGroups(potentialVictimsOnNode map[types.UID]fwk.PodInfo, logger klog.Logger) []*util.VictimGroup {
+	var potentialVictimPodGroups []*util.VictimGroup
+	if !pl.fts.EnableWorkloadAwarePreemption {
+		for _, pi := range potentialVictimsOnNode {
+			vg := util.WrapPodInVictimGroup(pi.GetPod())
+			potentialVictimPodGroups = append(potentialVictimPodGroups, vg)
+		}
+		return potentialVictimPodGroups
+	}
+
+	// Iterate over all potential victims on the node and group them accordingly.
+	// If the pod is part of a gang pod group with the PodGroup disruption mode,
+	// then we take all pods in the gang and group them together, including gang
+	// pods that are running on different nodes.
+	// Otherwise, the victim group serves as a wrapper for the individual victim pod.
+	podGroupKeys := sets.New[helper.PodGroupKey]()
+	for _, pi := range potentialVictimsOnNode {
+		if !helper.HasDisruptionModePodGroup(pi.GetPod(), pl.wl) {
+			vg := util.WrapPodInVictimGroup(pi.GetPod())
+			potentialVictimPodGroups = append(potentialVictimPodGroups, vg)
+			continue
+		}
+		key := helper.GetPodGroupKey(pi.GetPod())
+		if key == nil || podGroupKeys.Has(*key) {
+			continue
+		}
+		podGroupKeys.Insert(*key)
+		pgs, err := pl.wm.PodGroupState(key.GetNamespace(), key.GetWorkloadRef())
+		if err != nil {
+			// TODO: Should we fail the preemption instead of logging and treating as a non-gang pod?
+			logger.Error(err, "Failed to get pod group state for the pod", "pod", klog.KObj(pi.GetPod()), "workloadRef", key.GetWorkloadRef())
+			continue
+		}
+		// TODO: instead of using the priority of the individual pod, we should
+		// use the priority of the pod group's Workload.
+		// When https://github.com/kubernetes/kubernetes/pull/136426 is merged,
+		// we will switch to using the priority of the pod group's Workload.
+		vg := &util.VictimGroup{
+			Pods:      pgs.ScheduledPods().UnsortedList(),
+			Priority:  corev1helpers.PodPriority(pi.GetPod()),
+			StartTime: util.GetPodGroupInitTimestamp(pgs),
+			IsGang:    true,
+		}
+		// TODO: this assumes that the pods in the gang have the same priority which is not necessarily true.
+		// Do we have any better way of sorting the victim pods of the gang itself?
+		sort.Slice(vg.Pods, func(i, j int) bool {
+			return vg.Pods[i].Status.StartTime.Before(vg.Pods[j].Status.StartTime)
+		})
+		potentialVictimPodGroups = append(potentialVictimPodGroups, vg)
+	}
+	return potentialVictimPodGroups
 }

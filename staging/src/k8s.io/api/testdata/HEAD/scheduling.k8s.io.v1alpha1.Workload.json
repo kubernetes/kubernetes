@@ -55,7 +55,8 @@
         "policy": {
           "basic": {},
           "gang": {
-            "minCount": 1
+            "minCount": 1,
+            "disruptionMode": "disruptionModeValue"
           }
         }
       }

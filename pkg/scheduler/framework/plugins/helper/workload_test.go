@@ -22,6 +22,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	schedulingapi "k8s.io/api/scheduling/v1alpha1"
+	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha1"
+	"k8s.io/client-go/tools/cache"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
@@ -157,6 +159,138 @@ func TestPodGroupPolicy(t *testing.T) {
 			}
 			if diff := cmp.Diff(got, tt.expectedPolicy); diff != "" {
 				t.Errorf("PodGroupPolicy() policy (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestHasDisruptionModePodGroup(t *testing.T) {
+	disruptionModePodGroup := schedulingapi.DisruptionModePodGroup
+	disruptionModeInvalid := schedulingapi.DisruptionMode("Invalid")
+
+	pod := st.MakePod().Name("pod1").Namespace("default").WorkloadRef(&v1.WorkloadReference{Name: "wl1", PodGroup: "pg1"}).Obj()
+
+	tests := []struct {
+		name     string
+		pod      *v1.Pod
+		workload *schedulingapi.Workload
+		want     bool
+	}{
+		{
+			name: "Pod with no WorkloadRef",
+			pod:  st.MakePod().Name("pod1").Namespace("default").Obj(),
+			want: false,
+		},
+		{
+			name: "Pod with WorkloadRef but missing Workload",
+			pod:  pod,
+			want: false,
+		},
+		{
+			name:     "Pod with WorkloadRef and Workload, but missing PodGroup",
+			pod:      pod,
+			workload: st.MakeWorkload().Name("wl1").Namespace("default").PodGroup(&schedulingapi.PodGroup{Name: "other-pg"}).Obj(),
+			want:     false,
+		},
+		{
+			name: "Pod with WorkloadRef, Workload, PodGroup, but no DisruptionMode",
+			pod:  pod,
+			workload: st.MakeWorkload().Name("wl1").Namespace("default").PodGroup(
+				&schedulingapi.PodGroup{
+					Name: "pg1",
+					Policy: schedulingapi.PodGroupPolicy{
+						Gang: &schedulingapi.GangSchedulingPolicy{
+							// No DisruptionMode specified.
+						},
+					},
+				}).Obj(),
+			want: false,
+		},
+		{
+			name: "Pod with WorkloadRef, Workload, PodGroup, DisruptionMode != PodGroup",
+			pod:  pod,
+			workload: st.MakeWorkload().Name("wl1").Namespace("default").PodGroup(&schedulingapi.PodGroup{
+				Name: "pg1",
+				Policy: schedulingapi.PodGroupPolicy{
+					Gang: &schedulingapi.GangSchedulingPolicy{
+						DisruptionMode: &disruptionModeInvalid,
+					},
+				},
+			}).Obj(),
+			want: false,
+		},
+		{
+			name: "Pod with WorkloadRef, Workload, PodGroup, DisruptionMode == PodGroup",
+			pod:  pod,
+			workload: st.MakeWorkload().Name("wl1").Namespace("default").PodGroup(&schedulingapi.PodGroup{
+				Name: "pg1",
+				Policy: schedulingapi.PodGroupPolicy{
+					Gang: &schedulingapi.GangSchedulingPolicy{
+						DisruptionMode: &disruptionModePodGroup,
+					},
+				},
+			}).Obj(),
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+			if tt.workload != nil {
+				if err := indexer.Add(tt.workload); err != nil {
+					t.Fatalf("Failed to add workload to indexer: %v", err)
+				}
+			}
+			workloadLister := schedulinglisters.NewWorkloadLister(indexer)
+
+			if got := HasDisruptionModePodGroup(tt.pod, workloadLister); got != tt.want {
+				t.Errorf("HasDisruptionModePodGroup() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGetPodGroupKey(t *testing.T) {
+	tests := []struct {
+		name string
+		pod  *v1.Pod
+		want *PodGroupKey
+	}{
+		{
+			name: "Pod with no WorkloadRef",
+			pod:  st.MakePod().Name("pod1").Namespace("default").Obj(),
+			want: nil,
+		},
+		{
+			name: "Pod with WorkloadRef",
+			pod: st.MakePod().Name("pod1").Namespace("default").WorkloadRef(&v1.WorkloadReference{
+				Name:               "wl1",
+				PodGroup:           "pg1",
+				PodGroupReplicaKey: "key1",
+			}).Obj(),
+			want: &PodGroupKey{
+				namespace:    "default",
+				workloadName: "wl1",
+				podGroupName: "pg1",
+				replicaKey:   "key1",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := GetPodGroupKey(tt.pod)
+			if tt.want == nil && got != nil {
+				t.Fatalf("GetPodGroupKey() = %v, want nil", got)
+			}
+			if tt.want != nil {
+				if got == nil {
+					t.Fatalf("GetPodGroupKey() = nil, want %v", tt.want)
+				}
+				if *tt.want != *got {
+					t.Errorf("GetPodGroupKey() = %v, want %v", got, tt.want)
+				}
 			}
 		})
 	}

@@ -188,6 +188,13 @@ func validateGangSchedulingPolicy(policy *scheduling.GangSchedulingPolicy, fldPa
 	} else if policy.MinCount < 0 {
 		allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(policy.MinCount), fldPath.Child("minCount")).WithOrigin("minimum").MarkCoveredByDeclarative()...)
 	}
+	allowedDisruptionModes := sets.New(
+		scheduling.DisruptionModePod,
+		scheduling.DisruptionModePodGroup,
+	)
+	if policy.DisruptionMode != nil && !allowedDisruptionModes.Has(*policy.DisruptionMode) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("disruptionMode"), policy.DisruptionMode, "must be one of `Pod`, `PodGroup`").WithOrigin("union").MarkCoveredByDeclarative())
+	}
 	return allErrs
 }
 

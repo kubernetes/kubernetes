@@ -36,8 +36,9 @@ func (BasicSchedulingPolicy) SwaggerDoc() map[string]string {
 }
 
 var map_GangSchedulingPolicy = map[string]string{
-	"":         "GangSchedulingPolicy defines the parameters for gang scheduling.",
-	"minCount": "MinCount is the minimum number of pods that must be schedulable or scheduled at the same time for the scheduler to admit the entire group. It must be a positive integer.",
+	"":               "GangSchedulingPolicy defines the parameters for gang scheduling.",
+	"minCount":       "MinCount is the minimum number of pods that must be schedulable or scheduled at the same time for the scheduler to admit the entire group. It must be a positive integer.",
+	"disruptionMode": "DisruptionMode defines the mode in which a given PodGroup can be disrupted. One of Pod, PodGroup. Defaults to Pod if unset.",
 }
 
 func (GangSchedulingPolicy) SwaggerDoc() map[string]string {

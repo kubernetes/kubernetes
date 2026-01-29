@@ -22,6 +22,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/dynamic-resource-allocation/structured"
@@ -161,6 +162,8 @@ type PodGroupState interface {
 	// i.e., are neither assumed nor assigned.
 	// The returned map type corresponds to the argument of the PodActivator.Activate method.
 	UnscheduledPods() map[string]*v1.Pod
+	// ScheduledPods returns the set of all pods for this group that are either assumed or assigned.
+	ScheduledPods() sets.Set[*v1.Pod]
 	// AssumedPods returns the UIDs of all pods for this group in the "assumed" state,
 	// i.e., passed the Reserve gate.
 	AssumedPods() sets.Set[types.UID]
@@ -173,4 +176,6 @@ type PodGroupState interface {
 	// SchedulingTimeout returns the remaining time until the pod group scheduling times out.
 	// A new deadline is created if one doesn't exist, or if the previous one has expired.
 	SchedulingTimeout() time.Duration
+	// StartTime returns the start time of the earliest pod in the group, or nil if no pods have started yet.
+	StartTime() *metav1.Time
 }

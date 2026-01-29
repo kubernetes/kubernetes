@@ -52,12 +52,12 @@ import (
 	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	configv1 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1"
-	"k8s.io/kubernetes/pkg/scheduler/backend/api_cache"
-	"k8s.io/kubernetes/pkg/scheduler/backend/api_dispatcher"
+	apicache "k8s.io/kubernetes/pkg/scheduler/backend/api_cache"
+	apidispatcher "k8s.io/kubernetes/pkg/scheduler/backend/api_dispatcher"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
+	apicalls "k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
@@ -1727,16 +1727,16 @@ func TestCustomSelection(t *testing.T) {
 
 func TestCustomOrdering(t *testing.T) {
 	// Two arbitrary examples of custom selection ordering to check that they behave as expected
-	orderByOldestStart := func(pod1, pod2 *v1.Pod) bool {
-		return util.GetPodStartTime(pod1).Before(util.GetPodStartTime(pod2))
+	orderByOldestStart := func(vg1, vg2 *util.VictimGroup, _ bool) bool {
+		return util.GetPodStartTime(vg1.Pods[0]).Before(util.GetPodStartTime(vg2.Pods[0]))
 	}
-	orderByPodName := func(pod1, pod2 *v1.Pod) bool {
-		return pod1.Name < pod2.Name
+	orderByPodName := func(vg1, vg2 *util.VictimGroup, _ bool) bool {
+		return vg1.Pods[0].Name < vg2.Pods[0].Name
 	}
 
 	tests := []struct {
 		name         string
-		orderPods    MoreImportantPodFunc
+		orderPods    MoreImportantPodGroupFunc
 		nodeNames    []string
 		pod          *v1.Pod
 		pods         []*v1.Pod
@@ -1822,7 +1822,7 @@ func TestCustomOrdering(t *testing.T) {
 			}
 			// Override ordering logic
 			if tt.orderPods != nil {
-				pl.MoreImportantPod = tt.orderPods
+				pl.MoreImportantPodGroup = tt.orderPods
 			}
 			offset, numCandidates := pl.GetOffsetAndNumCandidates(int32(len(nodeInfos)))
 			candidates, _, _ := pl.Evaluator.DryRunPreemption(ctx, state, tt.pod, nodeInfos, nil, offset, numCandidates)

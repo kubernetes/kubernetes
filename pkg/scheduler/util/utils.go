@@ -36,6 +36,7 @@ import (
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
+	fwk "k8s.io/kube-scheduler/framework"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 )
 
@@ -51,6 +52,16 @@ func GetPodFullName(pod *v1.Pod) string {
 func GetPodStartTime(pod *v1.Pod) *metav1.Time {
 	if pod.Status.StartTime != nil {
 		return pod.Status.StartTime
+	}
+	// Assumed pods and bound pods that haven't started don't have a StartTime yet.
+	return &metav1.Time{Time: time.Now()}
+}
+
+// GetPodGroupInitTimestamp returns start time of the given pod group or current timestamp
+// if it hasn't started yet.
+func GetPodGroupInitTimestamp(pgs fwk.PodGroupState) *metav1.Time {
+	if st := pgs.StartTime(); st != nil {
+		return st
 	}
 	// Assumed pods and bound pods that haven't started don't have a StartTime yet.
 	return &metav1.Time{Time: time.Now()}
@@ -82,16 +93,69 @@ func GetEarliestPodStartTime(victims *extenderv1.Victims) *metav1.Time {
 	return earliestPodStartTime
 }
 
-// MoreImportantPod return true when priority of the first pod is higher than
-// the second one. If two pods' priorities are equal, compare their StartTime,
-// treating the older pod as more important.
-func MoreImportantPod(pod1, pod2 *v1.Pod) bool {
-	p1 := corev1helpers.PodPriority(pod1)
-	p2 := corev1helpers.PodPriority(pod2)
+// VictimGroup is a group of pods that should be preempted in an all-or-nothing fashion.
+// Without workload-aware preemption enabled, each victim group is just a wrapper
+// for a single victim pod.
+// With workload-aware preemption enabled, victim groups may consist of multiple pods
+// when they belong to the same gang PodGroup with the PodGroup disruption mode.
+type VictimGroup struct {
+	// Pods is the list of pods that comprise the victim group.
+	// For gangs with the PodGroup disruption mode, this is a list of all scheduled pods
+	// that belong to the same pod group.
+	// In all other cases, this list contains a single pod.
+	Pods []*v1.Pod
+	// Priority is the priority of the victim group.
+	// For gangs with the PodGroup disruption mode, this is the priority of the pod group's Workload.
+	// In all other cases, this is the priority of the sole pod that comprises the victim group.
+	Priority int32
+	// IsGang indicates if this victim group is a gang pod group with the PodGroup disruption mode.
+	IsGang bool
+	// StartTime is the start time of this victim group's pod group.
+	StartTime *metav1.Time
+}
+
+// MoreImportantPodGroup returns true if the first victim group is more important than the second.
+// We define the importance of a victim group as follows:
+//
+//  1. If both victim groups have different priorities, the one with the higher priority is more important.
+//  2. If both victim groups have the same priority, the one that is a gang is more important.
+//  3. If both gang victim groups have the same priority, the one that started first is more important.
+//  4. If neither of the victim groups are gangs and they have the same priority, the one with earlier
+//     start time is more important.
+//
+// Note: points 2. and 3. are hidden behind the WorkloadAwarePreemption feature gate, so if the flag is not enabled,
+// then victim groups are just wrappers for individual pods and we fall back to comparing the individual pods directly
+// in principle.
+func MoreImportantPodGroup(g1, g2 *VictimGroup, workloadAwarePreemptionEnabled bool) bool {
+	p1 := g1.Priority
+	p2 := g2.Priority
 	if p1 != p2 {
 		return p1 > p2
 	}
-	return GetPodStartTime(pod1).Before(GetPodStartTime(pod2))
+	if workloadAwarePreemptionEnabled {
+		if g1.IsGang && g2.IsGang {
+			if len(g1.Pods) != len(g2.Pods) {
+				return len(g1.Pods) > len(g2.Pods)
+			}
+			return g1.StartTime.Before(g2.StartTime)
+		}
+		if g1.IsGang {
+			return true
+		}
+		if g2.IsGang {
+			return false
+		}
+	}
+	return g1.StartTime.Before(g2.StartTime)
+}
+
+// WrapPodInVictimGroup wraps a single pod in a victim group.
+func WrapPodInVictimGroup(p *v1.Pod) *VictimGroup {
+	return &VictimGroup{
+		Pods:      []*v1.Pod{p},
+		Priority:  corev1helpers.PodPriority(p),
+		StartTime: GetPodStartTime(p),
+	}
 }
 
 // Retriable defines the retriable errors during a scheduling cycle.

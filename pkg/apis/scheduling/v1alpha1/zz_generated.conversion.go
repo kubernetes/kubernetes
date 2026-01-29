@@ -162,6 +162,7 @@ func Convert_scheduling_BasicSchedulingPolicy_To_v1alpha1_BasicSchedulingPolicy(
 
 func autoConvert_v1alpha1_GangSchedulingPolicy_To_scheduling_GangSchedulingPolicy(in *schedulingv1alpha1.GangSchedulingPolicy, out *scheduling.GangSchedulingPolicy, s conversion.Scope) error {
 	out.MinCount = in.MinCount
+	out.DisruptionMode = (*scheduling.DisruptionMode)(unsafe.Pointer(in.DisruptionMode))
 	return nil
 }
 
@@ -172,6 +173,7 @@ func Convert_v1alpha1_GangSchedulingPolicy_To_scheduling_GangSchedulingPolicy(in
 
 func autoConvert_scheduling_GangSchedulingPolicy_To_v1alpha1_GangSchedulingPolicy(in *scheduling.GangSchedulingPolicy, out *schedulingv1alpha1.GangSchedulingPolicy, s conversion.Scope) error {
 	out.MinCount = in.MinCount
+	out.DisruptionMode = (*schedulingv1alpha1.DisruptionMode)(unsafe.Pointer(in.DisruptionMode))
 	return nil
 }
 

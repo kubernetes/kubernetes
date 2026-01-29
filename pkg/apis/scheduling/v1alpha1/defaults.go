@@ -20,6 +20,9 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/api/scheduling/v1alpha1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
+	ptr "k8s.io/utils/ptr"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -32,5 +35,12 @@ func SetDefaults_PriorityClass(obj *v1alpha1.PriorityClass) {
 	if obj.PreemptionPolicy == nil {
 		preemptLowerPriority := apiv1.PreemptLowerPriority
 		obj.PreemptionPolicy = &preemptLowerPriority
+	}
+}
+
+// SetDefaults_GangSchedulingPolicy sets defaults for GangSchedulingPolicy.
+func SetDefaults_GangSchedulingPolicy(obj *v1alpha1.GangSchedulingPolicy) {
+	if obj.DisruptionMode == nil && utilfeature.DefaultFeatureGate.Enabled(features.WorkloadAwarePreemption) {
+		obj.DisruptionMode = ptr.To(v1alpha1.DisruptionModePod)
 	}
 }

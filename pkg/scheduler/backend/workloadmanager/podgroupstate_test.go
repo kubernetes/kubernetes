@@ -21,6 +21,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/utils/ptr"
 )
@@ -90,5 +91,43 @@ func TestPodGroupState_SchedulingTimeout(t *testing.T) {
 	}
 	if newTimeout <= 0 {
 		t.Errorf("Expected positive timeout duration after reset, got %v", timeout)
+	}
+}
+
+func TestPodGroupStateStartTime(t *testing.T) {
+	pgs := newPodGroupState()
+
+	initTimestamp := pgs.StartTime()
+	if initTimestamp != nil {
+		t.Fatal("StartTime should be nil initially")
+	}
+
+	ts := metav1.Now()
+	pod1 := st.MakePod().Namespace("ns1").Name("p1").UID("p1").Obj()
+	pod2 := st.MakePod().Namespace("ns1").Name("p2").UID("p2").Node("node1").Obj()
+	pod3 := st.MakePod().Namespace("ns1").Name("p3").UID("p3").Node("node1").StartTime(ts).Obj()
+
+	pgs.addPod(pod1)
+	initTimestamp = pgs.StartTime()
+	if initTimestamp != nil {
+		t.Fatal("StartTime should be nil after adding a pod without the StartTime field set")
+	}
+
+	pgs.updatePod(pod1, pod2)
+	initTimestamp = pgs.StartTime()
+	if initTimestamp != nil {
+		t.Fatal("StartTime should be nil after updating a pod without the StartTime field set")
+	}
+
+	pgs.updatePod(pod2, pod3)
+	initTimestamp = pgs.StartTime()
+	if initTimestamp == nil {
+		t.Fatal("StartTime should not be nil after updating a pod with the StartTime field set")
+	}
+
+	pgs.deletePod(pod3.UID)
+	initTimestamp = pgs.StartTime()
+	if initTimestamp == nil {
+		t.Fatal("StartTime should not be set to nil after deleting the last pod")
 	}
 }

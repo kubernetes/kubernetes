@@ -42,4 +42,5 @@ spec:
     policy:
       basic: {}
       gang:
+        disruptionMode: disruptionModeValue
         minCount: 1
