@@ -3284,13 +3284,13 @@ func TestAllocatorSelection(t *testing.T) {
 		// is used.
 		"default": {
 			features:             "",
-			expectImplementation: "incubating",
+			expectImplementation: "stable",
 		},
 
 		// Alpha features need the experimental implementation.
 		"alpha": {
 			features:             "AllAlpha=true,AllBeta=true",
-			expectImplementation: "experimental",
+			expectImplementation: "incubating",
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
