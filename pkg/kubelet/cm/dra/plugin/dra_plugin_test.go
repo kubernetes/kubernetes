@@ -296,7 +296,7 @@ func TestGRPCConnUsableAfterIdle(t *testing.T) {
 		},
 	}
 
-	callCtx := ktesting.WithTimeout(tCtx, 10*time.Second, "call timed out")
+	callCtx := tCtx.WithTimeout(10*time.Second, "call timed out")
 	_, err = plugin.NodePrepareResources(callCtx, req)
 	tCtx.ExpectNoError(err, "NodePrepareResources")
 }

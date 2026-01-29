@@ -139,7 +139,7 @@ func TestTCPPortExhaustion(t *testing.T) {
 			}
 			t.Logf("Adding %d pods with %d containers each in %v", numTestPods, numContainers, time.Since(now))
 
-			ctx := ktesting.WithTimeout(tCtx, 59*time.Second, "timeout 59 Second")
+			ctx := tCtx.WithTimeout(59*time.Second, "timeout 59 Second")
 			defer ctx.Cancel("TestTCPPortExhaustion completed")
 			var wg sync.WaitGroup
 

@@ -1164,7 +1164,7 @@ func setupTestCase(t testing.TB, tc *testCase, featureGates map[featuregate.Feat
 
 	// 30 minutes should be plenty enough even for the 5000-node tests.
 	timeout := 30 * time.Minute
-	tCtx = ktesting.WithTimeout(tCtx, timeout, fmt.Sprintf("timed out after the %s per-test timeout", timeout))
+	tCtx = tCtx.WithTimeout(timeout, fmt.Sprintf("timed out after the %s per-test timeout", timeout))
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints) {
 		registerQHintMetrics()
@@ -1517,7 +1517,7 @@ func checkEmptyInFlightEvents() error {
 }
 
 func startCollectingMetrics(tCtx ktesting.TContext, collectorWG *sync.WaitGroup, podInformer coreinformers.PodInformer, mcc *metricsCollectorConfig, throughputErrorMargin float64, opIndex int, name string, namespaces []string, labelSelector map[string]string) (ktesting.TContext, []testDataCollector, error) {
-	collectorCtx := ktesting.WithCancel(tCtx)
+	collectorCtx := tCtx.WithCancel()
 	workloadName := tCtx.Name()
 
 	// Clean up memory usage from the initial setup phase.
@@ -1617,7 +1617,7 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, topicName st
 	podInformer := informerFactory.Core().V1().Pods()
 
 	// Everything else started by this function gets stopped before it returns.
-	tCtx = ktesting.WithCancel(tCtx)
+	tCtx = tCtx.WithCancel()
 
 	executor := WorkloadExecutor{
 		tCtx:                         tCtx,
@@ -2096,7 +2096,7 @@ func createPodsSteadily(tCtx ktesting.TContext, namespace string, podInformer co
 		return err
 	}
 	tCtx.Logf("creating pods in namespace %q for %s", namespace, cpo.Duration)
-	tCtx = ktesting.WithTimeout(tCtx, cpo.Duration.Duration, fmt.Sprintf("the operation ran for the configured %s", cpo.Duration.Duration))
+	tCtx = tCtx.WithTimeout(cpo.Duration.Duration, fmt.Sprintf("the operation ran for the configured %s", cpo.Duration.Duration))
 
 	// Start watching pods in the namespace. Any pod which is seen as being scheduled
 	// gets deleted.

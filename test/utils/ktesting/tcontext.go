@@ -158,7 +158,7 @@ func Init(tb TB, opts ...InitOption) TContext {
 	if cancelTimeout != nil {
 		tCtx.cancel = cancelTimeout
 	} else {
-		tCtx = WithCancel(tCtx)
+		tCtx = tCtx.WithCancel()
 		tCtx.Cleanup(func() {
 			tCtx.Cancel(cleanupErr(tCtx.Name()).Error())
 		})
@@ -246,7 +246,7 @@ func (tc *TC) withTB(tb TB) TContext {
 		logger := newLogger(tb, false /* don't buffer logs in sub-test */)
 		tc.Context = klog.NewContext(tc.Context, logger)
 	}
-	tc = WithCancel(tc)
+	tc = tc.WithCancel()
 	return tc
 }
 
