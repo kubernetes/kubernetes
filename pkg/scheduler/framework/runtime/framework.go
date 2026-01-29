@@ -304,7 +304,7 @@ var _ framework.Framework = &frameworkImpl{}
 
 // NewFramework initializes plugins given the configuration and the registry.
 //
-// It creates background goroutines (for example, via defaultFrameworkOptions -> metrics.NewMetricsAsyncRecorder)
+// It creates background goroutines (for example, via metrics.NewMetricsAsyncRecorder)
 // which continue running until the context gets canceled. WaitForShutdown can be used to block
 // until they have terminated.
 func NewFramework(ctx context.Context, r Registry, profile *config.KubeSchedulerProfile, opts ...Option) (framework.Framework, error) {
@@ -312,6 +312,8 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 	for _, opt := range opts {
 		opt(&options)
 	}
+
+	go options.metricsRecorder.Run()
 
 	logger := klog.FromContext(ctx)
 	if options.logger != nil {
