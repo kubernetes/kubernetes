@@ -217,10 +217,10 @@ func ValidateServiceAccountSubject(subject *flowcontrol.ServiceAccountSubject, f
 func ValidateUserSubject(subject *flowcontrol.UserSubject, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if subject == nil {
-		return append(allErrs, field.Required(fldPath, "user is required when subject kind is 'User'").MarkCoveredByDeclarative())
+		return append(allErrs, field.Required(fldPath, "user is required when subject kind is 'User'"))
 	}
 	if len(subject.Name) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "").MarkCoveredByDeclarative())
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
 	}
 	return allErrs
 }
@@ -229,10 +229,10 @@ func ValidateUserSubject(subject *flowcontrol.UserSubject, fldPath *field.Path) 
 func ValidateGroupSubject(subject *flowcontrol.GroupSubject, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if subject == nil {
-		return append(allErrs, field.Required(fldPath, "group is required when subject kind is 'Group'"))
+		return append(allErrs, field.Required(fldPath, "group is required when subject kind is 'Group'").MarkCoveredByDeclarative())
 	}
 	if len(subject.Name) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "").MarkCoveredByDeclarative())
 	}
 	return allErrs
 }

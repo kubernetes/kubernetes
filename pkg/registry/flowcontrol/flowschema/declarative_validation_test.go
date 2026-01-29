@@ -52,10 +52,10 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		"valid": {
 			input: mkValidFlowSchema(),
 		},
-		"user subject name is required": {
-			input: mkValidFlowSchema(tweakUserSubjectName("")),
+		"group subject name is required": {
+			input: mkValidFlowSchema(tweakGroupSubjectName("")),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec", "rules").Index(0).Child("subjects").Index(0).Child("user.name"), "").MarkCoveredByDeclarative(),
+				field.Required(field.NewPath("spec", "rules").Index(0).Child("subjects").Index(0).Child("group.name"), "").MarkCoveredByDeclarative(),
 			},
 		},
 	}
@@ -84,10 +84,10 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			oldObj:    mkValidFlowSchema(),
 			updateObj: mkValidFlowSchema(),
 		},
-		"user subject name is required": {
-			updateObj: mkValidFlowSchema(tweakUserSubjectName("")),
+		"group subject name is required": {
+			updateObj: mkValidFlowSchema(tweakGroupSubjectName("")),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec", "rules").Index(0).Child("subjects").Index(0).Child("user.name"), "").MarkCoveredByDeclarative(),
+				field.Required(field.NewPath("spec", "rules").Index(0).Child("subjects").Index(0).Child("group.name"), "").MarkCoveredByDeclarative(),
 			},
 		},
 	}
@@ -121,8 +121,8 @@ func mkValidFlowSchema(tweaks ...func(obj *flowcontrol.FlowSchema)) flowcontrol.
 				{
 					Subjects: []flowcontrol.Subject{
 						{
-							Kind: flowcontrol.SubjectKindUser,
-							User: &flowcontrol.UserSubject{
+							Kind: flowcontrol.SubjectKindGroup,
+							Group: &flowcontrol.GroupSubject{
 								Name: "system:kube-controller-manager",
 							},
 						},
@@ -146,14 +146,8 @@ func mkValidFlowSchema(tweaks ...func(obj *flowcontrol.FlowSchema)) flowcontrol.
 	return obj
 }
 
-func tweakUserSubjectName(name string) func(*flowcontrol.FlowSchema) {
+func tweakGroupSubjectName(name string) func(*flowcontrol.FlowSchema) {
 	return func(fs *flowcontrol.FlowSchema) {
-		fs.Spec.Rules[0].Subjects[0].User.Name = name
-	}
-}
-
-func tweakSubject(subject flowcontrol.Subject) func(*flowcontrol.FlowSchema) {
-	return func(fs *flowcontrol.FlowSchema) {
-		fs.Spec.Rules[0].Subjects[0] = subject
+		fs.Spec.Rules[0].Subjects[0].Group.Name = name
 	}
 }
