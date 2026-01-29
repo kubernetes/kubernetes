@@ -24,6 +24,18 @@ readonly REGISTRY_DIR="/registry"
 # This script prepares a directory with container images to be used as a fake registry,
 # then creates a tarball of that directory inside the container.
 
+# digest_to_path converts a digest to a nested directory path following the Docker
+# registry storage layout. For example, "sha256:abc123..." becomes
+# "<base_dir>/sha256/ab/abc123.../data".
+digest_to_path() {
+    local base_dir="$1"
+    local digest="$2"
+    local algo="${digest%%:*}"    # e.g., "sha256"
+    local hash="${digest#*:}"     # e.g., "abc123..."
+    local prefix="${hash:0:2}"    # first 2 chars
+    echo "$base_dir/$algo/$prefix/$hash/data"
+}
+
 # function to download an image manifest and its blobs to create a fake registry layout.
 prepare_image() {
     local image_name="$1"
@@ -42,33 +54,44 @@ prepare_image() {
     crane manifest "$REGISTRY_URL/$image_name:$tag" | jq '.manifests |= map(select(.platform.os != "windows"))' > "$tmp_manifest_path"
     echo "Saved manifest list to $tmp_manifest_path"
 
-    local manifest_digest
-    manifest_digest="sha256:$(sha256sum < "$tmp_manifest_path" | awk '{print $1}')"
-    mv "$tmp_manifest_path" "$image_dir/manifests/$manifest_digest"
-    echo "Saved manifest list to $image_dir/manifests/$manifest_digest"
+    local manifest_hash manifest_digest manifest_path
+    manifest_hash="$(sha256sum < "$tmp_manifest_path" | awk '{print $1}')"
+    manifest_digest="sha256:$manifest_hash"
+    manifest_path="$(digest_to_path "$image_dir/manifests" "$manifest_digest")"
+    mkdir -p "$(dirname "$manifest_path")"
+    mv "$tmp_manifest_path" "$manifest_path"
+    echo "Saved manifest list to $manifest_path"
 
     # the file named after the tag now contains only the digest, acting as a redirect pointer
     echo "$manifest_digest" > "$image_dir/manifests/${internal_tag}"
     echo "Created tag file ${internal_tag} pointing to digest $manifest_digest"
 
     echo "Parsing manifest list and downloading individual manifests and blobs..."
-    
-    jq -r '.manifests[].digest' < "$image_dir/manifests/$manifest_digest" | while read -r individual_manifest_digest; do
+
+    jq -r '.manifests[].digest' < "$manifest_path" | while read -r individual_manifest_digest; do
       echo "  Downloading manifest $individual_manifest_digest..."
-      local individual_manifest_path="$image_dir/manifests/$individual_manifest_digest"
+      local individual_manifest_path
+      individual_manifest_path="$(digest_to_path "$image_dir/manifests" "$individual_manifest_digest")"
+      mkdir -p "$(dirname "$individual_manifest_path")"
       crane manifest "$REGISTRY_URL/$image_name@$individual_manifest_digest" > "$individual_manifest_path"
       echo "  Saved manifest to $individual_manifest_path"
 
       local config_digest
       config_digest=$(jq -r '.config.digest' < "$individual_manifest_path")
       echo "    Downloading config blob $config_digest..."
-      crane blob "$REGISTRY_URL/$image_name@$config_digest" > "$image_dir/blobs/$config_digest"
-      echo "    Saved config blob to $image_dir/blobs/$config_digest"
+      local config_path
+      config_path="$(digest_to_path "$image_dir/blobs" "$config_digest")"
+      mkdir -p "$(dirname "$config_path")"
+      crane blob "$REGISTRY_URL/$image_name@$config_digest" > "$config_path"
+      echo "    Saved config blob to $config_path"
 
       jq -r '.layers[].digest' < "$individual_manifest_path" | while read -r layer_digest; do
         echo "    Downloading layer blob $layer_digest..."
-        crane blob "$REGISTRY_URL/$image_name@$layer_digest" > "$image_dir/blobs/$layer_digest"
-        echo "    Saved layer blob to $image_dir/blobs/$layer_digest"
+        local layer_path
+        layer_path="$(digest_to_path "$image_dir/blobs" "$layer_digest")"
+        mkdir -p "$(dirname "$layer_path")"
+        crane blob "$REGISTRY_URL/$image_name@$layer_digest" > "$layer_path"
+        echo "    Saved layer blob to $layer_path"
       done
     done
 
