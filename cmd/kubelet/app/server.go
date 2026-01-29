@@ -1278,7 +1278,7 @@ func RunKubelet(ctx context.Context, kubeServer *options.KubeletServer, kubeDeps
 
 func startKubelet(ctx context.Context, k kubelet.Bootstrap, podCfg *config.PodConfig, kubeCfg *kubeletconfiginternal.KubeletConfiguration, kubeDeps *kubelet.Dependencies, enableServer bool) {
 	// start the kubelet
-	go k.Run(podCfg.Updates())
+	go k.Run(ctx, podCfg.Updates())
 
 	// start the kubelet server
 	if enableServer {
@@ -1333,7 +1333,7 @@ func createAndInitKubelet(
 
 	k.BirthCry()
 
-	k.StartGarbageCollection()
+	k.StartGarbageCollection(ctx)
 
 	return k, nil
 }
