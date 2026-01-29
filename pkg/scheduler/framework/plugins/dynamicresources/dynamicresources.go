@@ -665,25 +665,45 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 		// Claims (and thus their devices) are treated as "allocated" if they are in the assume cache
 		// or currently their allocation is in-flight. This does not change
 		// during filtering, so we can determine that once.
+		//
+		// This might have to be retried in the unlikely case that some concurrent modification made
+		// the result invalid.
 		var allocatedState *structured.AllocatedState
-		if pl.enableConsumableCapacity {
-			allocatedState, err = pl.draManager.ResourceClaims().GatherAllocatedState()
-			if err != nil {
-				return nil, statusError(logger, err)
+		err = wait.PollUntilContextTimeout(ctx, time.Microsecond, 5*time.Second, true /* immediate */, func(context.Context) (bool, error) {
+			if pl.enableConsumableCapacity {
+				allocatedState, err = pl.draManager.ResourceClaims().GatherAllocatedState()
+				if err != nil {
+					if errors.Is(err, errClaimTrackerConcurrentModification) {
+						logger.V(6).Info("Conflicting modification during GatherAllocatedState, trying again")
+						return false, nil
+					}
+					return false, err
+				}
+				if allocatedState == nil {
+					return false, errors.New("nil allocated state")
+				}
+				// Done.
+				return true, nil
+			} else {
+				allocatedDevices, err := pl.draManager.ResourceClaims().ListAllAllocatedDevices()
+				if err != nil {
+					if errors.Is(err, errClaimTrackerConcurrentModification) {
+						logger.V(6).Info("Conflicting modification during ListAllAllocatedDevices, trying again")
+						return false, nil
+					}
+					return false, err
+				}
+				allocatedState = &structured.AllocatedState{
+					AllocatedDevices:         allocatedDevices,
+					AllocatedSharedDeviceIDs: sets.New[structured.SharedDeviceID](),
+					AggregatedCapacity:       structured.NewConsumedCapacityCollection(),
+				}
+				// Done.
+				return true, nil
 			}
-			if allocatedState == nil {
-				return nil, statusError(logger, errors.New("nil allocated state"))
-			}
-		} else {
-			allocatedDevices, err := pl.draManager.ResourceClaims().ListAllAllocatedDevices()
-			if err != nil {
-				return nil, statusError(logger, err)
-			}
-			allocatedState = &structured.AllocatedState{
-				AllocatedDevices:         allocatedDevices,
-				AllocatedSharedDeviceIDs: sets.New[structured.SharedDeviceID](),
-				AggregatedCapacity:       structured.NewConsumedCapacityCollection(),
-			}
+		})
+		if err != nil {
+			return nil, statusError(logger, fmt.Errorf("gather allocation state: %w", err))
 		}
 		slices, err := pl.draManager.ResourceSlices().ListWithDeviceTaintRules()
 		if err != nil {
