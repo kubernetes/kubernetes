@@ -18,6 +18,7 @@ package e2enode
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -36,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -1915,6 +1917,256 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 			gomega.Expect(pod).ToNot(HaveContainerCPUsOverlapWith(appContainerName, nonReusableCPUs))
 		})
 	})
+
+	ginkgo.When("When checking CPU leaks in Guaranteed Pods", func() {
+		ginkgo.It("One init container(CPU number: 1) and one app container(CPU number: 2) for a pod, release leaked CPUs", func(ctx context.Context) {
+			reservedCPUs = cpuset.New(0)
+			cpuCount := 2
+			podCPUsNumber := 2
+
+			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
+
+			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+				policyName:         string(cpumanager.PolicyStatic),
+				reservedSystemCPUs: reservedCPUs, // Not really needed for the tests but helps to make a more precise check
+			}))
+
+			pod := makeCPUManagerMultiTypeContainersPodWithRestartPolicy("gu-pod-multi-type-container", []ctnAttribute{
+				{
+					ctnName:    "init-container-1",
+					cpuRequest: "1000m",
+					cpuLimit:   "1000m",
+				},
+			}, []ctnAttribute{
+				{
+					ctnName:    "gu-container-1",
+					cpuRequest: "2000m",
+					cpuLimit:   "2000m",
+				},
+			}, v1.RestartPolicyAlways)
+			ginkgo.By("running a Gu pod with a init container and a app container")
+			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+			podMap[string(pod.UID)] = pod
+
+			// waiting for reconcile loop.
+			time.Sleep(1 * time.Second)
+
+			UnionCPUNumber, err := getPodContainersCPUSetUnion(ctx, f, pod)
+			framework.ExpectNoError(err, "cannot get union CPU count for pod %s/%s", pod.Namespace, pod.Name)
+			ginkgo.By(fmt.Sprintf("UnionCPUNumber = %d", UnionCPUNumber))
+
+			// have leaked CPUs
+			gomega.Expect(UnionCPUNumber).ToNot(gomega.Equal(podCPUsNumber))
+
+			// no leaked CPUs in checkpoint
+			// initcontainer cpuset could be changed after terminating if there are leaked CPUs, this change only appied to checkpoint
+			gomega.Expect(pod).To(HavePodCPUsCount(getContainerCPUSetFromCheckpoint(pod, &pod.Spec.InitContainers[0]).Union(getContainerCPUSetFromCheckpoint(pod, &pod.Spec.Containers[0])), podCPUsNumber))
+
+			ginkgo.By("checking if the no leaked cpuset was applied when pod restart")
+			// make pod restart by removing pod sandbox
+			restartPodByRemovingSandbox(ctx, f, pod)
+
+			// waiting for reconcile loop.
+			time.Sleep(1 * time.Second)
+
+			// no leaked CPUs when Pod setup
+			UnionCPUNumber, err = getPodContainersCPUSetUnion(ctx, f, pod)
+			framework.ExpectNoError(err, "cannot get union CPU count for pod %s/%s", pod.Namespace, pod.Name)
+			ginkgo.By(fmt.Sprintf("UnionCPUNumber = %d", UnionCPUNumber))
+
+			// no leaked CPUs
+			gomega.Expect(UnionCPUNumber).To(gomega.Equal(podCPUsNumber))
+			gomega.Expect(pod).To(HavePodCPUsCount(getContainerCPUSetFromCheckpoint(pod, &pod.Spec.InitContainers[0]).Union(getContainerCPUSetFromCheckpoint(pod, &pod.Spec.Containers[0])), podCPUsNumber))
+		})
+
+		ginkgo.It("One init container(CPU number: 2) and one app container(CPU number: 1) for a pod, release part of unallocated reusable CPUs", func(ctx context.Context) {
+			reservedCPUs = cpuset.New(0)
+			cpuCount := 3
+			podCPUsNumber := 2
+
+			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
+
+			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+				policyName:         string(cpumanager.PolicyStatic),
+				reservedSystemCPUs: reservedCPUs, // Not really needed for the tests but helps to make a more precise check
+			}))
+
+			pod := makeCPUManagerMultiTypeContainersPodWithRestartPolicy("gu-pod-multi-type-container", []ctnAttribute{
+				{
+					ctnName:    "init-container-1",
+					cpuRequest: "2000m",
+					cpuLimit:   "2000m",
+				},
+			}, []ctnAttribute{
+				{
+					ctnName:    "gu-container-1",
+					cpuRequest: "1000m",
+					cpuLimit:   "1000m",
+				},
+			}, v1.RestartPolicyAlways)
+			ginkgo.By("running a Gu pod with a init container and a app container")
+			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+			podMap[string(pod.UID)] = pod
+
+			// waiting for reconcile loop.
+			time.Sleep(1 * time.Second)
+
+			UnionCPUNumber, err := getPodContainersCPUSetUnion(ctx, f, pod)
+			framework.ExpectNoError(err, "cannot get union CPU count for pod %s/%s", pod.Namespace, pod.Name)
+			ginkgo.By(fmt.Sprintf("UnionCPUNumber = %d", UnionCPUNumber))
+
+			// have leaked CPUs
+			gomega.Expect(UnionCPUNumber).ToNot(gomega.Equal(podCPUsNumber))
+
+			// no leaked CPUs in checkpoint
+			// initcontainer cpuset could be changed after terminating if there are leaked CPUs, this change only appied to checkpoint
+			gomega.Expect(pod).To(HavePodCPUsCount(getContainerCPUSetFromCheckpoint(pod, &pod.Spec.InitContainers[0]).Union(getContainerCPUSetFromCheckpoint(pod, &pod.Spec.Containers[0])), podCPUsNumber))
+
+			ginkgo.By("checking if the no leaked cpuset was applied when pod restart")
+			// make pod restart by removing pod sandbox
+			restartPodByRemovingSandbox(ctx, f, pod)
+
+			// waiting for reconcile loop.
+			time.Sleep(1 * time.Second)
+
+			// no leaked CPUs when Pod setup
+			UnionCPUNumber, err = getPodContainersCPUSetUnion(ctx, f, pod)
+			framework.ExpectNoError(err, "cannot get union CPU count for pod %s/%s", pod.Namespace, pod.Name)
+			ginkgo.By(fmt.Sprintf("UnionCPUNumber = %d", UnionCPUNumber))
+
+			// no leaked CPUs
+			gomega.Expect(UnionCPUNumber).To(gomega.Equal(podCPUsNumber))
+			gomega.Expect(pod).To(HavePodCPUsCount(getContainerCPUSetFromCheckpoint(pod, &pod.Spec.InitContainers[0]).Union(getContainerCPUSetFromCheckpoint(pod, &pod.Spec.Containers[0])), podCPUsNumber))
+		})
+
+		ginkgo.It("One sidecar container(CPU number:1) One init container(CPU number: 2) and one app container(CPU number: 1) for a pod, release part of unallocated reusable CPUs", func(ctx context.Context) {
+			reservedCPUs = cpuset.New(0, 2)
+			cpuCount := 4
+			podCPUsNumber := 3
+
+			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
+
+			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+				policyName:         string(cpumanager.PolicyStatic),
+				reservedSystemCPUs: reservedCPUs, // Not really needed for the tests but helps to make a more precise check
+			}))
+
+			containerRestartPolicyAlways := v1.ContainerRestartPolicyAlways
+			pod := makeCPUManagerMultiTypeContainersPodWithRestartPolicy("gu-pod-multi-type-container", []ctnAttribute{
+				{
+					ctnName:       "sidecar-container-1",
+					cpuRequest:    "1000m",
+					cpuLimit:      "1000m",
+					restartPolicy: &containerRestartPolicyAlways,
+				},
+				{
+					ctnName:    "init-container-1",
+					cpuRequest: "2000m",
+					cpuLimit:   "2000m",
+				},
+			}, []ctnAttribute{
+				{
+					ctnName:    "gu-container-1",
+					cpuRequest: "1000m",
+					cpuLimit:   "1000m",
+				},
+			}, v1.RestartPolicyAlways)
+			ginkgo.By("running a Gu pod with a init container and a app container")
+			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+			podMap[string(pod.UID)] = pod
+
+			// waiting for reconcile loop.
+			time.Sleep(1 * time.Second)
+
+			UnionCPUNumber, err := getPodContainersCPUSetUnion(ctx, f, pod)
+			framework.ExpectNoError(err, "cannot get union CPU count for pod %s/%s", pod.Namespace, pod.Name)
+			ginkgo.By(fmt.Sprintf("UnionCPUNumber = %d", UnionCPUNumber))
+
+			// have leaked CPUs
+			gomega.Expect(UnionCPUNumber).ToNot(gomega.Equal(podCPUsNumber))
+
+			// no leaked CPUs in checkpoint
+			// initcontainer cpuset could be changed after terminating if there are leaked CPUs, this change only appied to checkpoint
+			gomega.Expect(pod).To(HavePodCPUsCount(getContainerCPUSetFromCheckpoint(pod, &pod.Spec.InitContainers[0]).Union(getContainerCPUSetFromCheckpoint(pod, &pod.Spec.InitContainers[1]).Union(getContainerCPUSetFromCheckpoint(pod, &pod.Spec.Containers[0]))), podCPUsNumber))
+
+			ginkgo.By("checking if the no leaked cpuset was applied when pod restart")
+			// make pod restart by removing pod sandbox
+			restartPodByRemovingSandbox(ctx, f, pod)
+
+			// waiting for reconcile loop.
+			time.Sleep(1 * time.Second)
+
+			// no leaked CPUs when Pod setup
+			UnionCPUNumber, err = getPodContainersCPUSetUnion(ctx, f, pod)
+			framework.ExpectNoError(err, "cannot get union CPU count for pod %s/%s", pod.Namespace, pod.Name)
+			ginkgo.By(fmt.Sprintf("UnionCPUNumber = %d", UnionCPUNumber))
+
+			// no leaked CPUs
+			gomega.Expect(UnionCPUNumber).To(gomega.Equal(podCPUsNumber))
+			gomega.Expect(pod).To(HavePodCPUsCount(getContainerCPUSetFromCheckpoint(pod, &pod.Spec.InitContainers[0]).Union(getContainerCPUSetFromCheckpoint(pod, &pod.Spec.InitContainers[1]).Union(getContainerCPUSetFromCheckpoint(pod, &pod.Spec.Containers[0]))), podCPUsNumber))
+
+		})
+
+		ginkgo.It("One init container(CPU number: 2) and one app container(CPU number: 1) for a pod, no leaked CPUs", func(ctx context.Context) {
+			reservedCPUs = cpuset.New(0, 10)
+			cpuCount := 2
+			podCPUsNumber := 2
+
+			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
+
+			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+				policyName:         string(cpumanager.PolicyStatic),
+				reservedSystemCPUs: reservedCPUs, // Not really needed for the tests but helps to make a more precise check
+			}))
+
+			pod := makeCPUManagerMultiTypeContainersPodWithRestartPolicy("gu-pod-multi-type-container", []ctnAttribute{
+				{
+					ctnName:    "init-container-1",
+					cpuRequest: "2000m",
+					cpuLimit:   "2000m",
+				},
+			}, []ctnAttribute{
+				{
+					ctnName:    "gu-container-1",
+					cpuRequest: "1000m",
+					cpuLimit:   "1000m",
+				},
+			}, v1.RestartPolicyAlways)
+			ginkgo.By("running a Gu pod with a init container and a app container")
+			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+			podMap[string(pod.UID)] = pod
+
+			// waiting for reconcile loop.
+			time.Sleep(1 * time.Second)
+
+			UnionCPUNumber, err := getPodContainersCPUSetUnion(ctx, f, pod)
+			framework.ExpectNoError(err, "cannot get union CPU count for pod %s/%s", pod.Namespace, pod.Name)
+			ginkgo.By(fmt.Sprintf("UnionCPUNumber = %d", UnionCPUNumber))
+
+			// no leaked CPUs
+			gomega.Expect(UnionCPUNumber).To(gomega.Equal(podCPUsNumber))
+
+			// no leaked CPUs in checkpoint
+			// initcontainer cpuset could be changed after terminating if there are leaked CPUs, this change only appied to checkpoint
+			gomega.Expect(pod).To(HavePodCPUsCount(getContainerCPUSetFromCheckpoint(pod, &pod.Spec.InitContainers[0]).Union(getContainerCPUSetFromCheckpoint(pod, &pod.Spec.Containers[0])), podCPUsNumber))
+
+			ginkgo.By("checking if the no leaked cpuset was applied when pod restart")
+			// make pod restart by removing pod sandbox
+			restartPodByRemovingSandbox(ctx, f, pod)
+
+			// waiting for reconcile loop.
+			time.Sleep(1 * time.Second)
+
+			// no leaked CPUs when Pod setup
+			UnionCPUNumber, err = getPodContainersCPUSetUnion(ctx, f, pod)
+			framework.ExpectNoError(err, "cannot get union CPU count for pod %s/%s", pod.Namespace, pod.Name)
+			ginkgo.By(fmt.Sprintf("UnionCPUNumber = %d", UnionCPUNumber))
+
+			// no leaked CPUs
+			gomega.Expect(UnionCPUNumber).To(gomega.Equal(podCPUsNumber))
+			gomega.Expect(pod).To(HavePodCPUsCount(getContainerCPUSetFromCheckpoint(pod, &pod.Spec.InitContainers[0]).Union(getContainerCPUSetFromCheckpoint(pod, &pod.Spec.Containers[0])), podCPUsNumber))
+		})
+	})
 })
 
 var _ = SIGDescribe("CPU Manager Incompatibility Pod Level Resources", ginkgo.Ordered, ginkgo.ContinueOnFailure, framework.WithSerial(), feature.CPUManager, feature.PodLevelResources, framework.WithFeatureGate(features.PodLevelResources), func() {
@@ -2073,6 +2325,21 @@ type msgData struct {
 	Aligned          int
 	CurrentQuota     string
 	ExpectedQuota    string
+}
+
+func HavePodCPUsCount(podCPUSet cpuset.CPUSet, val int) types.GomegaMatcher {
+	md := &msgData{
+		CurrentCPUs: podCPUSet.String(),
+		Count:       val,
+	}
+	return gcustom.MakeMatcher(func(actual *v1.Pod) (bool, error) {
+		if podCPUSet.Size() == val {
+			return true, nil
+		} else if podCPUSet.Size() > val {
+			return false, fmt.Errorf("There are %d leaked CPUs", podCPUSet.Size()-val)
+		}
+		return false, fmt.Errorf("CPU not enough")
+	}).WithTemplate("Pod {{.Actual.Namespace}}/{{.Actual.Name}} UID {{.Actual.UID}} has allowed CPUs <{{.Data.CurrentCPUs}}> not matching expected count <{{.Data.Count}}> for container {{.Data.Name}}", md)
 }
 
 func HaveContainerCPUsCount(ctnName string, val int) types.GomegaMatcher {
@@ -2796,6 +3063,66 @@ func makeCPUManagerInitContainersPod(podName string, ctnAttributes []ctnAttribut
 	}
 }
 
+func makeCPUManagerMultiTypeContainersPodWithRestartPolicy(podName string, initCtnAttributes []ctnAttribute, ctnAttributes []ctnAttribute, restartPolicy v1.RestartPolicy) *v1.Pod {
+	var containers []v1.Container
+	var initContainers []v1.Container
+	cpusetCmd := "grep Cpus_allowed_list /proc/self/status | cut -f2"
+	cpusetAndSleepCmd := "grep Cpus_allowed_list /proc/self/status | cut -f2 && sleep 1d"
+
+	for _, ictnAttr := range initCtnAttributes {
+		ictn := v1.Container{
+			Name:  ictnAttr.ctnName,
+			Image: busyboxImage,
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse(ictnAttr.cpuRequest),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse(ictnAttr.cpuLimit),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+			},
+			Command:       []string{"sh", "-c", cpusetCmd},
+			RestartPolicy: ictnAttr.restartPolicy,
+		}
+		if ictnAttr.restartPolicy != nil && *ictnAttr.restartPolicy == v1.ContainerRestartPolicyAlways {
+			ictn.Command = []string{"sh", "-c", cpusetAndSleepCmd}
+		}
+		initContainers = append(initContainers, ictn)
+	}
+
+	for _, ctnAttr := range ctnAttributes {
+		ctn := v1.Container{
+			Name:  ctnAttr.ctnName,
+			Image: busyboxImage,
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse(ctnAttr.cpuRequest),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse(ctnAttr.cpuLimit),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+			},
+			Command: []string{"sh", "-c", cpusetAndSleepCmd},
+		}
+		containers = append(containers, ctn)
+	}
+
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: podName,
+		},
+		Spec: v1.PodSpec{
+			RestartPolicy:  restartPolicy,
+			InitContainers: initContainers,
+			Containers:     containers,
+		},
+	}
+}
+
 type cpuManagerKubeletArguments struct {
 	policyName                       string
 	enableCPUManagerOptions          bool
@@ -2841,4 +3168,102 @@ func configureCPUManagerInKubelet(oldCfg *kubeletconfig.KubeletConfiguration, ku
 	}
 
 	return newCfg
+}
+
+func getContainerCPUSetFromCheckpoint(pod *v1.Pod, container *v1.Container) cpuset.CPUSet {
+
+	// initialize empty cpuset as default return value
+	containerCPUSet := cpuset.CPUSet{}
+
+	// get the actual cpuset value from checkpoint file
+	checkpointPath := "/var/lib/kubelet/cpu_manager_state"
+	checkpointData, err := os.ReadFile(checkpointPath)
+	if err != nil {
+		fmt.Printf("Error reading checkpoint file %s: %v\n", checkpointPath, err)
+	} else {
+		// Parse the checkpoint JSON to extract CPU assignments
+		var checkpoint struct {
+			PolicyName    string                       `json:"policyName"`
+			DefaultCPUSet string                       `json:"defaultCpuSet"`
+			Entries       map[string]map[string]string `json:"entries,omitempty"`
+		}
+
+		if err := json.Unmarshal(checkpointData, &checkpoint); err != nil {
+			fmt.Printf("Error parsing checkpoint JSON: %v\n", err)
+		} else {
+			podUID := string(pod.UID)
+			if podEntries, exists := checkpoint.Entries[podUID]; exists {
+				if containerCPUs, exists := podEntries[container.Name]; exists {
+					// Parse the cpuset string and return it
+					if parsedCPUs, parseErr := cpuset.Parse(containerCPUs); parseErr == nil {
+						containerCPUSet = parsedCPUs
+					} else {
+						fmt.Printf("Error parsing cpuset string '%s': %v\n", containerCPUs, parseErr)
+					}
+				} else {
+					fmt.Printf("Container %s not found in checkpoint for pod %s\n", container.Name, podUID)
+				}
+			} else {
+				fmt.Printf("Pod %s not found in checkpoint entries\n", podUID)
+			}
+		}
+	}
+	return containerCPUSet
+}
+
+func restartPodByRemovingSandbox(ctx context.Context, f *framework.Framework, pod *v1.Pod) {
+	ginkgo.By("Getting the current pod sandbox ID")
+	rs, _, err := getCRIClient()
+	framework.ExpectNoError(err)
+	sandboxes, err := rs.ListPodSandbox(ctx, &runtimeapi.PodSandboxFilter{
+		LabelSelector: map[string]string{
+			"io.kubernetes.pod.name":      pod.Name,
+			"io.kubernetes.pod.namespace": pod.Namespace,
+		},
+	})
+	framework.ExpectNoError(err)
+	gomega.Expect(sandboxes).To(gomega.HaveLen(1))
+	podSandboxID := sandboxes[0].Id
+
+	ginkgo.By("Removing the pod sandbox")
+	err = rs.StopPodSandbox(ctx, podSandboxID)
+	framework.ExpectNoError(err)
+
+	ginkgo.By("Waiting for the pod to be restarted after sandbox removal")
+	err = e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
+	framework.ExpectNoError(err)
+}
+
+func getPodContainersCPUSetUnion(ctx context.Context, f *framework.Framework, pod *v1.Pod) (int, error) {
+	var allCPUSets []cpuset.CPUSet
+
+	for _, initContainer := range pod.Spec.InitContainers {
+		logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, pod.Namespace, pod.Name, initContainer.Name)
+		if err != nil {
+			return 0, fmt.Errorf("failed to get logs for init container %s: %w", initContainer.Name, err)
+		}
+
+		initContainerCPUs := getContainerAllowedCPUsFromLogs(pod.Name, initContainer.Name, logs)
+		allCPUSets = append(allCPUSets, initContainerCPUs)
+	}
+
+	for _, container := range pod.Spec.Containers {
+		logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, pod.Namespace, pod.Name, container.Name)
+		if err != nil {
+			return 0, fmt.Errorf("failed to get logs for container %s: %w", container.Name, err)
+		}
+		containerCPUs := getContainerAllowedCPUsFromLogs(pod.Name, container.Name, logs)
+		allCPUSets = append(allCPUSets, containerCPUs)
+	}
+
+	if len(allCPUSets) == 0 {
+		return 0, nil
+	}
+
+	union := allCPUSets[0]
+	for i := 1; i < len(allCPUSets); i++ {
+		union = union.Union(allCPUSets[i])
+	}
+
+	return union.Size(), nil
 }
