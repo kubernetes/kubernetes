@@ -34,6 +34,13 @@ import (
 	"k8s.io/klog/v2"
 )
 
+const (
+	// NamespaceRoleLabel is the label key used to identify system namespaces
+	NamespaceRoleLabel = "kubernetes.io/namespace-role"
+	// NamespaceRoleSystem is the label value for system namespaces
+	NamespaceRoleSystem = "system"
+)
+
 // Controller ensure system namespaces exist.
 type Controller struct {
 	client kubernetes.Interface
@@ -91,8 +98,10 @@ func (c *Controller) createNamespaceIfNeeded(ns string) error {
 	}
 	newNs := &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      ns,
-			Namespace: "",
+			Name: ns,
+			Labels: map[string]string{
+				NamespaceRoleLabel: NamespaceRoleSystem,
+			},
 		},
 	}
 	_, err := c.client.CoreV1().Namespaces().Create(context.TODO(), newNs, metav1.CreateOptions{})
