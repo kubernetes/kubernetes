@@ -48,6 +48,7 @@ func NewStorage(optsGetter generic.RESTOptionsGetter) (*VolumeAttachmentStorage,
 	store := &genericregistry.Store{
 		NewFunc:                   func() runtime.Object { return &storageapi.VolumeAttachment{} },
 		NewListFunc:               func() runtime.Object { return &storageapi.VolumeAttachmentList{} },
+		PredicateFunc:             volumeattachment.Matcher,
 		DefaultQualifiedResource:  storageapi.Resource("volumeattachments"),
 		SingularQualifiedResource: storageapi.Resource("volumeattachment"),
 
