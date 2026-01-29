@@ -65,6 +65,18 @@ func TestVersionedValidationByFuzzing(t *testing.T) {
 		{Group: "admissionregistration.k8s.io", Version: "v1alpha1"},
 	}
 
+	// subresourceOnly specifies the subresource path for types that can only be validated
+	// as subresources (e.g. autoscaling/Scale) and do not support root-level validation.
+	// For GVKs not in this map, the test defaults to fuzzing the root resource ("").
+	// Other resources with subresources (e.g. Pod status, exec) share validation logic with
+	// the root resource, so fuzzing the root is sufficient to verify validation equivalence.
+	subresourceOnly := map[schema.GroupVersionKind]string{
+		{Group: "autoscaling", Version: "v1", Kind: "Scale"}:      "scale",
+		{Group: "autoscaling", Version: "v1beta1", Kind: "Scale"}: "scale",
+		{Group: "autoscaling", Version: "v1beta2", Kind: "Scale"}: "scale",
+		{Group: "autoscaling", Version: "v2", Kind: "Scale"}:      "scale",
+	}
+
 	fuzzIters := *roundtrip.FuzzIters / 10 // TODO: Find a better way to manage test running time
 	f := fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(rand.Int63()), legacyscheme.Codecs)
 
@@ -78,6 +90,11 @@ func TestVersionedValidationByFuzzing(t *testing.T) {
 						t.Fatalf("could not create a %v: %s", kind, err)
 					}
 
+					subresource := ""
+					if specific, ok := subresourceOnly[gvk]; ok {
+						subresource = specific
+					}
+
 					var opts []ValidationTestConfig
 					// TODO(API group level configuration): Consider configuring normalization rules at the
 					// API group level to avoid potential collisions when multiple rule sets are combined.
@@ -85,10 +102,8 @@ func TestVersionedValidationByFuzzing(t *testing.T) {
 					allRules := append([]field.NormalizationRule{}, resourcevalidation.ResourceNormalizationRules...)
 					allRules = append(allRules, nodevalidation.NodeNormalizationRules...)
 					opts = append(opts, WithNormalizationRules(allRules...), WithFuzzer(f))
-
-					// Scale subresource needs to be specified explicitly.
-					if gv.Group == "autoscaling" && kind == "Scale" {
-						opts = append(opts, WithSubResources("scale"))
+					if subresource != "" {
+						opts = append(opts, WithSubResources(subresource))
 					}
 
 					VerifyVersionedValidationEquivalence(t, obj, nil, opts...)
