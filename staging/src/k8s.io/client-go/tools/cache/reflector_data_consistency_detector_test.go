@@ -30,6 +30,7 @@ import (
 	clientfeatures "k8s.io/client-go/features"
 	clientfeaturestesting "k8s.io/client-go/features/testing"
 	"k8s.io/client-go/util/consistencydetector"
+	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 )
 
@@ -73,7 +74,7 @@ func runTestReflectorDataConsistencyDetector(t *testing.T, transformer Transform
 	defer cancel()
 
 	store := NewStore(MetaNamespaceKeyFunc)
-	fifo := newQueueFIFO(store, transformer)
+	_, fifo := newQueueFIFO(klog.FromContext(ctx), nil, store, transformer)
 
 	lw := &ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
