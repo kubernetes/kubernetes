@@ -17483,7 +17483,7 @@ func schema_k8sio_api_certificates_v1_CertificateSigningRequestSpec(ref common.R
 						},
 					},
 				},
-				Required: []string{"request", "signerName"},
+				Required: []string{"request", "signerName", "usages"},
 			},
 		},
 	}
