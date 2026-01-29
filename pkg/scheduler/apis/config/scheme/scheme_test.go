@@ -624,6 +624,7 @@ leaderElection:
   resourceName: ""
   resourceNamespace: ""
   retryPeriod: 0s
+metric: {}
 profiles:
 - pluginConfig:
   - args:
@@ -727,6 +728,10 @@ leaderElection:
   resourceName: ""
   resourceNamespace: ""
   retryPeriod: 0s
+metric:
+  metricsAsyncRecorderBufferSize: 0
+  metricsAsyncRecorderFlushInterval: 0s
+  pluginMetricsSamplePercent: 0
 parallelism: 8
 podInitialBackoffSeconds: 0
 podMaxBackoffSeconds: 0
@@ -801,6 +806,10 @@ leaderElection:
   resourceName: ""
   resourceNamespace: ""
   retryPeriod: 0s
+metric:
+  metricsAsyncRecorderBufferSize: 0
+  metricsAsyncRecorderFlushInterval: 0s
+  pluginMetricsSamplePercent: 0
 parallelism: 8
 podInitialBackoffSeconds: 0
 podMaxBackoffSeconds: 0
