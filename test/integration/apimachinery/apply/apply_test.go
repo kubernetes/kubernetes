@@ -73,7 +73,7 @@ func TestApply(t *testing.T) {
 		tCtx.Log("Stopping the apiserver...")
 		server.TearDownFn()
 	})
-	tCtx = ktesting.WithRESTConfig(tCtx, server.ClientConfig)
+	tCtx = tCtx.WithRESTConfig(server.ClientConfig)
 
 	// More sub-tests could be added here. Currently there's only one.
 	tCtx.Run("optional-list-map-key", testOptionalListMapKey)
