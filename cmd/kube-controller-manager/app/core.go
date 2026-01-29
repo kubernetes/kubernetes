@@ -55,6 +55,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/resourceclaim"
 	resourcequotacontroller "k8s.io/kubernetes/pkg/controller/resourcequota"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
+	"k8s.io/kubernetes/pkg/controller/staleness"
 	"k8s.io/kubernetes/pkg/controller/storageversiongc"
 	"k8s.io/kubernetes/pkg/controller/tainteviction"
 	ttlcontroller "k8s.io/kubernetes/pkg/controller/ttl"
@@ -1146,4 +1147,29 @@ func newSELinuxWarningController(ctx context.Context, controllerContext Controll
 	return newControllerLoop(func(ctx context.Context) {
 		seLinuxController.Run(ctx, 1)
 	}, controllerName), nil
+}
+
+func newProberControllerDescriptor() *ControllerDescriptor {
+	return &ControllerDescriptor{
+		name:        names.StalenessProberController,
+		aliases:     []string{"staleness-prober"},
+		constructor: newProberController,
+		requiredFeatureGates: []featuregate.Feature{
+			features.MonitorInformerStaleness,
+		},
+	}
+}
+
+func newProberController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
+	client, err := controllerContext.NewClient("staleness-prober")
+	if err != nil {
+		return nil, err
+	}
+	prober := staleness.NewPodProber(
+		ctx,
+		client,
+		controllerContext.InformerFactory.Core().V1().Pods().Informer().GetStore(),
+	)
+	return newControllerLoop(prober.Run, controllerName), nil
+
 }
