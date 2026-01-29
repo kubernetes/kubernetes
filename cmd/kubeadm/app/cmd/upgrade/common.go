@@ -129,7 +129,7 @@ func enforceRequirements(flagSet *pflag.FlagSet, flags *applyPlanFlags, args []s
 		// version. While this is not the same for `upgrade plan` where the KubernetesVersion should be the old
 		// one (because the call to getComponentConfigVersionStates requires the currently installed version).
 		// This also makes the KubernetesVersion value returned for `upgrade plan` consistent as that command
-		// allows to not specify a target version in which case KubernetesVersion will always hold the currently
+		// allows one to not specify a target version in which case KubernetesVersion will always hold the currently
 		// installed one.
 		initCfg.KubernetesVersion = newK8sVersion
 	}
