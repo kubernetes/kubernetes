@@ -41,6 +41,7 @@ import (
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/version"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -1342,7 +1343,7 @@ func TestReadyCondition(t *testing.T) {
 				return tc.nodeShutdownManagerErrors
 			}
 			events := []testEvent{}
-			recordEventFunc := func(eventType, event string) {
+			recordEventFunc := func(logger klog.Logger, eventType, event string) {
 				events = append(events, testEvent{
 					eventType: eventType,
 					event:     event,
@@ -1461,7 +1462,7 @@ func TestMemoryPressureCondition(t *testing.T) {
 		t.Run(tc.desc, func(t *testing.T) {
 			ctx := ktesting.Init(t)
 			events := []testEvent{}
-			recordEventFunc := func(eventType, event string) {
+			recordEventFunc := func(logger klog.Logger, eventType, event string) {
 				events = append(events, testEvent{
 					eventType: eventType,
 					event:     event,
@@ -1583,7 +1584,7 @@ func TestPIDPressureCondition(t *testing.T) {
 		t.Run(tc.desc, func(t *testing.T) {
 			ctx := ktesting.Init(t)
 			events := []testEvent{}
-			recordEventFunc := func(eventType, event string) {
+			recordEventFunc := func(logger klog.Logger, eventType, event string) {
 				events = append(events, testEvent{
 					eventType: eventType,
 					event:     event,
@@ -1705,7 +1706,7 @@ func TestDiskPressureCondition(t *testing.T) {
 		t.Run(tc.desc, func(t *testing.T) {
 			ctx := ktesting.Init(t)
 			events := []testEvent{}
-			recordEventFunc := func(eventType, event string) {
+			recordEventFunc := func(logger klog.Logger, eventType, event string) {
 				events = append(events, testEvent{
 					eventType: eventType,
 					event:     event,
