@@ -2339,7 +2339,7 @@ func TestGetSidecarCPUsBeforeInit(t *testing.T) {
 			description: "No sidecar containers before init container",
 			pod: WithPodUID(makeMultiContainerPodWithOptions(
 				[]*containerOptions{
-					{request: "2000m", limit: "2000m"},                                                 // regular init container					
+					{request: "2000m", limit: "2000m"},                                                 // regular init container
 					{request: "2000m", limit: "2000m", restartPolicy: v1.ContainerRestartPolicyAlways}, // sidecar init container
 				},
 				[]*containerOptions{
@@ -2360,7 +2360,7 @@ func TestGetSidecarCPUsBeforeInit(t *testing.T) {
 			pod: WithPodUID(makeMultiContainerPodWithOptions(
 				[]*containerOptions{
 					{request: "1000m", limit: "1000m", restartPolicy: v1.ContainerRestartPolicyAlways},    // sidecar init container
-					{request: "1000m", limit: "1000m", restartPolicy: v1.ContainerRestartPolicyOnFailure}, // regular init container	
+					{request: "1000m", limit: "1000m", restartPolicy: v1.ContainerRestartPolicyOnFailure}, // regular init container
 				},
 				[]*containerOptions{
 					{request: "1000m", limit: "1000m"}, // regular app container
