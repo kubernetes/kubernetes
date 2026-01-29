@@ -2844,7 +2844,7 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 				},
 			},
 			wantErrs: field.ErrorList{
-				{Type: field.ErrorTypeRequired, Field: "status.startTime"},
+				{Type: field.ErrorTypeInvalid, Field: "status.startTime"},
 			},
 		},
 		"verify startTime cannot be updated for unsuspended job": {
@@ -2862,7 +2862,7 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 				},
 			},
 			wantErrs: field.ErrorList{
-				{Type: field.ErrorTypeRequired, Field: "status.startTime"},
+				{Type: field.ErrorTypeInvalid, Field: "status.startTime"},
 			},
 		},
 		"verify startTime can be updated when resuming job (JobSuspended: True -> False)": {
