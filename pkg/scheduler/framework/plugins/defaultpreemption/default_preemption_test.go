@@ -2012,7 +2012,24 @@ func TestPreempt(t *testing.T) {
 				},
 			},
 			registerPlugin: tf.RegisterPluginAsExtensions(noderesources.Name, nodeResourcesFitFunc, "Filter", "PreFilter"),
-			want:           nil,
+			want:           framework.NewPostFilterResultWithNominatedNode(""),
+			expectedPods:   []string{},
+		},
+		{
+			name: "Scheduler extenders do not allow any preemption but plugins allow",
+			pod:  st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Priority(highPriority).Req(smallRes).PreemptionPolicy(v1.PreemptLowerPriority).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1.1").UID("p1.1").Namespace(v1.NamespaceDefault).Node("node1").Priority(midPriority).Req(smallRes).Obj(),
+			},
+			nodeNames: []string{"node1"},
+			extenders: []*tf.FakeExtender{
+				{
+					ExtenderName: "FakeExtender1",
+					Predicates:   []tf.FitPredicate{tf.FalsePredicateExtender},
+				},
+			},
+			registerPlugin: tf.RegisterPluginAsExtensions(noderesources.Name, nodeResourcesFitFunc, "Filter", "PreFilter"),
+			want:           framework.NewPostFilterResultWithNominatedNode(""),
 			expectedPods:   []string{},
 		},
 		{
