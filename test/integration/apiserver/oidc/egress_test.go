@@ -19,7 +19,6 @@ package oidc
 import (
 	"context"
 	"errors"
-	"io"
 	"net"
 	"net/http"
 	"sync"
@@ -29,6 +28,7 @@ import (
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilsoidc "k8s.io/kubernetes/test/utils/oidc"
 )
 
 func runEgressProxy(t testing.TB, udsName string, ready chan<- struct{}) {
@@ -41,75 +41,7 @@ func runEgressProxy(t testing.TB, udsName string, ready chan<- struct{}) {
 	}
 
 	var called atomic.Bool
-	httpConnectProxy := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/ready" {
-			t.Log("egress proxy ready")
-			w.WriteHeader(http.StatusOK)
-			return
-		}
-
-		called.Store(true)
-
-		if r.Method != http.MethodConnect {
-			http.Error(w, "this proxy only supports CONNECT passthrough", http.StatusMethodNotAllowed)
-			return
-		}
-
-		backendConn, err := (&net.Dialer{}).DialContext(r.Context(), "tcp", r.Host)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		defer func() { _ = backendConn.Close() }()
-
-		hijacker, ok := w.(http.Hijacker)
-		if !ok {
-			http.Error(w, "hijacking not supported", http.StatusInternalServerError)
-			return
-		}
-
-		requestHijackedConn, _, err := hijacker.Hijack()
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		defer func() { _ = requestHijackedConn.Close() }()
-
-		// use t.Errorf for all errors after this Write since the client may think the connection is good
-		_, err = requestHijackedConn.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
-		if err != nil {
-			t.Errorf("unexpected established error: %v", err)
-			return
-		}
-
-		writerComplete := make(chan struct{})
-		readerComplete := make(chan struct{})
-
-		go func() {
-			_, err := io.Copy(backendConn, requestHijackedConn)
-			if err != nil && !utilnet.IsProbableEOF(err) {
-				t.Errorf("unexpected writer error: %v", err)
-			}
-			close(writerComplete)
-		}()
-
-		go func() {
-			_, err := io.Copy(requestHijackedConn, backendConn)
-			if err != nil && !utilnet.IsProbableEOF(err) {
-				t.Errorf("unexpected reader error: %v", err)
-			}
-			close(readerComplete)
-		}()
-
-		// Wait for one half the connection to exit. Once it does,
-		// the defer will clean up the other half of the connection.
-		select {
-		case <-writerComplete:
-		case <-readerComplete:
-		}
-	})
-
-	server := http.Server{Handler: httpConnectProxy}
+	server := http.Server{Handler: utilsoidc.NewHTTPConnectProxyHandler(t, &called)}
 
 	t.Cleanup(func() {
 		if !called.Load() {

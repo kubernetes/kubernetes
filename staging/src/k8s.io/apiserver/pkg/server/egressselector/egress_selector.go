@@ -300,6 +300,7 @@ func getTLSConfig(t *apiserver.TLSConfig) (*tls.Config, error) {
 	return &tls.Config{
 		Certificates: []tls.Certificate{clientCerts},
 		RootCAs:      certPool,
+		ServerName:   t.TLSServerName,
 	}, nil
 }
 
