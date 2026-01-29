@@ -87,6 +87,8 @@ func New(
 	clusterName string,
 	clusterCIDRs []*net.IPNet,
 ) (*RouteController, error) {
+	registerMetrics()
+
 	if len(clusterCIDRs) == 0 {
 		klog.Fatal("RouteController: Must specify clusterCIDR.")
 	}
@@ -247,6 +249,8 @@ func (rc *RouteController) processNextWorkItem(ctx context.Context) bool {
 }
 
 func (rc *RouteController) reconcileNodeRoutes(ctx context.Context) error {
+	routeSyncCount.Inc()
+
 	routeList, err := rc.routes.ListRoutes(ctx, rc.clusterName)
 	if err != nil {
 		return fmt.Errorf("error listing routes: %v", err)
