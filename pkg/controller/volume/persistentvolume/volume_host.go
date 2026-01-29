@@ -79,6 +79,10 @@ func (ctrl *PersistentVolumeController) GetNodeAllocatable() (v1.ResourceList, e
 	return v1.ResourceList{}, nil
 }
 
+func (ctrl *PersistentVolumeController) GetCPUAffinity(podUID, containerName string) []int64  {
+	return []int64{}
+}
+
 func (ctrl *PersistentVolumeController) GetAttachedVolumesFromNodeStatus() (map[v1.UniqueVolumeName]string, error) {
 	return map[v1.UniqueVolumeName]string{}, nil
 }

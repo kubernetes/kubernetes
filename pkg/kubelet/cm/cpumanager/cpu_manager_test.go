@@ -44,16 +44,23 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
+	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/utils/cpuset"
 )
 
 type mockState struct {
+	promised      state.ContainerCPUAssignments
 	assignments   state.ContainerCPUAssignments
 	defaultCPUSet cpuset.CPUSet
 }
 
 func (s *mockState) GetCPUSet(podUID string, containerName string) (cpuset.CPUSet, bool) {
 	res, ok := s.assignments[podUID][containerName]
+	return res.Clone(), ok
+}
+
+func (s *mockState) GetPromisedCPUSet(podUID string, containerName string) (cpuset.CPUSet, bool) {
+	res, ok := s.promised[podUID][containerName]
 	return res.Clone(), ok
 }
 
@@ -66,6 +73,13 @@ func (s *mockState) GetCPUSetOrDefault(podUID string, containerName string) cpus
 		return res
 	}
 	return s.GetDefaultCPUSet()
+}
+
+func (s *mockState) SetPromisedCPUSet(podUID string, containerName string, cset cpuset.CPUSet) {
+	if _, exists := s.promised[podUID]; !exists {
+		s.promised[podUID] = make(map[string]cpuset.CPUSet)
+	}
+	s.promised[podUID][containerName] = cset
 }
 
 func (s *mockState) SetCPUSet(podUID string, containerName string, cset cpuset.CPUSet) {
@@ -84,11 +98,16 @@ func (s *mockState) Delete(podUID string, containerName string) {
 	if len(s.assignments[podUID]) == 0 {
 		delete(s.assignments, podUID)
 	}
+	delete(s.promised[podUID], containerName)
+	if len(s.promised[podUID]) == 0 {
+		delete(s.promised, podUID)
+	}
 }
 
 func (s *mockState) ClearState() {
 	s.defaultCPUSet = cpuset.CPUSet{}
 	s.assignments = make(state.ContainerCPUAssignments)
+	s.promised = make(state.ContainerCPUAssignments)
 }
 
 func (s *mockState) SetCPUAssignments(a state.ContainerCPUAssignments) {
@@ -97,6 +116,14 @@ func (s *mockState) SetCPUAssignments(a state.ContainerCPUAssignments) {
 
 func (s *mockState) GetCPUAssignments() state.ContainerCPUAssignments {
 	return s.assignments.Clone()
+}
+
+func (s *mockState) SetCPUPromised(a state.ContainerCPUAssignments) {
+	s.promised = a.Clone()
+}
+
+func (s *mockState) GetCPUPromised() state.ContainerCPUAssignments {
+	return s.promised.Clone()
 }
 
 type mockPolicy struct {
@@ -129,6 +156,15 @@ func (p *mockPolicy) GetPodTopologyHints(_ logr.Logger, s state.State, pod *v1.P
 
 func (p *mockPolicy) GetAllocatableCPUs(m state.State) cpuset.CPUSet {
 	return cpuset.New()
+}
+
+func (p *mockPolicy) ReleaseTimedOutScaleDownCPUs(_ logr.Logger, s state.State) {
+    // Mock implementation - does nothing
+}
+
+func (p *mockPolicy) IsDuringScaleDownDelay(podID, containerName string) bool {
+    // Mock implementation - always returns false
+    return false
 }
 
 type mockRuntimeService struct {
@@ -169,6 +205,7 @@ func makePod(podUID, containerName, cpuRequest, cpuLimit string) *v1.Pod {
 	}
 
 	pod.UID = types.UID(podUID)
+	pod.Name = podUID
 	pod.Spec.Containers[0].Name = containerName
 
 	return pod
@@ -341,6 +378,7 @@ func TestCPUManagerAdd(t *testing.T) {
 		mgr := &manager{
 			policy: testCase.policy,
 			state: &mockState{
+				promised:      state.ContainerCPUAssignments{},
 				assignments:   state.ContainerCPUAssignments{},
 				defaultCPUSet: cpuset.New(1, 2, 3, 4),
 			},
@@ -566,6 +604,7 @@ func TestCPUManagerAddWithInitContainers(t *testing.T) {
 		policy, _ := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, cpuset.New(), topologymanager.NewFakeManager(), nil)
 
 		mockState := &mockState{
+			promised:      testCase.stAssignments,
 			assignments:   testCase.stAssignments,
 			defaultCPUSet: testCase.stDefaultCPUSet,
 		}
@@ -760,6 +799,7 @@ func TestCPUManagerRemove(t *testing.T) {
 			err: nil,
 		},
 		state: &mockState{
+			promised:      state.ContainerCPUAssignments{},
 			assignments:   state.ContainerCPUAssignments{},
 			defaultCPUSet: cpuset.New(),
 		},
@@ -1260,6 +1300,7 @@ func TestReconcileState(t *testing.T) {
 		mgr := &manager{
 			policy: testCase.policy,
 			state: &mockState{
+				promised:      testCase.stAssignments,
 				assignments:   testCase.stAssignments,
 				defaultCPUSet: testCase.stDefaultCPUSet,
 			},
@@ -1275,6 +1316,7 @@ func TestReconcileState(t *testing.T) {
 				podStatus: testCase.pspPS,
 				found:     testCase.pspFound,
 			},
+			runtimeHelper: &containertest.FakeRuntimeHelper{},
 		}
 		mgr.sourcesReady = &sourcesReadyStub{}
 		success, failure := mgr.reconcileState(context.Background())
@@ -1370,6 +1412,7 @@ func TestCPUManagerAddWithResvList(t *testing.T) {
 		mgr := &manager{
 			policy: testCase.policy,
 			state: &mockState{
+				promised:      state.ContainerCPUAssignments{},
 				assignments:   state.ContainerCPUAssignments{},
 				defaultCPUSet: cpuset.New(0, 1, 2, 3),
 			},
@@ -1522,6 +1565,7 @@ func TestCPUManagerGetAllocatableCPUs(t *testing.T) {
 			policy:     testCase.policy,
 			activePods: func() []*v1.Pod { return nil },
 			state: &mockState{
+				promised:      state.ContainerCPUAssignments{},
 				assignments:   state.ContainerCPUAssignments{},
 				defaultCPUSet: cpuset.New(0, 1, 2, 3),
 			},

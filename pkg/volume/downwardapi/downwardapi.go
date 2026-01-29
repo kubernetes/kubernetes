@@ -19,6 +19,7 @@ package downwardapi
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -264,8 +265,16 @@ func CollectData(items []v1.DownwardAPIVolumeFile, pod *v1.Pod, host volume.Volu
 			if err != nil {
 				errlist = append(errlist, err)
 			} else if values, err := resource.ExtractResourceValueByContainerNameAndNodeAllocatable(fileInfo.ResourceFieldRef, pod, containerName, nodeAllocatable); err != nil {
-				klog.Errorf("Unable to extract field %s: %s", fileInfo.ResourceFieldRef.Resource, err.Error())
-				errlist = append(errlist, err)
+				// Check if this is the special case for "status.cpuset" that requires CPU manager
+				if err != nil && strings.Contains(err.Error(), resource.ErrStatusCPUSetSetting) {
+					containerCPUSet := host.GetCPUAffinity(string(pod.UID), containerName)
+					values := fmt.Sprintf("%v", containerCPUSet)
+					fileProjection.Data = []byte(values)
+					klog.V(3).Infof("downwardAPI volume container CPUSet for pod %s/%s container %s: %s", pod.Namespace, pod.Name, containerName, values)
+				} else {
+					klog.Errorf("Unable to extract field %s: %s", fileInfo.ResourceFieldRef.Resource, err.Error())
+					errlist = append(errlist, err)
+				}
 			} else {
 				fileProjection.Data = []byte(values)
 			}
