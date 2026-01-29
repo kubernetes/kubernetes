@@ -45,7 +45,7 @@ type progressReporter struct {
 	usageCount              int64
 	wg                      sync.WaitGroup
 	signalCtx, interruptCtx context.Context
-	signalCancel            func()
+	signalChannel           chan os.Signal
 	progressChannel         chan os.Signal
 
 	// reportMutex protects report creation and settings.
@@ -103,11 +103,13 @@ func (p *progressReporter) init(tb TB) context.Context {
 		}
 	}
 
-	p.signalCtx, p.signalCancel = signal.NotifyContext(context.Background(), os.Interrupt)
-	cancelCtx, cancel := context.WithCancelCause(context.Background())
+	p.signalChannel = make(chan os.Signal)
+	signal.Notify(p.signalChannel, os.Interrupt)
 	p.wg.Go(func() {
-		<-p.signalCtx.Done()
-		cancel(errors.New("received interrupt signal"))
+		_, ok := <-p.signalChannel
+		if ok {
+			interrupted(errors.New("received interrupt signal"))
+		}
 	})
 
 	// This reimplements the contract between Ginkgo and Gomega for progress reporting.
@@ -139,7 +141,10 @@ func (p *progressReporter) finalize() {
 		return
 	}
 
-	p.signalCancel()
+	signal.Stop(p.signalChannel)
+	close(p.signalChannel)
+	signal.Stop(p.progressChannel)
+	close(p.progressChannel)
 	p.wg.Wait()
 
 	// Now that all goroutines are stopped, we can clean up some more.
@@ -175,21 +180,12 @@ func (p *progressReporter) detachProgressReporter(id int64) {
 
 func (p *progressReporter) run() {
 	for {
-		select {
-		case <-p.interruptCtx.Done():
-			// Maybe do one last progress report?
-			//
-			// This is primarily for unit testing of ktesting itself,
-			// in a normal test we don't care anymore.
-			select {
-			case <-p.progressChannel:
-				p.dumpProgress()
-			default:
-			}
+		_, ok := <-p.progressChannel
+		if !ok {
+			// Shut down.
 			return
-		case <-p.progressChannel:
-			p.dumpProgress()
 		}
+		p.dumpProgress()
 	}
 }
 
