@@ -1063,3 +1063,71 @@ func TestCreateHorizontalPodAutoscalerV1(t *testing.T) {
 		})
 	}
 }
+
+func TestAutoscaleOptionsCanCreateHPAV1(t *testing.T) {
+	tests := []struct {
+		name      string
+		options   *AutoscaleOptions
+		expectOK  bool
+		expectErr string
+	}{
+		{
+			name: "cpu percent only",
+			options: &AutoscaleOptions{
+				CPUPercent: 60,
+			},
+			expectOK: true,
+		},
+		{
+			name: "cpu percent unset no cpu flag",
+			options: &AutoscaleOptions{
+				CPUPercent: -1,
+			},
+			expectOK: false,
+		},
+		{
+			name: "cpu utilization via cpu flag",
+			options: &AutoscaleOptions{
+				CPU:        "70%",
+				CPUPercent: -1,
+			},
+			expectOK: true,
+		},
+		{
+			name: "cpu average value via cpu flag",
+			options: &AutoscaleOptions{
+				CPU:        "500m",
+				CPUPercent: -1,
+			},
+			expectOK: false,
+		},
+		{
+			name: "memory target prevents fallback",
+			options: &AutoscaleOptions{
+				CPUPercent: 50,
+				Memory:     "200Mi",
+			},
+			expectOK: false,
+		},
+		{
+			name: "invalid cpu value surfaces error",
+			options: &AutoscaleOptions{
+				CPU:        "invalid",
+				CPUPercent: -1,
+			},
+			expectErr: "invalid resource cpu value: invalid",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ok, err := tc.options.canCreateHPAV1()
+			if tc.expectErr != "" {
+				assert.EqualError(t, err, tc.expectErr)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, tc.expectOK, ok)
+		})
+	}
+}
