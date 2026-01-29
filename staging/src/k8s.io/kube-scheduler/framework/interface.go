@@ -708,7 +708,7 @@ type PlacementGeneratorPlugin interface {
 	// Each Placement represents a candidate set of resources (e.g., nodes matching a selector)
 	// and potential DRA allocations where the PodGroup might be scheduled.
 	// This runs in Phase 1 of the Workload Scheduling Cycle.
-	GeneratePlacements(ctx context.Context, state *CycleState, podGroup *PodGroupInfo, parentPlacements []*Placement) ([]*Placement, *Status)
+	GeneratePlacements(ctx context.Context, state *CycleState, podGroup *PodGroupInfo, parentPlacements []*ParentPlacement) ([]*Placement, *Status)
 }
 
 // PlacementStateData is the key for storing Placement options in the CycleState.
