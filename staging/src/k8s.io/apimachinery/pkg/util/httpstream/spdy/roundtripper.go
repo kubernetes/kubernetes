@@ -364,7 +364,11 @@ func (s *SpdyRoundTripper) NewConnection(resp *http.Response) (httpstream.Connec
 	connectionHeader := strings.ToLower(resp.Header.Get(httpstream.HeaderConnection))
 	upgradeHeader := strings.ToLower(resp.Header.Get(httpstream.HeaderUpgrade))
 	if (resp.StatusCode != http.StatusSwitchingProtocols) || !strings.Contains(connectionHeader, strings.ToLower(httpstream.HeaderUpgrade)) || !strings.Contains(upgradeHeader, strings.ToLower(HeaderSpdy31)) {
-		defer resp.Body.Close()
+		defer func ()  {
+			resp.Body.Close()
+			// Close the underlying connection to prevent fd leak
+			s.conn.Close()
+		}()
 		responseError := ""
 		responseErrorBytes, err := io.ReadAll(resp.Body)
 		if err != nil {
