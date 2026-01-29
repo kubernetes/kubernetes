@@ -319,4 +319,10 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 			obj.ImagePullCredentialsVerificationPolicy = kubeletconfigv1beta1.NeverVerifyPreloadedImages
 		}
 	}
+
+	if localFeatureGate.Enabled(features.ConfigurableCAdvisorMetrics) {
+		if obj.CAdvisor.IncludedMetrics.ProcessMetrics == nil {
+			obj.CAdvisor.IncludedMetrics.ProcessMetrics = ptr.To(true)
+		}
+	}
 }

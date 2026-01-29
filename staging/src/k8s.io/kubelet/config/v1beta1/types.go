@@ -928,6 +928,42 @@ type KubeletConfiguration struct {
 	// +featureGate=UserNamespacesSupport
 	// +optional
 	UserNamespaces *UserNamespaces `json:"userNamespaces,omitempty"`
+
+	// CAdvisor contains configuration for the embedded cAdvisor metrics collector.
+	// This allows disabling expensive metric collectors like ProcessMetrics
+	// which can reduce kubelet CPU usage significantly on high-density nodes.
+	// +featureGate=ConfigurableCAdvisorMetrics
+	// +optional
+	CAdvisor CAdvisorConfiguration `json:"cadvisor,omitempty"`
+}
+
+// CAdvisorConfiguration contains settings for the embedded cAdvisor.
+type CAdvisorConfiguration struct {
+	// IncludedMetrics specifies which cAdvisor metric collectors are enabled.
+	// All collectors are enabled by default for backward compatibility.
+	// +optional
+	IncludedMetrics CAdvisorIncludedMetrics `json:"includedMetrics,omitempty"`
+}
+
+// CAdvisorIncludedMetrics specifies which cAdvisor metric collectors to enable.
+// All fields default to true for backward compatibility.
+type CAdvisorIncludedMetrics struct {
+	// ProcessMetrics enables collection of process/thread metrics.
+	// These metrics scan /proc for every thread in every container, which
+	// causes significant CPU overhead on high-density nodes (100+ pods).
+	// Disabling this can reduce kubelet CPU usage by up to 99% on such nodes.
+	//
+	// Affected metrics when disabled:
+	//   - container_processes
+	//   - container_threads
+	//   - container_file_descriptors
+	//   - container_sockets
+	//   - container_ulimits_soft
+	//   - container_ulimits_hard
+	//
+	// Default: true (enabled for backward compatibility)
+	// +optional
+	ProcessMetrics *bool `json:"processMetrics,omitempty"`
 }
 
 type KubeletAuthorizationMode string

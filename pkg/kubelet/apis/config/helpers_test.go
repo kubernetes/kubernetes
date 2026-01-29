@@ -307,5 +307,6 @@ var (
 		"FailCgroupV1",
 		"CrashLoopBackOff.MaxContainerRestartPeriod",
 		"UserNamespaces.IDsPerPod",
+		"CAdvisor.IncludedMetrics.ProcessMetrics",
 	)
 )

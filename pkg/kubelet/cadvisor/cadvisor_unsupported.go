@@ -24,6 +24,7 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 )
 
 type cadvisorUnsupported struct {
@@ -32,7 +33,8 @@ type cadvisorUnsupported struct {
 var _ Interface = new(cadvisorUnsupported)
 
 // New creates a new cAdvisor Interface for unsupported systems.
-func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupsRoots []string, usingLegacyStats, localStorageCapacityIsolation bool) (Interface, error) {
+// The cadvisorConfig parameter is unused on unsupported platforms but accepted for API compatibility.
+func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupsRoots []string, usingLegacyStats, localStorageCapacityIsolation bool, _ *kubeletconfig.CAdvisorConfiguration) (Interface, error) {
 	return &cadvisorUnsupported{}, nil
 }
 
