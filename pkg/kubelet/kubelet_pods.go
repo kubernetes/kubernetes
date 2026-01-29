@@ -1132,14 +1132,40 @@ func (kl *Kubelet) filterOutInactivePods(pods []*v1.Pod) []*v1.Pod {
 			continue
 		}
 
-		// terminal pods are considered inactive UNLESS they are actively terminating
-		if kl.isAdmittedPodTerminal(p) && !kl.podWorkers.IsPodTerminationRequested(p.UID) {
+		// Filter out terminal pods that have no runtime resources (containers or
+		// sandboxes). This correctly handles:
+		// - Rejected pods: Never had containers created, Phase=Failed set by
+		//   rejectPod(), safe to exclude from resource accounting immediately.
+		// - Evicting pods: Had containers that are still running or being stopped,
+		//   will have runtime resources until termination completes, so they remain
+		//   in the active list for resource accounting.
+		//
+		// We check the runtime pod cache directly rather than the API status because
+		// generateAPIPodStatus creates placeholder ContainerStatus entries for all
+		// spec containers even if no containers were ever created in the runtime.
+		if kl.isAdmittedPodTerminal(p) && !kl.hasRuntimeContainers(p) {
 			continue
 		}
 
 		filteredPods = append(filteredPods, p)
 	}
 	return filteredPods
+}
+
+// hasRuntimeContainers returns true if the pod has any containers or sandboxes
+// in the container runtime. This checks the actual runtime state via the pod
+// cache, not the API status which may have placeholder entries for containers
+// that were never created (e.g., for rejected pods).
+//
+// This is used to distinguish between:
+// - Rejected pods: Never had containers created, safe to filter from resource accounting
+// - Evicting pods: Had containers that may still need cleanup, must keep in resource accounting
+func (kl *Kubelet) hasRuntimeContainers(pod *v1.Pod) bool {
+	podStatus, err := kl.podCache.Get(pod.UID)
+	if err != nil {
+		return false
+	}
+	return len(podStatus.ContainerStatuses) > 0 || len(podStatus.SandboxStatuses) > 0
 }
 
 // isAdmittedPodTerminal returns true if the provided config source pod is in
