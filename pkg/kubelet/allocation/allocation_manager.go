@@ -79,6 +79,9 @@ type Manager interface {
 	// Returns the updated (or original) pod, and whether there was an allocation stored.
 	UpdatePodFromAllocation(pod *v1.Pod) (*v1.Pod, bool)
 
+	// IsPodAllocated returns true if the pod has been allocated resources.
+	IsPodAllocated(pod *v1.Pod) bool
+
 	// SetAllocatedResources checkpoints the resources allocated to a pod's containers.
 	SetAllocatedResources(allocatedPod *v1.Pod) error
 
@@ -498,6 +501,14 @@ func updatePodFromAllocation(pod *v1.Pod, allocated state.PodResourceInfo) (*v1.
 		}
 	}
 	return pod, updated
+}
+
+func (m *manager) IsPodAllocated(pod *v1.Pod) bool {
+	if pod == nil {
+		return false
+	}
+	_, ok := m.allocated.GetPodResourceInfo(pod.UID)
+	return ok
 }
 
 // SetAllocatedResources checkpoints the resources allocated to a pod's containers
