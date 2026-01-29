@@ -143,10 +143,12 @@ func CreateResourceClaimController(ctx context.Context, tb ktesting.TB, clientSe
 	}
 }
 
-// StartFakePVController is a simplified pv controller logic that sets PVC VolumeName and annotation for each PV binding.
+// StartFakePVController is a simplified pv controller logic that sets PVC VolumeName and annotation for each PV binding
+// and creates PVs for PVCs that use dynamic provisioning.
 // TODO(mborsz): Use a real PV controller here.
 func StartFakePVController(ctx context.Context, clientSet clientset.Interface, informerFactory informers.SharedInformerFactory) {
 	pvInformer := informerFactory.Core().V1().PersistentVolumes()
+	pvcInformer := informerFactory.Core().V1().PersistentVolumeClaims()
 
 	syncPV := func(obj *v1.PersistentVolume) {
 		if obj.Spec.ClaimRef != nil {
@@ -178,12 +180,68 @@ func StartFakePVController(ctx context.Context, clientSet clientset.Interface, i
 		}
 	}
 
-	pvInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	syncPVC := func(obj *v1.PersistentVolumeClaim) {
+		if selectedNode, ok := obj.Annotations[pvutil.AnnSelectedNode]; ok {
+			if obj.Spec.VolumeName == "" {
+				_, err := clientSet.CoreV1().PersistentVolumes().Create(ctx, &v1.PersistentVolume{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "pv-" + obj.Name,
+					},
+					Spec: v1.PersistentVolumeSpec{
+						AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+						Capacity:    v1.ResourceList{v1.ResourceName(v1.ResourceStorage): obj.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]},
+						PersistentVolumeSource: v1.PersistentVolumeSource{
+							HostPath: &v1.HostPathVolumeSource{
+								Path: "/tmp",
+							},
+						},
+						NodeAffinity: &v1.VolumeNodeAffinity{
+							Required: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{
+												Key:      "kubernetes.io/hostname",
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{selectedNode},
+											},
+										},
+									},
+								},
+							},
+						},
+						ClaimRef: &v1.ObjectReference{
+							Kind:      "PersistentVolumeClaim",
+							Namespace: obj.Namespace,
+							Name:      obj.Name,
+						},
+					},
+				}, metav1.CreateOptions{})
+				if err != nil {
+					if ctx.Err() == nil || !errors.Is(err, context.Canceled) {
+						klog.Errorf("error while creating pv for %v/%v: %v", obj.Namespace, obj.Name, err)
+					}
+					return
+				}
+			}
+		}
+	}
+
+	_, _ = pvInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			syncPV(obj.(*v1.PersistentVolume))
 		},
 		UpdateFunc: func(_, obj interface{}) {
 			syncPV(obj.(*v1.PersistentVolume))
+		},
+	})
+
+	_, _ = pvcInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			syncPVC(obj.(*v1.PersistentVolumeClaim))
+		},
+		UpdateFunc: func(_, obj interface{}) {
+			syncPVC(obj.(*v1.PersistentVolumeClaim))
 		},
 	})
 }
