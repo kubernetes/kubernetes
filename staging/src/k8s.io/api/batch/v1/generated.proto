@@ -126,6 +126,13 @@ message CronJobStatus {
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastSuccessfulTime = 5;
 }
 
+// GangPolicy defines the gang scheduling configuration for a Job.
+message GangPolicy {
+  // Policy specifies the gang scheduling mode.
+  // +optional
+  optional string policy = 1;
+}
+
 // Job represents the configuration of a single job.
 message Job {
   // Standard object's metadata.
@@ -346,6 +353,16 @@ message JobSpec {
   // This field is immutable.
   // +optional
   optional string managedBy = 15;
+
+  // GangPolicy specifies the gang scheduling configuration for this Job.
+  // When set, all pods in the Job are scheduled as a group according to the specified policy.
+  // NOTE: This feature requires a gang scheduler that supports the Workload API
+  // (scheduling.k8s.io/v1alpha1) to be running in the cluster.
+  // The feature gates GenericWorkload, GangScheduling and JobGangPolicy are required
+  // to use this feature.
+  // +featureGate=JobGangPolicy
+  // +optional
+  optional GangPolicy gangPolicy = 17;
 }
 
 // JobStatus represents the current state of a Job.

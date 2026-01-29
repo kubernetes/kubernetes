@@ -75,6 +75,15 @@ func (CronJobStatus) SwaggerDoc() map[string]string {
 	return map_CronJobStatus
 }
 
+var map_GangPolicy = map[string]string{
+	"":       "GangPolicy defines the gang scheduling configuration for a Job.",
+	"policy": "Policy specifies the gang scheduling mode.",
+}
+
+func (GangPolicy) SwaggerDoc() map[string]string {
+	return map_GangPolicy
+}
+
 var map_Job = map[string]string{
 	"":         "Job represents the configuration of a single job.",
 	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
@@ -128,6 +137,7 @@ var map_JobSpec = map[string]string{
 	"suspend":                 "suspend specifies whether the Job controller should create Pods or not. If a Job is created with suspend set to true, no Pods are created by the Job controller. If a Job is suspended after creation (i.e. the flag goes from false to true), the Job controller will delete all active Pods associated with this Job. Users must design their workload to gracefully handle this. Suspending a Job will reset the StartTime field of the Job, effectively resetting the ActiveDeadlineSeconds timer too. Defaults to false.",
 	"podReplacementPolicy":    "podReplacementPolicy specifies when to create replacement Pods. Possible values are: - TerminatingOrFailed means that we recreate pods\n  when they are terminating (has a metadata.deletionTimestamp) or failed.\n- Failed means to wait until a previously created Pod is fully terminated (has phase\n  Failed or Succeeded) before creating a replacement Pod.\n\nWhen using podFailurePolicy, Failed is the the only allowed value. TerminatingOrFailed and Failed are allowed values when podFailurePolicy is not in use.",
 	"managedBy":               "ManagedBy field indicates the controller that manages a Job. The k8s Job controller reconciles jobs which don't have this field at all or the field value is the reserved string `kubernetes.io/job-controller`, but skips reconciling Jobs with a custom value for this field. The value must be a valid domain-prefixed path (e.g. acme.io/foo) - all characters before the first \"/\" must be a valid subdomain as defined by RFC 1123. All characters trailing the first \"/\" must be valid HTTP Path characters as defined by RFC 3986. The value cannot exceed 63 characters. This field is immutable.",
+	"gangPolicy":              "GangPolicy specifies the gang scheduling configuration for this Job. When set, all pods in the Job are scheduled as a group according to the specified policy. NOTE: This feature requires a gang scheduler that supports the Workload API (scheduling.k8s.io/v1alpha1) to be running in the cluster. The feature gates GenericWorkload, GangScheduling and JobGangPolicy are required to use this feature.",
 }
 
 func (JobSpec) SwaggerDoc() map[string]string {

@@ -21,8 +21,12 @@ import (
 	"slices"
 	"testing"
 
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // rolesWithAllowStar are the controller roles which are allowed to contain a *.  These are
@@ -103,4 +107,42 @@ func TestControllerRoleVerbsConsistency(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestJobControllerWorkloadsPermission(t *testing.T) {
+	hasWorkloadsPermission := func(roles []rbacv1.ClusterRole) bool {
+		for _, role := range roles {
+			if role.Name != saRolePrefix+"job-controller" {
+				continue
+			}
+			for _, rule := range role.Rules {
+				if slices.Contains(rule.APIGroups, schedulingGroup) &&
+					slices.Contains(rule.Resources, "workloads") {
+					return true
+				}
+			}
+		}
+		return false
+	}
+
+	t.Run("feature gate disabled", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobGangPolicy, false)
+		roles, _ := buildControllerRoles()
+		if hasWorkloadsPermission(roles) {
+			t.Errorf("job-controller should not have workloads permission when JobGangPolicy feature gate is disabled")
+		}
+	})
+
+	t.Run("feature gate enabled", func(t *testing.T) {
+		// JobGangPolicy depends on GangScheduling and GenericWorkload feature gates
+		featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+			features.GangScheduling:  true,
+			features.GenericWorkload: true,
+			features.JobGangPolicy:   true,
+		})
+		roles, _ := buildControllerRoles()
+		if !hasWorkloadsPermission(roles) {
+			t.Errorf("job-controller should have workloads permission when JobGangPolicy feature gate is enabled")
+		}
+	})
 }

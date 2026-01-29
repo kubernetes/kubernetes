@@ -27,6 +27,7 @@ import (
 
 	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
+	schedulingv1alpha1 "k8s.io/api/scheduling/v1alpha1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -815,6 +816,155 @@ func (jm *Controller) getPodsForJob(ctx context.Context, j *batch.Job) ([]*v1.Po
 	return pods, err
 }
 
+// ensureWorkloadForJob creates a Workload object for the Job if gangPolicy is JobAsGang
+// and the Workload doesn't already exist. If the Workload already exists but the minCount
+// doesn't match the current parallelism (e.g., for elastic Indexed Jobs), the old Workload
+// is deleted and a new one is created with the updated minCount.
+// Note: Workloads are only created when the job is not suspended (suspend=false).
+func (jm *Controller) ensureWorkloadForJob(ctx context.Context, job *batch.Job) error {
+	logger := klog.FromContext(ctx)
+
+	// Check if JobGangPolicy feature gate is enabled
+	if !feature.DefaultFeatureGate.Enabled(features.JobGangPolicy) {
+		return nil
+	}
+
+	// Check if the job has gangPolicy set to JobAsGang
+	if job.Spec.GangPolicy == nil || job.Spec.GangPolicy.Policy != batch.JobAsGang {
+		return nil
+	}
+
+	// Don't create workload if the job is suspended
+	if jobSuspended(job) {
+		logger.V(4).Info("Skipping workload creation for suspended job", "job", job.Name)
+		return nil
+	}
+
+	// Use the job's name as the workload name
+	workloadName := job.Name
+
+	// Get the desired parallelism value
+	parallelism := int32(1)
+	if job.Spec.Parallelism != nil {
+		parallelism = *job.Spec.Parallelism
+	}
+
+	// Check if the workload already exists
+	existingWorkload, err := jm.kubeClient.SchedulingV1alpha1().Workloads(job.Namespace).Get(ctx, workloadName, metav1.GetOptions{})
+	if err == nil {
+		// Workload already exists - check if minCount matches current parallelism
+		if len(existingWorkload.Spec.PodGroups) > 0 &&
+			existingWorkload.Spec.PodGroups[0].Policy.Gang != nil &&
+			existingWorkload.Spec.PodGroups[0].Policy.Gang.MinCount == parallelism {
+			// MinCount matches, no update needed
+			logger.V(4).Info("Workload already exists with correct minCount for job", "job", job.Name, "workload", workloadName, "minCount", parallelism)
+			return nil
+		}
+
+		// MinCount doesn't match - delete the old workload and create a new one
+		logger.V(2).Info("Workload minCount mismatch, deleting old workload to recreate with updated minCount",
+			"job", job.Name, "workload", workloadName,
+			"oldMinCount", existingWorkload.Spec.PodGroups[0].Policy.Gang.MinCount,
+			"newMinCount", parallelism)
+
+		err = jm.kubeClient.SchedulingV1alpha1().Workloads(job.Namespace).Delete(ctx, workloadName, metav1.DeleteOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			jm.recorder.Eventf(job, v1.EventTypeWarning, "WorkloadDeletionError", "Failed to delete stale Workload %s: %v", workloadName, err)
+			return fmt.Errorf("failed to delete stale workload %s: %w", workloadName, err)
+		}
+		jm.recorder.Eventf(job, v1.EventTypeNormal, "WorkloadDeleted", "Deleted stale Workload %s for gang scheduling (minCount changed from %d to %d)",
+			workloadName, existingWorkload.Spec.PodGroups[0].Policy.Gang.MinCount, parallelism)
+	} else if !apierrors.IsNotFound(err) {
+		// Some other error occurred
+		return fmt.Errorf("failed to get workload %s: %w", workloadName, err)
+	}
+
+	// Workload doesn't exist (or was just deleted), create it
+
+	workload := &schedulingv1alpha1.Workload{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      workloadName,
+			Namespace: job.Namespace,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         batch.SchemeGroupVersion.String(),
+					Kind:               "Job",
+					Name:               job.Name,
+					UID:                job.UID,
+					Controller:         ptr.To(true),
+					BlockOwnerDeletion: ptr.To(true),
+				},
+			},
+		},
+		Spec: schedulingv1alpha1.WorkloadSpec{
+			ControllerRef: &schedulingv1alpha1.TypedLocalObjectReference{
+				APIGroup: batch.SchemeGroupVersion.Group,
+				Kind:     "Job",
+				Name:     job.Name,
+			},
+			PodGroups: []schedulingv1alpha1.PodGroup{
+				{
+					Name: job.Name,
+					Policy: schedulingv1alpha1.PodGroupPolicy{
+						Gang: &schedulingv1alpha1.GangSchedulingPolicy{
+							MinCount: parallelism,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	_, err = jm.kubeClient.SchedulingV1alpha1().Workloads(job.Namespace).Create(ctx, workload, metav1.CreateOptions{})
+	if err != nil {
+		if apierrors.IsAlreadyExists(err) {
+			logger.V(4).Info("Workload was created by another goroutine", "job", job.Name, "workload", workloadName)
+			return nil
+		}
+		jm.recorder.Eventf(job, v1.EventTypeWarning, "WorkloadCreationError", "Failed to create Workload %s: %v", workloadName, err)
+		return fmt.Errorf("failed to create workload %s: %w", workloadName, err)
+	}
+
+	logger.V(2).Info("Created workload for job", "job", job.Name, "workload", workloadName, "minCount", parallelism)
+	jm.recorder.Eventf(job, v1.EventTypeNormal, "WorkloadCreated", "Created Workload %s for gang scheduling", workloadName)
+	return nil
+}
+
+// deleteWorkloadForJob deletes the Workload object for a Job when the job is suspended.
+// This ensures that workloads are only present when the job is active (not suspended).
+func (jm *Controller) deleteWorkloadForJob(ctx context.Context, job *batch.Job) error {
+	logger := klog.FromContext(ctx)
+
+	// Check if JobGangPolicy feature gate is enabled
+	if !feature.DefaultFeatureGate.Enabled(features.JobGangPolicy) {
+		return nil
+	}
+
+	// Check if the job has gangPolicy set to JobAsGang
+	if job.Spec.GangPolicy == nil || job.Spec.GangPolicy.Policy != batch.JobAsGang {
+		return nil
+	}
+
+	// Use the job's name as the workload name
+	workloadName := job.Name
+
+	// Try to delete the workload
+	err := jm.kubeClient.SchedulingV1alpha1().Workloads(job.Namespace).Delete(ctx, workloadName, metav1.DeleteOptions{})
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			// Workload doesn't exist, nothing to delete
+			logger.V(4).Info("Workload not found for suspended job, nothing to delete", "job", job.Name, "workload", workloadName)
+			return nil
+		}
+		jm.recorder.Eventf(job, v1.EventTypeWarning, "WorkloadDeletionError", "Failed to delete Workload %s for suspended job: %v", workloadName, err)
+		return fmt.Errorf("failed to delete workload %s for suspended job: %w", workloadName, err)
+	}
+
+	logger.V(2).Info("Deleted workload for suspended job", "job", job.Name, "workload", workloadName)
+	jm.recorder.Eventf(job, v1.EventTypeNormal, "WorkloadDeleted", "Deleted Workload %s because job was suspended", workloadName)
+	return nil
+}
+
 // syncJob will sync the job with the given key if it has had its expectations fulfilled, meaning
 // it did not expect to see any more of its pods created or deleted. This function is not meant to be invoked
 // concurrently with the same key.
@@ -880,6 +1030,19 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 	if job.Spec.CompletionMode != nil && *job.Spec.CompletionMode != batch.NonIndexedCompletion && *job.Spec.CompletionMode != batch.IndexedCompletion {
 		jm.recorder.Event(&job, v1.EventTypeWarning, "UnknownCompletionMode", "Skipped Job sync because completion mode is unknown")
 		return nil
+	}
+
+	// Handle Workload lifecycle based on suspend status:
+	// - If job is suspended, delete the Workload (if it exists)
+	// - If job is not suspended, ensure Workload is created (if gangPolicy is JobAsGang)
+	if jobSuspended(&job) {
+		if err := jm.deleteWorkloadForJob(ctx, &job); err != nil {
+			return fmt.Errorf("failed to delete workload for suspended job: %w", err)
+		}
+	} else {
+		if err := jm.ensureWorkloadForJob(ctx, &job); err != nil {
+			return fmt.Errorf("failed to ensure workload for job: %w", err)
+		}
 	}
 
 	completionMode := getCompletionMode(&job)
@@ -1766,6 +1929,15 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 		}
 		podTemplate.Finalizers = appendJobCompletionFinalizerIfNotFound(podTemplate.Finalizers)
 
+		// Set workloadRef if JobAsGang policy is enabled
+		if feature.DefaultFeatureGate.Enabled(features.JobGangPolicy) &&
+			job.Spec.GangPolicy != nil &&
+			job.Spec.GangPolicy.Policy == batch.JobAsGang {
+			podTemplate.Spec.WorkloadRef = &v1.WorkloadReference{
+				Name:     job.Name,
+				PodGroup: job.Name,
+			}
+		}
 		// Counters for pod creation status (used by the job_pods_creation_total metric)
 		var creationsSucceeded, creationsFailed int32 = 0, 0
 

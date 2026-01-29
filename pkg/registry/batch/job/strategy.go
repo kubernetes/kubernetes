@@ -125,6 +125,10 @@ func (jobStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 		job.Spec.PodReplacementPolicy = nil
 	}
 
+	if !utilfeature.DefaultFeatureGate.Enabled(features.JobGangPolicy) {
+		job.Spec.GangPolicy = nil
+	}
+
 	pod.DropDisabledTemplateFields(&job.Spec.Template, nil)
 }
 
@@ -153,6 +157,10 @@ func (jobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 	}
 	if !utilfeature.DefaultFeatureGate.Enabled(features.JobPodReplacementPolicy) && oldJob.Spec.PodReplacementPolicy == nil {
 		newJob.Spec.PodReplacementPolicy = nil
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.JobGangPolicy) && oldJob.Spec.GangPolicy == nil {
+		newJob.Spec.GangPolicy = nil
 	}
 
 	pod.DropDisabledTemplateFields(&newJob.Spec.Template, &oldJob.Spec.Template)
@@ -184,6 +192,7 @@ func validationOptionsForJob(newJob, oldJob *batch.Job) batchvalidation.JobValid
 		PodValidationOptions:  pod.GetValidationOptionsFromPodTemplate(newPodTemplate, oldPodTemplate),
 		RequirePrefixedLabels: true,
 	}
+	opts.AllowGangSchedulingPolicy = utilfeature.DefaultFeatureGate.Enabled(features.JobGangPolicy)
 	if oldJob != nil {
 		opts.AllowInvalidLabelValueInSelector = opts.AllowInvalidLabelValueInSelector || metav1validation.LabelSelectorHasInvalidLabelValue(oldJob.Spec.Selector)
 		// Updating node affinity, node selector and tolerations is allowed
@@ -197,6 +206,7 @@ func validationOptionsForJob(newJob, oldJob *batch.Job) batchvalidation.JobValid
 		if utilfeature.DefaultFeatureGate.Enabled(features.MutableSchedulingDirectivesForSuspendedJobs) {
 			opts.AllowMutableSchedulingDirectives = suspended && batchvalidation.IsConditionTrue(oldJob.Status.Conditions, batch.JobSuspended) && oldJob.Status.Active == 0
 		}
+
 		// Validation should not fail jobs if they don't have the new labels.
 		// This can be removed once we have high confidence that both labels exist (1.30 at least)
 		_, hadJobName := oldJob.Spec.Template.Labels[batch.JobNameLabel]
@@ -423,6 +433,7 @@ func getStatusValidationOptions(newJob, oldJob *batch.Job) batchvalidation.JobSt
 			AllowForSuccessCriteriaMetInExtendedScope: true,
 		}
 	}
+
 	return batchvalidation.JobStatusValidationOptions{
 		AllowForSuccessCriteriaMetInExtendedScope: batchvalidation.IsConditionTrue(oldJob.Status.Conditions, batch.JobSuccessCriteriaMet),
 	}
