@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
+	"k8s.io/kubernetes/pkg/kubelet/subscription"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	"k8s.io/utils/clock"
@@ -613,6 +614,9 @@ type podWorkers struct {
 
 	// clock is used for testing timing
 	clock clock.PassiveClock
+
+	// subscribers are notified of pod updates.
+	subscribers []subscription.PodUpdateSubscriber
 }
 
 func newPodWorkers(
@@ -622,6 +626,7 @@ func newPodWorkers(
 	resyncInterval, backOffPeriod time.Duration,
 	podCache kubecontainer.Cache,
 	allocationManager allocation.Manager,
+	subscribers []subscription.PodUpdateSubscriber,
 ) PodWorkers {
 	return &podWorkers{
 		podSyncStatuses:                    map[types.UID]*podSyncStatus{},
@@ -636,6 +641,7 @@ func newPodWorkers(
 		podCache:                           podCache,
 		allocationManager:                  allocationManager,
 		clock:                              clock.RealClock{},
+		subscribers:                        subscribers,
 	}
 }
 
@@ -984,6 +990,18 @@ func (p *podWorkers) UpdatePod(options UpdatePodOptions) {
 	}
 	status.working = true
 	klog.V(4).InfoS("Notifying pod of pending update", "pod", klog.KRef(ns, name), "podUID", uid, "workType", status.WorkType())
+	switch options.UpdateType {
+	case kubetypes.SyncPodCreate:
+		pod := status.pendingUpdate.Pod
+		for _, s := range p.subscribers {
+			s.OnPodAdded(pod)
+		}
+	case kubetypes.SyncPodUpdate:
+		pod := status.pendingUpdate.Pod
+		for _, s := range p.subscribers {
+			s.OnPodUpdated(pod)
+		}
+	}
 	select {
 	case podUpdates <- struct{}{}:
 	default:
@@ -1745,6 +1763,7 @@ func (p *podWorkers) requeueLastPodUpdate(podUID types.UID, status *podSyncStatu
 		return
 	}
 	copied := *status.activeUpdate
+	copied.UpdateType = kubetypes.SyncPodSync
 	status.pendingUpdate = &copied
 
 	// notify the pod worker
