@@ -433,6 +433,7 @@ func Test_podSchedulingPropertiesChange(t *testing.T) {
 		name        string
 		newPod      *v1.Pod
 		oldPod      *v1.Pod
+		isSelf      bool
 		draDisabled bool
 		want        []fwk.ClusterEvent
 	}{
@@ -440,96 +441,96 @@ func Test_podSchedulingPropertiesChange(t *testing.T) {
 			name:   "assigned pod is updated",
 			newPod: st.MakePod().Label("foo", "bar").Node("node").Obj(),
 			oldPod: st.MakePod().Label("foo", "bar2").Node("node").Obj(),
-			want:   []fwk.ClusterEvent{{Resource: assignedPod, ActionType: fwk.UpdatePodLabel}},
+			want:   []fwk.ClusterEvent{{Resource: fwk.AssignedPod, ActionType: fwk.UpdatePodLabel}},
 		},
 		{
 			name:   "only label is updated",
 			newPod: st.MakePod().Label("foo", "bar").Obj(),
 			oldPod: st.MakePod().Label("foo", "bar2").Obj(),
-			want:   []fwk.ClusterEvent{{Resource: unschedulablePod, ActionType: fwk.UpdatePodLabel}},
+			want:   []fwk.ClusterEvent{{Resource: fwk.UnscheduledPod, ActionType: fwk.UpdatePodLabel}},
 		},
 		{
 			name:   "pod's resource request is scaled down",
 			oldPod: podWithBigRequest,
 			newPod: podWithSmallRequest,
-			want:   []fwk.ClusterEvent{{Resource: unschedulablePod, ActionType: fwk.UpdatePodScaleDown}},
+			want:   []fwk.ClusterEvent{{Resource: fwk.UnscheduledPod, ActionType: fwk.UpdatePodScaleDown}},
 		},
 		{
 			name:   "pod's resource request is scaled up",
 			oldPod: podWithSmallRequest,
 			newPod: podWithBigRequest,
-			want:   []fwk.ClusterEvent{{Resource: unschedulablePod, ActionType: fwk.Update}},
+			want:   []fwk.ClusterEvent{{Resource: fwk.UnscheduledPod, ActionType: fwk.Update}},
 		},
 		{
 			name:   "both pod's resource request and label are updated",
 			oldPod: podWithBigRequest,
 			newPod: podWithSmallRequestAndLabel,
 			want: []fwk.ClusterEvent{
-				{Resource: unschedulablePod, ActionType: fwk.UpdatePodLabel},
-				{Resource: unschedulablePod, ActionType: fwk.UpdatePodScaleDown},
+				{Resource: fwk.UnscheduledPod, ActionType: fwk.UpdatePodLabel},
+				{Resource: fwk.UnscheduledPod, ActionType: fwk.UpdatePodScaleDown},
 			},
 		},
 		{
 			name:   "untracked properties of pod is updated",
 			newPod: st.MakePod().Annotation("foo", "bar").Obj(),
 			oldPod: st.MakePod().Annotation("foo", "bar2").Obj(),
-			want:   []fwk.ClusterEvent{{Resource: unschedulablePod, ActionType: fwk.Update}},
+			want:   []fwk.ClusterEvent{{Resource: fwk.UnscheduledPod, ActionType: fwk.Update}},
 		},
 		{
 			name:   "scheduling gate is eliminated",
 			newPod: st.MakePod().SchedulingGates([]string{}).Obj(),
 			oldPod: st.MakePod().SchedulingGates([]string{"foo"}).Obj(),
-			want:   []fwk.ClusterEvent{{Resource: unschedulablePod, ActionType: fwk.UpdatePodSchedulingGatesEliminated}},
+			want:   []fwk.ClusterEvent{{Resource: fwk.UnscheduledPod, ActionType: fwk.UpdatePodSchedulingGatesEliminated}},
 		},
 		{
 			name:   "scheduling gate is removed, but not completely eliminated",
 			newPod: st.MakePod().SchedulingGates([]string{"foo"}).Obj(),
 			oldPod: st.MakePod().SchedulingGates([]string{"foo", "bar"}).Obj(),
-			want:   []fwk.ClusterEvent{{Resource: unschedulablePod, ActionType: fwk.Update}},
+			want:   []fwk.ClusterEvent{{Resource: fwk.UnscheduledPod, ActionType: fwk.Update}},
 		},
 		{
 			name:   "pod's tolerations are updated",
 			newPod: st.MakePod().Toleration("key").Toleration("key2").Obj(),
 			oldPod: st.MakePod().Toleration("key").Obj(),
-			want:   []fwk.ClusterEvent{{Resource: unschedulablePod, ActionType: fwk.UpdatePodToleration}},
+			want:   []fwk.ClusterEvent{{Resource: fwk.UnscheduledPod, ActionType: fwk.UpdatePodToleration}},
 		},
 		{
 			name:        "pod claim statuses change, feature disabled",
 			draDisabled: true,
 			newPod:      st.MakePod().ResourceClaimStatuses(claimStatusA).Obj(),
 			oldPod:      st.MakePod().Obj(),
-			want:        []fwk.ClusterEvent{{Resource: unschedulablePod, ActionType: fwk.Update}},
+			want:        []fwk.ClusterEvent{{Resource: fwk.UnscheduledPod, ActionType: fwk.Update}},
 		},
 		{
 			name:   "pod claim statuses change, feature enabled",
 			newPod: st.MakePod().ResourceClaimStatuses(claimStatusA).Obj(),
 			oldPod: st.MakePod().Obj(),
-			want:   []fwk.ClusterEvent{{Resource: unschedulablePod, ActionType: fwk.UpdatePodGeneratedResourceClaim}},
+			want:   []fwk.ClusterEvent{{Resource: fwk.UnscheduledPod, ActionType: fwk.UpdatePodGeneratedResourceClaim}},
 		},
 		{
 			name:   "pod claim statuses swapped",
 			newPod: st.MakePod().ResourceClaimStatuses(claimStatusA, claimStatusB).Obj(),
 			oldPod: st.MakePod().ResourceClaimStatuses(claimStatusB, claimStatusA).Obj(),
-			want:   []fwk.ClusterEvent{{Resource: unschedulablePod, ActionType: fwk.UpdatePodGeneratedResourceClaim}},
+			want:   []fwk.ClusterEvent{{Resource: fwk.UnscheduledPod, ActionType: fwk.UpdatePodGeneratedResourceClaim}},
 		},
 		{
 			name:        "pod extended resource claim status change, feature disabled",
 			draDisabled: true,
 			newPod:      st.MakePod().ExtendedResourceClaimStatus(extendedClaimStatusA).Obj(),
 			oldPod:      st.MakePod().Obj(),
-			want:        []fwk.ClusterEvent{{Resource: unschedulablePod, ActionType: fwk.Update}},
+			want:        []fwk.ClusterEvent{{Resource: fwk.UnscheduledPod, ActionType: fwk.Update}},
 		},
 		{
 			name:   "pod extended resource claim status change, feature enabled",
 			newPod: st.MakePod().ExtendedResourceClaimStatus(extendedClaimStatusA).Obj(),
 			oldPod: st.MakePod().Obj(),
-			want:   []fwk.ClusterEvent{{Resource: unschedulablePod, ActionType: fwk.UpdatePodGeneratedResourceClaim}},
+			want:   []fwk.ClusterEvent{{Resource: fwk.UnscheduledPod, ActionType: fwk.UpdatePodGeneratedResourceClaim}},
 		},
 		{
 			name:   "pod extended resource claim status swapped",
 			newPod: st.MakePod().ExtendedResourceClaimStatus(extendedClaimStatusB).Obj(),
 			oldPod: st.MakePod().ExtendedResourceClaimStatus(extendedClaimStatusA).Obj(),
-			want:   []fwk.ClusterEvent{{Resource: unschedulablePod, ActionType: fwk.UpdatePodGeneratedResourceClaim}},
+			want:   []fwk.ClusterEvent{{Resource: fwk.UnscheduledPod, ActionType: fwk.UpdatePodGeneratedResourceClaim}},
 		},
 	}
 	for _, tt := range tests {
@@ -538,7 +539,7 @@ func Test_podSchedulingPropertiesChange(t *testing.T) {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
 			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicResourceAllocation, !tt.draDisabled)
-			got := PodSchedulingPropertiesChange(tt.newPod, tt.oldPod)
+			got := PodSchedulingPropertiesChange(tt.newPod, tt.oldPod, tt.isSelf)
 			if diff := cmp.Diff(tt.want, got, cmpopts.EquateComparable(fwk.ClusterEvent{})); diff != "" {
 				t.Errorf("unexpected event is returned from podSchedulingPropertiesChange (-want, +got):\n%s", diff)
 			}

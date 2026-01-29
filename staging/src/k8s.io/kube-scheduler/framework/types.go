@@ -147,7 +147,10 @@ const (
 	// the previous rejection from noderesources plugin can be resolved.
 	// this plugin would implement QueueingHint for Pod/Update event
 	// that returns Queue when such label changes are made in unscheduled Pods.
-	Pod EventResource = "Pod"
+	Pod            EventResource = "Pod"
+	AssignedPod    EventResource = "AssignedPod"
+	UnscheduledPod EventResource = "UnschedulablePod"
+	PodItself      EventResource = "PodItself"
 
 	// A note about NodeAdd event and UpdateNodeTaint event:
 	// When QHint is disabled, NodeAdd often isn't worked expectedly because of the internal feature called preCheck.
