@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 	_ "time/tzdata"
 
 	"github.com/google/go-cmp/cmp"
@@ -2708,6 +2709,50 @@ func TestValidateJobUpdateStatus(t *testing.T) {
 				{Type: field.ErrorTypeDuplicate, Field: "status.uncountedTerminatedPods.failed[0]"},
 				{Type: field.ErrorTypeDuplicate, Field: "status.uncountedTerminatedPods.failed[3]"},
 				{Type: field.ErrorTypeInvalid, Field: "status.uncountedTerminatedPods.failed[4]"},
+			},
+		},
+		"immutable startTime for unsuspended job": {
+			opts: JobStatusValidationOptions{
+				RejectStartTimeUpdateForUnsuspendedJob: true,
+			},
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "abc",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "1",
+				},
+				Spec: batch.JobSpec{
+					Suspend: ptr.To(false),
+				},
+				Status: batch.JobStatus{
+					StartTime: &metav1.Time{
+						Time: time.Now(),
+					},
+					Active: 1,
+				},
+			},
+			update: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "abc",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "1",
+				},
+				Spec: batch.JobSpec{
+					Suspend: ptr.To(false),
+				},
+				Status: batch.JobStatus{
+					StartTime: &metav1.Time{
+						Time: time.Now().Add(time.Second), // Attempt to change startTime
+					},
+					Active: 1,
+				},
+			},
+			wantErrs: field.ErrorList{
+				{
+					Type:   field.ErrorTypeInvalid,
+					Field:  "status.startTime",
+					Detail: "field is immutable for unsuspended job once set",
+				},
 			},
 		},
 	}
