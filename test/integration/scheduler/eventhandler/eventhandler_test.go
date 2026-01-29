@@ -153,7 +153,7 @@ func TestUpdateNominatedNodeName(t *testing.T) {
 	testBackoff := time.Minute
 	testContext := testutils.InitTestAPIServer(t, "test-event", nil)
 	capacity := map[v1.ResourceName]string{
-		v1.ResourceMemory: "32",
+		v1.ResourceMemory: "32Ki",
 	}
 	var cleanupPods []*v1.Pod
 
@@ -164,7 +164,7 @@ func TestUpdateNominatedNodeName(t *testing.T) {
 		Namespace: testContext.NS.Name,
 		Priority:  &lowPriority,
 		Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
-			v1.ResourceMemory: *resource.NewQuantity(20, resource.DecimalSI)},
+			v1.ResourceMemory: *resource.NewQuantity(20*1024, resource.DecimalSI)},
 		}})
 	cleanupPods = append(cleanupPods, podLow)
 	podMidNominated := testutils.InitPausePod(&testutils.PausePodConfig{
@@ -172,7 +172,7 @@ func TestUpdateNominatedNodeName(t *testing.T) {
 		Namespace: testContext.NS.Name,
 		Priority:  &mediumPriority,
 		Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
-			v1.ResourceMemory: *resource.NewQuantity(25, resource.DecimalSI)},
+			v1.ResourceMemory: *resource.NewQuantity(25*1024, resource.DecimalSI)},
 		}})
 	cleanupPods = append(cleanupPods, podMidNominated)
 	podHigh := testutils.InitPausePod(&testutils.PausePodConfig{
@@ -180,7 +180,7 @@ func TestUpdateNominatedNodeName(t *testing.T) {
 		Namespace: testContext.NS.Name,
 		Priority:  &highPriority,
 		Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
-			v1.ResourceMemory: *resource.NewQuantity(10, resource.DecimalSI)},
+			v1.ResourceMemory: *resource.NewQuantity(10*1024, resource.DecimalSI)},
 		}})
 	cleanupPods = append(cleanupPods, podHigh)
 
