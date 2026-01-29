@@ -80,7 +80,7 @@ func (op *createResourceClaimsOp) isValid(allowParameterization bool) error {
 func (op *createResourceClaimsOp) collectsMetrics() bool {
 	return false
 }
-func (op *createResourceClaimsOp) patchParams(w *workload) (realOp, error) {
+func (op *createResourceClaimsOp) patchParams(w *Workload) (realOp, error) {
 	if op.CountParam != "" {
 		var err error
 		op.Count, err = w.Params.get(op.CountParam[1:])
@@ -160,7 +160,7 @@ func (op *createResourceDriverOp) isValid(allowParameterization bool) error {
 func (op *createResourceDriverOp) collectsMetrics() bool {
 	return false
 }
-func (op *createResourceDriverOp) patchParams(w *workload) (realOp, error) {
+func (op *createResourceDriverOp) patchParams(w *Workload) (realOp, error) {
 	if op.MaxClaimsPerNodeParam != "" {
 		var err error
 		op.MaxClaimsPerNode, err = w.Params.get(op.MaxClaimsPerNodeParam[1:])
@@ -268,7 +268,7 @@ func (op *allocResourceClaimsOp) isValid(allowParameterization bool) error {
 func (op *allocResourceClaimsOp) collectsMetrics() bool {
 	return false
 }
-func (op *allocResourceClaimsOp) patchParams(w *workload) (realOp, error) {
+func (op *allocResourceClaimsOp) patchParams(w *Workload) (realOp, error) {
 	return op, op.isValid(false)
 }
 

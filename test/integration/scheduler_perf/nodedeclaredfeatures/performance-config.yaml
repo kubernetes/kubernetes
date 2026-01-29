@@ -1,0 +1,92 @@
+# The following labels are used in this file. (listed in ascending order of the number of covered test cases)
+#
+# - integration-test: test cases to run as the integration test, usually to spot some issues in the scheduler implementation or scheduler-perf itself.
+# - performance: test cases to run in the performance test.
+# - short: supplemental label for the above two labels (must not used alone), which literally means short execution time test cases.
+#
+# Specifically, the CIs use labels like the following:
+# - `ci-kubernetes-integration-master` (`integration-test`): Test cases are chosen based on a tradeoff between code coverage and overall runtime. 
+# It basically covers all test cases but with their smallest workload. 
+# - `pull-kubernetes-integration` (`integration-test`,`short`): Test cases are chosen so that they should take less than total 5 min to complete.
+# - `ci-benchmark-scheduler-perf` (`performance`): Long enough test cases are chosen (ideally, longer than 10 seconds) 
+# to provide meaningful samples for the pod scheduling rate.
+#
+# Also, `performance`+`short` isn't used in the CIs, but it's used to test the performance test locally.
+# (Sometimes, the test cases with `integration-test` are too small to spot issues.)
+#
+# Combining `performance` and `short` selects suitable workloads for a local
+# before/after comparisons with benchstat.
+
+
+- name: NodeDeclaredFeaturesDisabled
+  defaultPodTemplatePath: templates/pod-with-pod-level-resources.yaml
+  workloadTemplate:
+    - opcode: createNodes
+      countParam: $nodes
+      nodeTemplatePath: templates/node-base.yaml
+    - opcode: createPods
+      namespace: init
+      countParam: $initPods
+    - opcode: createPods
+      namespace: test
+      countParam: $measurePods
+      collectMetrics: true
+  workloads:
+    - name: 5Nodes
+      labels: [integration-test, short]
+      featureGates:
+        NodeDeclaredFeatures: false
+      params:
+        nodes: 5
+        initPods: 0
+        measurePods: 10
+    - name: 5000Nodes
+      labels: [performance]
+      featureGates:
+        NodeDeclaredFeatures: false
+      params:
+        nodes: 5000
+        initPods: 5000
+        measurePods: 5000
+
+- name: NodeDeclaredFeaturesEnabled
+  defaultPodTemplatePath: templates/pod-with-pod-level-resources.yaml
+  workloadTemplate:
+    - opcode: createNodes
+      countParam: $nodes
+      nodeTemplatePath: templates/node-base.yaml
+    - opcode: createPods
+      namespace: init
+      countParam: $initPods
+    - opcode: createPods
+      namespace: test
+      countParam: $measurePods
+      collectMetrics: true
+  workloads:
+    - name: 5Nodes5DeclaredFeatures
+      labels: [integration-test, short]
+      featureGates:
+        NodeDeclaredFeatures: true
+      params:
+        nodes: 5
+        initPods: 0
+        measurePods: 10
+        numNodeDeclaredFeatures: 5
+    - name: 5000Nodes20DeclaredFeatures
+      labels: [performance]
+      featureGates:
+        NodeDeclaredFeatures: true
+      params:
+        nodes: 5000
+        initPods: 5000
+        measurePods: 5000
+        numNodeDeclaredFeatures: 20
+    - name: 5000Nodes40DeclaredFeatures
+      labels: [performance]
+      featureGates:
+        NodeDeclaredFeatures: true
+      params:
+        nodes: 5000
+        initPods: 5000
+        measurePods: 5000
+        numNodeDeclaredFeatures: 40
