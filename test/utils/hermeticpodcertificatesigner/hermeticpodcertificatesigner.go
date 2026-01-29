@@ -353,7 +353,7 @@ func GenerateCAHierarchy(numIntermediates int) ([]crypto.PrivateKey, [][]byte, e
 	caKeys = append(caKeys, rootPrivKey)
 	caCerts = append(caCerts, rootDER)
 
-	for i := 0; i < numIntermediates; i++ {
+	for range numIntermediates {
 		pubKey, privKey, err := ed25519.GenerateKey(rand.Reader)
 		if err != nil {
 			return nil, nil, fmt.Errorf("while generating intermediate key: %w", err)

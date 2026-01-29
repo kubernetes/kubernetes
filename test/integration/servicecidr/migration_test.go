@@ -114,7 +114,7 @@ func TestMigrateServiceCIDR(t *testing.T) {
 	}
 
 	// make 2 services , there will be still 3 free addresses
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		if _, err := client1.CoreV1().Services(ns.Name).Create(context.TODO(), svc(i), metav1.CreateOptions{}); err != nil {
 			t.Fatal(err)
 		}

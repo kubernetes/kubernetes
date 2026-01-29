@@ -734,7 +734,7 @@ func StartPods(c clientset.Interface, replicas int, namespace string, podNamePre
 		panic("StartPods: number of replicas must be non-zero")
 	}
 	startPodsID := string(uuid.NewUUID()) // So that we can label and find them
-	for i := 0; i < replicas; i++ {
+	for i := range replicas {
 		podName := fmt.Sprintf("%v-%v", podNamePrefix, i)
 		pod.ObjectMeta.Name = podName
 		pod.ObjectMeta.Labels["name"] = podName
@@ -1048,7 +1048,7 @@ func DoPrepareNode(ctx context.Context, client clientset.Interface, node *v1.Nod
 	if len(patch) == 0 {
 		return nil
 	}
-	for attempt := 0; attempt < retries; attempt++ {
+	for range retries {
 		if _, err = client.CoreV1().Nodes().Patch(ctx, node.Name, types.MergePatchType, []byte(patch), metav1.PatchOptions{}); err == nil {
 			break
 		}
@@ -1061,7 +1061,7 @@ func DoPrepareNode(ctx context.Context, client clientset.Interface, node *v1.Nod
 		return fmt.Errorf("too many conflicts when applying patch %v to Node %v: %s", string(patch), node.Name, err)
 	}
 
-	for attempt := 0; attempt < retries; attempt++ {
+	for range retries {
 		if err = strategy.PrepareDependentObjects(ctx, node, client); err == nil {
 			break
 		}
