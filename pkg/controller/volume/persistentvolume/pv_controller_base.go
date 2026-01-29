@@ -472,7 +472,7 @@ func updateMigrationAnnotations(logger klog.Logger, cmpm CSIMigratedPluginManage
 	provisioner, ok := ann[provisionerKey]
 	if !ok {
 		if claim {
-			// Also check beta AnnStorageProvisioner annontation to make sure
+			// Also check beta AnnStorageProvisioner annotation to make sure
 			provisioner, ok = ann[storagehelpers.AnnBetaStorageProvisioner]
 			if !ok {
 				return false
