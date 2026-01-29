@@ -3132,6 +3132,16 @@ func (m *EmptyDirVolumeSource) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.StickyBit != nil {
+		i--
+		if *m.StickyBit {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i--
+		dAtA[i] = 0x18
+	}
 	if m.SizeLimit != nil {
 		{
 			size, err := m.SizeLimit.MarshalToSizedBuffer(dAtA[:i])
@@ -16038,6 +16048,9 @@ func (m *EmptyDirVolumeSource) Size() (n int) {
 		l = m.SizeLimit.Size()
 		n += 1 + l + sovGenerated(uint64(l))
 	}
+	if m.StickyBit != nil {
+		n += 2
+	}
 	return n
 }
 
@@ -21149,6 +21162,7 @@ func (this *EmptyDirVolumeSource) String() string {
 	s := strings.Join([]string{`&EmptyDirVolumeSource{`,
 		`Medium:` + fmt.Sprintf("%v", this.Medium) + `,`,
 		`SizeLimit:` + strings.Replace(fmt.Sprintf("%v", this.SizeLimit), "Quantity", "resource.Quantity", 1) + `,`,
+		`StickyBit:` + valueToStringGenerated(this.StickyBit) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -32772,6 +32786,27 @@ func (m *EmptyDirVolumeSource) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field StickyBit", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			b := bool(v != 0)
+			m.StickyBit = &b
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])

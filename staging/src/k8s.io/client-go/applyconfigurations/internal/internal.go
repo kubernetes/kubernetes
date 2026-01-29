@@ -4981,6 +4981,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: sizeLimit
       type:
         namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+    - name: stickyBit
+      type:
+        scalar: boolean
 - name: io.k8s.api.core.v1.EndpointAddress
   map:
     fields:
