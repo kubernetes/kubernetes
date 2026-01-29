@@ -19,9 +19,10 @@ package mutating
 import (
 	"fmt"
 
-	"k8s.io/api/admissionregistration/v1beta1"
+	"k8s.io/api/admissionregistration/v1"
 	plugincel "k8s.io/apiserver/pkg/admission/plugin/cel"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/mutating/patch"
+	"k8s.io/apiserver/pkg/admission/plugin/policy/validating"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/matchconditions"
 	apiservercel "k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/environment"
@@ -32,7 +33,7 @@ import (
 //
 // Each individual mutation is compiled into MutationEvaluationFunc and
 // returned is a PolicyEvaluator in the same order as the mutations appeared in the policy.
-func compilePolicy(policy *Policy) PolicyEvaluator {
+func compilePolicy(policy *v1.MutatingAdmissionPolicy) PolicyEvaluator {
 	opts := plugincel.OptionalVariableDeclarations{HasParams: policy.Spec.ParamKind != nil, HasAuthorizer: true}
 	compiler, err := plugincel.NewCompositedCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))
 	if err != nil {
@@ -43,7 +44,7 @@ func compilePolicy(policy *Policy) PolicyEvaluator {
 	}
 
 	// Compile and store variables
-	compiler.CompileAndStoreVariables(convertv1alpha1Variables(policy.Spec.Variables), opts, environment.StoredExpressions)
+	compiler.CompileAndStoreVariables(convertV1Variables(policy.Spec.Variables), opts, environment.StoredExpressions)
 
 	// Compile matchers
 	var matcher matchconditions.Matcher = nil
@@ -53,7 +54,7 @@ func compilePolicy(policy *Policy) PolicyEvaluator {
 		for i := range matchConditions {
 			matchExpressionAccessors[i] = (*matchconditions.MatchCondition)(&matchConditions[i])
 		}
-		matcher = matchconditions.NewMatcher(compiler.CompileCondition(matchExpressionAccessors, opts, environment.StoredExpressions), toV1FailurePolicy(policy.Spec.FailurePolicy), "policy", "validate", policy.Name)
+		matcher = matchconditions.NewMatcher(compiler.CompileCondition(matchExpressionAccessors, opts, environment.StoredExpressions), policy.Spec.FailurePolicy, "policy", "validate", policy.Name)
 	}
 
 	// Compiler patchers
@@ -62,13 +63,13 @@ func compilePolicy(policy *Policy) PolicyEvaluator {
 	patchOptions.HasPatchTypes = true
 	for _, m := range policy.Spec.Mutations {
 		switch m.PatchType {
-		case v1beta1.PatchTypeJSONPatch:
+		case v1.PatchTypeJSONPatch:
 			if m.JSONPatch != nil {
 				accessor := &patch.JSONPatchCondition{Expression: m.JSONPatch.Expression}
 				compileResult := compiler.CompileMutatingEvaluator(accessor, patchOptions, environment.StoredExpressions)
 				patchers = append(patchers, patch.NewJSONPatcher(compileResult))
 			}
-		case v1beta1.PatchTypeApplyConfiguration:
+		case v1.PatchTypeApplyConfiguration:
 			if m.ApplyConfiguration != nil {
 				accessor := &patch.ApplyConfigurationCondition{Expression: m.ApplyConfiguration.Expression}
 				compileResult := compiler.CompileMutatingEvaluator(accessor, patchOptions, environment.StoredExpressions)
@@ -78,4 +79,18 @@ func compilePolicy(policy *Policy) PolicyEvaluator {
 	}
 
 	return PolicyEvaluator{Matcher: matcher, Mutators: patchers, CompositedCompiler: compiler}
+}
+
+func convertV1Variables(variables []v1.Variable) []plugincel.NamedExpressionAccessor {
+	if variables == nil {
+		return nil
+	}
+	res := make([]plugincel.NamedExpressionAccessor, len(variables))
+	for i, v := range variables {
+		res[i] = &validating.Variable{
+			Name:       v.Name,
+			Expression: v.Expression,
+		}
+	}
+	return res
 }
