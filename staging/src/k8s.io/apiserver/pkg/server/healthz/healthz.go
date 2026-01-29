@@ -43,6 +43,26 @@ type HealthChecker interface {
 	Check(req *http.Request) error
 }
 
+// InitializableHealthChecker is an optional interface that health checkers can implement
+// to indicate whether they have completed initialization.
+//
+// When a health checker implements this interface and returns false from IsInitialized(),
+// the framework should treat the checker as "not yet ready" rather than "unhealthy".
+// This is particularly important during system startup to avoid false alarms that could
+// cause watchdog timeouts and unnecessary process restarts.
+//
+// If a HealthChecker does not implement this interface, it is assumed to always be
+// initialized and ready for health checks.
+type InitializableHealthChecker interface {
+	HealthChecker
+	// IsInitialized returns true if the component has completed initialization
+	// and is ready to perform meaningful health checks.
+	//
+	// Returns false if the component is still initializing. In this state,
+	// the Check() method may be skipped to avoid false negative results.
+	IsInitialized() bool
+}
+
 type GroupedHealthChecker interface {
 	HealthChecker
 	GroupName() string
@@ -162,6 +182,23 @@ func NamedGroupedCheck(name string, groupName string, check func(r *http.Request
 		groupName:     groupName,
 		HealthChecker: &healthzCheck{name, check},
 	}
+}
+
+// IsHealthCheckerInitialized checks if a health checker has completed initialization.
+// This function performs a type assertion to check if the HealthChecker implements
+// the InitializableHealthChecker interface. If it does, it returns the result of
+// IsInitialized(). If the checker does not implement InitializableHealthChecker,
+// it is assumed to always be initialized and this function returns true.
+//
+// This is useful for systems that need to distinguish between "not yet ready" and
+// "unhealthy" states during startup, such as watchdog implementations that should
+// not terminate processes during normal initialization.
+func IsHealthCheckerInitialized(checker HealthChecker) bool {
+	if initChecker, ok := checker.(InitializableHealthChecker); ok {
+		return initChecker.IsInitialized()
+	}
+	// Not an Initializable HealthChecker, assume always initialized
+	return true
 }
 
 // InstallHandler registers handlers for health checking on the path
