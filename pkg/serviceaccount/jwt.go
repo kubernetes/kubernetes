@@ -26,7 +26,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	jose "gopkg.in/go-jose/go-jose.v2"
 	"gopkg.in/go-jose/go-jose.v2/jwt"
@@ -414,21 +413,14 @@ func (j *jwtTokenAuthenticator[PrivateClaims]) AuthenticateToken(ctx context.Con
 // hasCorrectIssuer returns true if tokenData is a valid JWT in compact
 // serialization format and the "iss" claim matches the iss field of this token
 // authenticator, and otherwise returns false.
-//
-// Note: go-jose currently does not allow access to unverified JWS payloads.
-// See https://github.com/square/go-jose/issues/169
 func (j *jwtTokenAuthenticator[PrivateClaims]) hasCorrectIssuer(tokenData string) bool {
-	if strings.HasPrefix(strings.TrimSpace(tokenData), "{") {
-		return false
-	}
-	parts := strings.Split(tokenData, ".")
-	if len(parts) != 3 {
-		return false
-	}
-	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	object, err := jose.ParseSigned(tokenData)
 	if err != nil {
 		return false
 	}
+
+	payload := object.UnsafePayloadWithoutVerification()
+
 	claims := struct {
 		// WARNING: this JWT is not verified. Do not trust these claims.
 		Issuer string `json:"iss"`
