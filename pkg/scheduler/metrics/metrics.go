@@ -260,7 +260,7 @@ func InitMetrics() {
 			Subsystem:      SchedulerSubsystem,
 			Name:           "goroutines",
 			Help:           "Number of running goroutines split by the work they do such as binding.",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		}, []string{"operation"})
 	BatchAttemptStats = metrics.NewCounterVec(
 		&metrics.CounterOpts{
@@ -355,7 +355,7 @@ func InitMetrics() {
 			Name:           "permit_wait_duration_seconds",
 			Help:           "Duration of waiting on permit.",
 			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		},
 		[]string{"result"})
 
@@ -372,7 +372,7 @@ func InitMetrics() {
 			Subsystem:      SchedulerSubsystem,
 			Name:           "unschedulable_pods",
 			Help:           "The number of unschedulable pods broken down by plugin name. A pod will increment the gauge for all plugins that caused it to not schedule and so this metric have meaning only when broken down by plugin.",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		}, []string{"plugin", "profile"})
 
 	PluginEvaluationTotal = metrics.NewCounterVec(
@@ -380,7 +380,7 @@ func InitMetrics() {
 			Subsystem:      SchedulerSubsystem,
 			Name:           "plugin_evaluation_total",
 			Help:           "Number of attempts to schedule pods by each plugin and the extension point (available only in PreFilter, Filter, PreScore, and Score).",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		}, []string{"plugin", "extension_point", "profile"})
 
 	PreemptionGoroutinesDuration = metrics.NewHistogramVec(
