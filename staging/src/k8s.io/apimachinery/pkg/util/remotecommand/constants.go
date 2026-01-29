@@ -64,4 +64,4 @@ const (
 	StreamClose  = 255
 )
 
-var SupportedStreamingProtocols = []string{StreamProtocolV4Name, StreamProtocolV3Name, StreamProtocolV2Name, StreamProtocolV1Name}
+var SupportedStreamingProtocols = []string{StreamProtocolV5Name, StreamProtocolV4Name, StreamProtocolV3Name, StreamProtocolV2Name, StreamProtocolV1Name}
