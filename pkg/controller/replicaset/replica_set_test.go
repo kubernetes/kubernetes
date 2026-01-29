@@ -57,6 +57,8 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/utils/clock"
+	clocktesting "k8s.io/utils/clock/testing"
 	"k8s.io/utils/ptr"
 )
 
@@ -1871,6 +1873,7 @@ func TestRemoveCondition(t *testing.T) {
 
 func TestSlowStartBatch(t *testing.T) {
 	fakeErr := fmt.Errorf("fake error")
+	fakePreconditionErr := fmt.Errorf("fake precondition error")
 	callCnt := 0
 	callLimit := 0
 	var lock sync.Mutex
@@ -1887,6 +1890,7 @@ func TestSlowStartBatch(t *testing.T) {
 	tests := []struct {
 		name              string
 		count             int
+		precondition      batchPrecondition
 		callLimit         int
 		fn                func() error
 		expectedSuccesses int
@@ -1920,12 +1924,46 @@ func TestSlowStartBatch(t *testing.T) {
 			expectedErr:       fakeErr,
 			expectedCallCnt:   7, // 1(first batch) + 2(2nd batch) + 4(3rd batch) = 7
 		},
+		{
+			name:  "callLimit = 6 (stop prematurely due to precondition)",
+			count: 10,
+			precondition: func(successes int) (int, error) {
+				if successes >= 5 {
+					return 0, nil // enough calls - stop precondition
+				}
+				if successes >= 3 {
+					return 2, nil // slow down creation - create only 2 more
+				}
+				return 10, nil // allow all
+			},
+			callLimit:         5,
+			fn:                fn,
+			expectedSuccesses: 5,
+			expectedErr:       nil,
+			expectedCallCnt:   5, // 1(first batch) + 2(2nd batch) + 2(3rd batch limited by precondition) = 5
+		},
+
+		{
+			name:  "callLimit = 6 (stop prematurely due to error from precondition)",
+			count: 10,
+			precondition: func(successes int) (int, error) {
+				if successes >= 3 {
+					return 0, fakePreconditionErr // unexpected error from a precondition
+				}
+				return 10, nil // allow all
+			},
+			callLimit:         3,
+			fn:                fn,
+			expectedSuccesses: 3,
+			expectedErr:       fakePreconditionErr,
+			expectedCallCnt:   3, // 1(first batch) + 2(2nd batch) = 3
+		},
 	}
 
 	for _, test := range tests {
 		callCnt = 0
 		callLimit = test.callLimit
-		successes, err := slowStartBatch(test.count, 1, test.fn)
+		successes, err := slowStartBatch(test.count, 1, test.precondition, test.fn)
 		if successes != test.expectedSuccesses {
 			t.Errorf("%s: unexpected processed batch size, expected %d, got %d", test.name, test.expectedSuccesses, successes)
 		}
@@ -2175,5 +2213,349 @@ func TestGetPodKeys(t *testing.T) {
 				t.Errorf("%s: unexpected keys for pods to delete, expected %v, got %v", test.name, test.expectedPodKeys, podKeys)
 			}
 		}
+	}
+}
+
+func TestCalculateTimeWeightedFailedPodsCount(t *testing.T) {
+	labelMap := map[string]string{"name": "foo"}
+	rs := newReplicaSet(1, labelMap)
+
+	generatePodStartedBefore := func(clock clock.PassiveClock, startBefore time.Duration, podPhase v1.PodPhase) *v1.Pod {
+		pod := newPod(fmt.Sprintf("scheduled-%s-ready-pod-started-before-%d", podPhase, startBefore), rs, podPhase, nil, true)
+		pod.Spec.NodeName = "fake-node"
+		pod.Status.StartTime = ptr.To(metav1.Time{Time: clock.Now().Add(-startBefore)})
+		pod.Status.Conditions = []v1.PodCondition{
+			{
+				Type:   v1.PodReady,
+				Status: v1.ConditionTrue,
+			},
+		}
+		return pod
+	}
+
+	tests := []struct {
+		name                           string
+		replicasToCreate               int
+		runningPodsStartedBefore       []time.Duration
+		failedPodsStartedBefore        []time.Duration
+		expectedWeightedFailedPodCount int
+		expectedNextSync               *time.Duration
+	}{
+		{
+			name:                           "negative replicas",
+			replicasToCreate:               -5,
+			expectedWeightedFailedPodCount: 0,
+			expectedNextSync:               nil,
+		},
+		{
+			name:                           "zero replicas",
+			replicasToCreate:               0,
+			expectedWeightedFailedPodCount: 0,
+			expectedNextSync:               nil,
+		},
+		{
+			name:                           "no pods",
+			replicasToCreate:               5,
+			expectedWeightedFailedPodCount: 0,
+			expectedNextSync:               nil,
+		},
+		{
+			name:                           "running pod should get filtered",
+			replicasToCreate:               5,
+			runningPodsStartedBefore:       []time.Duration{1 * time.Second},
+			failedPodsStartedBefore:        []time.Duration{1 * time.Second},
+			expectedWeightedFailedPodCount: 1,
+			expectedNextSync:               ptr.To(9 * time.Second),
+		},
+		{
+			name:             "all pods (1 replica) rejected by kubelet",
+			replicasToCreate: 5,
+			failedPodsStartedBefore: []time.Duration{
+				0 * time.Second, // 1st bucket
+			},
+			expectedWeightedFailedPodCount: 1,                        // will block creation of additional pods
+			expectedNextSync:               ptr.To(10 * time.Second), // in 10 seconds the pod should move to the second bucket
+		},
+		{
+			name:             "all pods (5 replicas) rejected by kubelet",
+			replicasToCreate: 5,
+			failedPodsStartedBefore: []time.Duration{
+				1 * time.Second, // 1st bucket
+				2 * time.Second,
+				3 * time.Second,
+				4 * time.Second,
+				4 * time.Second,
+			},
+			expectedWeightedFailedPodCount: 5,                       // will block creation of additional pods
+			expectedNextSync:               ptr.To(6 * time.Second), // in 6 seconds 2 oldest pods should move to the second bucket
+		},
+		{
+			name:             "all pods (1 replica) rejected by kubelet, 1 pod move to the second bucket should allow 1 additional pod",
+			replicasToCreate: 1,
+			failedPodsStartedBefore: []time.Duration{
+				10*time.Second + 100*time.Millisecond, // 2nd bucket
+			},
+			expectedWeightedFailedPodCount: 0,                       // 0 means the replica set controller can create any number of pods (1)
+			expectedNextSync:               ptr.To(5 * time.Second), // 5s is the minimum
+		},
+		// emulate new pod creations and bucket transitions
+		{
+			name:             "all pods (5 replicas) rejected by kubelet (iteration 1), 1 pod move to the second bucket should allow 1 additional pod",
+			replicasToCreate: 5,
+			failedPodsStartedBefore: []time.Duration{
+				10 * time.Second, // 1st bucket
+				10 * time.Second,
+				10 * time.Second,
+				10 * time.Second,
+				10*time.Second + 100*time.Millisecond, // 2nd bucket
+			},
+			expectedWeightedFailedPodCount: 4,
+			expectedNextSync:               ptr.To(5 * time.Second), // 5s is the minimum
+		},
+		{
+			name:             "all pods (5 replicas) rejected by kubelet (iteration 2), 5 pods move to the second bucket should allow 1 additional pod",
+			replicasToCreate: 5,
+			failedPodsStartedBefore: []time.Duration{
+				10*time.Second + 100*time.Millisecond, // 2nd bucket
+				10*time.Second + 100*time.Millisecond,
+				10*time.Second + 100*time.Millisecond,
+				10*time.Second + 200*time.Millisecond,
+				10*time.Second + 300*time.Millisecond,
+			},
+			expectedWeightedFailedPodCount: 4,
+			expectedNextSync:               ptr.To(5 * time.Second), // 5s is the minimum
+		},
+		{
+			name:             "all pods (5 replicas) rejected by kubelet (iteration 3), 1 pod in the first bucket and 5 pods in the second bucket should not allow any pods",
+			replicasToCreate: 5,
+			failedPodsStartedBefore: []time.Duration{
+				1 * time.Second,                       // 1st bucket
+				11*time.Second + 100*time.Millisecond, // 2nd bucket
+				11*time.Second + 100*time.Millisecond,
+				11*time.Second + 100*time.Millisecond,
+				11*time.Second + 200*time.Millisecond,
+				11*time.Second + 300*time.Millisecond,
+			},
+			expectedWeightedFailedPodCount: 5,
+			expectedNextSync:               ptr.To(5 * time.Second), // 5s is the minimum
+		},
+		{
+			name:             "all pods (5 replicas) rejected by kubelet (iteration 4), 1 pod in the first bucket and 5 pods in the third bucket should allow additional pod",
+			replicasToCreate: 5,
+			failedPodsStartedBefore: []time.Duration{
+				4*time.Second + 100*time.Millisecond,  // 1st bucket
+				14*time.Second + 100*time.Millisecond, // 3rd bucket
+				14*time.Second + 100*time.Millisecond,
+				14*time.Second + 100*time.Millisecond,
+				14*time.Second + 200*time.Millisecond,
+				14*time.Second + 300*time.Millisecond,
+			},
+			expectedWeightedFailedPodCount: 4,
+			expectedNextSync:               ptr.To(5 * time.Second), // 5s is the minimum
+		},
+		{
+			name:             "all pods (5 replicas) rejected by kubelet (iteration 5), 2 pod in the first bucket, 1 pod in second bucket, and 5 pods in the fourth bucket should allow additional pod",
+			replicasToCreate: 5,
+			failedPodsStartedBefore: []time.Duration{
+				4*time.Second + 100*time.Millisecond, // 1st bucket
+				8*time.Second + 100*time.Millisecond,
+				12*time.Second + 100*time.Millisecond,
+				22*time.Second + 100*time.Millisecond, // 4th bucket
+				22*time.Second + 100*time.Millisecond,
+				22*time.Second + 100*time.Millisecond,
+				22*time.Second + 200*time.Millisecond,
+				22*time.Second + 300*time.Millisecond,
+			},
+			expectedWeightedFailedPodCount: 4,
+			expectedNextSync:               ptr.To(5 * time.Second), // 5s is the minimum
+		},
+		{
+			name:             "all pods (5 replicas) rejected by kubelet (iteration 6), 2 pod in the first bucket, 1 pod in second+third bucket, and 5 pods in the fifth bucket should allow additional pod",
+			replicasToCreate: 5,
+			failedPodsStartedBefore: []time.Duration{
+				4*time.Second + 100*time.Millisecond, // 1st bucket
+				8*time.Second + 100*time.Millisecond,
+				12*time.Second + 100*time.Millisecond, // 2nd bucket
+				16*time.Second + 100*time.Millisecond, // 3rd bucket
+				26*time.Second + 100*time.Millisecond, // 5th bucket
+				26*time.Second + 100*time.Millisecond,
+				26*time.Second + 100*time.Millisecond,
+				26*time.Second + 200*time.Millisecond,
+				26*time.Second + 300*time.Millisecond,
+			},
+			expectedWeightedFailedPodCount: 4,
+			expectedNextSync:               ptr.To(5 * time.Second), // 5s is the minimum
+		},
+		{
+			name:             "all pods (5 replicas) rejected by kubelet (iteration 7), 2 pod in the first bucket and 1 pod in second+third+fourth bucket should allow additional pod with 5 too old pods",
+			replicasToCreate: 5,
+			failedPodsStartedBefore: []time.Duration{
+				4*time.Second + 100*time.Millisecond, // 1st bucket
+				8*time.Second + 100*time.Millisecond,
+				12*time.Second + 100*time.Millisecond, // 2nd bucket
+				16*time.Second + 100*time.Millisecond, // 3rd bucket
+				20*time.Second + 100*time.Millisecond, // 4th bucket
+				30*time.Second + 100*time.Millisecond,
+				30*time.Second + 100*time.Millisecond,
+				30*time.Second + 100*time.Millisecond,
+				30*time.Second + 200*time.Millisecond,
+				30*time.Second + 300*time.Millisecond,
+			},
+			expectedWeightedFailedPodCount: 4,
+			expectedNextSync:               ptr.To(5 * time.Second), // 5s is the minimum
+		},
+		// partial kubelet rejections, for example when pods get scheduled to a different nodes
+		{
+			name:             "9 pods (100 replicas) rejected by kubelet, 9 pods in the first bucket",
+			replicasToCreate: 100,
+			failedPodsStartedBefore: []time.Duration{
+				0 * time.Second, // 1st bucket
+				1 * time.Second,
+				5 * time.Second,
+				10 * time.Second,
+				15 * time.Second,
+				20 * time.Second,
+				40 * time.Second,
+				80 * time.Second,
+				80 * time.Second,
+			},
+			expectedWeightedFailedPodCount: 9,
+			expectedNextSync:               ptr.To(20 * time.Second), // in 20s 2 oldest pods move to the next bucket
+		},
+		{
+			name:             "9 pods (500+ replicas) rejected by kubelet, 9 pods in the first bucket",
+			replicasToCreate: 500,
+			failedPodsStartedBefore: []time.Duration{
+				0 * time.Second, // 1st bucket
+				1 * time.Second,
+				5 * time.Second,
+				10 * time.Second,
+				15 * time.Second,
+				200 * time.Second,
+				400 * time.Second,
+				400 * time.Second,
+				500 * time.Second,
+			},
+			expectedWeightedFailedPodCount: 9,
+			expectedNextSync:               ptr.To(5 * time.Second), // 5s is the minimum
+		},
+		{
+			name:             "10 pods (500+ replicas) rejected by kubelet, 10 pods in the fourth bucket blocks creation of 5 pods",
+			replicasToCreate: 500,
+			failedPodsStartedBefore: []time.Duration{
+				901 * time.Second, // 4th bucket
+				901 * time.Second,
+				901 * time.Second,
+				901 * time.Second,
+				901 * time.Second,
+				901 * time.Second,
+				901 * time.Second,
+				901 * time.Second,
+				901 * time.Second,
+				901 * time.Second,
+			},
+			expectedWeightedFailedPodCount: 5,
+			expectedNextSync:               ptr.To(199 * time.Second),
+		},
+		{
+			name:             "12 pods (500+ replicas) rejected by kubelet, 12 pods in the last bucket blocks creation of 2 pods",
+			replicasToCreate: 500,
+			failedPodsStartedBefore: []time.Duration{
+				1500 * time.Second, // 6th bucket
+				1500 * time.Second,
+				1500 * time.Second,
+				1500 * time.Second,
+				1500 * time.Second,
+				1500 * time.Second,
+				1500 * time.Second,
+				1500 * time.Second,
+				1500 * time.Second,
+				1500 * time.Second,
+				1500 * time.Second,
+				1500 * time.Second,
+			},
+			expectedWeightedFailedPodCount: 2,
+			expectedNextSync:               ptr.To(5 * time.Second),
+		},
+		{
+			name:             "12 pods (500+ replicas) rejected by kubelet, 12 pods scattered in all the buckets blocks creation of 2 pods",
+			replicasToCreate: 500,
+			failedPodsStartedBefore: []time.Duration{
+				0 * time.Second,
+				200 * time.Second,
+				499 * time.Second,
+				501 * time.Second,
+				600 * time.Second,
+				900 * time.Second,
+				1000 * time.Second,
+				1100 * time.Second,
+				1200 * time.Second,
+				1300 * time.Second,
+				1400 * time.Second,
+				1500 * time.Second,
+			},
+			expectedWeightedFailedPodCount: 7,
+			expectedNextSync:               ptr.To(5 * time.Second), // 5s is the minimum
+		},
+		{
+			name:             "too old pods (5 replicas) rejected by kubelet are not relevant anymore",
+			replicasToCreate: 10,
+			failedPodsStartedBefore: []time.Duration{
+				30*time.Second + 1*time.Nanosecond,
+				30*time.Second + 1*time.Nanosecond,
+				30*time.Second + 1*time.Nanosecond,
+				30*time.Second + 1*time.Nanosecond,
+				30*time.Second + 1*time.Nanosecond,
+				30*time.Second + 1*time.Nanosecond,
+				31 * time.Second,
+				31 * time.Second,
+				31 * time.Second,
+				32 * time.Second,
+				32 * time.Second,
+				32 * time.Second,
+				33 * time.Minute,
+				33 * time.Minute,
+				33 * time.Minute,
+				33 * time.Minute,
+				33 * time.Minute,
+				33 * time.Minute,
+				33 * time.Minute,
+				33 * time.Minute,
+				33 * time.Minute,
+				34 * time.Hour,
+				34 * time.Hour,
+				34 * time.Hour,
+				34 * time.Hour,
+				34 * time.Hour,
+				34 * time.Hour,
+				34 * time.Hour,
+				34 * time.Hour,
+				34 * time.Hour,
+			},
+			expectedWeightedFailedPodCount: 0,   // will not block creation of additional pods
+			expectedNextSync:               nil, // no future resync needed
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			clock := clocktesting.NewFakePassiveClock(time.Now())
+			var failedPods []*v1.Pod
+			// Running pods should be filtered by the replica set controller before calling the function
+			// nevertheless the function should handle that as well so we can test it.
+			for _, runningPodStartedBefore := range test.runningPodsStartedBefore {
+				failedPods = append(failedPods, generatePodStartedBefore(clock, runningPodStartedBefore, v1.PodRunning))
+			}
+			for _, failedPodStartedBefore := range test.failedPodsStartedBefore {
+				failedPods = append(failedPods, generatePodStartedBefore(clock, failedPodStartedBefore, v1.PodFailed))
+			}
+			weightedFailedPodCount, nextSync := calculateTimeWeightedFailedPodsCount(clock, test.replicasToCreate, failedPods)
+			if weightedFailedPodCount != test.expectedWeightedFailedPodCount {
+				t.Errorf("unexpected time weighted failed pod count, expected %v, got %v", test.expectedWeightedFailedPodCount, weightedFailedPodCount)
+			}
+			if !ptr.Equal(nextSync, test.expectedNextSync) {
+				t.Errorf("unexpected next sync, expected %v, got %v", ptr.Deref(test.expectedNextSync, -1), ptr.Deref(nextSync, -1))
+			}
+		})
 	}
 }
