@@ -258,7 +258,7 @@ func TestUpdateAssignedPodInCache(t *testing.T) {
 				SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
 				logger:          logger,
 			}
-			sched.addAssignedPodToCache(tt.oldPod)
+			sched.addAssignedPodToCache(tt.oldPod, nil)
 			sched.updateAssignedPodInCache(tt.oldPod, tt.newPod)
 
 			if tt.oldPod.UID != tt.newPod.UID {
@@ -970,6 +970,160 @@ func TestUpdatePod(t *testing.T) {
 				t.Errorf("Expected pod not to be in cache")
 			}
 		})
+	}
+}
+
+func TestUpdatePod_WakeUpPodsOnExternalScheduling(t *testing.T) {
+	highPriorityPod :=
+		st.MakePod().Name("hpp").Namespace("ns1").UID("hppns1").Priority(highPriority).SchedulerName(testSchedulerName).Obj()
+	medPriorityPod :=
+		st.MakePod().Name("smpp").Namespace("ns3").UID("mppns2").Priority(midPriority).SchedulerName(testSchedulerName).Obj()
+	lowPriorityPod :=
+		st.MakePod().Name("lpp").Namespace("ns4").UID("lppns1").Priority(lowPriority).SchedulerName(testSchedulerName).Obj()
+
+	pod := st.MakePod().Name("pod1").UID("pod1").SchedulerName(testSchedulerName).Obj()
+	assumedPodOnNodeA := pod.DeepCopy()
+	assumedPodOnNodeA.Spec.NodeName = "node-a"
+	boundPodOnNodeB := pod.DeepCopy()
+	boundPodOnNodeB.Spec.NodeName = "node-b"
+	boundPodOnNodeA := pod.DeepCopy()
+	boundPodOnNodeA.Spec.NodeName = "node-a"
+
+	medPriorityNominatedPodOnNodeA := pod.DeepCopy()
+	medPriorityNominatedPodOnNodeA.Status.NominatedNodeName = "node-a"
+	medPriorityNominatedPodOnNodeA.Spec.Priority = &midPriority
+
+	unschedulablePods := []*v1.Pod{highPriorityPod, medPriorityPod, lowPriorityPod}
+
+	// Make pods schedulable on Delete event when QHints are enabled
+	queueHintForPodDelete := func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+		return fwk.Queue, nil
+	}
+	queueingHintMap := internalqueue.QueueingHintMapPerProfile{
+		testSchedulerName: {
+			framework.EventAssignedPodDelete: {
+				{
+					PluginName:     "fooPlugin1",
+					QueueingHintFn: queueHintForPodDelete,
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name                  string
+		oldPod                *v1.Pod
+		newPod                *v1.Pod
+		assumedPod            *v1.Pod
+		wantInActiveOrBackoff sets.Set[string]
+	}{
+		{
+			name:                  "assumed pod externally bound to a different node should wake up other pods",
+			oldPod:                pod,
+			newPod:                boundPodOnNodeB,
+			assumedPod:            assumedPodOnNodeA,
+			wantInActiveOrBackoff: sets.New(lowPriorityPod.Name, medPriorityPod.Name, highPriorityPod.Name),
+		},
+		{
+			name:                  "nominated pod externally bound to a different node should wake up other pods with lower or equal priority",
+			oldPod:                medPriorityNominatedPodOnNodeA,
+			newPod:                boundPodOnNodeB,
+			wantInActiveOrBackoff: sets.New(lowPriorityPod.Name, medPriorityPod.Name),
+		},
+		{
+			name:                  "assumed pod externally bound to the same node should not wake up other pods",
+			oldPod:                pod,
+			newPod:                boundPodOnNodeA,
+			assumedPod:            assumedPodOnNodeA,
+			wantInActiveOrBackoff: sets.New[string](),
+		},
+		{
+			name:                  "nominated pod externally bound to a the same node should not wake up other pods",
+			oldPod:                medPriorityNominatedPodOnNodeA,
+			newPod:                boundPodOnNodeA,
+			wantInActiveOrBackoff: sets.New[string](),
+		},
+	}
+
+	for _, tt := range tests {
+		for _, qHintEnabled := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s, with queuehint(%v)", tt.name, qHintEnabled), func(t *testing.T) {
+				if !qHintEnabled {
+					featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
+					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, false)
+				}
+
+				logger, ctx := ktesting.NewTestContext(t)
+				ctx, cancel := context.WithCancel(ctx)
+				defer cancel()
+
+				var objs []runtime.Object
+				for _, pod := range unschedulablePods {
+					objs = append(objs, pod)
+				}
+				client := fake.NewClientset(objs...)
+				informerFactory := informers.NewSharedInformerFactory(client, 0)
+
+				// apiDispatcher is unused in the test, but intializing it anyway.
+				apiDispatcher := apidispatcher.New(client, 16, apicalls.Relevances)
+				apiDispatcher.Run(logger)
+				defer apiDispatcher.Close()
+
+				recorder := metrics.NewMetricsAsyncRecorder(3, 20*time.Microsecond, ctx.Done())
+				queue := internalqueue.NewPriorityQueue(
+					newDefaultQueueSort(),
+					informerFactory,
+					internalqueue.WithMetricsRecorder(recorder),
+					internalqueue.WithQueueingHintMapPerProfile(queueingHintMap),
+					internalqueue.WithAPIDispatcher(apiDispatcher),
+					// disable backoff queue
+					internalqueue.WithPodInitialBackoffDuration(0),
+					internalqueue.WithPodMaxBackoffDuration(0))
+				schedulerCache := internalcache.New(ctx, nil)
+
+				// Put test pods into unschedulable queue
+				for _, pod := range unschedulablePods {
+					queue.Add(logger, pod)
+					poppedPod, err := queue.Pop(logger)
+					if err != nil {
+						t.Fatalf("Pop failed: %v", err)
+					}
+					poppedPod.UnschedulablePlugins = sets.New("fooPlugin1")
+					if err := queue.AddUnschedulableIfNotPresent(logger, poppedPod, queue.SchedulingCycle()); err != nil {
+						t.Errorf("Unexpected error from AddUnschedulableIfNotPresent: %v", err)
+					}
+				}
+
+				s, _, err := initScheduler(ctx, schedulerCache, queue, apiDispatcher, client, informerFactory)
+				if err != nil {
+					t.Fatalf("Failed to initialize test scheduler: %v", err)
+				}
+
+				if tt.assumedPod != nil {
+					err := schedulerCache.AssumePod(logger, tt.assumedPod)
+					if err != nil {
+						t.Fatalf("Failed to assume pod: %v", err)
+					}
+				}
+
+				if len(s.SchedulingQueue.PodsInActiveQ()) > 0 {
+					t.Errorf("No pods were expected to be in the activeQ before the update, but there were %v", s.SchedulingQueue.PodsInActiveQ())
+				}
+
+				s.updatePod(tt.oldPod, tt.newPod)
+
+				podsInActiveOrBackoff := s.SchedulingQueue.PodsInActiveQ()
+				podsInActiveOrBackoff = append(podsInActiveOrBackoff, s.SchedulingQueue.PodsInBackoffQ()...)
+				if len(podsInActiveOrBackoff) != len(tt.wantInActiveOrBackoff) {
+					t.Errorf("Different number of pods were expected to be in the activeQ or backoffQ, but found actual %v vs. expected %v", podsInActiveOrBackoff, tt.wantInActiveOrBackoff)
+				}
+				for _, pod := range podsInActiveOrBackoff {
+					if !tt.wantInActiveOrBackoff.Has(pod.Name) {
+						t.Errorf("Found unexpected pod in activeQ or backoffQ: %s", pod.Name)
+					}
+				}
+			})
+		}
 	}
 }
 
