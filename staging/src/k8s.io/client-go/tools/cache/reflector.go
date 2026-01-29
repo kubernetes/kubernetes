@@ -101,6 +101,9 @@ type Reflector struct {
 	expectedGVK *schema.GroupVersionKind
 	// The destination to sync up with the watch source
 	store ReflectorStore
+	// clientStore allows access to existing cache objects.
+	// TODO: consider narrowing this to KeyListerGetter.
+	clientStore Store
 	// listerWatcher is used to perform lists and watches.
 	listerWatcher ListerWatcherWithContext
 	// backoff manages backoff of ListWatch
@@ -779,6 +782,9 @@ func (r *Reflector) watchList(ctx context.Context) (watch.Interface, error) {
 		resourceVersion = ""
 		lastKnownRV := r.rewatchResourceVersion()
 		temporaryStore = NewStore(DeletionHandlingMetaNamespaceKeyFunc, storeOpts...)
+		// note when a transformer is configured, reusing cached objects may result in a double-transform.
+		// TODO: check ^
+		temporaryStore = newWatchListMemoryOptimizedStore(temporaryStore, r.clientStore, DeletionHandlingMetaNamespaceKeyFunc)
 		// TODO(#115478): large "list", slow clients, slow network, p&f
 		//  might slow down streaming and eventually fail.
 		//  maybe in such a case we should retry with an increased timeout?
