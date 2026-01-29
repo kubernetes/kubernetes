@@ -397,7 +397,7 @@ func (g *applyConfigurationGenerator) generateMemberWithForMap(sw *generator.Sni
 	sw.Do("// With$.Member.Name$ puts the entries into the $.Member.Name$ field in the declarative configuration\n", memberParams)
 	sw.Do("// and returns the receiver, so that objects can be build by chaining \"With\" function invocations.\n", memberParams)
 	sw.Do("// If called multiple times, the entries provided by each call will be put on the $.Member.Name$ field,\n", memberParams)
-	sw.Do("// overwriting an existing map entries in $.Member.Name$ field with the same key.\n", memberParams)
+	sw.Do("// overwriting existing map entries in $.Member.Name$ field with the same key.\n", memberParams)
 	sw.Do("func (b *$.ApplyConfig.ApplyConfiguration|public$) With$.Member.Name$(entries $.MemberType|raw$) *$.ApplyConfig.ApplyConfiguration|public$ {\n", memberParams)
 	g.ensureEmbedExistsIfApplicable(sw, memberParams)
 	sw.Do("  if b$if ne .EmbeddedIn nil$$if ne .EmbeddedIn.MemberType.Name.Name \"\"$.$.EmbeddedIn.MemberType.Name.Name$$else if ne .EmbeddedIn.MemberType.Elem nil$.$.EmbeddedIn.MemberType.Elem.Name.Name$$end$$end$.$.Member.Name$ == nil && len(entries) > 0 {\n", memberParams)
