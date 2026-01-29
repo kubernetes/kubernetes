@@ -40,11 +40,21 @@ func (kl *Kubelet) discoverNodeDeclaredFeatures() []string {
 		CPUManagerPolicy: kl.containerManager.GetNodeConfig().CPUManagerPolicy,
 	}
 
+	runtimeHandlers := kl.runtimeState.runtimeHandlers()
+	runtimeHandlerInfos := make([]nodedeclaredfeatures.RuntimeHandlerInfo, len(runtimeHandlers))
+	for i, handler := range runtimeHandlers {
+		runtimeHandlerInfos[i] = nodedeclaredfeatures.RuntimeHandlerInfo{
+			Name:                              handler.Name,
+			SupportsUserNamespacesHostNetwork: handler.SupportsUserNamespacesHostNetwork,
+		}
+	}
+
 	adaptedFG := FeatureGateAdapter{FeatureGate: utilfeature.DefaultFeatureGate}
 	cfg := &nodedeclaredfeatures.NodeConfiguration{
-		FeatureGates: adaptedFG,
-		StaticConfig: staticConfig,
-		Version:      kl.version,
+		FeatureGates:    adaptedFG,
+		StaticConfig:    staticConfig,
+		Version:         kl.version,
+		RuntimeHandlers: runtimeHandlerInfos,
 	}
 	return kl.nodeDeclaredFeaturesFramework.DiscoverNodeFeatures(cfg)
 }
