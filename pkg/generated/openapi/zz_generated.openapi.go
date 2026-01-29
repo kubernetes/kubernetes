@@ -47198,7 +47198,7 @@ func schema_k8sio_api_resource_v1_DeviceClassSpec(ref common.ReferenceCallback) 
 					},
 					"extendedResourceName": {
 						SchemaProps: spec.SchemaProps{
-							Description: "ExtendedResourceName is the extended resource name for the devices of this class. The devices of this class can be used to satisfy a pod's extended resource requests. It has the same format as the name of a pod's extended resource. It should be unique among all the device classes in a cluster. If two device classes have the same name, then the class created later is picked to satisfy a pod's extended resource requests. If two classes are created at the same time, then the name of the class lexicographically sorted first is picked.\n\nThis is an alpha field.",
+							Description: "ExtendedResourceName is the extended resource name for the devices of this class. The devices of this class can be used to satisfy a pod's extended resource requests. It has the same format as the name of a pod's extended resource. It should be unique among all the device classes in a cluster. If two device classes have the same name, then the class created later is picked to satisfy a pod's extended resource requests. If two classes are created at the same time, then the name of the class lexicographically sorted first is picked.\n\nThis is a beta field.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -49706,7 +49706,7 @@ func schema_k8sio_api_resource_v1beta1_DeviceClassSpec(ref common.ReferenceCallb
 					},
 					"extendedResourceName": {
 						SchemaProps: spec.SchemaProps{
-							Description: "ExtendedResourceName is the extended resource name for the devices of this class. The devices of this class can be used to satisfy a pod's extended resource requests. It has the same format as the name of a pod's extended resource. It should be unique among all the device classes in a cluster. If two device classes have the same name, then the class created later is picked to satisfy a pod's extended resource requests. If two classes are created at the same time, then the name of the class lexicographically sorted first is picked.\n\nThis is an alpha field.",
+							Description: "ExtendedResourceName is the extended resource name for the devices of this class. The devices of this class can be used to satisfy a pod's extended resource requests. It has the same format as the name of a pod's extended resource. It should be unique among all the device classes in a cluster. If two device classes have the same name, then the class created later is picked to satisfy a pod's extended resource requests. If two classes are created at the same time, then the name of the class lexicographically sorted first is picked.\n\nThis is a beta field.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -51878,7 +51878,7 @@ func schema_k8sio_api_resource_v1beta2_DeviceClassSpec(ref common.ReferenceCallb
 					},
 					"extendedResourceName": {
 						SchemaProps: spec.SchemaProps{
-							Description: "ExtendedResourceName is the extended resource name for the devices of this class. The devices of this class can be used to satisfy a pod's extended resource requests. It has the same format as the name of a pod's extended resource. It should be unique among all the device classes in a cluster. If two device classes have the same name, then the class created later is picked to satisfy a pod's extended resource requests. If two classes are created at the same time, then the name of the class lexicographically sorted first is picked.\n\nThis is an alpha field.",
+							Description: "ExtendedResourceName is the extended resource name for the devices of this class. The devices of this class can be used to satisfy a pod's extended resource requests. It has the same format as the name of a pod's extended resource. It should be unique among all the device classes in a cluster. If two device classes have the same name, then the class created later is picked to satisfy a pod's extended resource requests. If two classes are created at the same time, then the name of the class lexicographically sorted first is picked.\n\nThis is a beta field.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
