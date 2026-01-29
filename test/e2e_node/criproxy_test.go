@@ -241,6 +241,7 @@ var _ = SIGDescribe(feature.CriProxy, framework.WithSerial(), func() {
 			})
 			framework.ExpectNoError(err)
 
+			// for test
 			pod := e2epod.NewPodClient(f).Create(ctx, newPullImageAlwaysPod())
 			podErr := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
 			framework.ExpectNoError(podErr)
