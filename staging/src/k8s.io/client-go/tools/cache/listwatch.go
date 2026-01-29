@@ -90,7 +90,7 @@ func ToWatcherWithContext(w Watcher) WatcherWithContext {
 	if w, ok := w.(WatcherWithContext); ok {
 		return w
 	}
-	return watcherWrapper{
+	return &watcherWrapper{
 		parent: w,
 	}
 }
@@ -99,7 +99,7 @@ type watcherWrapper struct {
 	parent Watcher
 }
 
-func (l watcherWrapper) WatchWithContext(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
+func (l *watcherWrapper) WatchWithContext(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
 	return l.parent.Watch(options)
 }
 
@@ -121,7 +121,7 @@ func ToListerWatcherWithContext(lw ListerWatcher) ListerWatcherWithContext {
 	if lw, ok := lw.(ListerWatcherWithContext); ok {
 		return lw
 	}
-	return listerWatcherWrapper{
+	return &listerWatcherWrapper{
 		ListerWithContext:  ToListerWithContext(lw),
 		WatcherWithContext: ToWatcherWithContext(lw),
 	}
