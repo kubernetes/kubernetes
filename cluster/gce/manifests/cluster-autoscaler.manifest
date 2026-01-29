@@ -22,7 +22,7 @@
         "containers": [
             {
                 "name": "cluster-autoscaler",
-                "image": "registry.k8s.io/autoscaling/cluster-autoscaler:v1.31.1",
+                "image": "registry.k8s.io/autoscaling/cluster-autoscaler:v1.34.2",
                 "livenessProbe": {
                     "httpGet": {
                         "path": "/health-check",
@@ -41,6 +41,7 @@
                     "--write-status-configmap=true",
                     "--balance-similar-node-groups=true",
                     "--expendable-pods-priority-cutoff=-10",
+                    "--bypassed-scheduler-names=non-existing-bypassed-scheduler",
                     {{params}}
                 ],
                 "env": [
