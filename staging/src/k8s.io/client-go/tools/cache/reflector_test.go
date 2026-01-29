@@ -235,7 +235,7 @@ func TestReflectorHandleWatchStoppedBefore(t *testing.T) {
 			return resultCh
 		},
 	}
-	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, g.setLastSyncResourceVersion, g.clock, nevererrc)
+	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, func(rv string, _ bool) { g.setLastSyncResourceVersion(rv) }, g.clock, nevererrc)
 	require.Equal(t, err, errorStopRequested)
 	// Ensure handleWatch calls ResultChan and Stop
 	assert.Equal(t, []string{"ResultChan", "Stop"}, calls)
@@ -268,7 +268,7 @@ func TestReflectorHandleWatchStoppedAfter(t *testing.T) {
 			return resultCh
 		},
 	}
-	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, g.setLastSyncResourceVersion, g.clock, nevererrc)
+	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, func(rv string, _ bool) { g.setLastSyncResourceVersion(rv) }, g.clock, nevererrc)
 	require.Equal(t, err, errorStopRequested)
 	// Ensure handleWatch calls ResultChan and Stop
 	assert.Equal(t, []string{"ResultChan", "Stop"}, calls)
@@ -294,7 +294,7 @@ func TestReflectorHandleWatchResultChanClosedBefore(t *testing.T) {
 	}
 	// Simulate the result channel being closed by the producer before handleWatch is called.
 	close(resultCh)
-	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, g.setLastSyncResourceVersion, g.clock, nevererrc)
+	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, func(rv string, _ bool) { g.setLastSyncResourceVersion(rv) }, g.clock, nevererrc)
 	require.Equal(t, &VeryShortWatchError{Name: g.name}, err)
 	// Ensure handleWatch calls ResultChan and Stop
 	assert.Equal(t, []string{"ResultChan", "Stop"}, calls)
@@ -325,7 +325,7 @@ func TestReflectorHandleWatchResultChanClosedAfter(t *testing.T) {
 			return resultCh
 		},
 	}
-	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, g.setLastSyncResourceVersion, g.clock, nevererrc)
+	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, func(rv string, _ bool) { g.setLastSyncResourceVersion(rv) }, g.clock, nevererrc)
 	require.Equal(t, &VeryShortWatchError{Name: g.name}, err)
 	// Ensure handleWatch calls ResultChan and Stop
 	assert.Equal(t, []string{"ResultChan", "Stop"}, calls)
@@ -338,7 +338,7 @@ func TestReflectorWatchHandler(t *testing.T) {
 	// watching after all the events have been consumed.
 	_, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancelCause(ctx)
-	setLastSyncResourceVersion := func(rv string) {
+	setLastSyncResourceVersion := func(rv string, _ bool) {
 		g.setLastSyncResourceVersion(rv)
 		if rv == "32" {
 			cancel(errors.New("LastSyncResourceVersion is 32"))
@@ -398,7 +398,7 @@ func TestReflectorStopWatch(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancelCause(ctx)
 	cancel(errors.New("don't run"))
-	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, g.setLastSyncResourceVersion, g.clock, nevererrc)
+	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, func(rv string, _ bool) { g.setLastSyncResourceVersion(rv) }, g.clock, nevererrc)
 	require.Equal(t, err, errorStopRequested)
 }
 

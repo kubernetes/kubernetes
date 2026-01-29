@@ -520,6 +520,8 @@ func (r *Reflector) watch(ctx context.Context, w watch.Interface, resyncerrc cha
 		// start the clock before sending the request, since some proxies won't flush headers until after the first watch event is sent
 		start := r.clock.Now()
 
+		// if w is already initialized, it must be past any synthetic non-rv-ordered added events
+		propagateRVFromStart := true
 		if w == nil {
 			timeoutSeconds := int64(r.minWatchTimeout.Seconds() * (rand.Float64() + 1.0))
 			options := metav1.ListOptions{
@@ -531,6 +533,11 @@ func (r *Reflector) watch(ctx context.Context, w watch.Interface, resyncerrc cha
 				// Reflector doesn't assume bookmarks are returned at all (if the server do not support
 				// watch bookmarks, it will ignore this field).
 				AllowWatchBookmarks: true,
+			}
+			if options.ResourceVersion == "" || options.ResourceVersion == "0" {
+				// if we're starting the watch at a resource version that will get synthetic ADDED events in non-rv order,
+				// wait until we're through that set of events before propagating the RV
+				propagateRVFromStart = false
 			}
 
 			w, err = r.listerWatcher.WatchWithContext(ctx, options)
@@ -548,7 +555,25 @@ func (r *Reflector) watch(ctx context.Context, w watch.Interface, resyncerrc cha
 			}
 		}
 
-		err = handleWatch(ctx, start, w, r.store, r.expectedType, r.expectedGVK, r.name, r.typeDescription, r.setLastSyncResourceVersion,
+		err = handleWatch(ctx, start, w, r.store, r.expectedType, r.expectedGVK, r.name, r.typeDescription,
+			func(rv string, eventReceivedBesidesAdded bool) {
+				// We update the resource version in the store only if we have received at least one event that is
+				// not an added event, or if the resource version has been set previously. This is because we can
+				// encounter 2 scenarios:
+				// 1. The watch is started from a resource version specified by the LastSyncResourceVersion field.
+				//    In this case, we can update the resource version in the store without worrying about it being
+				//    out of order since we will not receive any synthetic added events for resources that may be
+				//    out of order.
+				// 2. The watch is started when the LastSyncResourceVersion field is empty. In this case, we may not
+				//    update the LastSyncResourceVersion until we receive at least one event that is not an added
+				//    event, since that is the only way to ensure that the watch has exited the initial list phase.
+				if propagateRVFromStart || eventReceivedBesidesAdded {
+					r.setLastSyncResourceVersion(rv)
+					if rvu, ok := r.store.(ResourceVersionUpdater); ok {
+						rvu.UpdateResourceVersion(rv)
+					}
+				}
+			},
 			r.clock, resyncerrc)
 		// handleWatch always stops the watcher. So we don't need to here.
 		// Just set it to nil to trigger a retry on the next loop.
@@ -775,7 +800,11 @@ func (r *Reflector) watchList(ctx context.Context) (watch.Interface, error) {
 			return nil, err
 		}
 		watchListBookmarkReceived, err := handleListWatch(ctx, start, w, temporaryStore, r.expectedType, r.expectedGVK, r.name, r.typeDescription,
-			func(rv string) { resourceVersion = rv },
+			func(rv string, eventReceivedBesidesAdded bool) {
+				if eventReceivedBesidesAdded {
+					resourceVersion = rv
+				}
+			},
 			r.clock, make(chan error))
 		if err != nil {
 			w.Stop() // stop and retry with clean state
@@ -832,7 +861,7 @@ func handleListWatch(
 	expectedGVK *schema.GroupVersionKind,
 	name string,
 	expectedTypeName string,
-	setLastSyncResourceVersion func(string),
+	setLastSyncResourceVersion func(string, bool),
 	clock clock.Clock,
 	errCh chan error,
 ) (bool, error) {
@@ -853,7 +882,7 @@ func handleWatch(
 	expectedGVK *schema.GroupVersionKind,
 	name string,
 	expectedTypeName string,
-	setLastSyncResourceVersion func(string),
+	setLastSyncResourceVersion func(string, bool),
 	clock clock.Clock,
 	errCh chan error,
 ) error {
@@ -881,12 +910,13 @@ func handleAnyWatch(
 	expectedGVK *schema.GroupVersionKind,
 	name string,
 	expectedTypeName string,
-	setLastSyncResourceVersion func(string),
+	setLastSyncResourceVersion func(string, bool),
 	exitOnWatchListBookmarkReceived bool,
 	clock clock.Clock,
 	errCh chan error,
 ) (bool, error) {
 	watchListBookmarkReceived := false
+	eventReceivedBesidesAdded := false
 	eventCount := 0
 	logger := klog.FromContext(ctx)
 	initialEventsEndBookmarkWarningTicker := newInitialEventsEndBookmarkTicker(logger, name, clock, start, exitOnWatchListBookmarkReceived)
@@ -946,6 +976,7 @@ loop:
 					utilruntime.HandleErrorWithContext(ctx, err, "Unable to add watch event object to store", "reflector", name, "object", event.Object)
 				}
 			case watch.Modified:
+				eventReceivedBesidesAdded = true
 				err := store.Update(event.Object)
 				if err != nil {
 					utilruntime.HandleErrorWithContext(ctx, err, "Unable to update watch event object to store", "reflector", name, "object", event.Object)
@@ -954,22 +985,22 @@ loop:
 				// TODO: Will any consumers need access to the "last known
 				// state", which is passed in event.Object? If so, may need
 				// to change this.
+				eventReceivedBesidesAdded = true
 				err := store.Delete(event.Object)
 				if err != nil {
 					utilruntime.HandleErrorWithContext(ctx, err, "Unable to delete watch event object from store", "reflector", name, "object", event.Object)
 				}
 			case watch.Bookmark:
 				// A `Bookmark` means watch has synced here, just update the resourceVersion
+				eventReceivedBesidesAdded = true
 				if meta.GetAnnotations()[metav1.InitialEventsAnnotationKey] == "true" {
 					watchListBookmarkReceived = true
 				}
 			default:
 				utilruntime.HandleErrorWithContext(ctx, err, "Unknown watch event", "reflector", name, "event", event)
 			}
-			setLastSyncResourceVersion(resourceVersion)
-			if rvu, ok := store.(ResourceVersionUpdater); ok {
-				rvu.UpdateResourceVersion(resourceVersion)
-			}
+			// when eventReceivedBesidesAdded is true, that indicates we are definitely past any initial synthetic Added events
+			setLastSyncResourceVersion(resourceVersion, eventReceivedBesidesAdded)
 			eventCount++
 			if exitOnWatchListBookmarkReceived && watchListBookmarkReceived {
 				stopWatcher = false
