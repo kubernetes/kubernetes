@@ -120,6 +120,7 @@ linters:
 When no `files` configuration is provided, the linter checks these Kubernetes files:
 
 - `cmd/kubeadm/app/features/features.go`
+- `pkg/controller/apis/config/types.go`
 - `pkg/features/kube_features.go`
 - `staging/src/k8s.io/apiserver/pkg/features/kube_features.go`
 - `staging/src/k8s.io/client-go/features/known_features.go`
@@ -200,18 +201,6 @@ not sorted alphabetically:
 +	FeatureC = value
  )
 ```
-
-## Files Checked
-
-By default, this linter checks the following files in the Kubernetes codebase:
-
-- `pkg/features/kube_features.go`
-- `staging/src/k8s.io/apiserver/pkg/features/kube_features.go`
-- `staging/src/k8s.io/client-go/features/known_features.go`
-- `staging/src/k8s.io/controller-manager/pkg/features/kube_features.go`
-- `staging/src/k8s.io/apiextensions-apiserver/pkg/features/kube_features.go`
-- `test/e2e/feature/feature.go`
-- `test/e2e/environment/environment.go`
 
 ## Integration with CI
 
