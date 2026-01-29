@@ -1130,7 +1130,8 @@ func (nc *Controller) processPod(ctx context.Context, podItem podUpdateItem) {
 
 	nodeHealth := nc.nodeHealthMap.getDeepCopy(nodeName)
 	if nodeHealth == nil {
-		// Node data is not gathered yet or node has been removed in the meantime.
+		// Node data is not gathered yet, requeue this pod until the data is gathered or the pod is deleted.
+		nc.podUpdateQueue.AddRateLimited(podItem)
 		return
 	}
 
