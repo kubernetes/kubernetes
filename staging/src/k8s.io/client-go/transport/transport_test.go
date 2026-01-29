@@ -96,7 +96,7 @@ stR0Yiw0buV6DL/moUO0HIM9Bjh96HJp+LxiIS6UCdIhMPp5HoQa
 
 func TestNew(t *testing.T) {
 	globalGetCert := &GetCertHolder{
-		GetCert: func() (*tls.Certificate, error) { return nil, nil },
+		GetCert: func(context.Context) (*tls.Certificate, error) { return nil, nil },
 	}
 	globalDial := &DialHolder{
 		Dial: func(ctx context.Context, network, address string) (net.Conn, error) { return nil, nil },
@@ -218,7 +218,7 @@ func TestNew(t *testing.T) {
 				TLS: TLSConfig{
 					CAData: []byte(rootCACert),
 					GetCertHolder: &GetCertHolder{
-						GetCert: func() (*tls.Certificate, error) {
+						GetCert: func(context.Context) (*tls.Certificate, error) {
 							crt, err := tls.X509KeyPair([]byte(certData), []byte(keyData))
 							return &crt, err
 						},
@@ -234,7 +234,7 @@ func TestNew(t *testing.T) {
 				TLS: TLSConfig{
 					CAData: []byte(rootCACert),
 					GetCertHolder: &GetCertHolder{
-						GetCert: func() (*tls.Certificate, error) {
+						GetCert: func(context.Context) (*tls.Certificate, error) {
 							return nil, errors.New("GetCert failure")
 						},
 					},
@@ -248,7 +248,7 @@ func TestNew(t *testing.T) {
 				TLS: TLSConfig{
 					CAData: []byte(rootCACert),
 					GetCertHolder: &GetCertHolder{
-						GetCert: func() (*tls.Certificate, error) {
+						GetCert: func(context.Context) (*tls.Certificate, error) {
 							return nil, nil
 						},
 					},
@@ -264,7 +264,7 @@ func TestNew(t *testing.T) {
 				TLS: TLSConfig{
 					CAData: []byte(rootCACert),
 					GetCertHolder: &GetCertHolder{
-						GetCert: func() (*tls.Certificate, error) {
+						GetCert: func(context.Context) (*tls.Certificate, error) {
 							return nil, nil
 						},
 					},
@@ -325,7 +325,7 @@ func TestNew(t *testing.T) {
 			Config: &Config{
 				TLS: TLSConfig{
 					GetCertHolder: &GetCertHolder{
-						GetCert: func() (*tls.Certificate, error) { return nil, nil },
+						GetCert: func(context.Context) (*tls.Certificate, error) { return nil, nil },
 					},
 				},
 				DialHolder: nil,

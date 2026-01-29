@@ -18,6 +18,7 @@ package exec
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
@@ -363,7 +364,8 @@ func (r *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 		return r.base.RoundTrip(req)
 	}
 
-	creds, err := r.a.getCreds()
+	ctx := req.Context()
+	creds, err := r.a.getCreds(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("getting credentials: %v", err)
 	}
@@ -376,8 +378,8 @@ func (r *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 		return nil, err
 	}
 	if res.StatusCode == http.StatusUnauthorized {
-		if err := r.a.maybeRefreshCreds(creds); err != nil {
-			klog.Errorf("refreshing credentials: %v", err)
+		if err := r.a.maybeRefreshCreds(ctx, creds); err != nil {
+			klog.FromContext(ctx).Error(err, "Refreshing credentials failed")
 		}
 	}
 	return res, nil
@@ -390,15 +392,15 @@ func (a *Authenticator) credsExpired() bool {
 	return a.now().After(a.exp)
 }
 
-func (a *Authenticator) cert() (*tls.Certificate, error) {
-	creds, err := a.getCreds()
+func (a *Authenticator) cert(ctx context.Context) (*tls.Certificate, error) {
+	creds, err := a.getCreds(ctx)
 	if err != nil {
 		return nil, err
 	}
 	return creds.cert, nil
 }
 
-func (a *Authenticator) getCreds() (*credentials, error) {
+func (a *Authenticator) getCreds(ctx context.Context) (*credentials, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
@@ -406,7 +408,7 @@ func (a *Authenticator) getCreds() (*credentials, error) {
 		return a.cachedCreds, nil
 	}
 
-	if err := a.refreshCredsLocked(); err != nil {
+	if err := a.refreshCredsLocked(ctx); err != nil {
 		return nil, err
 	}
 
@@ -415,7 +417,7 @@ func (a *Authenticator) getCreds() (*credentials, error) {
 
 // maybeRefreshCreds executes the plugin to force a rotation of the
 // credentials, unless they were rotated already.
-func (a *Authenticator) maybeRefreshCreds(creds *credentials) error {
+func (a *Authenticator) maybeRefreshCreds(ctx context.Context, creds *credentials) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
@@ -426,12 +428,12 @@ func (a *Authenticator) maybeRefreshCreds(creds *credentials) error {
 		return nil
 	}
 
-	return a.refreshCredsLocked()
+	return a.refreshCredsLocked(ctx)
 }
 
 // refreshCredsLocked executes the plugin and reads the credentials from
 // stdout. It must be called while holding the Authenticator's mutex.
-func (a *Authenticator) refreshCredsLocked() error {
+func (a *Authenticator) refreshCredsLocked(ctx context.Context) error {
 	interactive, err := a.interactiveFunc()
 	if err != nil {
 		return fmt.Errorf("exec plugin cannot support interactive mode: %w", err)
@@ -454,7 +456,7 @@ func (a *Authenticator) refreshCredsLocked() error {
 	env = append(env, fmt.Sprintf("%s=%s", execInfoEnv, data))
 
 	stdout := &bytes.Buffer{}
-	cmd := exec.Command(a.cmd, a.args...)
+	cmd := exec.CommandContext(ctx, a.cmd, a.args...)
 	cmd.Env = env
 	cmd.Stderr = a.stderr
 	cmd.Stdout = stdout
@@ -462,7 +464,7 @@ func (a *Authenticator) refreshCredsLocked() error {
 		cmd.Stdin = a.stdin
 	}
 
-	err = a.updateCommandAndCheckAllowlistLocked(cmd)
+	err = a.updateCommandAndCheckAllowlistLocked(ctx, cmd)
 	incrementPolicyMetric(err)
 	if err != nil {
 		return err
@@ -577,14 +579,14 @@ func (a *Authenticator) wrapCmdRunErrorLocked(err error) error {
 // according to the credential plugin policy. If the plugin is allowed, `nil`
 // is returned. If the plugin is not allowed, an error must be returned
 // explaining why.
-func (a *Authenticator) updateCommandAndCheckAllowlistLocked(cmd *exec.Cmd) error {
+func (a *Authenticator) updateCommandAndCheckAllowlistLocked(ctx context.Context, cmd *exec.Cmd) error {
 	switch a.execPluginPolicy.PolicyType {
 	case "", api.PluginPolicyAllowAll:
 		return nil
 	case api.PluginPolicyDenyAll:
 		return fmt.Errorf("plugin %q not allowed: policy set to %q", a.cmd, api.PluginPolicyDenyAll)
 	case api.PluginPolicyAllowlist:
-		return a.checkAllowlistLocked(cmd)
+		return a.checkAllowlistLocked(ctx, cmd)
 	default:
 		return fmt.Errorf("unknown plugin policy %q", a.execPluginPolicy.PolicyType)
 	}
@@ -592,7 +594,7 @@ func (a *Authenticator) updateCommandAndCheckAllowlistLocked(cmd *exec.Cmd) erro
 
 // `checkAllowlistLocked` checks the specified plugin against the allowlist,
 // and may update the Authenticator's allowlistLookup set.
-func (a *Authenticator) checkAllowlistLocked(cmd *exec.Cmd) error {
+func (a *Authenticator) checkAllowlistLocked(ctx context.Context, cmd *exec.Cmd) error {
 	// a.cmd is the original command as specified in the configuration, then filepath.Clean().
 	// cmd.Path is the possibly-resolved command.
 	// If either are an exact match in the allowlist, return success.
@@ -625,7 +627,7 @@ func (a *Authenticator) checkAllowlistLocked(cmd *exec.Cmd) error {
 	}
 
 	// There is no verbatim match
-	a.resolveAllowListEntriesLocked(cmd.Path)
+	a.resolveAllowListEntriesLocked(ctx, cmd.Path)
 
 	// allowlistLookup may have changed, recheck
 	if a.allowlistLookup.Has(cmdResolvedPath) {
@@ -638,7 +640,7 @@ func (a *Authenticator) checkAllowlistLocked(cmd *exec.Cmd) error {
 // resolveAllowListEntriesLocked tries to resolve allowlist entries with LookPath,
 // and adds successfully resolved entries to allowlistLookup.
 // The optional commandHint can be used to limit which entries are resolved to ones which match the hint basename.
-func (a *Authenticator) resolveAllowListEntriesLocked(commandHint string) {
+func (a *Authenticator) resolveAllowListEntriesLocked(ctx context.Context, commandHint string) {
 	hintName := filepath.Base(commandHint)
 	for _, entry := range a.execPluginPolicy.Allowlist {
 		entryBasename := filepath.Base(entry.Name)
@@ -648,7 +650,7 @@ func (a *Authenticator) resolveAllowListEntriesLocked(commandHint string) {
 		}
 		entryResolvedPath, err := exec.LookPath(entry.Name)
 		if err != nil {
-			klog.V(5).ErrorS(err, "resolving credential plugin allowlist", "name", entry.Name)
+			klog.FromContext(ctx).V(5).Info("Resolving credential plugin allowlist", "name", entry.Name, "err", err)
 			continue
 		}
 		if entryResolvedPath != "" {
