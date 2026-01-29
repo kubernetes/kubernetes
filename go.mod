@@ -17,7 +17,7 @@ require (
 	github.com/Microsoft/hnslib v0.1.2
 	github.com/blang/semver/v4 v4.0.0
 	github.com/container-storage-interface/spec v1.9.0
-	github.com/coredns/corefile-migration v1.0.29
+	github.com/coredns/corefile-migration v1.0.30
 	github.com/coreos/go-oidc v2.5.0+incompatible
 	github.com/coreos/go-systemd/v22 v22.6.0
 	github.com/cpuguy83/go-md2man/v2 v2.0.6
