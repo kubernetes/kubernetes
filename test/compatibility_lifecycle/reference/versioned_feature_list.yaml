@@ -1139,10 +1139,10 @@
     version: "1.33"
 - name: NodeDeclaredFeatures
   versionedSpecs:
-  - default: false
+  - default: true
     lockToDefault: false
-    preRelease: Alpha
-    version: "1.35"
+    preRelease: Beta
+    version: "1.36"
 - name: NodeInclusionPolicyInPodTopologySpread
   versionedSpecs:
   - default: false
