@@ -29,13 +29,13 @@ type FeatureGateAdapter struct {
 }
 
 // Enabled implements the nodedeclaredfeatures.FeatureGate interface
-func (a FeatureGateAdapter) Enabled(key string) bool {
+func (a FeatureGateAdapter) CheckEnabled(key string) (bool, error) {
 	// Convert the string key to featuregate.Feature
-	return a.FeatureGate.Enabled(featuregate.Feature(key))
+	return a.FeatureGate.CheckEnabled(featuregate.Feature(key))
 }
 
 // discoverNodeDeclaredFeatures determines the final set of node features to be declared by using the discovery library.
-func (kl *Kubelet) discoverNodeDeclaredFeatures() []string {
+func (kl *Kubelet) discoverNodeDeclaredFeatures() ([]string, error) {
 	staticConfig := nodedeclaredfeatures.StaticConfiguration{
 		CPUManagerPolicy: kl.containerManager.GetNodeConfig().CPUManagerPolicy,
 	}

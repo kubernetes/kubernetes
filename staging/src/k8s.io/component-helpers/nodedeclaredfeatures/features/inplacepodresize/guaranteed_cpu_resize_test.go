@@ -20,12 +20,21 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/component-helpers/nodedeclaredfeatures"
 	test "k8s.io/component-helpers/nodedeclaredfeatures/testing"
 )
+
+func TestGuaranteedQoSPodCPUResizeFeature_Requirements(t *testing.T) {
+	feature := &guaranteedQoSPodCPUResizeFeature{}
+	reqs := feature.Requirements()
+	assert.NotNil(t, reqs)
+	assert.Equal(t, []string{IPPRExclusiveCPUsFeatureGate}, reqs.EnabledFeatureGates)
+	assert.Equal(t, map[string]string{"CPUManagerPolicy": "static"}, reqs.StaticConfig)
+}
 
 func TestGuaranteedQoSPodCPUResizeFeature_Discover(t *testing.T) {
 	testCases := []struct {
@@ -64,13 +73,14 @@ func TestGuaranteedQoSPodCPUResizeFeature_Discover(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			mockFG := test.NewMockFeatureGate(t)
-			mockFG.EXPECT().Enabled(IPPRExclusiveCPUsFeatureGate).Return(tc.gateEnabled)
+			mockFG.EXPECT().CheckEnabled(IPPRExclusiveCPUsFeatureGate).Return(tc.gateEnabled, nil)
 
 			config := &nodedeclaredfeatures.NodeConfiguration{
 				FeatureGates: mockFG,
 				StaticConfig: nodedeclaredfeatures.StaticConfiguration{CPUManagerPolicy: tc.cpuManagerPolicy},
 			}
-			enabled := feature.Discover(config)
+			enabled, err := feature.Discover(config)
+			require.NoError(t, err)
 			assert.Equal(t, tc.expected, enabled)
 		})
 	}

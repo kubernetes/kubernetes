@@ -36,13 +36,27 @@ type PodInfo struct {
 	// Example: ResourceClaims []*v1.ResourceClaim
 }
 
+// DiscoveryResult encapsulates the result of a feature discovery process.
+type DiscoveryResult struct {
+	// Enabled indicates whether the feature is enabled based on the provided configuration.
+	Enabled bool
+	// NecessaryFeatureGates lists feature gate strings that were actively checked
+	// during the Discover call.
+	NecessaryFeatureGates []string
+	// UsedStaticConfigKeys lists keys from StaticConfiguration that were accessed during Discover.
+	UsedStaticConfigKeys []string
+}
+
 // Feature encapsulates all logic for a given declared feature.
 type Feature interface {
 	// Name returns the feature's well-known name.
 	Name() string
 
 	// Discover checks if a node provides the feature based on its configuration.
-	Discover(cfg *NodeConfiguration) bool
+	Discover(cfg *NodeConfiguration) (bool, error)
+
+	// Requirements returns the feature's feature gate and static config dependencies.
+	Requirements() *FeatureRequirements
 
 	// InferForScheduling checks if pod scheduling requires the feature.
 	InferForScheduling(podInfo *PodInfo) bool
@@ -57,10 +71,19 @@ type Feature interface {
 	MaxVersion() *version.Version
 }
 
+// FeatureRequirements lists the potential dependencies of a feature.
+type FeatureRequirements struct {
+	// EnabledFeatureGates lists feature gate strings that the feature depends on.
+	EnabledFeatureGates []string
+	// StaticConfig lists keys from StaticConfiguration that the feature depends on and their expected values.
+	StaticConfig map[string]string
+}
+
 // FeatureGate is an interface that abstracts feature gate checking.
 type FeatureGate interface {
-	// Enabled returns true if the named feature gate is enabled.
-	Enabled(key string) bool
+	// CheckEnabled returns true if the named feature gate is enabled.
+	// Returns an error if the key is not a known feature gate.
+	CheckEnabled(key string) (bool, error)
 }
 
 // StaticConfiguration provides a view of a node's static configuration.
