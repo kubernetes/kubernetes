@@ -62,27 +62,27 @@ const (
 
 // nodeResourceStrategyTypeMap maps strategy to scorer implementation
 var nodeResourceStrategyTypeMap = map[config.ScoringStrategyType]scorer{
-	config.LeastAllocated: func(args *config.NodeResourcesFitArgs) *resourceAllocationScorer {
-		resources := args.ScoringStrategy.Resources
+	config.LeastAllocated: func(args *config.ScoringStrategy) *resourceAllocationScorer {
+		resources := args.Resources
 		return &resourceAllocationScorer{
 			Name:      string(config.LeastAllocated),
 			scorer:    leastResourceScorer(resources),
 			resources: resources,
 		}
 	},
-	config.MostAllocated: func(args *config.NodeResourcesFitArgs) *resourceAllocationScorer {
-		resources := args.ScoringStrategy.Resources
+	config.MostAllocated: func(args *config.ScoringStrategy) *resourceAllocationScorer {
+		resources := args.Resources
 		return &resourceAllocationScorer{
 			Name:      string(config.MostAllocated),
 			scorer:    mostResourceScorer(resources),
 			resources: resources,
 		}
 	},
-	config.RequestedToCapacityRatio: func(args *config.NodeResourcesFitArgs) *resourceAllocationScorer {
-		resources := args.ScoringStrategy.Resources
+	config.RequestedToCapacityRatio: func(args *config.ScoringStrategy) *resourceAllocationScorer {
+		resources := args.Resources
 		return &resourceAllocationScorer{
 			Name:      string(config.RequestedToCapacityRatio),
-			scorer:    requestedToCapacityRatioScorer(resources, args.ScoringStrategy.RequestedToCapacityRatio.Shape),
+			scorer:    requestedToCapacityRatioScorer(resources, args.RequestedToCapacityRatio.Shape),
 			resources: resources,
 		}
 	},
@@ -184,6 +184,17 @@ func (pl *Fit) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *f
 	}, nil
 }
 
+func GetScorer(strategy *config.ScoringStrategy) (*resourceAllocationScorer, error) {
+	if strategy == nil {
+		return nil, fmt.Errorf("scoring strategy not specified")
+	}
+	scorerFactory, exists := nodeResourceStrategyTypeMap[strategy.Type]
+	if !exists {
+		return nil, fmt.Errorf("scoring strategy %s is not supported", strategy.Type)
+	}
+	return scorerFactory(strategy), nil
+}
+
 // NewFit initializes a new plugin and returns it.
 func NewFit(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.Features) (fwk.Plugin, error) {
 	args, ok := plArgs.(*config.NodeResourcesFitArgs)
@@ -194,17 +205,10 @@ func NewFit(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.
 		return nil, err
 	}
 
-	if args.ScoringStrategy == nil {
-		return nil, fmt.Errorf("scoring strategy not specified")
+	scorer, err := GetScorer(args.ScoringStrategy)
+	if err != nil {
+		return nil, err
 	}
-
-	strategy := args.ScoringStrategy.Type
-	scorePlugin, exists := nodeResourceStrategyTypeMap[strategy]
-	if !exists {
-		return nil, fmt.Errorf("scoring strategy %s is not supported", strategy)
-	}
-
-	scorer := scorePlugin(args)
 	if fts.EnableDRAExtendedResource {
 		scorer.enableDRAExtendedResource = true
 		scorer.draManager = h.SharedDRAManager()
@@ -733,7 +737,7 @@ func (f *Fit) Score(ctx context.Context, state fwk.CycleState, pod *v1.Pod, node
 	s, err := getPreScoreState(state)
 	if err != nil {
 		s = &preScoreState{
-			podRequests: f.calculatePodResourceRequestList(pod, f.resources),
+			podRequests: f.CalculatePodResourceRequestList(pod),
 		}
 		if f.enableDRAExtendedResource {
 			draPreScoreState, status := getDRAPreScoredParams(f.draManager, f.resources)
