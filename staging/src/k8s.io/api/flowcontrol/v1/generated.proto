@@ -165,6 +165,8 @@ message GroupSubject {
   // See https://github.com/kubernetes/apiserver/blob/master/pkg/authentication/user/user.go for some
   // well-known group names.
   // Required.
+  // +required
+  // +k8s:required
   optional string name = 1;
 }
 
@@ -505,6 +507,7 @@ message Subject {
 
   // `group` matches based on user group name.
   // +optional
+  // +k8s:optional
   optional GroupSubject group = 3;
 
   // `serviceAccount` matches ServiceAccounts.
@@ -516,8 +519,6 @@ message Subject {
 message UserSubject {
   // `name` is the username that matches, or "*" to match all usernames.
   // Required.
-  // +required
-  // +k8s:required
   optional string name = 1;
 }
 

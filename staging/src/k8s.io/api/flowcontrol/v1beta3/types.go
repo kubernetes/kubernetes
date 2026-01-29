@@ -251,6 +251,7 @@ type Subject struct {
 	User *UserSubject `json:"user,omitempty" protobuf:"bytes,2,opt,name=user"`
 	// `group` matches based on user group name.
 	// +optional
+	// +k8s:optional
 	Group *GroupSubject `json:"group,omitempty" protobuf:"bytes,3,opt,name=group"`
 	// `serviceAccount` matches ServiceAccounts.
 	// +optional
@@ -282,6 +283,8 @@ type GroupSubject struct {
 	// See https://github.com/kubernetes/apiserver/blob/master/pkg/authentication/user/user.go for some
 	// well-known group names.
 	// Required.
+	// +required
+	// +k8s:required
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 }
 
