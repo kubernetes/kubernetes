@@ -2856,9 +2856,8 @@ func (kl *Kubelet) HandlePodUpdates(logger klog.Logger, pods []*v1.Pod) {
 	}
 }
 
-// recordResizeOperaations records if any of the pod level resources or
-// containers need to be resized, and returns
-// true if so
+// recordResizeOperations records if any of the pod level resources or
+// containers need to be resized, and returns true if so
 func recordResizeOperations(oldPod, newPod *v1.Pod) bool {
 	if oldPod == nil {
 		// This should never happen.
@@ -2867,7 +2866,6 @@ func recordResizeOperations(oldPod, newPod *v1.Pod) bool {
 
 	hasResize := recordContainerResizeOperations(oldPod, newPod) || recordPodLevelResourceResizeOperations(oldPod, newPod)
 	return hasResize
-
 }
 
 // recordPodLevelResourceResizeOperations records if any of the pod level resources need to be resized, and returns
@@ -2972,10 +2970,6 @@ func (kl *Kubelet) HandlePodRemoves(pods []*v1.Pod) {
 			klog.V(2).InfoS("Failed to delete pod", "pod", klog.KObj(pod), "err", err)
 		}
 	}
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		kl.allocationManager.RetryPendingResizes(allocation.TriggerReasonPodsRemoved)
-	}
 }
 
 // HandlePodReconcile is the callback in the SyncHandler interface for pods
@@ -2984,6 +2978,7 @@ func (kl *Kubelet) HandlePodRemoves(pods []*v1.Pod) {
 func (kl *Kubelet) HandlePodReconcile(pods []*v1.Pod) {
 	start := kl.clock.Now()
 	retryPendingResizes := false
+	var triggerReason string
 	hasPendingResizes := kl.allocationManager.HasPendingResizes()
 	for _, pod := range pods {
 		// Update the pod in pod manager, status manager will do periodically reconcile according
@@ -3001,9 +2996,15 @@ func (kl *Kubelet) HandlePodReconcile(pods []*v1.Pod) {
 		}
 
 		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-			// If there are pending resizes, check whether the requests shrank as a result of the status
-			// resources changing.
 			if hasPendingResizes && !retryPendingResizes && oldPod != nil {
+				// If the pod has reached a terminal phase, we retry all pending resizes.
+				if podutil.IsPodTerminal(pod) && !podutil.IsPodTerminal(oldPod) {
+					retryPendingResizes = true
+					triggerReason = allocation.TriggerReasonPodTerminated
+				}
+
+				// If there are pending resizes, check whether the requests shrank as a result of the status
+				// resources changing.
 				opts := resourcehelper.PodResourcesOptions{
 					UseStatusResources:                             true,
 					SkipPodLevelResources:                          !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
@@ -3018,8 +3019,11 @@ func (kl *Kubelet) HandlePodReconcile(pods []*v1.Pod) {
 				newRequest := resourcehelper.PodRequests(allocatedPod, opts)
 
 				// If cpu or memory requests shrank, then retry the pending resizes.
-				retryPendingResizes = newRequest.Memory().Cmp(*oldRequest.Memory()) < 0 ||
-					newRequest.Cpu().Cmp(*oldRequest.Cpu()) < 0
+				if newRequest.Memory().Cmp(*oldRequest.Memory()) < 0 ||
+					newRequest.Cpu().Cmp(*oldRequest.Cpu()) < 0 {
+					retryPendingResizes = true
+					triggerReason = allocation.TriggerReasonPodResized
+				}
 			}
 		}
 
@@ -3054,7 +3058,7 @@ func (kl *Kubelet) HandlePodReconcile(pods []*v1.Pod) {
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		if retryPendingResizes {
-			kl.allocationManager.RetryPendingResizes(allocation.TriggerReasonPodResized)
+			kl.allocationManager.RetryPendingResizes(triggerReason)
 		}
 	}
 }
