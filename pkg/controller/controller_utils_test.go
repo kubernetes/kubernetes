@@ -325,6 +325,297 @@ func TestUIDExpectations(t *testing.T) {
 	}
 }
 
+func TestUIDExpectationsCreationTracking(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	uidExp := NewUIDTrackingControllerExpectations(NewControllerExpectations())
+
+	t.Run("Basic creation tracking with keys", func(t *testing.T) {
+		rc := newReplicationController(3)
+		rcKey, err := KeyFunc(rc)
+		if err != nil {
+			t.Fatalf("Couldn't get key for object %#v: %v", rc, err)
+		}
+
+		// Generate creation keys
+		creationKeys := []string{
+			GeneratePodCreationKey("default", "myapp-", 0),
+			GeneratePodCreationKey("default", "myapp-", 1),
+			GeneratePodCreationKey("default", "myapp-", 2),
+		}
+
+		// Expect creations with keys
+		err = uidExp.ExpectCreations(logger, rcKey, creationKeys)
+		if err != nil {
+			t.Fatalf("Failed to set creation expectations: %v", err)
+		}
+
+		assert.False(t, uidExp.SatisfiedExpectations(logger, rcKey),
+			"Controller %v satisfied expectations before creation", rcKey)
+
+		// Observe creations
+		for _, key := range creationKeys {
+			uidExp.CreationObserved(logger, rcKey, key)
+		}
+
+		assert.True(t, uidExp.SatisfiedExpectations(logger, rcKey),
+			"Controller %v didn't satisfy expectations after creation", rcKey)
+	})
+
+	t.Run("CreationObserved with non-matching key doesn't decrement", func(t *testing.T) {
+		rc := newReplicationController(2)
+		rcKey, err := KeyFunc(rc)
+		if err != nil {
+			t.Fatalf("Couldn't get key for object %#v: %v", rc, err)
+		}
+
+		creationKeys := []string{
+			GeneratePodCreationKey("default", "myapp-", 0),
+			GeneratePodCreationKey("default", "myapp-", 1),
+		}
+
+		err = uidExp.ExpectCreations(logger, rcKey, creationKeys)
+		if err != nil {
+			t.Fatalf("Failed to set creation expectations: %v", err)
+		}
+
+		// Observe creation with non-matching key (shouldn't decrement)
+		uidExp.CreationObserved(logger, rcKey, "default/other-app-0")
+
+		assert.False(t, uidExp.SatisfiedExpectations(logger, rcKey),
+			"Controller %v satisfied expectations with non-matching key", rcKey)
+
+		// Now observe with correct keys
+		for _, key := range creationKeys {
+			uidExp.CreationObserved(logger, rcKey, key)
+		}
+
+		assert.True(t, uidExp.SatisfiedExpectations(logger, rcKey),
+			"Controller %v didn't satisfy expectations after correct keys", rcKey)
+	})
+
+	t.Run("DeleteExpectations cleans up creation keys", func(t *testing.T) {
+		rc := newReplicationController(2)
+		rcKey, err := KeyFunc(rc)
+		if err != nil {
+			t.Fatalf("Couldn't get key for object %#v: %v", rc, err)
+		}
+
+		creationKeys := []string{
+			GeneratePodCreationKey("default", "myapp-", 0),
+			GeneratePodCreationKey("default", "myapp-", 1),
+		}
+
+		err = uidExp.ExpectCreations(logger, rcKey, creationKeys)
+		if err != nil {
+			t.Fatalf("Failed to set creation expectations: %v", err)
+		}
+
+		assert.NotNil(t, uidExp.GetCreationUIDs(rcKey),
+			"Creation UIDs should exist before deletion")
+
+		uidExp.DeleteExpectations(logger, rcKey)
+
+		assert.Nil(t, uidExp.GetCreationUIDs(rcKey),
+			"Failed to delete creation expectations for %v", rcKey)
+	})
+
+	t.Run("Mixed creation and deletion expectations", func(t *testing.T) {
+		rc := newReplicationController(2)
+		rcKey, err := KeyFunc(rc)
+		if err != nil {
+			t.Fatalf("Couldn't get key for object %#v: %v", rc, err)
+		}
+
+		// Expect some creations
+		creationKeys := []string{
+			GeneratePodCreationKey("default", "myapp-", 0),
+			GeneratePodCreationKey("default", "myapp-", 1),
+		}
+		err = uidExp.ExpectCreations(logger, rcKey, creationKeys)
+		if err != nil {
+			t.Fatalf("Failed to set creation expectations: %v", err)
+		}
+
+		// Expect some deletions
+		deletionKeys := []string{"pod-1", "pod-2"}
+		err = uidExp.ExpectDeletions(logger, rcKey, deletionKeys)
+		if err != nil {
+			t.Fatalf("Failed to set deletion expectations: %v", err)
+		}
+
+		assert.False(t, uidExp.SatisfiedExpectations(logger, rcKey),
+			"Controller %v satisfied expectations prematurely", rcKey)
+
+		// Observe creations
+		for _, key := range creationKeys {
+			uidExp.CreationObserved(logger, rcKey, key)
+		}
+
+		// Still not satisfied because deletions pending
+		assert.False(t, uidExp.SatisfiedExpectations(logger, rcKey),
+			"Controller %v satisfied expectations before deletions", rcKey)
+
+		// Observe deletions
+		for _, key := range deletionKeys {
+			uidExp.DeletionObserved(logger, rcKey, key)
+		}
+
+		assert.True(t, uidExp.SatisfiedExpectations(logger, rcKey),
+			"Controller %v didn't satisfy expectations after both creations and deletions", rcKey)
+	})
+
+	t.Run("Backward compatibility - empty key falls back to counter", func(t *testing.T) {
+		rc := newReplicationController(1)
+		rcKey, err := KeyFunc(rc)
+		if err != nil {
+			t.Fatalf("Couldn't get key for object %#v: %v", rc, err)
+		}
+
+		// Use old-style expectation (just count, no keys)
+		err = uidExp.ControllerExpectationsInterface.ExpectCreations(logger, rcKey, 1)
+		if err != nil {
+			t.Fatalf("Failed to set creation expectations: %v", err)
+		}
+
+		// Observe with empty key (backward compatibility path)
+		uidExp.CreationObserved(logger, rcKey, "")
+
+		assert.True(t, uidExp.SatisfiedExpectations(logger, rcKey),
+			"Controller %v didn't satisfy expectations with backward compatible empty key", rcKey)
+	})
+}
+
+func TestPodCreationKeyGeneration(t *testing.T) {
+	tests := []struct {
+		name         string
+		namespace    string
+		generateName string
+		index        int
+		expected     string
+	}{
+		{
+			name:         "Simple key generation",
+			namespace:    "default",
+			generateName: "myapp-",
+			index:        0,
+			expected:     "default/myapp--0",
+		},
+		{
+			name:         "Key with different namespace",
+			namespace:    "kube-system",
+			generateName: "coredns-",
+			index:        5,
+			expected:     "kube-system/coredns--5",
+		},
+		{
+			name:         "Key without trailing dash in generateName",
+			namespace:    "default",
+			generateName: "pod",
+			index:        1,
+			expected:     "default/pod-1",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			key := GeneratePodCreationKey(tt.namespace, tt.generateName, tt.index)
+			assert.Equal(t, tt.expected, key, "Generated key doesn't match expected")
+		})
+	}
+}
+
+func TestMatchPodToCreationKey(t *testing.T) {
+	tests := []struct {
+		name         string
+		pod          *v1.Pod
+		expectedKeys []string
+		shouldMatch  bool
+		expectedKey  string
+	}{
+		{
+			name: "Pod matches expected key",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "myapp-abc123",
+					Namespace: "default",
+				},
+			},
+			expectedKeys: []string{
+				"default/myapp--0",
+				"default/myapp--1",
+			},
+			shouldMatch: true,
+			expectedKey: "default/myapp--0",
+		},
+		{
+			name: "Pod doesn't match any expected key",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "other-app-abc123",
+					Namespace: "default",
+				},
+			},
+			expectedKeys: []string{
+				"default/myapp--0",
+				"default/myapp--1",
+			},
+			shouldMatch: false,
+			expectedKey: "",
+		},
+		{
+			name: "Pod in different namespace doesn't match",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "myapp-abc123",
+					Namespace: "other-ns",
+				},
+			},
+			expectedKeys: []string{
+				"default/myapp--0",
+			},
+			shouldMatch: false,
+			expectedKey: "",
+		},
+		{
+			name:         "Nil pod returns empty string",
+			pod:          nil,
+			expectedKeys: []string{"default/myapp--0"},
+			shouldMatch:  false,
+			expectedKey:  "",
+		},
+		{
+			name: "Empty expected keys returns empty string",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "myapp-abc123",
+					Namespace: "default",
+				},
+			},
+			expectedKeys: []string{},
+			shouldMatch:  false,
+			expectedKey:  "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			expectedSet := sets.NewString(tt.expectedKeys...)
+			matchedKey := MatchPodToCreationKey(tt.pod, expectedSet)
+
+			if tt.shouldMatch {
+				assert.NotEmpty(t, matchedKey, "Expected pod to match a key but got empty string")
+				assert.Contains(t, tt.expectedKeys, matchedKey, "Matched key not in expected keys")
+			} else {
+				assert.Empty(t, matchedKey, "Expected pod not to match any key but got: %s", matchedKey)
+			}
+
+			if tt.expectedKey != "" {
+				assert.Equal(t, tt.expectedKey, matchedKey, "Matched key doesn't match expected specific key")
+			}
+		})
+	}
+}
+
 func TestCreatePodsWithGenerateName(t *testing.T) {
 	ns := metav1.NamespaceDefault
 	generateName := "hello-"
