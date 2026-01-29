@@ -41,6 +41,7 @@ type RuntimeClass struct {
 
 	// spec represents specification of the RuntimeClass
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	// +required
 	Spec RuntimeClassSpec `json:"spec" protobuf:"bytes,2,name=spec"`
 }
 

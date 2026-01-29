@@ -1613,6 +1613,7 @@ message ResourceSlice {
   // Contains the information published by the driver.
   //
   // Changing the spec automatically increments the metadata.generation number.
+  // +required
   optional ResourceSliceSpec spec = 2;
 }
 
