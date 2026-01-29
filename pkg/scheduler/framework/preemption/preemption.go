@@ -309,7 +309,7 @@ func (ev *Evaluator) Preempt(ctx context.Context, state fwk.CycleState, pod *v1.
 		}
 		fitError.Diagnosis.NodeToStatus.SetAbsentNodesStatus(fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "Preemption is not helpful for scheduling"))
 		// Specify nominatedNodeName to clear the pod's nominatedNodeName status, if applicable.
-		return framework.NewPostFilterResultWithNominatedNode(""), fwk.NewStatus(fwk.Unschedulable, fitError.Error())
+		return framework.NewPostFilterResult("", nil), fwk.NewStatus(fwk.Unschedulable, fitError.Error())
 	}
 
 	// 3) Interact with registered Extenders to filter out some candidates if needed.
@@ -335,7 +335,7 @@ func (ev *Evaluator) Preempt(ctx context.Context, state fwk.CycleState, pod *v1.
 		}
 	}
 
-	return framework.NewPostFilterResultWithNominatedNode(bestCandidate.Name()), fwk.NewStatus(fwk.Success)
+	return framework.NewPostFilterResult(bestCandidate.Name(), bestCandidate.Victims().Pods), fwk.NewStatus(fwk.Success)
 }
 
 // FindCandidates calculates a slice of preemption candidates.
