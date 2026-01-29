@@ -46,7 +46,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/volume/common"
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume/metrics"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
 	"k8s.io/kubernetes/pkg/util/slice"
 	vol "k8s.io/kubernetes/pkg/volume"
@@ -402,9 +401,6 @@ func (ctrl *PersistentVolumeController) updateVolumeMigrationAnnotationsAndFinal
 func modifyDeletionFinalizers(logger klog.Logger, cmpm CSIMigratedPluginManager, volume *v1.PersistentVolume) ([]string, bool) {
 	modified := false
 	var outFinalizers []string
-	if !utilfeature.DefaultFeatureGate.Enabled(features.HonorPVReclaimPolicy) {
-		return volume.Finalizers, false
-	}
 	if !metav1.HasAnnotation(volume.ObjectMeta, storagehelpers.AnnDynamicallyProvisioned) {
 		// PV deletion protection finalizer is currently supported only for dynamically
 		// provisioned volumes.
