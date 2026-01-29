@@ -533,7 +533,7 @@ func TestGenericStorageProviders(t *testing.T) {
 		switch kube[k].(type) {
 		case autoscalingrest.RESTStorageProvider,
 			batchrest.RESTStorageProvider,
-			discoveryrest.StorageProvider,
+			*discoveryrest.StorageProvider,
 			networkingrest.RESTStorageProvider,
 			noderest.RESTStorageProvider,
 			policyrest.RESTStorageProvider,
