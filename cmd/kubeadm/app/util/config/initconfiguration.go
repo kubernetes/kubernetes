@@ -380,11 +380,6 @@ func documentMapToInitConfiguration(gvkmap kubeadmapi.DocumentMap, allowDeprecat
 	// If ClusterConfiguration was given, populate it in the InitConfiguration struct
 	if clustercfg != nil {
 		initcfg.ClusterConfiguration = *clustercfg
-
-		// TODO: Workaround for missing v1beta3 ClusterConfiguration timeout conversion. Remove this conversion once the v1beta3 is removed
-		if clustercfg.APIServer.TimeoutForControlPlane.Duration != 0 && clustercfg.APIServer.TimeoutForControlPlane.Duration != kubeadmconstants.ControlPlaneComponentHealthCheckTimeout {
-			initcfg.Timeouts.ControlPlaneComponentHealthCheck.Duration = clustercfg.APIServer.TimeoutForControlPlane.Duration
-		}
 	} else {
 		// Populate the internal InitConfiguration.ClusterConfiguration with defaults
 		extclustercfg := &kubeadmapiv1.ClusterConfiguration{}
