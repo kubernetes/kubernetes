@@ -94,7 +94,7 @@ func TestGetPodList(t *testing.T) {
 
 	for i := range tests {
 		test := tests[i]
-		fake := fakeexternal.NewSimpleClientset(test.podList)
+		fake := fakeexternal.NewClientset(test.podList)
 		if len(test.watching) > 0 {
 			watcher := watch.NewFake()
 			for _, event := range test.watching {
@@ -254,7 +254,7 @@ func TestGetFirstPod(t *testing.T) {
 
 	for i := range tests {
 		test := tests[i]
-		fake := fakeexternal.NewSimpleClientset(test.podList)
+		fake := fakeexternal.NewClientset(test.podList)
 		if len(test.watching) > 0 {
 			watcher := watch.NewFake()
 			for _, event := range test.watching {
