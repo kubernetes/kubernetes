@@ -112,17 +112,14 @@ var _ = SIGDescribe("LocalStorageCapacityIsolationFSQuotaMonitoring", framework.
 
 const (
 	writeConcealedPodCommand = `
-my $file = "%s.bin";
-open OUT, ">$file" || die "Cannot open $file: $!\n";
-unlink "$file" || die "Cannot unlink $file: $!\n";
-my $a = "a";
-foreach (1..20) { $a = "$a$a"; }
-foreach (1..%d) { syswrite(OUT, $a); }
-sleep 999999;`
+exec 3>%s.bin || exit 1
+rm %s.bin || exit 1
+dd if=/dev/zero of=/proc/self/fd/3 bs=1M count=%d || exit 1
+sleep 999999`
 )
 
-// This is needed for testing eviction of pods using disk space in concealed files; the shell has no convenient
-// way of performing I/O to a concealed file, and the busybox image doesn't contain Perl.
+// This is needed for testing eviction of pods using disk space in concealed files.
+// Uses shell file descriptors to write to an unlinked file (concealed file).
 func diskConcealingPod(name string, diskConsumedMB int, volumeSource *v1.VolumeSource, resources v1.ResourceRequirements) *v1.Pod {
 	path := ""
 	volumeMounts := []v1.VolumeMount{}
@@ -139,12 +136,12 @@ func diskConcealingPod(name string, diskConsumedMB int, volumeSource *v1.VolumeS
 			RestartPolicy: v1.RestartPolicyNever,
 			Containers: []v1.Container{
 				{
-					Image: imageutils.GetE2EImage(imageutils.Perl),
+					Image: imageutils.GetE2EImage(imageutils.BusyBox),
 					Name:  fmt.Sprintf("%s-container", name),
 					Command: []string{
-						"perl",
-						"-e",
-						fmt.Sprintf(writeConcealedPodCommand, filepath.Join(path, "file"), diskConsumedMB),
+						"sh",
+						"-c",
+						fmt.Sprintf(writeConcealedPodCommand, filepath.Join(path, "file"), filepath.Join(path, "file"), diskConsumedMB),
 					},
 					Resources:    resources,
 					VolumeMounts: volumeMounts,
