@@ -1968,16 +1968,6 @@ func (PodStatus) SwaggerDoc() map[string]string {
 	return map_PodStatus
 }
 
-var map_PodStatusResult = map[string]string{
-	"":         "PodStatusResult is a wrapper for PodStatus returned by kubelet that can be encode/decoded",
-	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
-	"status":   "Most recently observed status of the pod. This data may not be up to date. Populated by the system. Read-only. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
-}
-
-func (PodStatusResult) SwaggerDoc() map[string]string {
-	return map_PodStatusResult
-}
-
 var map_PodTemplate = map[string]string{
 	"":         "PodTemplate describes a template for creating copies of a predefined pod.",
 	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",

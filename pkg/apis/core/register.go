@@ -54,7 +54,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&Pod{},
 		&PodList{},
-		&PodStatusResult{},
 		&PodTemplate{},
 		&PodTemplateList{},
 		&ReplicationControllerList{},

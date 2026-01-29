@@ -341,8 +341,6 @@ func (*PodSpec) ProtoMessage() {}
 
 func (*PodStatus) ProtoMessage() {}
 
-func (*PodStatusResult) ProtoMessage() {}
-
 func (*PodTemplate) ProtoMessage() {}
 
 func (*PodTemplateList) ProtoMessage() {}
