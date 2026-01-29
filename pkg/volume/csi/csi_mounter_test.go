@@ -1225,6 +1225,40 @@ func TestUnmounterTeardown(t *testing.T) {
 
 }
 
+func TestUnmounterTeardownWithVolumeFileNotExists(t *testing.T) {
+	plug, tmpDir := newTestPlugin(t, nil)
+	defer os.RemoveAll(tmpDir)
+	registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
+	pv := makeTestPV("test-pv", 10, testDriver, testVol)
+
+	// save the data file prior to unmount
+	targetDir := getTargetPath(testPodUID, pv.ObjectMeta.Name, plug.host)
+	dir := filepath.Join(targetDir, "mount")
+
+	// do a fake local mount
+	diskMounter := mount.NewSafeFormatAndMount(plug.host.GetMounter(), &testingexec.FakeExec{DisableScripts: true})
+	device := "/fake/device"
+	if goruntime.GOOS == "windows" {
+		// We need disk numbers on Windows.
+		device = "1"
+	}
+	if err := diskMounter.FormatAndMount(device, dir, "testfs", nil); err != nil {
+		t.Errorf("failed to mount dir [%s]: %v", dir, err)
+	}
+
+	unmounter, err := plug.NewUnmounter(pv.ObjectMeta.Name, testPodUID)
+	if err != nil {
+		t.Fatalf("failed to make a new Unmounter: %v", err)
+	}
+
+	csiUnmounter := unmounter.(*csiMountMgr)
+	csiUnmounter.csiClient = setupClient(t, true)
+	err = csiUnmounter.TearDownAt(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestUnmounterTeardownNoClientError(t *testing.T) {
 	transientError := volumetypes.NewTransientOperationFailure("")
 	plug, tmpDir := newTestPlugin(t, nil)
