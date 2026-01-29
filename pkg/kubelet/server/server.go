@@ -1190,8 +1190,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	servermetrics.HTTPInflightRequests.WithLabelValues(method, path, serverType, longRunning).Inc()
 	defer servermetrics.HTTPInflightRequests.WithLabelValues(method, path, serverType, longRunning).Dec()
 
-	startTime := time.Now()
-	defer servermetrics.HTTPRequestsDuration.WithLabelValues(method, path, serverType, longRunning).Observe(servermetrics.SinceInSeconds(startTime))
+	// Use ObserveSince to ensure the duration is calculated when the defer executes,
+	// not when it's declared. In Go, arguments to deferred functions are evaluated
+	// immediately at the defer statement, which would cause the metric to record
+	// near-zero values (~2 microseconds) instead of actual request handling time.
+	defer servermetrics.HTTPRequestsDuration.ObserveSince(time.Now(), method, path, serverType, longRunning)()
 
 	handler.ServeHTTP(w, req)
 }
