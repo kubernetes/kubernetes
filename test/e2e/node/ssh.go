@@ -110,9 +110,9 @@ var _ = SIGDescribe("SSH", func() {
 		}
 
 		// Quickly test that SSH itself errors correctly.
-		ginkgo.By("SSH'ing to a nonexistent host")
-		if _, err = e2essh.SSH(ctx, `echo "hello"`, "i.do.not.exist", framework.TestContext.Provider); err == nil {
-			framework.Failf("Expected error trying to SSH to nonexistent host.")
-		}
-	})
-})
+                ginkgo.By("SSH'ing to a nonexistent host")
+                _, err = e2essh.SSH(ctx, `echo "hello"`, "i.do.not.exist", framework.TestContext.Provider)
+                if err == nil {
+                        framework.Failf("Expected error trying to SSH to nonexistent host")
+                }
+
