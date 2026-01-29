@@ -31,6 +31,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/generated/openapi"
 )
 
@@ -105,7 +106,9 @@ func TestTypeChecking(t *testing.T) {
 				SchemaResolver: resolver.NewDefinitionsSchemaResolver(openapi.GetOpenAPIDefinitions, scheme.Scheme),
 				RestMapper:     testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme),
 			}
+			logger := klog.FromContext(ctx)
 			controller, err := NewController(
+				logger,
 				informerFactory.Admissionregistration().V1().ValidatingAdmissionPolicies(),
 				client.AdmissionregistrationV1().ValidatingAdmissionPolicies(),
 				typeChecker,

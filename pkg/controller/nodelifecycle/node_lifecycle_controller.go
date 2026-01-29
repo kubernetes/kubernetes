@@ -418,11 +418,11 @@ func NewNodeLifecycleController(
 
 	logger.Info("Controller will reconcile labels")
 	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: controllerutil.CreateAddNodeHandler(func(node *v1.Node) error {
+		AddFunc: controllerutil.CreateAddNodeHandler(logger, func(node *v1.Node) error {
 			nc.nodeUpdateQueue.Add(node.Name)
 			return nil
 		}),
-		UpdateFunc: controllerutil.CreateUpdateNodeHandler(func(_, newNode *v1.Node) error {
+		UpdateFunc: controllerutil.CreateUpdateNodeHandler(logger, func(_, newNode *v1.Node) error {
 			nc.nodeUpdateQueue.Add(newNode.Name)
 			return nil
 		}),
