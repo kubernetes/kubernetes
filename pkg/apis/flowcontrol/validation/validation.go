@@ -120,10 +120,10 @@ func ValidateFlowSchemaSpec(fsName string, spec *flowcontrol.FlowSchemaSpec, fld
 	}
 	if len(spec.PriorityLevelConfiguration.Name) > 0 {
 		for _, msg := range ValidatePriorityLevelConfigurationName(spec.PriorityLevelConfiguration.Name, false) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("priorityLevelConfiguration").Child("name"), spec.PriorityLevelConfiguration.Name, msg))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("priorityLevelConfiguration").Child("name"), spec.PriorityLevelConfiguration.Name, msg).WithOrigin("format=k8s-long-name").MarkCoveredByDeclarative())
 		}
 	} else {
-		allErrs = append(allErrs, field.Required(fldPath.Child("priorityLevelConfiguration").Child("name"), "must reference a priority level"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("priorityLevelConfiguration").Child("name"), "must reference a priority level").MarkCoveredByDeclarative())
 	}
 	for i, rule := range spec.Rules {
 		allErrs = append(allErrs, ValidateFlowSchemaPolicyRulesWithSubjects(&rule, fldPath.Child("rules").Index(i))...)
