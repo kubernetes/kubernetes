@@ -63046,7 +63046,7 @@ func schema_pkg_apis_audit_v1_GroupResources(ref common.ReferenceCallback) commo
 				Properties: map[string]spec.Schema{
 					"group": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Group is the name of the API group that contains the resources. The empty string represents the core API group.",
+							Description: "Group is the name of the API group that contains the resources. The empty string represents the core API group. `*` matches all groups",
 							Type:        []string{"string"},
 							Format:      "",
 						},
