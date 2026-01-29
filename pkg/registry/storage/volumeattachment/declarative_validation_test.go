@@ -27,9 +27,8 @@ import (
 	storage "k8s.io/kubernetes/pkg/apis/storage"
 )
 
-var apiVersions = []string{"v1", "v1alpha1", "v1beta1"}
-
 func TestDeclarativeValidate(t *testing.T) {
+	apiVersions := []string{"v1", "v1alpha1", "v1beta1"}
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {
 			testDeclarativeValidate(t, apiVersion)
@@ -38,6 +37,7 @@ func TestDeclarativeValidate(t *testing.T) {
 }
 
 func TestDeclarativeValidateUpdate(t *testing.T) {
+	apiVersions := []string{"v1", "v1alpha1", "v1beta1"}
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {
 			testDeclarativeValidateUpdate(t, apiVersion)
@@ -112,7 +112,7 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			oldInput: mkValidVolumeAttachment(),
 			newInput: mkValidVolumeAttachment(),
 		},
-		"immutable spec.attacher": {
+		"immutable spec": {
 			oldInput: mkValidVolumeAttachment(),
 			newInput: mkValidVolumeAttachment(TweakAttacher("different.com")),
 			expectedErrs: field.ErrorList{
