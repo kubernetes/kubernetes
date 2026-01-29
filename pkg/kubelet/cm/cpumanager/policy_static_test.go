@@ -2161,7 +2161,6 @@ func TestReleaseLeakedCPUs(t *testing.T) {
 				"test-pod-4": map[string]cpuset.CPUSet{
 					"initContainer-0": cpuset.New(0, 4),
 					"appContainer-0":  cpuset.New(1, 5, 2, 6),
-					"appContainer-0":  cpuset.New(1, 5, 2, 6),
 				},
 			},
 			stDefaultCPUSet: cpuset.New(3, 7),
