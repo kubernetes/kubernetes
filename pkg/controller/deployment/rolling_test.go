@@ -26,6 +26,7 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2/ktesting"
+	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 )
 
 func TestDeploymentController_reconcileNewReplicaSet(t *testing.T) {
@@ -346,7 +347,8 @@ func TestDeploymentController_scaleDownOldReplicaSetsForRollingUpdate(t *testing
 			eventRecorder: &record.FakeRecorder{},
 		}
 		_, ctx := ktesting.NewTestContext(t)
-		scaled, err := controller.scaleDownOldReplicaSetsForRollingUpdate(ctx, allRSs, oldRSs, deployment)
+		maxUnavailableValue := deploymentutil.MaxUnavailable(*deployment)
+		scaled, err := controller.scaleDownOldReplicaSetsForRollingUpdate(ctx, allRSs, oldRSs, deployment, maxUnavailableValue)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 			continue
