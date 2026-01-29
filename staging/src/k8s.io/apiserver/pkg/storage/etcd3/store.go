@@ -787,10 +787,9 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		})
 		if err != nil {
 			if errors.Is(err, etcdrpc.ErrFutureRev) {
-				currentRV, getRVErr := s.GetCurrentResourceVersion(ctx)
-				if getRVErr != nil {
-					// If we can't get the current RV, use 0 as a fallback.
-					currentRV = 0
+				currentRV, err := s.GetCurrentResourceVersion(ctx)
+				if err != nil {
+					return fmt.Errorf("failed to get the current Resource Version: %w", err)
 				}
 				return storage.NewTooLargeResourceVersionError(uint64(withRev), currentRV, 0)
 			}
