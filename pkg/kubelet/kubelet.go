@@ -2719,7 +2719,11 @@ func handleProbeSync(kl *Kubelet, update proberesults.Update, handler SyncHandle
 // a config source.
 func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 	start := kl.clock.Now()
-	sort.Sort(sliceutils.PodsByCreationTime(pods))
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodStartingOrderByPriority) {
+		sort.Sort(sliceutils.PodsByPriority(pods))
+	} else {
+		sort.Sort(sliceutils.PodsByCreationTime(pods))
+	}
 	var pendingResizes []types.UID
 	for _, pod := range pods {
 		// Always add the pod to the pod manager. Kubelet relies on the pod
