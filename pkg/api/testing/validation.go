@@ -31,6 +31,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"sigs.k8s.io/randfill"
 )
 
 // ValidateFunc is a function that runs validation.
@@ -88,6 +89,13 @@ func VerifyVersionedValidationEquivalence(t *testing.T, obj, old runtime.Object,
 	if internalObj == nil {
 		return
 	}
+	// We do fuzzing on the internal version of the object.
+	// This is because custom fuzzing function are only
+	// supported for internal objects.
+	// Fuzz the internal object if a fuzzer is provided.
+	if opts.Fuzzer != nil {
+		opts.Fuzzer.Fill(internalObj)
+	}
 	if old == nil {
 		runtimetest.RunValidationForEachVersion(t, legacyscheme.Scheme, []string{}, internalObj, accumulate, opts.IgnoreObjectConversionErrors, opts.SubResources...)
 	} else {
@@ -99,6 +107,10 @@ func VerifyVersionedValidationEquivalence(t *testing.T, obj, old runtime.Object,
 		}
 		if internalOld == nil {
 			return
+		}
+		// Fuzz the internal old object if a fuzzer is provided.
+		if opts.Fuzzer != nil {
+			opts.Fuzzer.Fill(internalOld)
 		}
 		runtimetest.RunUpdateValidationForEachVersion(t, legacyscheme.Scheme, []string{}, internalObj, internalOld, accumulate, opts.IgnoreObjectConversionErrors, opts.SubResources...)
 	}
@@ -205,6 +217,9 @@ type validationOption struct {
 	// IgnoreObjectConversions skips the tests if the conversion from the internal object
 	// to the versioned object fails.
 	IgnoreObjectConversionErrors bool
+
+	// Fuzzer is the fuzzer to use for generating test objects.
+	Fuzzer *randfill.Filler
 }
 
 func WithSubResources(subResources ...string) ValidationTestConfig {
@@ -222,6 +237,12 @@ func WithNormalizationRules(rules ...field.NormalizationRule) ValidationTestConf
 func WithIgnoreObjectConversionErrors() ValidationTestConfig {
 	return func(o *validationOption) {
 		o.IgnoreObjectConversionErrors = true
+	}
+}
+
+func WithFuzzer(fuzzer *randfill.Filler) ValidationTestConfig {
+	return func(o *validationOption) {
+		o.Fuzzer = fuzzer
 	}
 }
 
