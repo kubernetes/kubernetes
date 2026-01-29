@@ -48,7 +48,7 @@ func (kl *Kubelet) getCachedNode(ctx context.Context) (*v1.Node, error) {
 	}
 
 	if kl.cachedNode == nil {
-		kl.cachedNode = informerNode
+		kl.setCachedNode(informerNode)
 		return informerNode, nil
 	}
 
@@ -56,10 +56,10 @@ func (kl *Kubelet) getCachedNode(ctx context.Context) (*v1.Node, error) {
 	if err != nil {
 		// In error cases, default to the informer node.
 		logger.Error(err, "failed to check if node is newer; using informer node")
-		kl.cachedNode = informerNode
+		kl.setCachedNode(informerNode)
 	}
 	if isNewer {
-		kl.cachedNode = informerNode
+		kl.setCachedNode(informerNode)
 	}
 	return kl.cachedNode, nil
 }
@@ -74,8 +74,16 @@ func (kl *Kubelet) getNodeSync() (*v1.Node, error) {
 	if err != nil {
 		return nil, err
 	}
-	kl.cachedNode = node
+	kl.setCachedNode(node)
 	return node, nil
+}
+
+// setCachedNode updates both the Node object cache and the NodeInfo cache.
+func (kl *Kubelet) setCachedNode(node *v1.Node) {
+	kl.cachedNode = node
+	if kl.nodeInfoCache != nil {
+		kl.nodeInfoCache.SetNode(node)
+	}
 }
 
 // isNewer checks if the informer node is newer than the cached node based on the ResourceVersion.

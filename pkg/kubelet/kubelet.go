@@ -107,6 +107,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/metrics/collectors"
 	"k8s.io/kubernetes/pkg/kubelet/network/dns"
+	"k8s.io/kubernetes/pkg/kubelet/nodeinfocache"
 	"k8s.io/kubernetes/pkg/kubelet/nodeshutdown"
 	oomwatcher "k8s.io/kubernetes/pkg/kubelet/oom"
 	"k8s.io/kubernetes/pkg/kubelet/pleg"
@@ -701,6 +702,11 @@ func NewMainKubelet(ctx context.Context,
 		kubeDeps.Recorder,
 	)
 
+	// Initialize NodeInfo cache for efficient pod admission.
+	// The node will be set when GetCachedNode is first called.
+	// Pods will be added incrementally via HandlePodAdditions.
+	klet.nodeInfoCache = nodeinfocache.New()
+
 	klet.resourceAnalyzer = serverstats.NewResourceAnalyzer(ctx, klet, kubeCfg.VolumeStatsAggPeriod.Duration, kubeDeps.Recorder)
 
 	klet.runtimeService = kubeDeps.RemoteRuntimeService
@@ -1064,7 +1070,7 @@ func NewMainKubelet(ctx context.Context,
 	handlers = append(handlers, klet.containerManager.GetAllocateResourcesPodAdmitHandler())
 
 	criticalPodAdmissionHandler := preemption.NewCriticalPodAdmissionHandler(klet.getAllocatedPods, killPodNow(klet.podWorkers, kubeDeps.Recorder), kubeDeps.Recorder)
-	handlers = append(handlers, lifecycle.NewPredicateAdmitHandler(klet.GetCachedNode, criticalPodAdmissionHandler, klet.containerManager.UpdatePluginResources))
+	handlers = append(handlers, lifecycle.NewPredicateAdmitHandler(klet.GetCachedNode, criticalPodAdmissionHandler, klet.containerManager.UpdatePluginResources, klet.nodeInfoCache))
 	// apply functional Option's
 	for _, opt := range kubeDeps.Options {
 		opt(klet)
@@ -1245,6 +1251,10 @@ type Kubelet struct {
 
 	// allocationManager manages allocated resources for pods.
 	allocationManager allocation.Manager
+
+	// nodeInfoCache caches NodeInfo for efficient pod admission.
+	// Updated incrementally when pods are added/removed/updated.
+	nodeInfoCache *nodeinfocache.Cache
 
 	// podCertificateManager is fed updates as pods are added and removed from
 	// the node, and requests certificates for them based on their configured
@@ -2765,6 +2775,8 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 				recordAdmissionRejection(reason)
 				continue
 			}
+			// Update NodeInfo cache after successful admission
+			kl.nodeInfoCache.AddPod(pod)
 
 			if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 				// Backfill the queue of pending resizes, but only after all the pods have
@@ -2801,6 +2813,10 @@ func (kl *Kubelet) HandlePodUpdates(logger klog.Logger, pods []*v1.Pod) {
 	for _, pod := range pods {
 		oldPod, _ := kl.podManager.GetPodByUID(pod.UID)
 		kl.podManager.UpdatePod(pod)
+		// Update NodeInfo cache if pod resources may have changed
+		if oldPod != nil {
+			kl.nodeInfoCache.UpdatePod(logger, oldPod, pod)
+		}
 
 		pod, mirrorPod, wasMirror := kl.podManager.GetPodAndMirrorPod(pod)
 		if wasMirror {
@@ -2946,9 +2962,12 @@ func resizeOperationForResources(new, old *resource.Quantity) string {
 // being removed from a config source.
 func (kl *Kubelet) HandlePodRemoves(pods []*v1.Pod) {
 	start := kl.clock.Now()
+	logger := klog.FromContext(context.TODO())
 	for _, pod := range pods {
 		kl.podCertificateManager.ForgetPod(context.TODO(), pod)
 		kl.podManager.RemovePod(pod)
+		// Remove from NodeInfo cache
+		kl.nodeInfoCache.RemovePod(logger, pod)
 		kl.allocationManager.RemovePod(pod.UID)
 
 		pod, mirrorPod, wasMirror := kl.podManager.GetPodAndMirrorPod(pod)
