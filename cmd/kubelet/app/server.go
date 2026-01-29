@@ -70,8 +70,10 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	eventsv1 "k8s.io/client-go/kubernetes/typed/events/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/tools/record"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/certificate"
@@ -521,6 +523,7 @@ func UnsecuredDependencies(ctx context.Context, s *options.KubeletServer, featur
 		KubeClient:          nil,
 		HeartbeatClient:     nil,
 		EventClient:         nil,
+		EventClientV1:       nil,
 		TracerProvider:      tp,
 		HostUtil:            hu,
 		Mounter:             mounter,
@@ -593,6 +596,12 @@ func makeEventRecorder(ctx context.Context, kubeDeps *kubelet.Dependencies, node
 		eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeDeps.EventClient.Events("")})
 	} else {
 		logger.Info("No api server defined - no events will be sent to API server")
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.ImageManagerEventRecorder) && kubeDeps.NewRecorder == nil {
+		broadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: kubeDeps.EventClientV1})
+		kubeDeps.NewRecorder = broadcaster.NewRecorder(legacyscheme.Scheme, server.ComponentKubelet)
+		broadcaster.StartRecordingToSink(ctx.Done())
 	}
 }
 
@@ -689,6 +698,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 	case standaloneMode:
 		kubeDeps.KubeClient = nil
 		kubeDeps.EventClient = nil
+		kubeDeps.EventClientV1 = nil
 		kubeDeps.HeartbeatClient = nil
 		logger.Info("Standalone mode, no API client")
 
@@ -714,6 +724,10 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		kubeDeps.EventClient, err = v1core.NewForConfig(&eventClientConfig)
 		if err != nil {
 			return fmt.Errorf("failed to initialize kubelet event client: %w", err)
+		}
+		kubeDeps.EventClientV1, err = eventsv1.NewForConfig(&eventClientConfig)
+		if err != nil {
+			return fmt.Errorf("failed to initialize kubelet event client v1: %w", err)
 		}
 
 		// make a separate client for heartbeat with throttling disabled and a timeout attached

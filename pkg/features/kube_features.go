@@ -400,6 +400,11 @@ const (
 	// Enables In-Place Pod Vertical Scaling
 	InPlacePodVerticalScaling featuregate.Feature = "InPlacePodVerticalScaling"
 
+	// owner: @xinyunliu
+	//
+	// Enables the event recorder for image manager
+	ImageManagerEventRecorder featuregate.Feature = "ImageManagerEventRecorder"
+
 	// owner: @tallclair
 	// kep: http://kep.k8s.io/1287
 	//
@@ -1329,6 +1334,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	ImageManagerEventRecorder: {
+		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
+	},
+
 	ImageMaximumGCAge: {
 		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.Beta},
@@ -2207,6 +2216,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	HonorPVReclaimPolicy: {},
 
 	HostnameOverride: {},
+
+	ImageManagerEventRecorder: {},
 
 	ImageMaximumGCAge: {},
 
