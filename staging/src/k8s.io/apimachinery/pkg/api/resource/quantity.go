@@ -313,7 +313,12 @@ func ParseQuantity(str string) (Quantity, error) {
 		}
 	}
 
-	if precision >= 0 {
+	// Allow the fast int64 path for:
+	// - precision >= 0 (values well within int64 range)
+	// - precision == -1 for decimal formats (handles 19-digit numbers like math.MaxInt64)
+	//   For precision == -1, strconv.ParseInt may fail for values > MaxInt64, in which case
+	//   we fall through to inf.Dec parsing instead of returning an error
+	if precision >= 0 || (precision == -1 && (format == DecimalExponent || format == DecimalSI)) {
 		// if we have a denominator, shift the entire value to the left by the number of places in the
 		// denominator
 		scale -= int32(len(denom))
@@ -323,6 +328,11 @@ func ParseQuantity(str string) (Quantity, error) {
 			var value int64
 			value, err := strconv.ParseInt(shifted, 10, 64)
 			if err != nil {
+				// For precision == -1, the value might be a 19-digit number that exceeds MaxInt64.
+				// In this case, fall through to inf.Dec parsing instead of returning an error.
+				if precision < 0 {
+					goto infDecParsing
+				}
 				return Quantity{}, ErrNumeric
 			}
 			if result, ok := int64Multiply(value, int64(mantissa)); ok {
@@ -344,6 +354,8 @@ func ParseQuantity(str string) (Quantity, error) {
 			}
 		}
 	}
+
+infDecParsing:
 
 	amount := new(inf.Dec)
 	if _, ok := amount.SetString(value); !ok {
