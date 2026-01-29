@@ -250,6 +250,8 @@ func (p *Plugins) Names() []string {
 		p.PostBind,
 		p.Permit,
 		p.QueueSort,
+		p.PlacementGenerate,
+		p.PlacementScore,
 	}
 	n := sets.New[string]()
 	for _, e := range extensions {

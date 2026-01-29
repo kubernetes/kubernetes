@@ -258,6 +258,10 @@ type Framework interface {
 	// code=5("skip") status.
 	RunBindPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status
 
+	// RunPlacementGeneratorPlugins runs the set of configured PlacementGenerator plugins.
+	// It returns the combined list of generated Placements.
+	RunPlacementGeneratorPlugins(ctx context.Context, state fwk.PodGroupCycleState, podGroup *fwk.PodGroupInfo, initialParents []*fwk.PlacementInfo) ([]*fwk.PlacementInfo, *fwk.Status)
+
 	// HasFilterPlugins returns true if at least one Filter plugin is defined.
 	HasFilterPlugins() bool
 
