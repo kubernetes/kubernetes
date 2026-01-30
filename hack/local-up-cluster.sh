@@ -424,6 +424,13 @@ function detect_binary {
 cleanup()
 {
   echo "Cleaning up..."
+
+  # Capture CoreDNS logs before shutting down (useful for debugging DNS issues)
+  if [[ "${ENABLE_CLUSTER_DNS}" == true ]]; then
+    echo "Capturing CoreDNS logs..."
+    ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" logs -n kube-system -l k8s-app=kube-dns --all-containers > "${LOG_DIR}/coredns.log" 2>&1 || true
+  fi
+
   # delete running images
   # if [[ "${ENABLE_CLUSTER_DNS}" == true ]]; then
   # Still need to figure why this commands throw an error: Error from server: client: etcd cluster is unavailable or misconfigured
@@ -839,27 +846,6 @@ function wait_node_ready(){
 function wait_coredns_available(){
   if [[ -n "${DRY_RUN}" ]]; then
     return
-  fi
-
-  local interval_time=2
-  local coredns_wait_time=300
-
-  # kick the coredns pods to be recreated
-  ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" -n kube-system delete pods -l k8s-app=kube-dns
-  sleep 30
-
-  local coredns_pods_ready="${KUBECTL} --kubeconfig '${CERT_DIR}/admin.kubeconfig' wait --for=condition=Ready --timeout=60s pods -l k8s-app=kube-dns -n kube-system"
-  kube::util::wait_for_success "$coredns_wait_time" "$interval_time" "$coredns_pods_ready"
-  if [ $? == "1" ]; then
-    echo "time out on waiting for coredns pods"
-    exit 1
-  fi
-
-  local coredns_available="${KUBECTL} --kubeconfig '${CERT_DIR}/admin.kubeconfig' wait --for=condition=Available --timeout=60s deployments coredns -n kube-system"
-  kube::util::wait_for_success "$coredns_wait_time" "$interval_time" "$coredns_available"
-  if [ $? == "1" ]; then
-    echo "time out on waiting for coredns deployment"
-    exit 1
   fi
 
   if [[ "${ENABLE_DAEMON}" = false ]]; then
@@ -1318,8 +1304,12 @@ function install_cni {
         \) \
         -delete
 
-  # containerd in kubekins supports CNI version 0.4.0
-  echo "Configuring cni"
+  # Configure CNI using ptp (point-to-point) plugin instead of bridge.
+  # ptp creates direct veth pairs between pods and host namespace, which
+  # avoids the need for br_netfilter and bridge-nf-call-iptables settings
+  # that are unreliable in docker-in-docker environments.
+  # This approach is proven to work reliably by KIND (Kubernetes IN Docker).
+  echo "Configuring cni (ptp mode)"
   sudo mkdir -p "$CNI_CONFIG_DIR"
   cat << EOF | sudo tee "$CNI_CONFIG_DIR"/10-containerd-net.conflist
 {
@@ -1327,11 +1317,8 @@ function install_cni {
  "name": "containerd-net",
  "plugins": [
    {
-     "type": "bridge",
-     "bridge": "cni0",
-     "isGateway": true,
+     "type": "ptp",
      "ipMasq": true,
-     "promiscMode": true,
      "ipam": {
        "type": "host-local",
        "ranges": [
@@ -1386,6 +1373,26 @@ if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then
 
   # configure shared mounts to prevent failure in DIND scenarios
   mount --make-rshared /
+
+  # Configure kernel network parameters for container networking.
+  # These settings are required for ptp CNI and iptables-based kube-proxy
+  # to work correctly in docker-in-docker environments.
+  # See KIND's network configuration for reference.
+  echo "Configuring kernel network parameters for DIND..."
+
+  # Enable route_localnet - allows routing to localhost addresses after NAT.
+  # Required for proper DNS resolution in containers.
+  echo 1 > /proc/sys/net/ipv4/conf/all/route_localnet
+
+  # Set arp_ignore=0 - required for ptp CNI which uses /32 addresses.
+  # Ensures ARP replies are sent for all local addresses.
+  echo 0 > /proc/sys/net/ipv4/conf/all/arp_ignore
+
+  # Ensure IP forwarding is enabled for pod-to-pod traffic
+  echo 1 > /proc/sys/net/ipv4/ip_forward
+  echo 1 > /proc/sys/net/ipv6/conf/all/forwarding 2>/dev/null || true
+
+  echo "Kernel network parameters configured"
 
   # to use containerd as kubelet container runtime we need to install cni
   install_cni 
