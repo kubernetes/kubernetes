@@ -624,6 +624,11 @@ func (pqi *QueuedPodInfo) DeepCopy() *QueuedPodInfo {
 	}
 }
 
+func (pqi *QueuedPodInfo) Update(pod *v1.Pod) error {
+	pqi.PodSignature = nil
+	return pqi.PodInfo.Update(pod)
+}
+
 // ClearRejectorPlugins clears the plugin-related fields that track why a pod
 // was rejected in a previous scheduling attempt.
 func (pqi *QueuedPodInfo) ClearRejectorPlugins() {
