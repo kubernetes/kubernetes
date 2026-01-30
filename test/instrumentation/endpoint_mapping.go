@@ -91,7 +91,15 @@ func (c *endpointMappingConfig) isSharedPath(filePath string) bool {
 }
 
 func (c *endpointMappingConfig) inferComponent(filePath string, components map[string][]string) string {
-	for component, patterns := range components {
+	// Sort component names for deterministic iteration order
+	componentNames := make([]string, 0, len(components))
+	for name := range components {
+		componentNames = append(componentNames, name)
+	}
+	sort.Strings(componentNames)
+
+	for _, component := range componentNames {
+		patterns := components[component]
 		for _, pattern := range patterns {
 			if strings.Contains(filePath, pattern) {
 				return component
