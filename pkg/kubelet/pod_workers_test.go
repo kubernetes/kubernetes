@@ -105,6 +105,12 @@ func (f *fakePodWorkers) IsPodKnownTerminated(uid types.UID) bool {
 	defer f.statusLock.Unlock()
 	return f.terminated[uid]
 }
+func (f *fakePodWorkers) IsPodKnownToWorker(uid types.UID) bool {
+	f.statusLock.Lock()
+	defer f.statusLock.Unlock()
+	// In tests, a pod is known if it's in any of the tracking maps
+	return f.running[uid] || f.terminating[uid] || f.terminated[uid]
+}
 func (f *fakePodWorkers) CouldHaveRunningContainers(uid types.UID) bool {
 	f.statusLock.Lock()
 	defer f.statusLock.Unlock()
