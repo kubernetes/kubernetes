@@ -36,6 +36,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/version"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/dynamic-resource-allocation/resourceslice"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	drautils "k8s.io/kubernetes/test/e2e/dra/utils"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -51,40 +52,37 @@ func init() {
 	ktesting.SetDefaultVerbosity(2)
 }
 
-// The overall flow of upgrade/downgrade testing is always the same:
-//
-//   - Bring up a cluster with the previous release.
-//   - "Install" the test DRA driver with 8 devices for the one node in the cluster.
-//     There is a DeviceClass for it.
-//   - Step 1: run some test code.
-//   - Upgrade the cluster to the current code.
-//   - Step 2: run some more test code.
-//   - Downgrade to the previous release again.
-//   - Step 3: run some final test code.
-//
-// The "test code" gets registered here with a single function for each
-// sub-test. That function then returns the next piece of code, which then
-// returns the final code. Each callback function is executed as a sub-test.
-// The builder is configured to not delete objects when that sub-test ends,
-// so objects persist until the entire test is done. The same DRA driver
-// is used for all sub-tests.
-//
-// Each sub-test must be self-contained. They intentionally run in a random
-// order. However, they share the same cluster and the 8 devices which are
-// available there.
-var subTests = map[string]initialTestFunc{
-	"core DRA":                    coreDRA,
-	"ResourceClaim device status": resourceClaimDeviceStatus,
-	"DeviceTaints":                deviceTaints,
-	"ExplicitExtendedResource":    extendedResourceUpgradeDowngrade(resourceTypeExplicit),
-	"ImplicitExtendedResource":    extendedResourceUpgradeDowngrade(resourceTypeImplicit),
-}
-
 type initialTestFunc func(tCtx ktesting.TContext, builder *drautils.Builder) upgradedTestFunc
 
 type upgradedTestFunc func(tCtx ktesting.TContext) downgradedTestFunc
 
 type downgradedTestFunc func(tCtx ktesting.TContext)
+
+// countSlices returns how many ResourceSlices will be created for a given
+// set of driver resources (one per slice in each pool in each entry).
+func countSlices(driverResources map[string]resourceslice.DriverResources) int {
+	n := 0
+	for _, dr := range driverResources {
+		for _, pool := range dr.Pools {
+			n += len(pool.Slices)
+		}
+	}
+	return n
+}
+
+// waitForSlices waits for a driver's ResourceSlices to be recreated.
+func waitForSlices(tCtx ktesting.TContext, name string, b *drautils.Builder, driverResources map[string]resourceslice.DriverResources) {
+	if driverResources == nil {
+		// Skip waiting for the slices to be ready.
+		// Still each test might have its own slices, and they should be handled in each test.
+		return
+	}
+	numSlices := countSlices(driverResources)
+	tCtx.WithStep(fmt.Sprintf("wait for %s ResourceSlices", name)).
+		Eventually(b.Driver.NewGetSlices()).
+		WithTimeout(5 * time.Minute).
+		Should(gomega.HaveField("Items", gomega.HaveLen(numSlices)))
+}
 
 var repoRoot = repoRootDefault()
 
@@ -215,7 +213,7 @@ func testUpgradeDowngrade(tCtx ktesting.TContext) {
 		cluster = localupcluster.New(tCtx)
 		localUpClusterEnv := map[string]string{
 			"RUNTIME_CONFIG": "resource.k8s.io/v1beta1,resource.k8s.io/v1beta2,resource.k8s.io/v1alpha3",
-			"FEATURE_GATES":  "DynamicResourceAllocation=true,DRADeviceTaintRules=true,DRADeviceTaints=true,DRAExtendedResource=true",
+			"FEATURE_GATES":  "DynamicResourceAllocation=true,DRADeviceTaintRules=true,DRADeviceTaints=true,DRAExtendedResource=true,DRAPartitionableDevices=true",
 			// *not* needed because driver will run in "local filesystem" mode (= driver.IsLocal): "ALLOW_PRIVILEGED": "1",
 		}
 		cluster.Start(tCtx, binDir, localUpClusterEnv)
@@ -231,36 +229,99 @@ func testUpgradeDowngrade(tCtx ktesting.TContext) {
 		nodes = drautils.NewNodesNow(tCtx, 1, 1)
 	})
 
-	// Opening sockets locally avoids intermittent errors and delays caused by proxying through the restarted apiserver.
-	// We could speed up testing by shortening the sync delay in the ResourceSlice controller, but let's better
-	// test the defaults.
-	driver := drautils.NewDriverInstance(tCtx)
-	driver.IsLocal = true
-	driver.Run(tCtx, "/var/lib/kubelet", nodes, drautils.DriverResourcesNow(nodes, 8))
-	b := drautils.NewBuilderNow(tCtx, driver)
-	b.SkipCleanup = true
+	// The overall flow of upgrade/downgrade testing is always the same:
+	//
+	//   - Bring up a cluster with the previous release.
+	//   - "Install" test DRA drivers for the one node in the cluster.
+	//     There is a DeviceClass for it.
+	//   - Step 1: run test code on the previous release.
+	//   - Upgrade the cluster to the current code.
+	//   - Step 2: run test code on the upgraded cluster.
+	//   - Downgrade the cluster back to the previous release.
+	//   - Step 3: run test code on the downgraded cluster.
+	//
+	// The "test code" gets registered here with a single function for each
+	// sub-test. That function then returns the next piece of code, which then
+	// returns the final code. Each callback function is executed as a sub-test.
+	// The builder is configured to not delete objects when that sub-test ends,
+	// so objects persist until the entire test is done.
+	//
+	// Each sub-test may provide driverResources to define the
+	// ResourceSlices the driver publishes. After upgrade/downgrade,
+	// kubelet wipes all slices; the framework automatically waits for
+	// them to be re-created. Sub-tests with nil driverResources can manage
+	// their own slices, but must wait for slice re-creation themselves
+	// after upgrade/downgrade.
+	//
+	// Sub-tests run in an unspecified order due to map iteration, so each
+	// must be self-contained. They share the same cluster but each has its
+	// own driver and devices.
+	var subTests = map[string]struct {
+		test            initialTestFunc
+		driverResources map[string]resourceslice.DriverResources
+	}{
+		"core-dra": {
+			test:            coreDRA,
+			driverResources: coreDRAResources(nodes),
+		},
+		"resource-claim-device-status": {
+			test: resourceClaimDeviceStatus,
+		},
+		"device-taints": {
+			test: deviceTaints,
+		},
+		"partitionable-devices": {
+			test:            partitionableDevices,
+			driverResources: partitionableDeviceResources(nodes),
+		},
+		"extended-resource-explicit": {
+			test:            extendedResourceUpgradeDowngrade(resourceTypeExplicit),
+			driverResources: extendedResourcesDriverResources(nodes),
+		},
+		"extended-resource-implicit": {
+			test:            extendedResourceUpgradeDowngrade(resourceTypeImplicit),
+			driverResources: extendedResourcesDriverResources(nodes),
+		},
+	}
+
+	// Create a driver and builder for each sub-test. Opening sockets locally
+	// avoids intermittent errors and delays caused by proxying through the
+	// restarted apiserver. Builders are created on the outer tCtx so that
+	// cleanup runs at the end of the entire test, not at the end of a
+	// sub-test step.
+	builders := make(map[string]*drautils.Builder, len(subTests))
+	for name, def := range subTests {
+		d := drautils.NewDriverInstance(tCtx)
+		d.SetNameSuffix(tCtx, name)
+		d.IsLocal = true
+		d.Run(tCtx, "/var/lib/kubelet", nodes, def.driverResources)
+		b := drautils.NewBuilderNow(tCtx, d)
+		b.SkipCleanup = true
+		builders[name] = b
+	}
 
 	upgradedTestFuncs := make(map[string]upgradedTestFunc, len(subTests))
 	tCtx.Run("after-cluster-creation", func(tCtx ktesting.TContext) {
-		for subTest, f := range subTests {
+		for subTest, def := range subTests {
 			tCtx.Run(subTest, func(tCtx ktesting.TContext) {
-				// This only gets set if f doesn't panic because of a fatal error,
+				// This only gets set if def.test doesn't panic because of a fatal error,
 				// so below we won't continue if step 1 already failed.
 				// Other sub-tests are not affected.
-				upgradedTestFuncs[subTest] = f(tCtx, b)
+				upgradedTestFuncs[subTest] = def.test(tCtx, builders[subTest])
 			})
 		}
 	})
-	numSlices := len(driver.NewGetSlices()(tCtx).Items)
 
 	// We could split this up into first updating the apiserver, then control plane components, then restarting kubelet.
 	// For the purpose of this test here we we primarily care about full before/after comparisons, so not done yet.
 	// TODO
 	restoreOptions := cluster.Modify(tCtx.WithStep(fmt.Sprintf("update to %s", gitVersion)), localupcluster.ModifyOptions{Upgrade: true, BinDir: dir})
 
-	// The kubelet wipes all ResourceSlices on a restart because it doesn't know which drivers were running.
-	// Wait for the ResourceSlice controller in the driver to notice and recreate the ResourceSlices.
-	tCtx.WithStep("wait for ResourceSlices").Eventually(driver.NewGetSlices()).WithTimeout(5 * time.Minute).Should(gomega.HaveField("Items", gomega.HaveLen(numSlices)))
+	// kubelet wipes all resource slices because it doesn't know which drivers were running.
+	// We need to wait for them to be recreated.
+	for name, b := range builders {
+		waitForSlices(tCtx, name, b, subTests[name].driverResources)
+	}
 
 	downgradedTestFuncs := make(map[string]downgradedTestFunc, len(subTests))
 	tCtx.Run("after-cluster-upgrade", func(tCtx ktesting.TContext) {
@@ -273,6 +334,12 @@ func testUpgradeDowngrade(tCtx ktesting.TContext) {
 
 	// Roll back.
 	cluster.Modify(tCtx.WithStep("downgrade"), restoreOptions)
+
+	// kubelet wipes all resource slices because it doesn't know which drivers were running.
+	// We need to wait for them to be recreated.
+	for name, b := range builders {
+		waitForSlices(tCtx, name, b, subTests[name].driverResources)
+	}
 
 	tCtx.Run("after-cluster-downgrade", func(tCtx ktesting.TContext) {
 		for subTest, f := range downgradedTestFuncs {
@@ -318,38 +385,6 @@ func sourceVersion(tCtx ktesting.TContext, kubeRoot string) (gitVersion string, 
 	}
 	return
 }
-
-// func runCmdIn(tCtx ktesting.TContext, dir string, name string, args ...string) string {
-// 	tCtx.Helper()
-// 	tCtx.Logf("Running command: %s %s", name, strings.Join(args, " "))
-// 	cmd := exec.CommandContext(tCtx, name, args...)
-// 	cmd.Dir = dir
-// 	var output strings.Builder
-// 	reader, writer := io.Pipe()
-// 	cmd.Stdout = writer
-// 	cmd.Stderr = writer
-// 	tCtx.ExpectNoError(cmd.Start(), "start %s command", name)
-// 	scanner := bufio.NewScanner(reader)
-// 	var wg sync.WaitGroup
-// 	wg.Add(1)
-// 	go func() {
-// 		defer wg.Done()
-// 		for scanner.Scan() {
-// 			line := scanner.Text()
-// 			line = strings.TrimSuffix(line, "\n")
-// 			tCtx.Logf("%s: %s", name, line)
-// 			output.WriteString(line)
-// 			output.WriteByte('\n')
-// 		}
-// 	}()
-// 	result := cmd.Wait()
-// 	tCtx.ExpectNoError(writer.Close(), "close in-memory pipe")
-// 	wg.Wait()
-// 	tCtx.ExpectNoError(result, fmt.Sprintf("%s command failed, output:\n%s", name, output.String()))
-// 	tCtx.ExpectNoError(scanner.Err(), "read %s command output", name)
-
-// 	return output.String()
-// }
 
 // serverDownloadURL constructs a download URL for a Kubernetes server tarball based on the given
 // prefix, major, and minor version numbers. It performs an HTTP GET request to retrieve the version

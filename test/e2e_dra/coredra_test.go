@@ -23,10 +23,15 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/dynamic-resource-allocation/resourceslice"
 	drautils "k8s.io/kubernetes/test/e2e/dra/utils"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
+
+func coreDRAResources(nodes *drautils.Nodes) map[string]resourceslice.DriverResources {
+	return drautils.DriverResourcesNow(nodes, 8)
+}
 
 func coreDRA(tCtx ktesting.TContext, b *drautils.Builder) upgradedTestFunc {
 	namespace := tCtx.Namespace()
