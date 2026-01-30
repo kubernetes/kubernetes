@@ -586,6 +586,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			FSGroupChangePolicy: fsGroupChangePolicy,
 			Recorder:            og.recorder,
 			SELinuxLabel:        volumeToMount.SELinuxLabel,
+			ReconstructedVolume: actualStateOfWorld.IsVolumeReconstructed(volumeToMount.VolumeName, volumeToMount.PodName),
 		})
 		// Update actual state of world
 		markOpts := MarkVolumeOpts{

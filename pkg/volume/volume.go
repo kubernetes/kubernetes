@@ -138,6 +138,7 @@ type MounterArgs struct {
 	// Optional interface that will be used to change the ownership of the volume, if specified.
 	// mainly used by unit tests
 	VolumeOwnershipApplicator VolumeOwnershipChanger
+	ReconstructedVolume       bool
 }
 
 type VolumeOwnershipChanger interface {
