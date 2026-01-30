@@ -52,7 +52,7 @@ func TestContainerMapCloneUnshared(t *testing.T) {
 	// check the original copy didn't change
 	// early sanity check, random ID, no special meaning
 	podUIDRedo, containerNameRedo, err2 := cm.GetContainerRef("fakeContainerID-C")
-	if err != nil {
+	if err2 != nil {
 		t.Fatalf("unexpected error: %v", err2)
 	}
 	if podUIDRedo != "fakePodUID-2" || containerNameRedo != "fakeContainerName-c2" {
