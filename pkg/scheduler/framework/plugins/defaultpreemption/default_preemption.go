@@ -65,6 +65,11 @@ type MoreImportantPodFunc func(pod1, pod2 *v1.Pod) bool
 
 type MoreImportantVictimFunc func(victim1, victim2 preemption.PreemptionUnit) bool
 
+type CanPlacePodsFunc func(ctx context.Context,
+	state fwk.CycleState,
+	pods []*v1.Pod,
+	nodes []fwk.NodeInfo) *fwk.Status
+
 // DefaultPreemption is a PostFilter plugin implements the preemption logic.
 type DefaultPreemption struct {
 	fh        fwk.Handle
@@ -87,6 +92,8 @@ type DefaultPreemption struct {
 	MoreImportantPod MoreImportantPodFunc
 
 	MoreImportantVictim MoreImportantVictimFunc
+
+	CanPlacePods CanPlacePodsFunc
 }
 
 var _ fwk.PostFilterPlugin = &DefaultPreemption{}
@@ -128,6 +135,19 @@ func New(_ context.Context, dpArgs runtime.Object, fh fwk.Handle, fts feature.Fe
 	pl.MoreImportantPod = util.MoreImportantPod
 
 	pl.MoreImportantVictim = MoreImportantVictim
+
+	pl.CanPlacePods = func(
+		ctx context.Context,
+		state fwk.CycleState,
+		pods []*v1.Pod,
+		nodes []fwk.NodeInfo,
+	) *fwk.Status {
+		if len(pods) == 1 && len(nodes) == 1 {
+			return pl.fh.RunFilterPluginsWithNominatedPods(ctx, state, pods[0], nodes[0])
+		}
+
+		return nil
+	}
 
 	return &pl, nil
 }
@@ -347,6 +367,10 @@ func (pl *DefaultPreemption) SelectVictimsOnDomain(
 	pdbs []*policy.PodDisruptionBudget) ([]*v1.Pod, int, *fwk.Status) {
 	logger := klog.FromContext(ctx)
 	var potentialVictims []preemption.PreemptionUnit
+	nodeToName := make(map[string]fwk.NodeInfo)
+	for _, nodeInfo := range domain.Nodes() {
+		nodeToName[nodeInfo.Node().Name] = nodeInfo
+	}
 
 	piToPods := func(pis []fwk.PodInfo) []*v1.Pod {
 		var pods []*v1.Pod
@@ -357,10 +381,8 @@ func (pl *DefaultPreemption) SelectVictimsOnDomain(
 	}
 
 	removePods := func(pu preemption.PreemptionUnit) error {
-		nodes := pu.AffectedNodes()
-
 		for _, pi := range pu.Pods() {
-			nodeInfo := nodes[pi.GetPod().Spec.NodeName] // TODO: what if it's nominated?
+			nodeInfo := nodeToName[pi.GetPod().Spec.NodeName] // TODO: what if it's nominated?
 			if err := nodeInfo.RemovePod(logger, pi.GetPod()); err != nil {
 				return err
 			}
@@ -373,10 +395,8 @@ func (pl *DefaultPreemption) SelectVictimsOnDomain(
 		return nil
 	}
 	addPods := func(pu preemption.PreemptionUnit) error {
-		nodes := pu.AffectedNodes()
-
 		for _, pi := range pu.Pods() {
-			nodeInfo := nodes[pi.GetPod().Spec.NodeName]
+			nodeInfo := nodeToName[pi.GetPod().Spec.NodeName]
 			nodeInfo.AddPodInfo(pi)
 			status := pl.runPreFilterExtension(ctx, state, preemptor.Members(), pi, nodeInfo, pl.fh.RunPreFilterExtensionAddPod) // TODO: not sure, I believe it should for preeptor on PreFilter plugign level
 			if !status.IsSuccess() {
@@ -400,6 +420,13 @@ func (pl *DefaultPreemption) SelectVictimsOnDomain(
 	}
 
 	for _, victim := range potentialVictims {
+		for key, val := range victim.AffectedNodes() {
+			_, ok := nodeToName[key]
+			if !ok {
+				nodeToName[key] = val
+			}
+		}
+
 		if err := removePods(victim); err != nil {
 			return nil, 0, fwk.AsStatus(err)
 		}
@@ -408,7 +435,7 @@ func (pl *DefaultPreemption) SelectVictimsOnDomain(
 	nodesToProceed := domain.Nodes()
 	podToSchedule := preemptor.Members()
 
-	if status := pl.canPlacePods(ctx, state, podToSchedule, nodesToProceed); !status.IsSuccess() {
+	if status := pl.CanPlacePods(ctx, state, podToSchedule, nodesToProceed); !status.IsSuccess() {
 		return nil, 0, status
 	}
 
@@ -428,7 +455,7 @@ func (pl *DefaultPreemption) SelectVictimsOnDomain(
 		nodesToProceed := domain.Nodes()
 		podToSchedule := preemptor.Members()
 
-		fits := pl.canPlacePods(ctx, state, podToSchedule, nodesToProceed)
+		fits := pl.CanPlacePods(ctx, state, podToSchedule, nodesToProceed)
 		if !fits.IsSuccess() {
 			if err := removePods(v); err != nil {
 				return false, err
@@ -475,7 +502,7 @@ func (pl *DefaultPreemption) SelectVictimsOnDomain(
 
 			nodesToProceed := domain.Nodes()
 			podToSchedule := preemptor.Members()
-			fits := pl.canPlacePods(ctx, state, podToSchedule, nodesToProceed)
+			fits := pl.CanPlacePods(ctx, state, podToSchedule, nodesToProceed)
 
 			for _, v := range victimsToReprieve {
 				removePods(v)
@@ -508,9 +535,16 @@ func (pl *DefaultPreemption) SelectVictimsOnDomain(
 		}
 	}
 
+	sort.Slice(victimsToPreempt, func(i, j int) bool {
+		return pl.MoreImportantVictim(victimsToPreempt[i], victimsToPreempt[j])
+	})
 	var podsToPreempt []*v1.Pod
 	for _, v := range victimsToPreempt {
-		podsToPreempt = append(podsToPreempt, piToPods(v.Pods())...)
+		if fits, err := reprieveVictim(v); err != nil {
+			return nil, 0, fwk.AsStatus(err)
+		} else if !fits {
+			podsToPreempt = append(podsToPreempt, piToPods(v.Pods())...)
+		}
 	}
 
 	return podsToPreempt, numViolatingVictim, nil
@@ -580,33 +614,21 @@ func filterVictimsWithPDBViolation(victims []preemption.PreemptionUnit, pdbs []*
 	}
 
 	for _, victim := range victims {
+		isUnitViolating := false
+
 		for _, pi := range victim.Pods() {
 			if podIsViolating(pi.GetPod()) {
-				violatingVictims = append(violatingVictims, victim)
-			} else {
-				nonViolatingVictims = append(nonViolatingVictims, victim)
+				isUnitViolating = true
 			}
 		}
-
+		if isUnitViolating {
+			violatingVictims = append(violatingVictims, victim)
+		} else {
+			nonViolatingVictims = append(nonViolatingVictims, victim)
+		}
 	}
 
 	return violatingVictims, nonViolatingVictims
-}
-
-// TODO: use mock
-// TODO: For simplicity used backtracking with returning success status if any possible placement or first unsuccess if no possible way
-func (pl *DefaultPreemption) canPlacePods(
-	ctx context.Context,
-	state fwk.CycleState,
-	pods []*v1.Pod,
-	nodes []fwk.NodeInfo,
-) *fwk.Status {
-
-	if len(pods) == 1 && len(nodes) == 1 {
-		return pl.fh.RunFilterPluginsWithNominatedPods(ctx, state, pods[0], nodes[0])
-	}
-
-	return nil
 }
 
 // PodEligibleToPreemptOthers returns one bool and one strinSelectVictimsOnNodeg. The bool

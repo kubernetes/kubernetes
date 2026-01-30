@@ -129,8 +129,7 @@ func NewPodPreemptor(p *v1.Pod) Preemptor {
 	}
 }
 
-func NewWorkloadPreemptor(pod *v1.Pod, priority int32, members []*v1.Pod, policy *v1.PreemptionPolicy) Preemptor {
-	// if any pod is not .... .
+func NewWorkloadPreemptor(priority int32, members []*v1.Pod, policy *v1.PreemptionPolicy) Preemptor {
 	return &preemptor{
 		priority:         priority,
 		pods:             members,
@@ -164,63 +163,78 @@ type Domain interface {
 
 type domain struct {
 	Domain
-	nodes      []fwk.NodeInfo
-	nameToNode map[string]fwk.NodeInfo
+	nodeInfoLister fwk.NodeInfoLister
+	nodes          []fwk.NodeInfo
+	name           string
+	podGroupIndex  map[string][]fwk.PodInfo
 }
 
 func (d *domain) Nodes() []fwk.NodeInfo {
 	return d.nodes
 }
 
-// For now it considers only single pod as victim
 func (d *domain) GetAllPossibleVictims() []PreemptionUnit {
-
 	processedPodGroups := make(map[string]bool)
-	transformIntoPreemptionUnit := func(pi fwk.PodInfo) PreemptionUnit {
-		if pi.GetPod().Spec.WorkloadRef != nil {
-			// 1. TODO: Check via premption policy if it should preempted as a gang
-			// 2. If group already transformed
-			if processedPodGroups[pi.GetPod().Spec.WorkloadRef.PodGroup] {
-				return nil
-			}
-			// 2. TODO: Collect all pods from the podGroup
-			// 4. newPreeptionUnit(pods)
-			// 3. Mark podGroup as processed
-			processedPodGroups[pi.GetPod().Spec.WorkloadRef.PodGroup] = true
-		}
-
-		return d.newPreemptionUnit([]fwk.PodInfo{pi}, corev1helpers.PodPriority(pi.GetPod()))
-	}
-
 	var allVictims []PreemptionUnit
-	for _, nodeInfo := range d.nodes {
-		for _, pi := range nodeInfo.GetPods() {
-			preemptionUnit := transformIntoPreemptionUnit(pi)
-			if preemptionUnit != nil {
-				allVictims = append(allVictims, preemptionUnit)
+
+	for _, node := range d.nodes {
+		for _, pi := range node.GetPods() {
+			pod := pi.GetPod()
+
+			if ref := pod.Spec.WorkloadRef; ref != nil {
+				// Deduplication Check
+				if processedPodGroups[ref.PodGroup] {
+					continue
+				}
+
+				// Get all pods for this gang (Global Lookup via Index)
+				gangPods := d.podGroupIndex[ref.PodGroup]
+
+				if len(gangPods) > 0 {
+					// Collect NodeInfo for ALL pods in the gang
+					var gangNodes []fwk.NodeInfo
+					for _, gp := range gangPods {
+						nodeName := gp.GetPod().Spec.NodeName
+						// Use the global lister to find the node, even if it's not in domain
+						if n, err := d.nodeInfoLister.Get(nodeName); err == nil {
+							gangNodes = append(gangNodes, n)
+						}
+					}
+
+					unit := d.newPreemptionUnit(gangPods, corev1helpers.PodPriority(pod), gangNodes)
+					allVictims = append(allVictims, unit)
+				}
+
+				// Mark as processed so we don't do this again for the next pod in this gang
+				processedPodGroups[ref.PodGroup] = true
+
+			} else {
+				// We just pass the current node (slice of 1)
+				unit := d.newPreemptionUnit(
+					[]fwk.PodInfo{pi},
+					corev1helpers.PodPriority(pod),
+					[]fwk.NodeInfo{node}, // Single node slice
+				)
+				allVictims = append(allVictims, unit)
 			}
 		}
 	}
 
 	return allVictims
-
-	//TODO: need to consider the podGroup as a victim
-	// 1. Check if pod is a part of PodGroup that should be preempted as a Gang
-	// 2. Collect all pods for considered PodGroup into the same Victim (also pods out of selected domain)
 }
 
 func (d *domain) Snapshot() Domain {
 	var snapshotNodes []fwk.NodeInfo
+
 	for _, node := range d.nodes {
 		snapshotNodes = append(snapshotNodes, node.Snapshot())
 	}
-	nameToNode := make(map[string]fwk.NodeInfo)
-	for _, node := range snapshotNodes {
-		nameToNode[node.Node().Name] = node
-	}
+
 	return &domain{
-		nodes:      snapshotNodes,
-		nameToNode: nameToNode,
+		nodes:          snapshotNodes,
+		name:           d.name,
+		nodeInfoLister: d.nodeInfoLister,
+		podGroupIndex:  d.podGroupIndex,
 	}
 }
 
@@ -239,17 +253,10 @@ type preemptionUnit struct {
 	isWorkload    bool
 }
 
-func (d *domain) newPreemptionUnit(pods []fwk.PodInfo, priority int32) PreemptionUnit {
+func (d *domain) newPreemptionUnit(pods []fwk.PodInfo, priority int32, nodeInfos []fwk.NodeInfo) PreemptionUnit {
 	nodes := make(map[string]fwk.NodeInfo)
-
-	for _, pi := range pods {
-		nodeName := pi.GetPod().Spec.NodeName
-		node := d.nameToNode[nodeName]
-		if node == nil {
-			// TODO fetch nodeInfo is it's outside the domain
-		}
-
-		nodes[nodeName] = node
+	for _, node := range nodeInfos {
+		nodes[node.Node().Name] = node
 	}
 
 	return &preemptionUnit{
@@ -468,19 +475,19 @@ func (ev *Evaluator) Preempt(ctx context.Context, state fwk.CycleState, preempto
 		}
 	}
 
-	domains, allNodes, err := ev.newDomains(preemptor, m)
+	// 2) Find all preemption candidates.
+	allNodes, err := ev.Handler.SnapshotSharedLister().NodeInfos().List()
 	if err != nil {
 		return nil, fwk.AsStatus(err)
 	}
-
-	candidates, nodeToStatusMap, err := ev.findCandidates(ctx, state, domains, preemptor, m)
+	candidates, nodeToStatusMap, err := ev.findCandidates(ctx, state, allNodes, preemptor, m)
 	if err != nil && len(candidates) == 0 {
 		return nil, fwk.AsStatus(err)
 	}
 
 	// Return a FitError only when there are no candidates that fit the pod.
 	if len(candidates) == 0 {
-		// logger.V(2).Info("No preemption candidate is found; preemption is not helpful for scheduling", "pod", klog.KObj())
+		logger.V(2).Info("No preemption candidate is found; preemption is not helpful for scheduling", "pod", klog.KObj(preemptor.Members()[0]))
 		fitError := &framework.FitError{
 			Pod:         preemptor.Members()[0], //TODO: not sure, assuming we have single pod as preemptor for now
 			NumAllNodes: len(allNodes),
@@ -506,7 +513,7 @@ func (ev *Evaluator) Preempt(ctx context.Context, state fwk.CycleState, preempto
 		return nil, fwk.NewStatus(fwk.Unschedulable, "no candidate node for preemption")
 	}
 
-	// logger.V(2).Info("the target node for the preemption is determined", "node", bestCandidate.Name(), "pod", klog.KObj(pod))
+	logger.V(2).Info("the target node for the preemption is determined", "node", bestCandidate.Name(), "pod", klog.KObj(preemptor.Members()[0]))
 
 	// 5) Perform preparation work before nominating the selected candidate.
 	if ev.enableAsyncPreemption {
@@ -526,10 +533,20 @@ func (ev *Evaluator) Preempt(ctx context.Context, state fwk.CycleState, preempto
 
 // FindCandidates calculates a slice of preemption candidates.
 // Each candidate is executable to make the given <pod> schedulable.
-func (ev *Evaluator) findCandidates(ctx context.Context, state fwk.CycleState, domains []Domain, preemptor Preemptor, m fwk.NodeToStatusReader) ([]Candidate, *framework.NodeToStatus, error) {
-	// logger := klog.FromContext(ctx)
-	if len(domains) == 0 {
-		// logger.V(3).Info("Preemption will not help schedule preemptor on any node", "preemptor", klog.KObj(preemptor))
+func (ev *Evaluator) findCandidates(ctx context.Context, state fwk.CycleState, allNodes []fwk.NodeInfo, preemptor Preemptor, m fwk.NodeToStatusReader) ([]Candidate, *framework.NodeToStatus, error) {
+	pod := preemptor.Members()[0]
+
+	if len(allNodes) == 0 {
+		return nil, nil, errors.New("no nodes available")
+	}
+	logger := klog.FromContext(ctx)
+	// Get a list of nodes with failed predicates (Unschedulable) that may be satisfied by removing pods from the node.
+	potentialNodes, err := m.NodesForStatusCode(ev.Handler.SnapshotSharedLister().NodeInfos(), fwk.Unschedulable)
+	if err != nil {
+		return nil, nil, err
+	}
+	if len(potentialNodes) == 0 {
+		logger.V(3).Info("Preemption will not help schedule pod on any node", "pod", klog.KObj(pod))
 		return nil, framework.NewDefaultNodeToStatus(), nil
 	}
 
@@ -537,6 +554,8 @@ func (ev *Evaluator) findCandidates(ctx context.Context, state fwk.CycleState, d
 	if err != nil {
 		return nil, nil, err
 	}
+
+	domains := ev.NewDomains(preemptor, potentialNodes)
 
 	offset, candidatesNum := ev.GetOffsetAndNumCandidates(int32(len(domains)))
 	return ev.DryRunPreemption(ctx, state, preemptor, domains, pdbs, offset, candidatesNum)
@@ -1009,45 +1028,64 @@ func (ev *Evaluator) DryRunPreemption(ctx context.Context, state fwk.CycleState,
 	return append(nonViolatingCandidates.get(), violatingCandidates.get()...), nodeStatuses, utilerrors.NewAggregate(errs)
 }
 
-func (ev *Evaluator) newDomains(preemptor Preemptor, m fwk.NodeToStatusReader) ([]Domain, []fwk.NodeInfo, error) {
-	allNodes, err := ev.Handler.SnapshotSharedLister().NodeInfos().List()
-	if err != nil {
-		return nil, allNodes, err
-	}
-
-	if len(allNodes) == 0 {
-		return nil, allNodes, errors.New("no nodes available")
-	}
-
-	potentialNodes, err := m.NodesForStatusCode(ev.Handler.SnapshotSharedLister().NodeInfos(), fwk.Unschedulable)
-	if err != nil {
-		return nil, allNodes, err
-	}
+func (ev *Evaluator) NewDomains(preemptor Preemptor, potentialNodes []fwk.NodeInfo) []Domain {
+	// Get the global lister once
+	nodeInfoLister := ev.Handler.SnapshotSharedLister().NodeInfos()
 
 	if preemptor.IsWorkload() {
-		// assume for now we have only cluster level
-		nameToNode := make(map[string]fwk.NodeInfo)
 		if len(potentialNodes) == 0 {
-			return []Domain{}, allNodes, nil
+			return []Domain{}
 		}
-		for _, node := range potentialNodes {
-			nameToNode[node.Node().Name] = node
+
+		podGroupIndex := ev.buildPodGroupIndex(nodeInfoLister)
+
+		representative := preemptor.Members()[0].Spec.WorkloadRef.PodGroup
+		domainName := fmt.Sprintf("Cluster-Scope-%s", representative)
+
+		d := &domain{
+			nodes:          potentialNodes,
+			name:           domainName,
+			nodeInfoLister: nodeInfoLister,
+			podGroupIndex:  podGroupIndex, // Pass the cache!
 		}
-		return []Domain{&domain{nodes: potentialNodes, nameToNode: nameToNode}}, allNodes, nil
+		return []Domain{d}
 	}
 
+	// Single Pod Case: Standard Node-by-Node domains
 	domains := make([]Domain, 0, len(potentialNodes))
+
+	podGroupIndex := ev.buildPodGroupIndex(nodeInfoLister)
+
 	for _, node := range potentialNodes {
-		domains = append(domains, &domain{nodes: []fwk.NodeInfo{node}, nameToNode: map[string]fwk.NodeInfo{node.Node().Name: node}})
+		domains = append(domains, &domain{
+			nodes:          []fwk.NodeInfo{node},
+			name:           node.Node().Name,
+			nodeInfoLister: nodeInfoLister,
+			podGroupIndex:  podGroupIndex,
+		})
 	}
 
-	return domains, allNodes, nil
+	return domains
 }
 
-// TODO: for cluster we can use clusterName, topology???
+// Helper to build the cache
+func (ev *Evaluator) buildPodGroupIndex(lister fwk.NodeInfoLister) map[string][]fwk.PodInfo {
+	index := make(map[string][]fwk.PodInfo)
+	allNodes, err := lister.List()
+	if err != nil {
+		return index
+	}
+
+	for _, node := range allNodes {
+		for _, pi := range node.GetPods() {
+			if ref := pi.GetPod().Spec.WorkloadRef; ref != nil {
+				index[ref.PodGroup] = append(index[ref.PodGroup], pi)
+			}
+		}
+	}
+	return index
+}
+
 func (d *domain) GetName() string {
-	if d.nodes == nil || len(d.nodes) == 0 {
-		return ""
-	} //TODO: Any other naming approach for the
-	return d.nodes[0].Node().Name // TODO: for now assuming that we have only single node for domain
+	return d.name
 }
