@@ -237,6 +237,10 @@ const (
 
 	// instrumentationScope is the name of OpenTelemetry instrumentation scope
 	instrumentationScope = "k8s.io/kubernetes/pkg/kubelet"
+
+	// PodRejectionMessagePrefix is the prefix used in status messages to identify a
+	// pod that was rejected by the kubelet and should never enter the pod worker pipeline.
+	PodRejectionMessagePrefix = "Pod was rejected: "
 )
 
 var (
@@ -2480,7 +2484,28 @@ func (kl *Kubelet) rejectPod(ctx context.Context, pod *v1.Pod, reason, message s
 		QOSClass: v1qos.GetPodQOS(pod), // keep it as is
 		Phase:    v1.PodFailed,
 		Reason:   reason,
-		Message:  "Pod was rejected: " + message})
+		Message:  PodRejectionMessagePrefix + message})
+}
+
+// isLocallyRejected checks if a pod has already been rejected. These pods
+// have never had containers created, have a Failed phase and a specific
+// status that is forced by rejectPod() call. The only distinctive feature
+// they have from other pods is the presence of a specific status: empty
+// and having a message with the prefix PodRejectionMessagePrefix.
+// This function looks for the message in both statusManager (current
+// session rejection) and, if not found, in status from API server (rejection
+// that was already synced to the API in case of a kubelet restart).
+func (kl *Kubelet) isLocallyRejected(pod *v1.Pod) bool {
+	localStatus, found := kl.statusManager.GetPodStatus(pod.UID)
+	if found && strings.HasPrefix(localStatus.Message, PodRejectionMessagePrefix) {
+		return true
+	}
+
+	if strings.HasPrefix(pod.Status.Message, PodRejectionMessagePrefix) {
+		return true
+	}
+
+	return false
 }
 
 func recordAdmissionRejection(reason string) {
@@ -2776,6 +2801,16 @@ func (kl *Kubelet) HandlePodAdditions(ctx context.Context, pods []*v1.Pod) {
 				}
 			}
 		}
+
+		// Skip previously rejected pods on kubelet restart.
+		// When kubelet restarts, all pods arrive as ADD operations. Pods that were
+		// previously rejected have Failed phase and skip the admission check above
+		// (due to IsPodPhaseTerminal check). Without this filter, they would enter
+		// pod_workers.
+		if kl.isLocallyRejected(pod) {
+			continue
+		}
+
 		kl.podWorkers.UpdatePod(UpdatePodOptions{
 			Pod:        pod,
 			MirrorPod:  mirrorPod,
@@ -2846,6 +2881,19 @@ func (kl *Kubelet) HandlePodUpdates(ctx context.Context, pods []*v1.Pod) {
 					kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, events.FailedNodeDeclaredFeaturesCheck, "Pod requires node features that are not available: %s", missingNodeDeclaredFeatures)
 				}
 			}
+		}
+
+		// Skip rejected pods during UPDATE operations.
+		//
+		// Pods always arrive as ADD before UPDATE (guaranteed by the config layer).
+		// If a pod failed admission in HandlePodAdditions, it was never sent to
+		// pod_workers and won't be known to the worker. UPDATE operations for such
+		// pods should be ignored because:
+		// 1. No containers exist - nothing to sync or clean up
+		// 2. The pod is already in terminal Failed state
+		// 3. REMOVE operation will eventually clean up podManager
+		if !kl.podWorkers.IsPodKnownToWorker(pod.UID) {
+			continue
 		}
 
 		kl.podWorkers.UpdatePod(UpdatePodOptions{

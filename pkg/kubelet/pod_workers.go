@@ -183,6 +183,13 @@ type PodWorkers interface {
 	// Intended for use by the kubelet config loops, but not subsystems, which should
 	// use ShouldPod*().
 	IsPodKnownTerminated(uid types.UID) bool
+	// IsPodKnownToWorker returns true if the pod has ever been sent to the pod
+	// worker via UpdatePod (i.e., has an entry in podSyncStatuses). A pod that
+	// did not enter the pod worker pipeline is a pod that was rejected and
+	// therefore should not be processed. No containers exist for these pods
+	// and they are already in a terminal Failed state.
+	// Intended for use by the kubelet config loops, but not subsystems.
+	IsPodKnownToWorker(uid types.UID) bool
 	// CouldHaveRunningContainers returns true before the pod workers have synced,
 	// once the pod workers see the pod (syncPod could be called), and returns false
 	// after the pod has been terminated (running containers guaranteed stopped).
@@ -647,6 +654,13 @@ func (p *podWorkers) IsPodKnownTerminated(uid types.UID) bool {
 	}
 	// if the pod is not known, we return false (pod worker is not aware of it)
 	return false
+}
+
+func (p *podWorkers) IsPodKnownToWorker(uid types.UID) bool {
+	p.podLock.Lock()
+	defer p.podLock.Unlock()
+	_, ok := p.podSyncStatuses[uid]
+	return ok
 }
 
 func (p *podWorkers) CouldHaveRunningContainers(uid types.UID) bool {
