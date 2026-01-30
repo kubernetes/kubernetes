@@ -350,13 +350,11 @@ konnectivity_network_proxy_client_client_connections{status="dialing"} 1
 func TestGetTLSConfig(t *testing.T) {
 	tempDir := t.TempDir()
 
-	// Generate self-signed cert and key using Kubernetes test utilities
 	certPEM, keyPEM, err := certutil.GenerateSelfSignedCertKey("localhost", nil, nil)
 	if err != nil {
 		t.Fatalf("Failed to generate test certificates: %v", err)
 	}
 
-	// Write cert and key to temp files (getTLSConfig reads from disk)
 	certPath := filepath.Join(tempDir, "cert.crt")
 	keyPath := filepath.Join(tempDir, "cert.key")
 	if err := os.WriteFile(certPath, certPEM, 0600); err != nil {
