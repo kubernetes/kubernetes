@@ -32,13 +32,13 @@ var (
 
 	kubercExample = templates.Examples(i18n.T(`
 		# View the current kuberc configuration
-		kubectl alpha kuberc view
+		kubectl kuberc view
 
 		# Set a default value for a command flag
-		kubectl alpha kuberc set --section defaults --command get --option output=wide
+		kubectl kuberc set --section defaults --command get --option output=wide
 
 		# Create an alias for a command
-		kubectl alpha kuberc set --section aliases --name getn --command get --prependarg nodes --option output=wide`))
+		kubectl kuberc set --section aliases --name getn --command get --prependarg nodes --option output=wide`))
 )
 
 // NewCmdKubeRC creates a command object for the "kuberc" action, and adds all child commands to it.
