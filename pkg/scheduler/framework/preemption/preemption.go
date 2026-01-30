@@ -107,9 +107,10 @@ func (cl *candidateList) get() []Candidate {
 
 type Preemptor interface {
 	Priority() int32
-	PreemptionPolicy() *v1.PreemptionPolicy
 	IsWorkload() bool
 	Members() []*v1.Pod
+	IsElgigibleToPreemptOthers() bool
+	SupportExtenders() bool
 }
 
 type preemptor struct {
@@ -150,8 +151,12 @@ func (p *preemptor) Members() []*v1.Pod {
 	return p.pods
 }
 
-func (p *preemptor) PreemptionPolicy() *v1.PreemptionPolicy {
-	return p.preemptionPolicy
+func (p *preemptor) IsElgigibleToPreemptOthers() bool {
+	return p.preemptionPolicy == nil || *p.preemptionPolicy != v1.PreemptNever
+}
+
+func (p *preemptor) SupportExtenders() bool {
+	return !p.isWorkload
 }
 
 type Domain interface {
@@ -294,17 +299,15 @@ type Interface interface {
 	// PodEligibleToPreemptOthers returns one bool and one string. The bool indicates whether this pod should be considered for
 	// preempting other pods or not. The string includes the reason if this pod isn't eligible.
 	PodEligibleToPreemptOthers(ctx context.Context, pod *v1.Pod, nominatedNodeStatus *fwk.Status) (bool, string)
-	// SelectVictimsOnNode finds minimum set of pods on the given node that should be preempted in order to make enough room
-	// for "pod" to be scheduled.
+	// SelectVictimsOnDomain finds minimum set of pods on the given domain that should be preempted in order to make enough room
+	// for "pods" from preemptor to be scheduled.
 	// Note that both `state` and `nodeInfo` are deep copied.
-	SelectVictimsOnNode(ctx context.Context, state fwk.CycleState,
-		pod *v1.Pod, nodeInfo fwk.NodeInfo, pdbs []*policy.PodDisruptionBudget) ([]*v1.Pod, int, *fwk.Status)
 	SelectVictimsOnDomain(ctx context.Context, state fwk.CycleState, preemptor Preemptor, domain Domain, pdbs []*policy.PodDisruptionBudget) ([]*v1.Pod, int, *fwk.Status)
 	// OrderedScoreFuncs returns a list of ordered score functions to select preferable node where victims will be preempted.
 	// The ordered score functions will be processed one by one if we find more than one node with the highest score.
 	// Default score functions will be processed if nil returned here for backwards-compatibility.
 	OrderedScoreFuncs(ctx context.Context, nodesToVictims map[string]*extenderv1.Victims) []func(node string) int64
-} //TODO do we need another interface
+}
 
 type Evaluator struct {
 	PluginName string
@@ -451,7 +454,7 @@ func (ev *Evaluator) IsPodRunningPreemption(podUID types.UID) bool {
 func (ev *Evaluator) Preempt(ctx context.Context, state fwk.CycleState, preemptor Preemptor, m fwk.NodeToStatusReader) (*fwk.PostFilterResult, *fwk.Status) {
 	logger := klog.FromContext(ctx)
 
-	if preemptor.PreemptionPolicy() != nil && *preemptor.PreemptionPolicy() == v1.PreemptNever {
+	if !preemptor.IsElgigibleToPreemptOthers() {
 		return nil, fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "Preemptor couldn't preempt other victims because of preemptionPolicy: never")
 	}
 
@@ -540,11 +543,18 @@ func (ev *Evaluator) findCandidates(ctx context.Context, state fwk.CycleState, a
 		return nil, nil, errors.New("no nodes available")
 	}
 	logger := klog.FromContext(ctx)
-	// Get a list of nodes with failed predicates (Unschedulable) that may be satisfied by removing pods from the node.
-	potentialNodes, err := m.NodesForStatusCode(ev.Handler.SnapshotSharedLister().NodeInfos(), fwk.Unschedulable)
-	if err != nil {
-		return nil, nil, err
+
+	var potentialNodes []fwk.NodeInfo
+	if !preemptor.IsWorkload() {
+		nodes, err := m.NodesForStatusCode(ev.Handler.SnapshotSharedLister().NodeInfos(), fwk.Unschedulable)
+		if err != nil {
+			return nil, nil, err
+		}
+		potentialNodes = nodes
+	} else {
+		potentialNodes = allNodes
 	}
+
 	if len(potentialNodes) == 0 {
 		logger.V(3).Info("Preemption will not help schedule pod on any node", "pod", klog.KObj(pod))
 		return nil, framework.NewDefaultNodeToStatus(), nil
@@ -566,6 +576,10 @@ func (ev *Evaluator) findCandidates(ctx context.Context, state fwk.CycleState, a
 // Extenders which do not support preemption may later prevent preemptor from being scheduled on the nominated
 // node. In that case, scheduler will find a different host for the preemptor in subsequent scheduling cycles.
 func (ev *Evaluator) callExtenders(logger klog.Logger, preemptor Preemptor, candidates []Candidate) ([]Candidate, *fwk.Status) {
+	if !preemptor.SupportExtenders() {
+		return candidates, nil
+	}
+
 	extenders := ev.Handler.Extenders()
 	nodeLister := ev.Handler.SnapshotSharedLister().NodeInfos()
 	if len(extenders) == 0 {
@@ -579,38 +593,37 @@ func (ev *Evaluator) callExtenders(logger klog.Logger, preemptor Preemptor, cand
 		return candidates, nil
 	}
 	for _, extender := range extenders {
-		for _, pod := range preemptor.Members() {
-			if !extender.SupportsPreemption() || !extender.IsInterested(pod) {
+		pod := preemptor.Members()[0]
+		if !extender.SupportsPreemption() || !extender.IsInterested(pod) {
+			continue
+		}
+		nodeNameToVictims, err := extender.ProcessPreemption(pod, victimsMap, nodeLister)
+		if err != nil {
+			if extender.IsIgnorable() {
+				logger.V(2).Info("Skipped extender as it returned error and has ignorable flag set",
+					"extender", extender.Name(), "err", err)
 				continue
 			}
-			nodeNameToVictims, err := extender.ProcessPreemption(pod, victimsMap, nodeLister)
-			if err != nil {
+			return nil, fwk.AsStatus(err)
+		}
+		// Check if the returned victims are valid.
+		for nodeName, victims := range nodeNameToVictims {
+			if victims == nil || len(victims.Pods) == 0 {
 				if extender.IsIgnorable() {
-					logger.V(2).Info("Skipped extender as it returned error and has ignorable flag set",
-						"extender", extender.Name(), "err", err)
+					delete(nodeNameToVictims, nodeName)
+					logger.V(2).Info("Ignored node for which the extender didn't report victims", "node", klog.KRef("", nodeName), "extender", extender.Name())
 					continue
 				}
-				return nil, fwk.AsStatus(err)
+				return nil, fwk.AsStatus(fmt.Errorf("expected at least one victim pod on node %q", nodeName))
 			}
-			// Check if the returned victims are valid.
-			for nodeName, victims := range nodeNameToVictims {
-				if victims == nil || len(victims.Pods) == 0 {
-					if extender.IsIgnorable() {
-						delete(nodeNameToVictims, nodeName)
-						logger.V(2).Info("Ignored node for which the extender didn't report victims", "node", klog.KRef("", nodeName), "extender", extender.Name())
-						continue
-					}
-					return nil, fwk.AsStatus(fmt.Errorf("expected at least one victim pod on node %q", nodeName))
-				}
-			}
-			// Replace victimsMap with new result after preemption. So the
-			// rest of extenders can continue use it as parameter.
-			victimsMap = nodeNameToVictims
+		}
+		// Replace victimsMap with new result after preemption. So the
+		// rest of extenders can continue use it as parameter.
+		victimsMap = nodeNameToVictims
 
-			// If node list becomes empty, no preemption can happen regardless of other extenders.
-			if len(victimsMap) == 0 {
-				break
-			}
+		// If node list becomes empty, no preemption can happen regardless of other extenders.
+		if len(victimsMap) == 0 {
+			break
 		}
 	}
 

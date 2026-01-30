@@ -240,112 +240,6 @@ func (pl *DefaultPreemption) CandidatesToVictimsMap(candidates []preemption.Cand
 	return m
 }
 
-// SelectVictimsOnNode finds minimum set of pods on the given node that should be preempted in order to make enough room
-// for "pod" to be scheduled.
-func (pl *DefaultPreemption) SelectVictimsOnNode(
-	ctx context.Context,
-	state fwk.CycleState,
-	pod *v1.Pod,
-	nodeInfo fwk.NodeInfo,
-	pdbs []*policy.PodDisruptionBudget) ([]*v1.Pod, int, *fwk.Status) {
-	logger := klog.FromContext(ctx)
-	var potentialVictims []fwk.PodInfo
-	removePod := func(rpi fwk.PodInfo) error {
-		if err := nodeInfo.RemovePod(logger, rpi.GetPod()); err != nil {
-			return err
-		}
-		status := pl.fh.RunPreFilterExtensionRemovePod(ctx, state, pod, rpi, nodeInfo)
-		if !status.IsSuccess() {
-			return status.AsError()
-		}
-		return nil
-	}
-	addPod := func(api fwk.PodInfo) error {
-		nodeInfo.AddPodInfo(api)
-		status := pl.fh.RunPreFilterExtensionAddPod(ctx, state, pod, api, nodeInfo)
-		if !status.IsSuccess() {
-			return status.AsError()
-		}
-		return nil
-	}
-	// As the first step, remove all pods eligible for preemption from the node and
-	// check if the given pod can be scheduled without them present.
-	for _, pi := range nodeInfo.GetPods() {
-		if pl.isPreemptionAllowed(nodeInfo, pi, pod) {
-			potentialVictims = append(potentialVictims, pi)
-		}
-	}
-	for _, pi := range potentialVictims {
-		if err := removePod(pi); err != nil {
-			return nil, 0, fwk.AsStatus(err)
-		}
-	}
-
-	// No potential victims are found, and so we don't need to evaluate the node again since its state didn't change.
-	if len(potentialVictims) == 0 {
-		return nil, 0, fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "No preemption victims found for incoming pod")
-	}
-
-	// If the new pod does not fit after removing all the eligible pods,
-	// we are almost done and this node is not suitable for preemption. The only
-	// condition that we could check is if the "pod" is failing to schedule due to
-	// inter-pod affinity to one or more victims, but we have decided not to
-	// support this case for performance reasons. Having affinity to lower
-	// importance (priority) pods is not a recommended configuration anyway.
-	if status := pl.fh.RunFilterPluginsWithNominatedPods(ctx, state, pod, nodeInfo); !status.IsSuccess() {
-		return nil, 0, status
-	}
-	var victims []fwk.PodInfo
-	numViolatingVictim := 0
-	// Sort potentialVictims by descending importance, which ensures reprieve of
-	// higher importance pods first.
-	sort.Slice(potentialVictims, func(i, j int) bool {
-		return pl.MoreImportantPod(potentialVictims[i].GetPod(), potentialVictims[j].GetPod())
-	})
-	// Try to reprieve as many pods as possible. We first try to reprieve the PDB
-	// violating victims and then other non-violating ones. In both cases, we start
-	// from the highest importance victims.
-	violatingVictims, nonViolatingVictims := filterPodsWithPDBViolation(potentialVictims, pdbs)
-	reprievePod := func(pi fwk.PodInfo) (bool, error) {
-		if err := addPod(pi); err != nil {
-			return false, err
-		}
-		status := pl.fh.RunFilterPluginsWithNominatedPods(ctx, state, pod, nodeInfo)
-		fits := status.IsSuccess()
-		if !fits {
-			if err := removePod(pi); err != nil {
-				return false, err
-			}
-			victims = append(victims, pi)
-			logger.V(5).Info("Pod is a potential preemption victim on node", "pod", klog.KObj(pi.GetPod()), "node", klog.KObj(nodeInfo.Node()))
-		}
-		return fits, nil
-	}
-	for _, p := range violatingVictims {
-		if fits, err := reprievePod(p); err != nil {
-			return nil, 0, fwk.AsStatus(err)
-		} else if !fits {
-			numViolatingVictim++
-		}
-	}
-	// Now we try to reprieve non-violating victims.
-	for _, p := range nonViolatingVictims {
-		if _, err := reprievePod(p); err != nil {
-			return nil, 0, fwk.AsStatus(err)
-		}
-	}
-
-	// Sort victims after reprieving pods to keep the pods in the victims sorted in order of importance from high to low.
-	if len(violatingVictims) != 0 && len(nonViolatingVictims) != 0 {
-		sort.Slice(victims, func(i, j int) bool { return pl.MoreImportantPod(victims[i].GetPod(), victims[j].GetPod()) })
-	}
-	var victimPods []*v1.Pod
-	for _, pi := range victims {
-		victimPods = append(victimPods, pi.GetPod())
-	}
-	return victimPods, numViolatingVictim, fwk.NewStatus(fwk.Success)
-}
-
 type runPreFilterExtension func(ctx context.Context, state fwk.CycleState, pod *v1.Pod, piForAction fwk.PodInfo, nodeInfo fwk.NodeInfo) *fwk.Status
 
 func (pl *DefaultPreemption) runPreFilterExtension(ctx context.Context, state fwk.CycleState, podsToSchedule []*v1.Pod, piToAction fwk.PodInfo, nodeInfo fwk.NodeInfo, runPreFilterExtension runPreFilterExtension) *fwk.Status {
@@ -366,7 +260,6 @@ func (pl *DefaultPreemption) SelectVictimsOnDomain(
 	domain preemption.Domain,
 	pdbs []*policy.PodDisruptionBudget) ([]*v1.Pod, int, *fwk.Status) {
 	logger := klog.FromContext(ctx)
-	var potentialVictims []preemption.PreemptionUnit
 	nodeToName := make(map[string]fwk.NodeInfo)
 	for _, nodeInfo := range domain.Nodes() {
 		nodeToName[nodeInfo.Node().Name] = nodeInfo
@@ -407,6 +300,7 @@ func (pl *DefaultPreemption) SelectVictimsOnDomain(
 		return nil
 	}
 
+	var potentialVictims []preemption.PreemptionUnit
 	allPossiblyAffectedVictims := domain.GetAllPossibleVictims()
 	for _, victim := range allPossiblyAffectedVictims {
 		if pl.isPreemptionAllowedForDomain(domain, victim, preemptor) {
@@ -432,10 +326,7 @@ func (pl *DefaultPreemption) SelectVictimsOnDomain(
 		}
 	}
 
-	nodesToProceed := domain.Nodes()
-	podToSchedule := preemptor.Members()
-
-	if status := pl.CanPlacePods(ctx, state, podToSchedule, nodesToProceed); !status.IsSuccess() {
+	if status := pl.CanPlacePods(ctx, state, preemptor.Members(), domain.Nodes()); !status.IsSuccess() {
 		return nil, 0, status
 	}
 
@@ -445,22 +336,17 @@ func (pl *DefaultPreemption) SelectVictimsOnDomain(
 
 	violatingVictims, nonViolatingVictims := filterVictimsWithPDBViolation(potentialVictims, pdbs)
 	numViolatingVictim := 0
-	var keptVictims []preemption.PreemptionUnit
 
 	reprieveVictim := func(v preemption.PreemptionUnit) (bool, error) {
 		if err := addPods(v); err != nil {
 			return false, err
 		}
 
-		nodesToProceed := domain.Nodes()
-		podToSchedule := preemptor.Members()
-
-		fits := pl.CanPlacePods(ctx, state, podToSchedule, nodesToProceed)
+		fits := pl.CanPlacePods(ctx, state, preemptor.Members(), domain.Nodes())
 		if !fits.IsSuccess() {
 			if err := removePods(v); err != nil {
 				return false, err
 			}
-			keptVictims = append(keptVictims, v)
 			// logger.V(5).Info("Pod is a potential preemption victim on node", "pod", klog.KObj(pi.GetPod()), "node", klog.KObj(nodeInfo.Node()))
 		}
 
@@ -474,63 +360,60 @@ func (pl *DefaultPreemption) SelectVictimsOnDomain(
 		}
 	}
 
-	keptVictims = append(keptVictims, nonViolatingVictims...)
-	sort.Slice(keptVictims, func(i, j int) bool {
-		return pl.MoreImportantVictim(keptVictims[i], keptVictims[j])
-	})
-
 	var victimsToPreempt []preemption.PreemptionUnit
-	if len(keptVictims) > 0 {
-		// 1. Get Unique Priorities and Sort ASCENDING (Low -> High)
-		// We want to find the lowest possible priority cutoff.
-		uniquePriorities := getUniquePriorities(keptVictims)
-		sort.Slice(uniquePriorities, func(i, j int) bool {
-			return uniquePriorities[i] < uniquePriorities[j]
+	if len(nonViolatingVictims) > 0 {
+		currentReprievedCount := 0
+
+		// Search range is [0, N+1]. We are searching for the "Breaking Point".
+		// sort.Search finds the smallest index 'i' where the function returns true.
+		// We define true as "It does NOT fit".
+		cutoff := sort.Search(len(nonViolatingVictims)+1, func(targetCount int) bool {
+
+			// Move Right: We need to reprieve MORE victims (Add them back to snapshot)
+			if targetCount > currentReprievedCount {
+				for i := currentReprievedCount; i < targetCount; i++ {
+					addPods(nonViolatingVictims[i])
+				}
+			}
+
+			// Move Left: We went too far, need to preempt victims again (Remove from snapshot)
+			if targetCount < currentReprievedCount {
+				for i := targetCount; i < currentReprievedCount; i++ {
+					removePods(nonViolatingVictims[i])
+				}
+			}
+
+			// Update Cursor
+			currentReprievedCount = targetCount
+
+			// Check Feasibility
+			fits := pl.CanPlacePods(ctx, state, preemptor.Members(), domain.Nodes())
+
+			// Return true if we FAILED (to force search to go lower/left)
+			return !fits.IsSuccess()
 		})
 
-		// 2. Binary Search
-		// Find the smallest index 'i' such that setting cutoff = uniquePriorities[i]
-		// allows the workload to fit.
-		index := sort.Search(len(uniquePriorities), func(i int) bool {
-			cutoff := int32(uniquePriorities[i])
-
-			victimsToReprieve := filterByPriorityStrictlyGreater(keptVictims, cutoff)
-
-			for _, v := range victimsToReprieve {
-				addPods(v)
-			}
-
-			nodesToProceed := domain.Nodes()
-			podToSchedule := preemptor.Members()
-			fits := pl.CanPlacePods(ctx, state, podToSchedule, nodesToProceed)
-
-			for _, v := range victimsToReprieve {
-				removePods(v)
-			}
-
-			return fits.IsSuccess()
-		})
-
-		// 3. Construct Final List based on the result
-		var cutoff int32 = -1
-
-		// If index < len, we found a valid cutoff.
-		if index < len(uniquePriorities) {
-			cutoff = int32(uniquePriorities[index])
-		} else {
-			// Edge Case: Even killing the highest priority group wasn't enough?
-			// (Or list was empty). Usually implies we must kill everyone.
-			if len(uniquePriorities) > 0 {
-				cutoff = int32(uniquePriorities[len(uniquePriorities)-1])
-			}
+		// 'breakingPoint' is the first count that caused a failure.
+		// Therefore, the maximum safe count is 'breakingPoint - 1'.
+		maxSafeReprieveCount := cutoff - 1
+		if maxSafeReprieveCount < 0 {
+			maxSafeReprieveCount = 0
 		}
 
-		// Apply the Cutoff
-		for _, v := range keptVictims {
-			if v.Priority() > cutoff {
-				addPods(v)
+		for i, v := range nonViolatingVictims {
+			if i < maxSafeReprieveCount {
+				// This victim is safe.
+				// Ensure it is added back to snapshot if you plan to reuse this domain state.
+				if currentReprievedCount <= i {
+					addPods(v)
+				}
 			} else {
+				// This victim must die.
 				victimsToPreempt = append(victimsToPreempt, v)
+				// Ensure it is removed from snapshot
+				if currentReprievedCount > i {
+					removePods(v)
+				}
 			}
 		}
 	}
@@ -548,29 +431,6 @@ func (pl *DefaultPreemption) SelectVictimsOnDomain(
 	}
 
 	return podsToPreempt, numViolatingVictim, nil
-}
-
-func getUniquePriorities(victims []preemption.PreemptionUnit) []int32 {
-	seen := make(map[int32]bool)
-	var res []int32
-	for _, v := range victims {
-		pr := v.Priority()
-		if _, ok := seen[pr]; !ok {
-			seen[pr] = true
-			res = append(res, pr)
-		}
-	}
-	return res
-}
-
-func filterByPriorityStrictlyGreater(victims []preemption.PreemptionUnit, cutoff int32) []preemption.PreemptionUnit {
-	var res []preemption.PreemptionUnit
-	for _, v := range victims {
-		if v.Priority() > cutoff {
-			res = append(res, v)
-		}
-	}
-	return res
 }
 
 func filterVictimsWithPDBViolation(victims []preemption.PreemptionUnit, pdbs []*policy.PodDisruptionBudget) (violatingVictims, nonViolatingVictims []preemption.PreemptionUnit) {
@@ -694,59 +554,6 @@ func podTerminatingByPreemption(p *v1.Pod) bool {
 		}
 	}
 	return false
-}
-
-// filterPodsWithPDBViolation groups the given "pods" into two groups of "violatingPods"
-// and "nonViolatingPods" based on whether their PDBs will be violated if they are
-// preempted.
-// This function is stable and does not change the order of received pods. So, if it
-// receives a sorted list, grouping will preserve the order of the input list.
-func filterPodsWithPDBViolation(podInfos []fwk.PodInfo, pdbs []*policy.PodDisruptionBudget) (violatingPodInfos, nonViolatingPodInfos []fwk.PodInfo) {
-	pdbsAllowed := make([]int32, len(pdbs))
-	for i, pdb := range pdbs {
-		pdbsAllowed[i] = pdb.Status.DisruptionsAllowed
-	}
-
-	for _, podInfo := range podInfos {
-		pod := podInfo.GetPod()
-		pdbForPodIsViolated := false
-		// A pod with no labels will not match any PDB. So, no need to check.
-		if len(pod.Labels) != 0 {
-			for i, pdb := range pdbs {
-				if pdb.Namespace != pod.Namespace {
-					continue
-				}
-				selector, err := metav1.LabelSelectorAsSelector(pdb.Spec.Selector)
-				if err != nil {
-					// This object has an invalid selector, it does not match the pod
-					continue
-				}
-				// A PDB with a nil or empty selector matches nothing.
-				if selector.Empty() || !selector.Matches(labels.Set(pod.Labels)) {
-					continue
-				}
-
-				// Existing in DisruptedPods means it has been processed in API server,
-				// we don't treat it as a violating case.
-				if _, exist := pdb.Status.DisruptedPods[pod.Name]; exist {
-					continue
-				}
-				// Only decrement the matched pdb when it's not in its <DisruptedPods>;
-				// otherwise we may over-decrement the budget number.
-				pdbsAllowed[i]--
-				// We have found a matching PDB.
-				if pdbsAllowed[i] < 0 {
-					pdbForPodIsViolated = true
-				}
-			}
-		}
-		if pdbForPodIsViolated {
-			violatingPodInfos = append(violatingPodInfos, podInfo)
-		} else {
-			nonViolatingPodInfos = append(nonViolatingPodInfos, podInfo)
-		}
-	}
-	return violatingPodInfos, nonViolatingPodInfos
 }
 
 func MoreImportantVictim(v1, v2 preemption.PreemptionUnit) bool {
