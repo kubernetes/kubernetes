@@ -5435,6 +5435,12 @@ type PodStatus struct {
 	// +featureGate=InPlacePodLevelResourcesVerticalScaling
 	// +optional
 	Resources *ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,20,opt,name=resources"`
+
+	// NativeResourceClaimStatus contains the status of native resources (like cpu, memory)
+	// that were allocated for this pod through DRA claims.
+	// +featureGate=DRANativeResources
+	// +optional
+	NativeResourceClaimStatus []PodNativeResourceClaimStatus `json:"nativeResourceClaimStatus,omitempty" protobuf:"bytes,43,rep,name=nativeResourceClaimStatus"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -8472,4 +8478,27 @@ type ImageVolumeSource struct {
 	// Defaults to Always if :latest tag is specified, or IfNotPresent otherwise.
 	// +optional
 	PullPolicy PullPolicy `json:"pullPolicy,omitempty" protobuf:"bytes,2,opt,name=pullPolicy,casttype=PullPolicy"`
+}
+
+// PodNativeResourceClaimStatus describes the status of native resources allocated via DRA.
+type PodNativeResourceClaimStatus struct {
+	// ClaimInfo holds a reference to the ResourceClaim that resulted in this allocation.
+	// +required
+	ClaimInfo ObjectReference `json:"claimInfo" protobuf:"bytes,1,opt,name=claimInfo"`
+	// Containers lists the names of all containers in this pod that reference the claim.
+	// +optional
+	Containers []string `json:"containers,omitempty" protobuf:"bytes,2,rep,name=containers"`
+	// Resources lists the native resources and quantities allocated by this claim.
+	// +required
+	Resources []NativeResourceAllocation `json:"resources" protobuf:"bytes,3,rep,name=resources"`
+}
+
+// NativeResourceAllocation describes the allocation of a native resource.
+type NativeResourceAllocation struct {
+	// ResourceName is the native resource name (e.g., "cpu", "memory").
+	// +required
+	ResourceName ResourceName `json:"resourceName" protobuf:"bytes,1,opt,name=resourceName,casttype=ResourceName"`
+	// Quantity is the amount of native resource allocated through this claim for this resource.
+	// +required
+	Quantity resource.Quantity `json:"quantity" protobuf:"bytes,2,opt,name=quantity"`
 }
