@@ -170,14 +170,14 @@ Stable metrics observe strict API contracts and no labels can be added or remove
 	<ul>
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">STABLE</span></li>
 	<li data-type="gauge"><label class="metric_detail">Type:</label> <span class="metric_type">Gauge</span></li>
-	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">name</span><span class="metric_label">type</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>cloud-controller-manager (/metrics)</li><li>kube-apiserver (/metrics)</li><li>kube-controller-manager (/metrics)</li><li>kube-proxy (/metrics)</li><li>kube-scheduler (/metrics)</li><li>kubelet (/metrics)</li></ul></li></ul>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">name</span><span class="metric_label">type</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>cloud-controller-manager (/metrics/slis)</li><li>kube-apiserver (/metrics/slis)</li><li>kube-controller-manager (/metrics/slis)</li><li>kube-proxy (/metrics/slis)</li><li>kube-scheduler (/metrics/slis)</li><li>kubelet (/metrics/slis)</li></ul></li></ul>
 	</div><div class="metric" data-stability="stable">
 	<div class="metric_name">kubernetes_healthchecks_total</div>
 	<div class="metric_help">This metric records the results of all healthcheck.</div>
 	<ul>
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">STABLE</span></li>
 	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
-	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">name</span><span class="metric_label">status</span><span class="metric_label">type</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>cloud-controller-manager (/metrics)</li><li>kube-apiserver (/metrics)</li><li>kube-controller-manager (/metrics)</li><li>kube-proxy (/metrics)</li><li>kube-scheduler (/metrics)</li><li>kubelet (/metrics)</li></ul></li></ul>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">name</span><span class="metric_label">status</span><span class="metric_label">type</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>cloud-controller-manager (/metrics/slis)</li><li>kube-apiserver (/metrics/slis)</li><li>kube-controller-manager (/metrics/slis)</li><li>kube-proxy (/metrics/slis)</li><li>kube-scheduler (/metrics/slis)</li><li>kubelet (/metrics/slis)</li></ul></li></ul>
 	</div><div class="metric" data-stability="stable">
 	<div class="metric_name">node_collector_evictions_total</div>
 	<div class="metric_help">Number of Node evictions that happened since current instance of NodeController started.</div>

@@ -7635,17 +7635,17 @@
   - type
   componentEndpoints:
   - component: cloud-controller-manager
-    endpoint: /metrics
+    endpoint: /metrics/slis
   - component: kube-apiserver
-    endpoint: /metrics
+    endpoint: /metrics/slis
   - component: kube-controller-manager
-    endpoint: /metrics
+    endpoint: /metrics/slis
   - component: kube-proxy
-    endpoint: /metrics
+    endpoint: /metrics/slis
   - component: kube-scheduler
-    endpoint: /metrics
+    endpoint: /metrics/slis
   - component: kubelet
-    endpoint: /metrics
+    endpoint: /metrics/slis
 - name: healthchecks_total
   namespace: kubernetes
   help: This metric records the results of all healthcheck.
@@ -7657,17 +7657,17 @@
   - type
   componentEndpoints:
   - component: cloud-controller-manager
-    endpoint: /metrics
+    endpoint: /metrics/slis
   - component: kube-apiserver
-    endpoint: /metrics
+    endpoint: /metrics/slis
   - component: kube-controller-manager
-    endpoint: /metrics
+    endpoint: /metrics/slis
   - component: kube-proxy
-    endpoint: /metrics
+    endpoint: /metrics/slis
   - component: kube-scheduler
-    endpoint: /metrics
+    endpoint: /metrics/slis
   - component: kubelet
-    endpoint: /metrics
+    endpoint: /metrics/slis
 - name: x509_insecure_sha1_total
   subsystem: kube_aggregator
   namespace: apiserver

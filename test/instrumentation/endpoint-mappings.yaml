@@ -50,7 +50,7 @@ sharedPaths:
 
 # Endpoint mappings: override the default endpoint for specific paths.
 endpointMappings:
-  - pathContains: "staging/src/k8s.io/component-base/metrics/slis"
+  - pathContains: "staging/src/k8s.io/component-base/metrics/prometheus/slis"
     endpoint: /metrics/slis
   - pathContains: "pkg/kubelet/metrics/collectors/resource_metrics.go"
     endpoint: /metrics/resource
