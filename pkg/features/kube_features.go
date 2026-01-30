@@ -218,6 +218,12 @@ const (
 	// Enables support for providing extended resource requests backed by DRA.
 	DRAExtendedResource featuregate.Feature = "DRAExtendedResource"
 
+	// owner: @pravk03
+	// kep: https://kep.k8s.io/5517
+	//
+	// Enables support for native resouces backed by DRA.
+	DRANativeResources featuregate.Feature = "DRANativeResources"
+
 	// owner: @mortent, @cici37
 	// kep: http://kep.k8s.io/4815
 	//
@@ -1220,6 +1226,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
+	DRANativeResources: {
+		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	DRAPartitionableDevices: {
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -2162,6 +2172,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	DRADeviceTaints: {DynamicResourceAllocation},
 
 	DRAExtendedResource: {DynamicResourceAllocation},
+
+	DRANativeResources: {DynamicResourceAllocation},
 
 	DRAPartitionableDevices: {DynamicResourceAllocation},
 
