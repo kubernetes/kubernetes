@@ -62,7 +62,7 @@ func (b *Builder) ExtendedResourceName(i int) string {
 	case SingletonIndex:
 		return "example.com/resource"
 	default:
-		return b.driver.Name + "/resource" + fmt.Sprintf("-%d", i)
+		return b.Driver.Name + "/resource" + fmt.Sprintf("-%d", i)
 	}
 }
 
@@ -70,18 +70,19 @@ func (b *Builder) ExtendedResourceName(i int) string {
 // namespace.
 type Builder struct {
 	namespace               string
-	driver                  *Driver
+	Driver                  *Driver
 	UseExtendedResourceName bool
 
 	podCounter      int
 	claimCounter    int
 	ClassParameters string // JSON
 	SkipCleanup     bool
+	SkipTearDown    bool
 }
 
 // ClassName returns the default device class name.
 func (b *Builder) ClassName() string {
-	return b.namespace + b.driver.NameSuffix + "-class"
+	return b.namespace + b.Driver.NameSuffix + "-class"
 }
 
 // SingletonIndex causes Builder.Class and ExtendedResourceName to create a
@@ -117,14 +118,14 @@ func (b *Builder) Class(i int) *resourceapi.DeviceClass {
 	}
 	class.Spec.Selectors = []resourceapi.DeviceSelector{{
 		CEL: &resourceapi.CELDeviceSelector{
-			Expression: fmt.Sprintf(`device.driver == "%s"`, b.driver.Name),
+			Expression: fmt.Sprintf(`device.driver == "%s"`, b.Driver.Name),
 		},
 	}}
 	if b.ClassParameters != "" {
 		class.Spec.Config = []resourceapi.DeviceClassConfiguration{{
 			DeviceConfiguration: resourceapi.DeviceConfiguration{
 				Opaque: &resourceapi.OpaqueDeviceConfiguration{
-					Driver:     b.driver.Name,
+					Driver:     b.Driver.Name,
 					Parameters: runtime.RawExtension{Raw: []byte(b.ClassParameters)},
 				},
 			},
@@ -137,7 +138,7 @@ func (b *Builder) Class(i int) *resourceapi.DeviceClass {
 // that test pods can reference
 func (b *Builder) ExternalClaim() *resourceapi.ResourceClaim {
 	b.claimCounter++
-	name := "external-claim" + b.driver.NameSuffix // This is what podExternal expects.
+	name := "external-claim" + b.Driver.NameSuffix // This is what podExternal expects.
 	if b.claimCounter > 1 {
 		name += fmt.Sprintf("-%d", b.claimCounter)
 	}
@@ -162,7 +163,7 @@ func (b *Builder) claimSpecWithV1beta1() resourcev1beta1.ResourceClaimSpec {
 			Config: []resourcev1beta1.DeviceClaimConfiguration{{
 				DeviceConfiguration: resourcev1beta1.DeviceConfiguration{
 					Opaque: &resourcev1beta1.OpaqueDeviceConfiguration{
-						Driver: b.driver.Name,
+						Driver: b.Driver.Name,
 						Parameters: runtime.RawExtension{
 							Raw: []byte(parameters),
 						},
@@ -190,7 +191,7 @@ func (b *Builder) claimSpecWithV1beta2() resourcev1beta2.ResourceClaimSpec {
 			Config: []resourcev1beta2.DeviceClaimConfiguration{{
 				DeviceConfiguration: resourcev1beta2.DeviceConfiguration{
 					Opaque: &resourcev1beta2.OpaqueDeviceConfiguration{
-						Driver: b.driver.Name,
+						Driver: b.Driver.Name,
 						Parameters: runtime.RawExtension{
 							Raw: []byte(parameters),
 						},
@@ -218,7 +219,7 @@ func (b *Builder) ClaimSpec() resourceapi.ResourceClaimSpec {
 			Config: []resourceapi.DeviceClaimConfiguration{{
 				DeviceConfiguration: resourceapi.DeviceConfiguration{
 					Opaque: &resourceapi.OpaqueDeviceConfiguration{
-						Driver: b.driver.Name,
+						Driver: b.Driver.Name,
 						Parameters: runtime.RawExtension{
 							Raw: []byte(parameters),
 						},
@@ -251,7 +252,7 @@ func (b *Builder) Pod() *v1.Pod {
 	pod.Spec.RestartPolicy = v1.RestartPolicyNever
 	pod.GenerateName = ""
 	b.podCounter++
-	pod.Name = fmt.Sprintf("tester%s-%d", b.driver.NameSuffix, b.podCounter)
+	pod.Name = fmt.Sprintf("tester%s-%d", b.Driver.NameSuffix, b.podCounter)
 	return pod
 }
 
@@ -320,7 +321,7 @@ func (b *Builder) PodExternal() *v1.Pod {
 	pod := b.Pod()
 	pod.Spec.Containers[0].Name = "with-resource"
 	podClaimName := "resource-claim"
-	externalClaimName := "external-claim" + b.driver.NameSuffix
+	externalClaimName := "external-claim" + b.Driver.NameSuffix
 	pod.Spec.ResourceClaims = []v1.PodResourceClaim{
 		{
 			Name:              podClaimName,
@@ -419,7 +420,7 @@ func (b *Builder) DeletePodAndWaitForNotFound(tCtx ktesting.TContext, pod *v1.Po
 func (b *Builder) TestPod(tCtx ktesting.TContext, pod *v1.Pod, env ...string) {
 	tCtx.Helper()
 
-	if !b.driver.WithKubelet {
+	if !b.Driver.WithKubelet {
 		// Less testing when we cannot rely on the kubelet to actually run the pod.
 		err := e2epod.WaitForPodScheduled(tCtx, tCtx.Client(), pod.Namespace, pod.Name)
 		tCtx.ExpectNoError(err, "schedule pod")
@@ -476,7 +477,7 @@ func TestContainerEnv(tCtx ktesting.TContext, pod *v1.Pod, containerName string,
 }
 
 func NewBuilder(f *framework.Framework, driver *Driver) *Builder {
-	b := &Builder{driver: driver}
+	b := &Builder{Driver: driver}
 	ginkgo.BeforeEach(func() {
 		b.setUp(f.TContext(context.Background()))
 	})
@@ -484,7 +485,7 @@ func NewBuilder(f *framework.Framework, driver *Driver) *Builder {
 }
 
 func NewBuilderNow(tCtx ktesting.TContext, driver *Driver) *Builder {
-	b := &Builder{driver: driver}
+	b := &Builder{Driver: driver}
 	b.setUp(tCtx)
 	return b
 }
@@ -503,6 +504,9 @@ func (b *Builder) ClientV1(tCtx ktesting.TContext) cgoresource.ResourceV1Interfa
 }
 
 func (b *Builder) tearDown(tCtx ktesting.TContext) {
+	if b.SkipTearDown {
+		return
+	}
 	client := b.ClientV1(tCtx)
 
 	// Before we allow the namespace and all objects in it do be deleted by
@@ -539,7 +543,7 @@ func (b *Builder) tearDown(tCtx ktesting.TContext) {
 		}
 	}
 
-	for host, plugin := range b.driver.Nodes {
+	for host, plugin := range b.Driver.Nodes {
 		tCtx.Logf("Waiting for resources on %s to be unprepared", host)
 		tCtx.Eventually(func(ktesting.TContext) []app.ClaimID { return plugin.GetPreparedResources() }).WithTimeout(time.Minute).Should(gomega.BeEmpty(), "prepared claims on host %s", host)
 	}

@@ -398,6 +398,11 @@ func (d *Driver) initName(tCtx ktesting.TContext) {
 	d.Name = tCtx.Namespace() + d.NameSuffix + ".k8s.io"
 }
 
+func (d *Driver) SetNameSuffix(tCtx ktesting.TContext, suffix string) {
+	d.NameSuffix = suffix
+	d.initName(tCtx)
+}
+
 func (d *Driver) SetUp(tCtx ktesting.TContext, kubeletRootDir string, nodes *Nodes, driverResources map[string]resourceslice.DriverResources) {
 	tCtx.Logf("deploying driver %s on nodes %v", d.Name, nodes.NodeNames)
 	d.Nodes = make(map[string]KubeletPlugin)

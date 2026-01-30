@@ -51,29 +51,11 @@ func init() {
 	ktesting.SetDefaultVerbosity(2)
 }
 
-// The overall flow of upgrade/downgrade testing is always the same:
-//
-//   - Bring up a cluster with the previous release.
-//   - "Install" the test DRA driver with 8 devices for the one node in the cluster.
-//     There is a DeviceClass for it.
-//   - Step 1: run some test code.
-//   - Upgrade the cluster to the current code.
-//   - Step 2: run some more test code.
-//   - Downgrade to the previous release again.
-//   - Step 3: run some final test code.
-//
-// The "test code" gets registered here with a single function for each
-// sub-test. That function then returns the next piece of code, which then
-// returns the final code. Each callback function is executed as a sub-test.
-// The builder is configured to not delete objects when that sub-test ends,
-// so objects persist until the entire test is done.
-//
-// Each sub-test must be self-contained. They intentionally run in a random
-// order. However, they share the same cluster and the 8 devices which are
-// available there.
-var subTests = map[string]initialTestFunc{
-	"core DRA":                    coreDRA,
-	"ResourceClaim device status": resourceClaimDeviceStatus,
+type subTestDef struct {
+	test initialTestFunc
+	// builder optionally provides a custom builder for this sub-test.
+	// If nil, the default builder is used.
+	builder *drautils.Builder
 }
 
 type initialTestFunc func(tCtx ktesting.TContext, builder *drautils.Builder) upgradedTestFunc
@@ -211,7 +193,7 @@ func testUpgradeDowngrade(tCtx ktesting.TContext) {
 		cluster = localupcluster.New(tCtx)
 		localUpClusterEnv := map[string]string{
 			"RUNTIME_CONFIG": "resource.k8s.io/v1beta1,resource.k8s.io/v1beta2",
-			"FEATURE_GATES":  "DynamicResourceAllocation=true",
+			"FEATURE_GATES":  "DynamicResourceAllocation=true,DRAPartitionableDevices=true",
 			// *not* needed because driver will run in "local filesystem" mode (= driver.IsLocal): "ALLOW_PRIVILEGED": "1",
 		}
 		cluster.Start(tCtx, binDir, localUpClusterEnv)
@@ -233,17 +215,43 @@ func testUpgradeDowngrade(tCtx ktesting.TContext) {
 	driver := drautils.NewDriverInstance(tCtx)
 	driver.IsLocal = true
 	driver.Run(tCtx, "/var/lib/kubelet", nodes, drautils.DriverResourcesNow(nodes, 8))
-	b := drautils.NewBuilderNow(tCtx, driver)
-	b.SkipCleanup = true
+	defaultBuilder := drautils.NewBuilderNow(tCtx, driver)
+	defaultBuilder.SkipCleanup = true
+
+	// The overall flow of upgrade/downgrade testing is always the same:
+	//
+	//   - Bring up a cluster with the previous release.
+	//   - "Install" the test DRA driver with 8 devices for the one node in the cluster.
+	//     There is a DeviceClass for it.
+	//   - Step 1: run some test code.
+	//   - Upgrade the cluster to the current code.
+	//   - Step 2: run some more test code.
+	//   - Downgrade to the previous release again.
+	//   - Step 3: run some final test code.
+	//
+	// The "test code" gets registered here with a single function for each
+	// sub-test. That function then returns the next piece of code, which then
+	// returns the final code. Each callback function is executed as a sub-test.
+	// The builder is configured to not delete objects when that sub-test ends,
+	// so objects persist until the entire test is done.
+	//
+	// Each sub-test must be self-contained. They intentionally run in a random
+	// order. However, they share the same cluster and the 8 devices which are
+	// available there.
+	var subTests = map[string]subTestDef{
+		"core DRA":                    {test: coreDRA, builder: defaultBuilder},
+		"ResourceClaim device status": {test: resourceClaimDeviceStatus, builder: defaultBuilder},
+		"partitionable devices":       {test: partitionableDevices, builder: builderForPartitionableDevices(tCtx, nodes)},
+	}
 
 	upgradedTestFuncs := make(map[string]upgradedTestFunc, len(subTests))
 	tCtx.Run("after-cluster-creation", func(tCtx ktesting.TContext) {
-		for subTest, f := range subTests {
+		for subTest, def := range subTests {
 			tCtx.Run(subTest, func(tCtx ktesting.TContext) {
-				// This only gets set if f doesn't panic because of a fatal error,
+				// This only gets set if def.test doesn't panic because of a fatal error,
 				// so below we won't continue if step 1 already failed.
 				// Other sub-tests are not affected.
-				upgradedTestFuncs[subTest] = f(tCtx, b)
+				upgradedTestFuncs[subTest] = def.test(tCtx, def.builder)
 			})
 		}
 	})
