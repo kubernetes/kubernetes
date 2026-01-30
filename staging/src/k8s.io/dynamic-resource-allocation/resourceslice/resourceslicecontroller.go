@@ -18,9 +18,12 @@ package resourceslice
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -66,6 +69,10 @@ const (
 	// causes redundant delete API calls) and not too long that a human mistake
 	// doesn't get fixed while that human is waiting for it.
 	DefaultSyncDelay = 30 * time.Second
+
+	// poolHashLength is the number of characters from the pool name hash
+	// to include in the ResourceSlice name.
+	poolHashLength = 8
 )
 
 // Controller synchronizes information about resources of one driver with
@@ -639,9 +646,6 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 		}
 	}
 
-	// Slices that don't match any driver slice need to be deleted.
-	obsoleteSlices := make([]*resourceapi.ResourceSlice, 0, len(slices))
-
 	// Determine highest generation.
 	var generation int64
 	for _, slice := range slices {
@@ -650,66 +654,40 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 		}
 	}
 
-	// Everything older is obsolete.
-	currentSlices := make([]*resourceapi.ResourceSlice, 0, len(slices))
+	// Construct the deterministic name prefix for all slices in this pool.
+	// Use the pool name hash to ensure uniqueness across pools from the same driver
+	// while keeping the total name length manageable.
+	resourceSliceNamePrefix := c.driverName + "-" + getPoolHash(poolName) + "-"
+	if c.owner != nil {
+		resourceSliceNamePrefix = c.owner.Name + "-" + resourceSliceNamePrefix
+	}
+
+	// 1. Map the deterministic names of the desired slices to their indices.
+	desiredNameToIndex := make(map[string]int, len(pool.Slices))
+	for i := range pool.Slices {
+		desiredNameToIndex[getResourceSliceName(resourceSliceNamePrefix, i)] = i
+	}
+
+	// 2. Classify existing slices. If an existing slice has wrong generation
+	// or doesn't match a desired name, it's obsolete.
+	currentSliceForDesiredSlice := make(map[int]*resourceapi.ResourceSlice, len(pool.Slices))
+	obsoleteSlices := make([]*resourceapi.ResourceSlice, 0, len(slices))
+
 	for _, slice := range slices {
+		// Wrong generation is always obsolete.
 		if slice.Spec.Pool.Generation < generation {
 			obsoleteSlices = append(obsoleteSlices, slice)
-		} else {
-			currentSlices = append(currentSlices, slice)
+			continue
 		}
-	}
-	logger.V(5).Info("Existing slices", "obsolete", klog.KObjSlice(obsoleteSlices), "current", klog.KObjSlice(currentSlices))
 
-	// Match each existing slice against the desired slices.
-	// Two slices "match" if they contain exactly the
-	// same device IDs, in an arbitrary order. As a
-	// special case, slices are also considered
-	// "matched" in the scenario where there's a single
-	// existing slice and a single desired slice. Such a
-	// matched slice gets updated with the desired
-	// content if there is a difference.
-	//
-	// In the case where there is more than one existing
-	// or desired slices, adding or removing devices is
-	// done by deleting the old slice and creating a new one.
-	//
-	// This is primarily a simplification of the code:
-	// to support adding or removing devices from
-	// existing slices, we would have to identify "most
-	// similar" slices (= minimal editing distance).
-	//
-	// In currentSliceForDesiredSlice we keep track of
-	// which desired slice has a matched slice.
-	//
-	// At the end of the loop, each current slice is either
-	// a match or obsolete.
-	currentSliceForDesiredSlice := make(map[int]*resourceapi.ResourceSlice, len(pool.Slices))
-	if len(currentSlices) == 1 && len(pool.Slices) == 1 {
-		// If there's just one existing slice and one desired slice, assume
-		// they "matched" such that if required, it is the existing slice
-		// which gets updated and we avoid an unnecessary deletion and
-		// recreation of the slice.
-		currentSliceForDesiredSlice[0] = currentSlices[0]
-	} else {
-		for _, currentSlice := range currentSlices {
-			matched := false
-			for i := range pool.Slices {
-				if _, ok := currentSliceForDesiredSlice[i]; ok {
-					// Already has a match.
-					continue
-				}
-				if sameSlice(currentSlice, &pool.Slices[i]) {
-					currentSliceForDesiredSlice[i] = currentSlice
-					logger.V(5).Info("Matched existing slice", "slice", klog.KObj(currentSlice), "matchIndex", i)
-					matched = true
-					break
-				}
-			}
-			if !matched {
-				obsoleteSlices = append(obsoleteSlices, currentSlice)
-				logger.V(5).Info("Unmatched existing slice", "slice", klog.KObj(currentSlice))
-			}
+		// If the slice name matches a desired index, it's a match.
+		// Otherwise (random name or out of current index range), it's obsolete.
+		if index, ok := desiredNameToIndex[slice.Name]; ok {
+			currentSliceForDesiredSlice[index] = slice
+			logger.V(5).Info("Matched existing slice by name", "slice", klog.KObj(slice), "matchIndex", index)
+		} else {
+			obsoleteSlices = append(obsoleteSlices, slice)
+			logger.V(5).Info("Unmatched existing slice (obsolete)", "slice", klog.KObj(slice))
 		}
 	}
 
@@ -815,14 +793,11 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 				},
 			)
 		}
-		generateName := c.driverName + "-"
-		if c.owner != nil {
-			generateName = c.owner.Name + "-" + generateName
-		}
+		name := getResourceSliceName(resourceSliceNamePrefix, i)
 		slice := &resourceapi.ResourceSlice{
 			ObjectMeta: metav1.ObjectMeta{
+				Name:            name,
 				OwnerReferences: ownerReferences,
-				GenerateName:    generateName,
 			},
 			Spec: resourceapi.ResourceSliceSpec{
 				Driver:                 c.driverName,
@@ -969,25 +944,6 @@ func copyServerDefaults(desiredSlice, actualSlice *resourceapi.ResourceSlice) bo
 	return copied
 }
 
-func sameSlice(existingSlice *resourceapi.ResourceSlice, desiredSlice *Slice) bool {
-	if len(existingSlice.Spec.Devices) != len(desiredSlice.Devices) {
-		return false
-	}
-
-	existingDevices := sets.New[string]()
-	for _, device := range existingSlice.Spec.Devices {
-		existingDevices.Insert(device.Name)
-	}
-	for _, device := range desiredSlice.Devices {
-		if !existingDevices.Has(device.Name) {
-			return false
-		}
-	}
-
-	// Same number of devices, names all present -> equal.
-	return true
-}
-
 // copyTaintTimeAdded copies existing TimeAdded values from one slice into
 // the other if the other one doesn't have it for a taint. Both input
 // slices are read-only.
@@ -1062,4 +1018,26 @@ func refIfNotZero[T comparable](t T) *T {
 		return nil
 	}
 	return &t
+}
+
+// getPoolHash returns a short, fixed-length hash of the pool name to be used in
+// deterministic ResourceSlice names.
+func getPoolHash(poolName string) string {
+	hash := sha256.Sum256([]byte(poolName))
+	return hex.EncodeToString(hash[:])[:poolHashLength]
+}
+
+// encodeIndex encodes an integer into a base36 string, padded with '0' to 13
+// characters. 13 characters is the minimum needed to represent the maximum
+// int64 value in base36 safely.
+func encodeIndex(index int) string {
+	s := strconv.FormatInt(int64(index), 36)
+	if len(s) < 13 {
+		return strings.Repeat("0", 13-len(s)) + s
+	}
+	return s
+}
+
+func getResourceSliceName(prefix string, index int) string {
+	return prefix + encodeIndex(index)
 }
