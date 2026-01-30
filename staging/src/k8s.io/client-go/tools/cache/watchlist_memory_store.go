@@ -21,7 +21,7 @@ import (
 )
 
 // watchListMemoryOptimizedStore reuses cached objects when the incoming watch-list
-// event matches an existing cache object by key, resourceVersion, and UID.
+// event matches an existing cache object by key and resourceVersion.
 type watchListMemoryOptimizedStore struct {
 	Store       // embedded delegate
 	clientStore Store

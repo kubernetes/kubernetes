@@ -44,14 +44,14 @@ func TestWatchListMemoryOptimizedStore(t *testing.T) {
 		expectReuse    bool
 	}{
 		{
-			name:           "add reuses cached (existing) object when rv and uid match",
+			name:           "add reuses cached (existing) object when rv matches",
 			op:             "add",
 			existingObject: makePodFunc("p1", "10"),
 			incomingObject: makePodFunc("p1", "10"),
 			expectReuse:    true,
 		},
 		{
-			name:           "update reuses cached (existing) object when rv and uid match",
+			name:           "update reuses cached (existing) object when rv matches",
 			op:             "update",
 			existingObject: makePodFunc("p1", "10"),
 			incomingObject: makePodFunc("p1", "10"),
