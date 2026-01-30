@@ -1863,11 +1863,10 @@ func (f *frameworkImpl) GetWaitingPod(uid types.UID) fwk.WaitingPod {
 }
 
 // RejectWaitingPod rejects a WaitingPod given its UID.
-// The returned value indicates if the given pod is waiting or not.
+// The returned value indicates if the rejection was successful.
 func (f *frameworkImpl) RejectWaitingPod(uid types.UID) bool {
 	if waitingPod := f.waitingPods.get(uid); waitingPod != nil {
-		waitingPod.Reject("", "removed")
-		return true
+		return waitingPod.Reject("", "removed")
 	}
 	return false
 }
