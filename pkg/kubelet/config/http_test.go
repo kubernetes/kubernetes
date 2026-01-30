@@ -168,6 +168,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 						Name:        "foo" + "-" + nodeName,
 						Namespace:   "mynamespace",
 						Annotations: map[string]string{kubetypes.ConfigHashAnnotationKey: "111"},
+						Generation:  1,
 					},
 					Spec: v1.PodSpec{
 						NodeName:                      nodeName,
@@ -238,6 +239,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 						Name:        "foo" + "-" + nodeName,
 						Namespace:   "default",
 						Annotations: map[string]string{kubetypes.ConfigHashAnnotationKey: "111"},
+						Generation:  1,
 					},
 					Spec: v1.PodSpec{
 						NodeName:                      nodeName,
@@ -266,6 +268,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 						Name:        "bar" + "-" + nodeName,
 						Namespace:   "default",
 						Annotations: map[string]string{kubetypes.ConfigHashAnnotationKey: "222"},
+						Generation:  1,
 					},
 					Spec: v1.PodSpec{
 						NodeName:                      nodeName,
