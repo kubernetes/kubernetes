@@ -48,19 +48,6 @@ type DRACaches struct {
 	nodeMatchCache sync.Map // map[nodeMatchCacheKey]bool
 }
 
-type ResourceAllocationScorer interface {
-	CalculatePodResourceRequestList(pod *v1.Pod) []int64
-
-	CalculateNodeAllocatableRequest(
-		ctx context.Context,
-		nodeInfo fwk.NodeInfo,
-		podRequests []int64,
-		draPreScoreState *draPreScoreState,
-	) ([]int64, []int64)
-
-	Score(allocatable, allocated, requested []int64) int64
-}
-
 // resourceAllocationScorer contains information to calculate resource allocation score.
 type resourceAllocationScorer struct {
 	Name                                          string
@@ -164,7 +151,7 @@ func (r *resourceAllocationScorer) score(
 	}
 
 	requested := make([]int64, len(r.resources))
-	allocatable, allocated := r.CalculateNodeAllocatableRequest(ctx, nodeInfo, podRequests, draPreScoreState)
+	allocatable, allocated := r.calculateNodeAllocatableRequest(ctx, nodeInfo, podRequests, draPreScoreState)
 	for i := range r.resources {
 		requested[i] = allocated[i] + podRequests[i]
 	}
@@ -185,7 +172,7 @@ func (r *resourceAllocationScorer) Score(allocatable, allocated, requested []int
 	return r.scorer(requested, allocated, allocatable)
 }
 
-func (r *resourceAllocationScorer) CalculateNodeAllocatableRequest(
+func (r *resourceAllocationScorer) calculateNodeAllocatableRequest(
 	ctx context.Context,
 	nodeInfo fwk.NodeInfo,
 	podRequests []int64,
@@ -277,7 +264,7 @@ func (r *resourceAllocationScorer) calculatePodResourceRequest(pod *v1.Pod, reso
 	return quantity.Value()
 }
 
-func (r *resourceAllocationScorer) CalculatePodResourceRequestList(pod *v1.Pod) []int64 {
+func (r *resourceAllocationScorer) calculatePodRequestList(pod *v1.Pod) []int64 {
 	return r.calculatePodResourceRequestList(pod, r.resources)
 }
 

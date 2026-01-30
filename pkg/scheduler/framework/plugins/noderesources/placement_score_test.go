@@ -1,4 +1,4 @@
-package placementbinpacking
+package noderesources
 
 import (
 	"testing"
@@ -74,7 +74,7 @@ func TestPlacementBinPackingArgsValidation(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
-			_, err := New(tCtx, tc.args, nil, tc.features)
+			_, err := NewPlacementBinPacking(tCtx, tc.args, nil, tc.features)
 			if (err != nil) != tc.expectedErr {
 				t.Fatalf("Unexpected error, want error %v, got %v", tc.expectedErr, err)
 			}
@@ -232,7 +232,7 @@ func TestPlacementBinPackingScore(t *testing.T) {
 			tCtx := ktesting.Init(t)
 			snapshot := cache.NewSnapshot(tc.preExistingPods, tc.nodes)
 			fh, _ := runtime.NewFramework(tCtx, nil, nil, runtime.WithSnapshotSharedLister(snapshot))
-			plugin, err := New(tCtx, &config.PlacementBinPackingArgs{ScoringStrategy: tc.strategy},
+			plugin, err := NewPlacementBinPacking(tCtx, &config.PlacementBinPackingArgs{ScoringStrategy: tc.strategy},
 				fh, feature.Features{EnableWorkloadSchedulingCycle: true})
 
 			if err != nil {
@@ -262,11 +262,4 @@ func TestPlacementBinPackingScore(t *testing.T) {
 			}
 		})
 	}
-}
-
-func cpuAndMemory(cpuReq, memoryReq string) map[v1.ResourceName]string {
-	return map[v1.ResourceName]string{v1.ResourceCPU: cpuReq, v1.ResourceMemory: memoryReq}
-}
-func cpuAndMemoryAndGpu(cpuReq, memoryReq, gpuReq string) map[v1.ResourceName]string {
-	return map[v1.ResourceName]string{v1.ResourceCPU: cpuReq, v1.ResourceMemory: memoryReq, "nvidia.com/gpu": gpuReq}
 }

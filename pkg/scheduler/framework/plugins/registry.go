@@ -32,7 +32,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeunschedulable"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodevolumelimits"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/placementbinpacking"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/schedulinggates"
@@ -49,28 +48,28 @@ import (
 func NewInTreeRegistry() runtime.Registry {
 	fts := plfeature.NewSchedulerFeaturesFromGates(feature.DefaultFeatureGate)
 	registry := runtime.Registry{
-		dynamicresources.Name:                runtime.FactoryAdapter(fts, dynamicresources.New),
-		imagelocality.Name:                   imagelocality.New,
-		tainttoleration.Name:                 runtime.FactoryAdapter(fts, tainttoleration.New),
-		nodename.Name:                        runtime.FactoryAdapter(fts, nodename.New),
-		nodeports.Name:                       runtime.FactoryAdapter(fts, nodeports.New),
-		nodeaffinity.Name:                    runtime.FactoryAdapter(fts, nodeaffinity.New),
-		nodedeclaredfeatures.Name:            runtime.FactoryAdapter(fts, nodedeclaredfeatures.New),
-		podtopologyspread.Name:               runtime.FactoryAdapter(fts, podtopologyspread.New),
-		nodeunschedulable.Name:               runtime.FactoryAdapter(fts, nodeunschedulable.New),
-		noderesources.Name:                   runtime.FactoryAdapter(fts, noderesources.NewFit),
-		noderesources.BalancedAllocationName: runtime.FactoryAdapter(fts, noderesources.NewBalancedAllocation),
-		volumebinding.Name:                   runtime.FactoryAdapter(fts, volumebinding.New),
-		volumerestrictions.Name:              runtime.FactoryAdapter(fts, volumerestrictions.New),
-		volumezone.Name:                      runtime.FactoryAdapter(fts, volumezone.New),
-		nodevolumelimits.CSIName:             runtime.FactoryAdapter(fts, nodevolumelimits.NewCSI),
-		interpodaffinity.Name:                runtime.FactoryAdapter(fts, interpodaffinity.New),
-		queuesort.Name:                       queuesort.New,
-		defaultbinder.Name:                   defaultbinder.New,
-		defaultpreemption.Name:               runtime.FactoryAdapter(fts, defaultpreemption.New),
-		schedulinggates.Name:                 runtime.FactoryAdapter(fts, schedulinggates.New),
-		gangscheduling.Name:                  runtime.FactoryAdapter(fts, gangscheduling.New),
-		placementbinpacking.Name:             runtime.FactoryAdapter(fts, placementbinpacking.New),
+		dynamicresources.Name:                 runtime.FactoryAdapter(fts, dynamicresources.New),
+		imagelocality.Name:                    imagelocality.New,
+		tainttoleration.Name:                  runtime.FactoryAdapter(fts, tainttoleration.New),
+		nodename.Name:                         runtime.FactoryAdapter(fts, nodename.New),
+		nodeports.Name:                        runtime.FactoryAdapter(fts, nodeports.New),
+		nodeaffinity.Name:                     runtime.FactoryAdapter(fts, nodeaffinity.New),
+		nodedeclaredfeatures.Name:             runtime.FactoryAdapter(fts, nodedeclaredfeatures.New),
+		podtopologyspread.Name:                runtime.FactoryAdapter(fts, podtopologyspread.New),
+		nodeunschedulable.Name:                runtime.FactoryAdapter(fts, nodeunschedulable.New),
+		noderesources.Name:                    runtime.FactoryAdapter(fts, noderesources.NewFit),
+		noderesources.BalancedAllocationName:  runtime.FactoryAdapter(fts, noderesources.NewBalancedAllocation),
+		volumebinding.Name:                    runtime.FactoryAdapter(fts, volumebinding.New),
+		volumerestrictions.Name:               runtime.FactoryAdapter(fts, volumerestrictions.New),
+		volumezone.Name:                       runtime.FactoryAdapter(fts, volumezone.New),
+		nodevolumelimits.CSIName:              runtime.FactoryAdapter(fts, nodevolumelimits.NewCSI),
+		interpodaffinity.Name:                 runtime.FactoryAdapter(fts, interpodaffinity.New),
+		queuesort.Name:                        queuesort.New,
+		defaultbinder.Name:                    defaultbinder.New,
+		defaultpreemption.Name:                runtime.FactoryAdapter(fts, defaultpreemption.New),
+		schedulinggates.Name:                  runtime.FactoryAdapter(fts, schedulinggates.New),
+		gangscheduling.Name:                   runtime.FactoryAdapter(fts, gangscheduling.New),
+		noderesources.PlacementBinPackingName: runtime.FactoryAdapter(fts, noderesources.NewPlacementBinPacking),
 	}
 
 	return registry

@@ -184,7 +184,7 @@ func (pl *Fit) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *f
 	}, nil
 }
 
-func GetScorer(strategy *config.ScoringStrategy) (*resourceAllocationScorer, error) {
+func getScorer(strategy *config.ScoringStrategy) (*resourceAllocationScorer, error) {
 	if strategy == nil {
 		return nil, fmt.Errorf("scoring strategy not specified")
 	}
@@ -205,7 +205,7 @@ func NewFit(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.
 		return nil, err
 	}
 
-	scorer, err := GetScorer(args.ScoringStrategy)
+	scorer, err := getScorer(args.ScoringStrategy)
 	if err != nil {
 		return nil, err
 	}
@@ -737,7 +737,7 @@ func (f *Fit) Score(ctx context.Context, state fwk.CycleState, pod *v1.Pod, node
 	s, err := getPreScoreState(state)
 	if err != nil {
 		s = &preScoreState{
-			podRequests: f.CalculatePodResourceRequestList(pod),
+			podRequests: f.calculatePodRequestList(pod),
 		}
 		if f.enableDRAExtendedResource {
 			draPreScoreState, status := getDRAPreScoredParams(f.draManager, f.resources)
