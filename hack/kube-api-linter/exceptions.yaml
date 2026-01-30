@@ -95,3 +95,7 @@
 # OptionalOrRequired - Existing fields that are marked as both optional and required (based on standard optional vs kubebuilder:validation:Required) and should not be fixed.
 - text: "field (PortStatus|IngressPortStatus)\\.Error must not be marked as both optional and required"
   path: "staging/src/k8s.io/api/(core/v1|extensions/v1beta1|networking/(v1|v1beta1))"
+
+# jsontags: 'Port' must be capitalized for backward compatibility
+- text: 'jsontags: field DaemonEndpoint.Port json tag does not match'
+  path: "staging/src/k8s.io/api/core/v1/types.go"
