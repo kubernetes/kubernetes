@@ -397,6 +397,14 @@ func New(ctx context.Context,
 		return nil, returnErr
 	}
 
+	// Extract pod signing functions from each profile
+	podSigners := make(map[string]internalqueue.PodSigner)
+	for profileName, profile := range profiles {
+		podSigners[profileName] = func(ctx context.Context, pod *v1.Pod, recordPluginStats bool) fwk.PodSignature {
+			return profile.SignPod(ctx, pod, recordPluginStats)
+		}
+	}
+
 	podQueue := internalqueue.NewSchedulingQueue(
 		profiles[options.profiles[0].SchedulerName].QueueSortFunc(),
 		informerFactory,
@@ -410,6 +418,7 @@ func New(ctx context.Context,
 		internalqueue.WithPluginMetricsSamplePercent(pluginMetricsSamplePercent),
 		internalqueue.WithMetricsRecorder(metricsRecorder),
 		internalqueue.WithAPIDispatcher(apiDispatcher),
+		internalqueue.WithPodSigners(podSigners),
 	)
 
 	schedulerCache := internalcache.New(ctx, apiDispatcher)

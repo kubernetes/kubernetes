@@ -231,7 +231,7 @@ func (sched *Scheduler) addPodToSchedulingQueue(pod *v1.Pod) {
 
 	logger := sched.logger
 	logger.V(3).Info("Add event for unscheduled pod", "pod", klog.KObj(pod))
-	sched.SchedulingQueue.Add(logger, pod)
+	sched.SchedulingQueue.Add(context.Background(), logger, pod)
 	if utilfeature.DefaultFeatureGate.Enabled(features.GangScheduling) {
 		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.EventUnscheduledPodAdd, nil, pod, nil)
 	}
@@ -330,7 +330,7 @@ func (sched *Scheduler) updatePodInSchedulingQueue(oldPod, newPod *v1.Pod) {
 	}
 
 	logger.V(4).Info("Update event for unscheduled pod", "pod", klog.KObj(newPod))
-	sched.SchedulingQueue.Update(logger, oldPod, newPod)
+	sched.SchedulingQueue.Update(context.Background(), logger, oldPod, newPod)
 	if hasNominatedNodeNameChanged(oldPod, newPod) {
 		// Nominated node changed in pod, so we need to treat it as if the pod was deleted from the old nominated node,
 		// because the scheduler treats such a pod as if it was already assigned when scheduling lower or equal priority pods.
