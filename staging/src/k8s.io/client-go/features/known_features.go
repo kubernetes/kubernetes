@@ -87,6 +87,13 @@ const (
 	//
 	// Allow the client to get a stream of individual items instead of chunking from the server.
 	WatchListClient Feature = "WatchListClient"
+
+	// owner: @p0lyn0mial
+	// alpha: v1.36
+	//
+	// Enable memory optimization for WatchList by reusing cached objects when
+	// resource version matches.
+	WatchListMemoryOptimization Feature = "WatchListMemoryOptimization"
 )
 
 // defaultVersionedKubernetesFeatureGates consists of all known Kubernetes-specific feature keys.
@@ -120,5 +127,8 @@ var defaultVersionedKubernetesFeatureGates = map[Feature]VersionedSpecs{
 	WatchListClient: {
 		{Version: version.MustParse("1.30"), Default: false, PreRelease: Beta},
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: Beta},
+	},
+	WatchListMemoryOptimization: {
+		{Version: version.MustParse("1.36"), Default: false, PreRelease: Alpha},
 	},
 }
