@@ -639,12 +639,12 @@ func TestWatchListMemoryOptimizationFeatureGate(t *testing.T) {
 		expectReuse         bool
 	}{
 		{
-			name:                "watchlist enabled reuses existing object",
+			name:                "memory optimization enabled reuses existing object",
 			enableWatchListGate: true,
 			expectReuse:         true,
 		},
 		{
-			name:                "watchlist disabled does not reuse existing object",
+			name:                "memory optimization disabled does not reuse existing object",
 			enableWatchListGate: false,
 			expectReuse:         false,
 		},
@@ -652,7 +652,8 @@ func TestWatchListMemoryOptimizationFeatureGate(t *testing.T) {
 
 	for _, scenario := range scenarios {
 		t.Run(scenario.name, func(t *testing.T) {
-			clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListClient, scenario.enableWatchListGate)
+			clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListClient, true)
+			clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListMemoryOptimization, scenario.enableWatchListGate)
 
 			existingObject := makePod("p1", "10")
 			incomingObject := makePod("p1", "10")
@@ -676,21 +677,19 @@ func TestWatchListMemoryOptimizationFeatureGate(t *testing.T) {
 				errCh <- reflector.ListAndWatchWithContext(ctx)
 			}()
 
-			if scenario.enableWatchListGate {
-				require.NoError(t, wait.PollImmediate(10*time.Millisecond, 1*time.Second, func() (bool, error) {
-					return lw.watchCounter > 0, nil
-				}))
-				lw.fakeWatcher.Add(incomingObject)
-				bookmark := &v1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						ResourceVersion: "10",
-						Annotations: map[string]string{
-							metav1.InitialEventsAnnotationKey: "true",
-						},
+			require.NoError(t, wait.PollImmediate(10*time.Millisecond, 1*time.Second, func() (bool, error) {
+				return lw.watchCounter > 0, nil
+			}))
+			lw.fakeWatcher.Add(incomingObject)
+			bookmark := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					ResourceVersion: "10",
+					Annotations: map[string]string{
+						metav1.InitialEventsAnnotationKey: "true",
 					},
-				}
-				lw.fakeWatcher.Action(watch.Bookmark, bookmark)
+				},
 			}
+			lw.fakeWatcher.Action(watch.Bookmark, bookmark)
 
 			key, err := DeletionHandlingMetaNamespaceKeyFunc(incomingObject)
 			require.NoError(t, err)
