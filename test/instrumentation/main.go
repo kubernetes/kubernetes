@@ -46,7 +46,7 @@ var (
 	// env configs
 	GOOS                  string = findGOOS()
 	ALL_STABILITY_CLASSES bool
-	ENDPOINT_MAPPINGS     string
+	EndpointMappings      string
 )
 
 func findGOOS() string {
@@ -64,7 +64,7 @@ func findGOOS() string {
 func main() {
 
 	flag.BoolVar(&ALL_STABILITY_CLASSES, "allstabilityclasses", false, "use this flag to enable all stability classes")
-	flag.StringVar(&ENDPOINT_MAPPINGS, "endpoint-mappings", "", "path to endpoint mappings configuration file")
+	flag.StringVar(&EndpointMappings, "endpoint-mappings", "", "path to endpoint mappings configuration file")
 	flag.Parse()
 	if len(flag.Args()) < 1 {
 		fmt.Fprintf(os.Stderr, "USAGE: %s <DIR or FILE or '-'> [...]\n", os.Args[0])
@@ -73,9 +73,9 @@ func main() {
 
 	// Load endpoint mappings configuration if provided
 	var endpointConfig *endpointMappingConfig
-	if ENDPOINT_MAPPINGS != "" {
+	if EndpointMappings != "" {
 		var err error
-		endpointConfig, err = loadEndpointMappingConfig(ENDPOINT_MAPPINGS)
+		endpointConfig, err = loadEndpointMappingConfig(EndpointMappings)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "failed to load endpoint mappings: %s\n", err)
 			os.Exit(1)
