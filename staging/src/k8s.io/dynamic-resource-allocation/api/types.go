@@ -72,6 +72,7 @@ type Device struct {
 	BindingConditions        []string                                                  `json:",omitempty"`
 	BindingFailureConditions []string                                                  `json:",omitempty"`
 	AllowMultipleAllocations *bool                                                     `json:",omitempty"`
+	NativeResourceMappings   map[v1.ResourceName]resourceapi.NativeResourceMapping     `json:",omitempty"`
 }
 
 type DeviceCounterConsumption struct {
