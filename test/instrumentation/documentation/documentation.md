@@ -8,7 +8,7 @@ description: >-
 
 ## Metrics (v1.36)
 
-<!-- (auto-generated 2026 Jan 22) -->
+<!-- (auto-generated 2026 Jan 30) -->
 <!-- (auto-generated v1.36) -->
 This page details the metrics that different Kubernetes components export. You can query the metrics endpoint for these 
 components using an HTTP scrape, and fetch the current metrics data in Prometheus format.
@@ -597,7 +597,7 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<ul>
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
 	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
-	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">crd</span><span class="metric_label">reason</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-controller-manager (/metrics)</li></ul></li></ul>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">crd</span><span class="metric_label">reason</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-apiserver (/metrics)</li></ul></li></ul>
 	</div><div class="metric" data-stability="alpha">
 	<div class="metric_name">apiextensions_openapi_v3_regeneration_count</div>
 	<div class="metric_help">Counter of OpenAPI v3 spec regeneration count broken down by group, version, causing CRD and reason.</div>

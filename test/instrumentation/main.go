@@ -191,6 +191,9 @@ func searchFileForStableMetrics(filename string, src interface{}, endpointConfig
 			for i := range metrics {
 				metrics[i].ComponentEndpoints = ces
 			}
+		} else if len(metrics) > 0 {
+			fmt.Fprintf(os.Stderr, "WARNING: found %d metric(s) in %q but could not infer component endpoints. "+
+				"Consider updating endpoint-mappings.yaml.\n", len(metrics), filename)
 		}
 	}
 

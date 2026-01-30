@@ -4142,7 +4142,7 @@
   - crd
   - reason
   componentEndpoints:
-  - component: kube-controller-manager
+  - component: kube-apiserver
     endpoint: /metrics
 - name: apiextensions_openapi_v3_regeneration_count
   help: Counter of OpenAPI v3 spec regeneration count broken down by group, version,
