@@ -355,10 +355,16 @@ func (o *AttachOptions) reattachMessage(containerName string, rawTTY bool) strin
 	if o.Quiet || !o.Stdin || !rawTTY || o.Pod.Spec.RestartPolicy != corev1.RestartPolicyAlways {
 		return ""
 	}
-	if _, path := podcmd.FindContainerByName(o.Pod, containerName); strings.HasPrefix(path, "spec.ephemeralContainers") {
-		return fmt.Sprintf("Session ended, the ephemeral container will not be restarted but may be reattached using '%s %s -c %s -i -t' if it is still running", o.CommandName, o.Pod.Name, containerName)
+
+	var namespaceFlag string
+	if o.Pod.Namespace != "" && o.Pod.Namespace != "default" {
+		namespaceFlag = fmt.Sprintf(" -n %s", o.Pod.Namespace)
 	}
-	return fmt.Sprintf("Session ended, resume using '%s %s -c %s -i -t' command when the pod is running", o.CommandName, o.Pod.Name, containerName)
+
+	if _, path := podcmd.FindContainerByName(o.Pod, containerName); strings.HasPrefix(path, "spec.ephemeralContainers") {
+		return fmt.Sprintf("Session ended, the ephemeral container will not be restarted but may be reattached using '%s%s %s -c %s -i -t' if it is still running", o.CommandName, namespaceFlag, o.Pod.Name, containerName)
+	}
+	return fmt.Sprintf("Session ended, resume using '%s%s %s -c %s -i -t' command when the pod is running", o.CommandName, namespaceFlag, o.Pod.Name, containerName)
 }
 
 type terminalSizeQueueAdapter struct {
