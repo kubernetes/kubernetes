@@ -17,6 +17,7 @@ limitations under the License.
 package retry
 
 import (
+	"context"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -42,13 +43,16 @@ var DefaultBackoff = wait.Backoff{
 	Jitter:   0.1,
 }
 
-// OnError allows the caller to retry fn in case the error returned by fn is retriable
-// according to the provided function. backoff defines the maximum retries and the wait
-// interval between two retries.
-func OnError(backoff wait.Backoff, retriable func(error) bool, fn func() error) error {
+// OnErrorWithContext allows the caller to retry fn in case the error returned by fn
+// is retriable according to the provided function. backoff defines the maximum retries
+// and the wait interval between two retries.
+//
+// The context is used to allow the caller to cancel the retry operation.
+// If the context is cancelled, OnErrorWithContext will return ctx.Err().
+func OnErrorWithContext(ctx context.Context, backoff wait.Backoff, retriable func(error) bool, fn func(context.Context) error) error {
 	var lastErr error
-	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
-		err := fn()
+	err := wait.ExponentialBackoffWithContext(ctx, backoff, func(ctx context.Context) (bool, error) {
+		err := fn(ctx)
 		switch {
 		case err == nil:
 			return true, nil
@@ -59,10 +63,24 @@ func OnError(backoff wait.Backoff, retriable func(error) bool, fn func() error) 
 			return false, err
 		}
 	})
+	// If the context was cancelled or the deadline was exceeded, return the context error.
+	// Otherwise, if we timed out (ran out of steps), return the last error we saw.
+	if err == context.Canceled || err == context.DeadlineExceeded {
+		return err
+	}
 	if wait.Interrupted(err) {
-		err = lastErr
+		return lastErr
 	}
 	return err
+}
+
+// OnError allows the caller to retry fn in case the error returned by fn is retriable
+// according to the provided function. backoff defines the maximum retries and the wait
+// interval between two retries.
+func OnError(backoff wait.Backoff, retriable func(error) bool, fn func() error) error {
+	return OnErrorWithContext(context.Background(), backoff, retriable, func(context.Context) error {
+		return fn()
+	})
 }
 
 // RetryOnConflict is used to make an update to a resource when you have to worry about
@@ -101,5 +119,17 @@ func OnError(backoff wait.Backoff, retriable func(error) bool, fn func() error) 
 //
 // TODO: Make Backoff an interface?
 func RetryOnConflict(backoff wait.Backoff, fn func() error) error {
-	return OnError(backoff, errors.IsConflict, fn)
+	return RetryOnConflictWithContext(context.Background(), backoff, func(context.Context) error {
+		return fn()
+	})
+}
+
+// RetryOnConflictWithContext is used to make an update to a resource when you have
+// to worry about conflicts caused by other code making unrelated updates to the
+// resource at the same time.
+//
+// The context is used to allow the caller to cancel the retry operation.
+// If the context is cancelled, RetryOnConflictWithContext will return ctx.Err().
+func RetryOnConflictWithContext(ctx context.Context, backoff wait.Backoff, fn func(context.Context) error) error {
+	return OnErrorWithContext(ctx, backoff, errors.IsConflict, fn)
 }
