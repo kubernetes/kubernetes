@@ -259,7 +259,6 @@ func buildPool(id PoolID, slices []*draapi.ResourceSlice, features Features, all
 	} else {
 		deviceSlices = slices
 	}
-
 	if err := validateDeviceNames(deviceSlices); err != nil {
 		return &Pool{
 			PoolID:        id,
