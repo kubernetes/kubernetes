@@ -18,16 +18,20 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"testing"
 	"time"
 
 	apps "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	types "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
+	appsv1apply "k8s.io/client-go/applyconfigurations/apps/v1"
 	kubeinformers "k8s.io/client-go/informers"
 	k8sfake "k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
@@ -228,12 +232,9 @@ func filterInformerActions(actions []core.Action) []core.Action {
 	return ret
 }
 
-func (f *fixture) expectCreateDeploymentAction(d *apps.Deployment) {
-	f.kubeactions = append(f.kubeactions, core.NewCreateAction(schema.GroupVersionResource{Resource: "deployments"}, d.Namespace, d))
-}
-
-func (f *fixture) expectUpdateDeploymentAction(d *apps.Deployment) {
-	f.kubeactions = append(f.kubeactions, core.NewUpdateAction(schema.GroupVersionResource{Resource: "deployments"}, d.Namespace, d))
+func (f *fixture) expectApplyDeploymentAction(d *appsv1apply.DeploymentApplyConfiguration) {
+	patch, _ := json.Marshal(d)
+	f.kubeactions = append(f.kubeactions, core.NewPatchAction(schema.GroupVersionResource{Resource: "deployments"}, *d.ObjectMetaApplyConfiguration.Namespace, *d.ObjectMetaApplyConfiguration.Name, types.ApplyPatchType, patch))
 }
 
 func (f *fixture) expectUpdateFooStatusAction(foo *samplecontroller.Foo) {
@@ -246,6 +247,41 @@ func getRef(foo *samplecontroller.Foo, t *testing.T) cache.ObjectName {
 	return ref
 }
 
+func newDeployment(foo *samplecontroller.Foo) *apps.Deployment {
+	labels := map[string]string{
+		"app":        "nginx",
+		"controller": foo.Name,
+	}
+	return &apps.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      foo.Spec.DeploymentName,
+			Namespace: foo.Namespace,
+			OwnerReferences: []metav1.OwnerReference{
+				*metav1.NewControllerRef(foo, samplecontroller.SchemeGroupVersion.WithKind("Foo")),
+			},
+		},
+		Spec: apps.DeploymentSpec{
+			Replicas: foo.Spec.Replicas,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: labels,
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: labels,
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "nginx",
+							Image: "nginx:latest",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 func TestCreatesDeployment(t *testing.T) {
 	f := newFixture(t)
 	foo := newFoo("test", ptr.To[int32](1))
@@ -254,8 +290,8 @@ func TestCreatesDeployment(t *testing.T) {
 	f.fooLister = append(f.fooLister, foo)
 	f.objects = append(f.objects, foo)
 
-	expDeployment := newDeployment(foo)
-	f.expectCreateDeploymentAction(expDeployment)
+	expDeployment := applyDeployment(foo)
+	f.expectApplyDeploymentAction(expDeployment)
 	f.expectUpdateFooStatusAction(foo)
 
 	f.run(ctx, getRef(foo, t))
@@ -273,6 +309,8 @@ func TestDoNothing(t *testing.T) {
 	f.deploymentLister = append(f.deploymentLister, d)
 	f.kubeobjects = append(f.kubeobjects, d)
 
+	expDeployment := applyDeployment(foo)
+	f.expectApplyDeploymentAction(expDeployment)
 	f.expectUpdateFooStatusAction(foo)
 	f.run(ctx, getRef(foo, t))
 }
@@ -286,7 +324,7 @@ func TestUpdateDeployment(t *testing.T) {
 
 	// Update replicas
 	foo.Spec.Replicas = ptr.To[int32](2)
-	expDeployment := newDeployment(foo)
+	expDeployment := applyDeployment(foo)
 
 	f.fooLister = append(f.fooLister, foo)
 	f.objects = append(f.objects, foo)
@@ -294,7 +332,7 @@ func TestUpdateDeployment(t *testing.T) {
 	f.kubeobjects = append(f.kubeobjects, d)
 
 	f.expectUpdateFooStatusAction(foo)
-	f.expectUpdateDeploymentAction(expDeployment)
+	f.expectApplyDeploymentAction(expDeployment)
 	f.run(ctx, getRef(foo, t))
 }
 

@@ -39,6 +39,10 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 
+	appsv1apply "k8s.io/client-go/applyconfigurations/apps/v1"
+	corev1apply "k8s.io/client-go/applyconfigurations/core/v1"
+	metav1apply "k8s.io/client-go/applyconfigurations/meta/v1"
+
 	samplev1alpha1 "k8s.io/sample-controller/pkg/apis/samplecontroller/v1alpha1"
 	clientset "k8s.io/sample-controller/pkg/generated/clientset/versioned"
 	samplescheme "k8s.io/sample-controller/pkg/generated/clientset/versioned/scheme"
@@ -128,6 +132,13 @@ func NewController(
 	fooInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: controller.enqueueFoo,
 		UpdateFunc: func(old, new interface{}) {
+			oldFoo := old.(*samplev1alpha1.Foo)
+			newFoo := new.(*samplev1alpha1.Foo)
+			if oldFoo.Generation == newFoo.Generation {
+				// Spec hasn't changed, so no need to re-apply the Deployment.
+				// (Status updates don't change Generation)
+				return
+			}
 			controller.enqueueFoo(new)
 		},
 	})
@@ -145,6 +156,11 @@ func NewController(
 			if newDepl.ResourceVersion == oldDepl.ResourceVersion {
 				// Periodic resync will send update events for all known Deployments.
 				// Two different versions of the same Deployment will always have different RVs.
+				return
+			}
+			// Optimization: If Deployment spec hasn't changed (Generation) AND the status we care about (AvailableReplicas) hasn't changed,
+			// we can ignore this update.
+			if newDepl.Generation == oldDepl.Generation && newDepl.Status.AvailableReplicas == oldDepl.Status.AvailableReplicas {
 				return
 			}
 			controller.handleObject(new)
@@ -247,7 +263,7 @@ func (c *Controller) syncHandler(ctx context.Context, objectRef cache.ObjectName
 		// The Foo resource may no longer exist, in which case we stop
 		// processing.
 		if errors.IsNotFound(err) {
-			utilruntime.HandleErrorWithContext(ctx, err, "Foo referenced by item in work queue no longer exists", "objectReference", objectRef)
+			logger.Info("Foo referenced by item in work queue no longer exists")
 			return nil
 		}
 
@@ -267,35 +283,26 @@ func (c *Controller) syncHandler(ctx context.Context, objectRef cache.ObjectName
 	deployment, err := c.deploymentsLister.Deployments(foo.Namespace).Get(deploymentName)
 	// If the resource doesn't exist, we'll create it
 	if errors.IsNotFound(err) {
-		deployment, err = c.kubeclientset.AppsV1().Deployments(foo.Namespace).Create(ctx, newDeployment(foo), metav1.CreateOptions{FieldManager: FieldManager})
+		deployment = nil
 	}
 
 	// If an error occurs during Get/Create, we'll requeue the item so we can
 	// attempt processing again later. This could have been caused by a
 	// temporary network failure, or any other transient reason.
-	if err != nil {
+	if err != nil && !errors.IsNotFound(err) {
 		return err
 	}
 
 	// If the Deployment is not controlled by this Foo resource, we should log
 	// a warning to the event recorder and return error msg.
-	if !metav1.IsControlledBy(deployment, foo) {
+	if deployment != nil && !metav1.IsControlledBy(deployment, foo) {
 		msg := fmt.Sprintf(MessageResourceExists, deployment.Name)
 		c.recorder.Event(foo, corev1.EventTypeWarning, ErrResourceExists, msg)
 		return fmt.Errorf("%s", msg)
 	}
 
-	// If this number of the replicas on the Foo resource is specified, and the
-	// number does not equal the current desired replicas on the Deployment, we
-	// should update the Deployment resource.
-	if foo.Spec.Replicas != nil && *foo.Spec.Replicas != *deployment.Spec.Replicas {
-		logger.V(4).Info("Update deployment resource", "currentReplicas", *deployment.Spec.Replicas, "desiredReplicas", *foo.Spec.Replicas)
-		deployment, err = c.kubeclientset.AppsV1().Deployments(foo.Namespace).Update(ctx, newDeployment(foo), metav1.UpdateOptions{FieldManager: FieldManager})
-	}
-
-	// If an error occurs during Update, we'll requeue the item so we can
-	// attempt processing again later. This could have been caused by a
-	// temporary network failure, or any other transient reason.
+	applyConfig := applyDeployment(foo)
+	deployment, err = c.kubeclientset.AppsV1().Deployments(foo.Namespace).Apply(ctx, applyConfig, metav1.ApplyOptions{FieldManager: FieldManager, Force: true})
 	if err != nil {
 		return err
 	}
@@ -385,37 +392,26 @@ func (c *Controller) handleObject(obj interface{}) {
 // newDeployment creates a new Deployment for a Foo resource. It also sets
 // the appropriate OwnerReferences on the resource so handleObject can discover
 // the Foo resource that 'owns' it.
-func newDeployment(foo *samplev1alpha1.Foo) *appsv1.Deployment {
+func applyDeployment(foo *samplev1alpha1.Foo) *appsv1apply.DeploymentApplyConfiguration {
 	labels := map[string]string{
 		"app":        "nginx",
 		"controller": foo.Name,
 	}
-	return &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      foo.Spec.DeploymentName,
-			Namespace: foo.Namespace,
-			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(foo, samplev1alpha1.SchemeGroupVersion.WithKind("Foo")),
-			},
-		},
-		Spec: appsv1.DeploymentSpec{
-			Replicas: foo.Spec.Replicas,
-			Selector: &metav1.LabelSelector{
-				MatchLabels: labels,
-			},
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: labels,
-				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{
-							Name:  "nginx",
-							Image: "nginx:latest",
-						},
-					},
-				},
-			},
-		},
-	}
+	return appsv1apply.Deployment(foo.Spec.DeploymentName, foo.Namespace).
+		WithOwnerReferences(metav1apply.OwnerReference().
+			WithAPIVersion(samplev1alpha1.SchemeGroupVersion.String()).
+			WithKind("Foo").
+			WithName(foo.Name).
+			WithUID(foo.GetUID()).
+			WithController(true).
+			WithBlockOwnerDeletion(true)).
+		WithSpec(appsv1apply.DeploymentSpec().
+			WithReplicas(*foo.Spec.Replicas).
+			WithSelector(metav1apply.LabelSelector().WithMatchLabels(labels)).
+			WithTemplate(corev1apply.PodTemplateSpec().
+				WithLabels(labels).
+				WithSpec(corev1apply.PodSpec().
+					WithContainers(corev1apply.Container().
+						WithName("nginx").
+						WithImage("nginx:latest")))))
 }
