@@ -55,13 +55,13 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		"service account subject name is required": {
 			input: mkValidFlowSchema(tweakServiceAccountSubjectName("")),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec", "rules").Index(0).Child("subjects").Index(0).Child("group.name"), "").MarkCoveredByDeclarative(),
+				field.Required(field.NewPath("spec", "rules").Index(0).Child("subjects").Index(0).Child("serviceAccount.name"), "").MarkCoveredByDeclarative(),
 			},
 		},
 		"service account subject namespace is required": {
 			input: mkValidFlowSchema(tweakServiceAccountSubjectNamespace("")),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec", "rules").Index(0).Child("subjects").Index(0).Child("group.name"), "").MarkCoveredByDeclarative(),
+				field.Required(field.NewPath("spec", "rules").Index(0).Child("subjects").Index(0).Child("serviceAccount.namespace"), "").MarkCoveredByDeclarative(),
 			},
 		},
 	}
@@ -93,13 +93,13 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		"service account subject name is required": {
 			updateObj: mkValidFlowSchema(tweakServiceAccountSubjectName("")),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec", "rules").Index(0).Child("subjects").Index(0).Child("group.name"), "").MarkCoveredByDeclarative(),
+				field.Required(field.NewPath("spec", "rules").Index(0).Child("subjects").Index(0).Child("serviceAccount.name"), "").MarkCoveredByDeclarative(),
 			},
 		},
 		"service account subject namespace is required": {
 			updateObj: mkValidFlowSchema(tweakServiceAccountSubjectNamespace("")),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec", "rules").Index(0).Child("subjects").Index(0).Child("group.name"), "").MarkCoveredByDeclarative(),
+				field.Required(field.NewPath("spec", "rules").Index(0).Child("subjects").Index(0).Child("serviceAccount.namespace"), "").MarkCoveredByDeclarative(),
 			},
 		},
 	}
@@ -135,8 +135,8 @@ func mkValidFlowSchema(tweaks ...func(obj *flowcontrol.FlowSchema)) flowcontrol.
 						{
 							Kind: flowcontrol.SubjectKindServiceAccount,
 							ServiceAccount: &flowcontrol.ServiceAccountSubject{
-								Name:      "service account name",
-								Namespace: "service account namespace",
+								Name:      "serviceaccountname",
+								Namespace: "serviceaccountnamespace",
 							},
 						},
 					},
