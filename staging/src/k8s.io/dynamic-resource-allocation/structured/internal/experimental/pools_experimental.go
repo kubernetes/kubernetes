@@ -245,11 +245,11 @@ func addSlice(pools map[PoolID][]*draapi.ResourceSlice, s *resourceapi.ResourceS
 	return nil
 }
 
-func buildPool(id PoolID, resourceSlices []*draapi.ResourceSlice, features Features, allSlicesForPool []*resourceapi.ResourceSlice) (*Pool, error) {
+func buildPool(id PoolID, slices []*draapi.ResourceSlice, features Features, allSlicesForPool []*resourceapi.ResourceSlice) (*Pool, error) {
 	var deviceSlices []*draapi.ResourceSlice
 	var counterSetSlices []*draapi.ResourceSlice
 	if features.PartitionableDevices {
-		for _, slice := range resourceSlices {
+		for _, slice := range slices {
 			if len(slice.Spec.SharedCounters) > 0 {
 				counterSetSlices = append(counterSetSlices, slice)
 			} else {
@@ -257,7 +257,7 @@ func buildPool(id PoolID, resourceSlices []*draapi.ResourceSlice, features Featu
 			}
 		}
 	} else {
-		deviceSlices = resourceSlices
+		deviceSlices = slices
 	}
 
 	if err := validateDeviceNames(deviceSlices); err != nil {
@@ -285,7 +285,7 @@ func buildPool(id PoolID, resourceSlices []*draapi.ResourceSlice, features Featu
 		}, nil
 	}
 
-	if err := validateDeviceCounterConsumption(counterSets, resourceSlices); err != nil {
+	if err := validateDeviceCounterConsumption(counterSets, slices); err != nil {
 		return &Pool{
 			PoolID:        id,
 			IsInvalid:     true,
@@ -294,7 +294,7 @@ func buildPool(id PoolID, resourceSlices []*draapi.ResourceSlice, features Featu
 	}
 	// If we have already seen all slices (both with counter sets and devices),
 	// we don't need to do any more validation.
-	if allSlicesForPool == nil || len(resourceSlices) == len(allSlicesForPool) {
+	if allSlicesForPool == nil || len(slices) == len(allSlicesForPool) {
 		return &Pool{
 			PoolID:                    id,
 			DeviceSlicesTargetingNode: deviceSlices,
@@ -309,7 +309,7 @@ func buildPool(id PoolID, resourceSlices []*draapi.ResourceSlice, features Featu
 	// We only want to convert the slices we haven't already converted, so make it easy to
 	// look up the names of converted slices.
 	slicesTargetingNodeNames := sets.New[string]()
-	for _, slice := range resourceSlices {
+	for _, slice := range slices {
 		slicesTargetingNodeNames.Insert(slice.Name)
 	}
 	var slicesNotTargetingNode []*draapi.ResourceSlice
