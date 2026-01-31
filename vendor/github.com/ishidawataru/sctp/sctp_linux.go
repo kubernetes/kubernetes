@@ -22,7 +22,6 @@ import (
 	"io"
 	"net"
 	"runtime"
-	"sync/atomic"
 	"syscall"
 	"unsafe"
 )
@@ -138,7 +137,7 @@ func (c *SCTPConn) SCTPRead(b []byte) (int, *SndRcvInfo, error) {
 
 func (c *SCTPConn) Close() error {
 	if c != nil {
-		fd := atomic.SwapInt32(&c._fd, -1)
+		fd := c._fd.Swap(-1)
 		if fd > 0 {
 			info := &SndRcvInfo{
 				Flags: SCTP_EOF,

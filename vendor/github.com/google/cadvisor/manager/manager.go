@@ -26,7 +26,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/google/cadvisor/cache/memory"
@@ -1261,7 +1260,7 @@ func (m *manager) watchForNewOoms() error {
 				continue
 			}
 			for _, cont := range conts {
-				atomic.AddUint64(&cont.oomEvents, 1)
+				cont.oomEvents.Add(1)
 			}
 		}
 	}()

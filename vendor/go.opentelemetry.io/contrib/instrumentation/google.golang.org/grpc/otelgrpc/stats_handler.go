@@ -26,8 +26,8 @@ import (
 type gRPCContextKey struct{}
 
 type gRPCContext struct {
-	inMessages  int64
-	outMessages int64
+	inMessages  atomic.Int64
+	outMessages atomic.Int64
 	metricAttrs []attribute.KeyValue
 	record      bool
 }
@@ -285,7 +285,7 @@ func (c *config) handleRPC(
 	case *stats.Begin:
 	case *stats.InPayload:
 		if gctx != nil {
-			messageId = atomic.AddInt64(&gctx.inMessages, 1)
+			messageId = gctx.inMessages.Add(1)
 			inSize.Record(ctx, int64(rs.Length), gctx.metricAttrs...)
 		}
 
@@ -301,7 +301,7 @@ func (c *config) handleRPC(
 		}
 	case *stats.OutPayload:
 		if gctx != nil {
-			messageId = atomic.AddInt64(&gctx.outMessages, 1)
+			messageId = gctx.outMessages.Add(1)
 			outSize.Record(ctx, int64(rs.Length), gctx.metricAttrs...)
 		}
 
@@ -356,8 +356,8 @@ func (c *config) handleRPC(
 
 		duration.Record(ctx, elapsedTime, recordOpts...)
 		if gctx != nil {
-			inMsg.Record(ctx, atomic.LoadInt64(&gctx.inMessages), recordOpts...)
-			outMsg.Record(ctx, atomic.LoadInt64(&gctx.outMessages), recordOpts...)
+			inMsg.Record(ctx, gctx.inMessages.Load(), recordOpts...)
+			outMsg.Record(ctx, gctx.outMessages.Load(), recordOpts...)
 		}
 	default:
 		return

@@ -38,14 +38,14 @@ type writeQuota struct {
 	// It is implemented as a field so that it can be updated
 	// by tests.
 	replenish func(n int)
-	quota     int32
+	quota     atomic.Int32
 }
 
 // init allows a writeQuota to be initialized in-place, which is useful for
 // resetting a buffer or for avoiding a heap allocation when the buffer is
 // embedded in another struct.
 func (w *writeQuota) init(sz int32, done <-chan struct{}) {
-	w.quota = sz
+	w.quota.Store(sz)
 	w.ch = make(chan struct{}, 1)
 	w.done = done
 	w.replenish = w.realReplenish
@@ -53,8 +53,8 @@ func (w *writeQuota) init(sz int32, done <-chan struct{}) {
 
 func (w *writeQuota) get(sz int32) error {
 	for {
-		if atomic.LoadInt32(&w.quota) > 0 {
-			atomic.AddInt32(&w.quota, -sz)
+		if w.quota.Load() > 0 {
+			w.quota.Add(-sz)
 			return nil
 		}
 		select {
@@ -68,7 +68,7 @@ func (w *writeQuota) get(sz int32) error {
 
 func (w *writeQuota) realReplenish(n int) {
 	sz := int32(n)
-	newQuota := atomic.AddInt32(&w.quota, sz)
+	newQuota := w.quota.Add(sz)
 	previousQuota := newQuota - sz
 	if previousQuota <= 0 && newQuota > 0 {
 		select {
@@ -81,7 +81,7 @@ func (w *writeQuota) realReplenish(n int) {
 type trInFlow struct {
 	limit               uint32
 	unacked             uint32
-	effectiveWindowSize uint32
+	effectiveWindowSize atomic.Uint32
 }
 
 func (f *trInFlow) newLimit(n uint32) uint32 {
@@ -108,11 +108,11 @@ func (f *trInFlow) reset() uint32 {
 }
 
 func (f *trInFlow) updateEffectiveWindowSize() {
-	atomic.StoreUint32(&f.effectiveWindowSize, f.limit-f.unacked)
+	f.effectiveWindowSize.Store(f.limit - f.unacked)
 }
 
 func (f *trInFlow) getSize() uint32 {
-	return atomic.LoadUint32(&f.effectiveWindowSize)
+	return f.effectiveWindowSize.Load()
 }
 
 // TODO(mmukhi): Simplify this code.

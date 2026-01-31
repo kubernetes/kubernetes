@@ -314,7 +314,7 @@ type ClientConn struct {
 	t             *Transport
 	tconn         net.Conn             // usually *tls.Conn, except specialized impls
 	tlsState      *tls.ConnectionState // nil only for specialized impls
-	atomicReused  uint32               // whether conn is being reused; atomic
+	atomicReused  atomic.Uint32        // whether conn is being reused; atomic
 	singleUse     bool                 // whether being used for a single http.Request
 	getConnCalled bool                 // used by clientConnPool
 
@@ -605,7 +605,7 @@ func (t *Transport) RoundTripOpt(req *http.Request, opt RoundTripOpt) (*http.Res
 			t.vlogf("http2: Transport failed to get client conn for %s: %v", addr, err)
 			return nil, err
 		}
-		reused := !atomic.CompareAndSwapUint32(&cc.atomicReused, 0, 1)
+		reused := !cc.atomicReused.CompareAndSwap(0, 1)
 		traceGotConn(req, cc, reused)
 		res, err := cc.RoundTrip(req)
 		if err != nil && retry <= 6 {
@@ -2189,7 +2189,7 @@ func (rl *clientConnReadLoop) cleanup() {
 		unusedWaitTime = cc.idleTimeout
 	}
 	idleTime := time.Now().Sub(cc.lastActive)
-	if atomic.LoadUint32(&cc.atomicReused) == 0 && idleTime < unusedWaitTime && !cc.closedOnIdle {
+	if cc.atomicReused.Load() == 0 && idleTime < unusedWaitTime && !cc.closedOnIdle {
 		cc.idleTimer = time.AfterFunc(unusedWaitTime-idleTime, func() {
 			cc.t.connPool().MarkDead(cc)
 		})

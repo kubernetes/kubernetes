@@ -351,7 +351,7 @@ func TestNewNodeInfo(t *testing.T) {
 
 	gen := generation
 	ni := NewNodeInfo(pods...)
-	if ni.Generation <= gen {
+	if ni.Generation <= gen.Load() {
 		t.Errorf("Generation is not incremented. previous: %v, current: %v", gen, ni.Generation)
 	}
 	expected.Generation = ni.Generation

@@ -422,8 +422,8 @@ type summaryCounts struct {
 	// observations. sumBits and count have to go first in the struct to
 	// guarantee alignment for atomic operations.
 	// http://golang.org/pkg/sync/atomic/#pkg-note-BUG
-	sumBits uint64
-	count   uint64
+	sumBits atomic.Uint64
+	count   atomic.Uint64
 }
 
 type noObjectivesSummary struct {
@@ -443,7 +443,7 @@ type noObjectivesSummary struct {
 
 	// Fields with atomic access first! See alignment constraint:
 	// http://golang.org/pkg/sync/atomic/#pkg-note-BUG
-	countAndHotIdx uint64
+	countAndHotIdx atomic.Uint64
 
 	selfCollector
 	desc     *Desc
@@ -468,19 +468,19 @@ func (s *noObjectivesSummary) Observe(v float64) {
 	// We increment h.countAndHotIdx so that the counter in the lower
 	// 63 bits gets incremented. At the same time, we get the new value
 	// back, which we can use to find the currently-hot counts.
-	n := atomic.AddUint64(&s.countAndHotIdx, 1)
+	n := s.countAndHotIdx.Add(1)
 	hotCounts := s.counts[n>>63]
 
 	for {
-		oldBits := atomic.LoadUint64(&hotCounts.sumBits)
+		oldBits := hotCounts.sumBits.Load()
 		newBits := math.Float64bits(math.Float64frombits(oldBits) + v)
-		if atomic.CompareAndSwapUint64(&hotCounts.sumBits, oldBits, newBits) {
+		if hotCounts.sumBits.CompareAndSwap(oldBits, newBits) {
 			break
 		}
 	}
 	// Increment count last as we take it as a signal that the observation
 	// is complete.
-	atomic.AddUint64(&hotCounts.count, 1)
+	hotCounts.count.Add(1)
 }
 
 func (s *noObjectivesSummary) Write(out *dto.Metric) error {
@@ -494,7 +494,7 @@ func (s *noObjectivesSummary) Write(out *dto.Metric) error {
 	// Adding 1<<63 switches the hot index (from 0 to 1 or from 1 to 0)
 	// without touching the count bits. See the struct comments for a full
 	// description of the algorithm.
-	n := atomic.AddUint64(&s.countAndHotIdx, 1<<63)
+	n := s.countAndHotIdx.Add(1 << 63)
 	// count is contained unchanged in the lower 63 bits.
 	count := n & ((1 << 63) - 1)
 	// The most significant bit tells us which counts is hot. The complement
@@ -503,13 +503,13 @@ func (s *noObjectivesSummary) Write(out *dto.Metric) error {
 	coldCounts := s.counts[(^n)>>63]
 
 	// Await cooldown.
-	for count != atomic.LoadUint64(&coldCounts.count) {
+	for count != coldCounts.count.Load() {
 		runtime.Gosched() // Let observations get work done.
 	}
 
 	sum := &dto.Summary{
 		SampleCount:      proto.Uint64(count),
-		SampleSum:        proto.Float64(math.Float64frombits(atomic.LoadUint64(&coldCounts.sumBits))),
+		SampleSum:        proto.Float64(math.Float64frombits(coldCounts.sumBits.Load())),
 		CreatedTimestamp: s.createdTs,
 	}
 
@@ -517,13 +517,13 @@ func (s *noObjectivesSummary) Write(out *dto.Metric) error {
 	out.Label = s.labelPairs
 
 	// Finally add all the cold counts to the new hot counts and reset the cold counts.
-	atomic.AddUint64(&hotCounts.count, count)
-	atomic.StoreUint64(&coldCounts.count, 0)
+	hotCounts.count.Add(count)
+	coldCounts.count.Store(0)
 	for {
-		oldBits := atomic.LoadUint64(&hotCounts.sumBits)
+		oldBits := hotCounts.sumBits.Load()
 		newBits := math.Float64bits(math.Float64frombits(oldBits) + sum.GetSampleSum())
-		if atomic.CompareAndSwapUint64(&hotCounts.sumBits, oldBits, newBits) {
-			atomic.StoreUint64(&coldCounts.sumBits, 0)
+		if hotCounts.sumBits.CompareAndSwap(oldBits, newBits) {
+			coldCounts.sumBits.Store(0)
 			break
 		}
 	}

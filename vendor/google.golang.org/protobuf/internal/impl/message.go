@@ -37,7 +37,7 @@ type MessageInfo struct {
 	OneofWrappers []any
 
 	initMu   sync.Mutex // protects all unexported fields
-	initDone uint32
+	initDone atomic.Uint32
 
 	reflectMessageInfo // for reflection implementation
 	coderMessageInfo   // for fast-path method implementations
@@ -67,7 +67,7 @@ func (mi *MessageInfo) init() {
 	// This function is called in the hot path. Inline the sync.Once logic,
 	// since allocating a closure for Once.Do is expensive.
 	// Keep init small to ensure that it can be inlined.
-	if atomic.LoadUint32(&mi.initDone) == 0 {
+	if mi.initDone.Load() == 0 {
 		mi.initOnce()
 	}
 }
@@ -75,7 +75,7 @@ func (mi *MessageInfo) init() {
 func (mi *MessageInfo) initOnce() {
 	mi.initMu.Lock()
 	defer mi.initMu.Unlock()
-	if mi.initDone == 1 {
+	if mi.initDone.Load() == 1 {
 		return
 	}
 	if opaqueInitHook(mi) {
@@ -92,7 +92,7 @@ func (mi *MessageInfo) initOnce() {
 	mi.makeReflectFuncs(t, si)
 	mi.makeCoderMethods(t, si)
 
-	atomic.StoreUint32(&mi.initDone, 1)
+	mi.initDone.Store(1)
 }
 
 // getPointer returns the pointer for a message, which should be of

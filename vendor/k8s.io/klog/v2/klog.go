@@ -162,18 +162,18 @@ func (s *severityValue) Set(value string) error {
 
 // OutputStats tracks the number of output lines and bytes written.
 type OutputStats struct {
-	lines int64
-	bytes int64
+	lines atomic.Int64
+	bytes atomic.Int64
 }
 
 // Lines returns the number of lines written.
 func (s *OutputStats) Lines() int64 {
-	return atomic.LoadInt64(&s.lines)
+	return s.lines.Load()
 }
 
 // Bytes returns the number of bytes written.
 func (s *OutputStats) Bytes() int64 {
-	return atomic.LoadInt64(&s.bytes)
+	return s.bytes.Load()
 }
 
 // Stats tracks the number of lines of output and number of bytes
@@ -487,7 +487,7 @@ type settings struct {
 	// filterLength stores the length of the vmodule filter chain. If greater
 	// than zero, it means vmodule is enabled. It may be read safely
 	// using sync.LoadInt32, but is only modified under mu.
-	filterLength int32
+	filterLength atomic.Int32
 	// traceLocation is the state of the -log_backtrace_at flag.
 	traceLocation traceLocation
 	// These flags are modified only under lock, although verbosity may be fetched
@@ -564,7 +564,7 @@ func (l *loggingT) setVState(verbosity Level, filter []modulePat, setFilter bool
 	// Turn verbosity off so V will not fire while we are in transition.
 	l.verbosity.set(0)
 	// Ditto for filter length.
-	atomic.StoreInt32(&l.filterLength, 0)
+	l.filterLength.Store(0)
 
 	// Set the new filters and wipe the pc->Level map if the filter has changed.
 	if setFilter {
@@ -574,7 +574,7 @@ func (l *loggingT) setVState(verbosity Level, filter []modulePat, setFilter bool
 
 	// Things are consistent now, so enable filtering and verbosity.
 	// They are enabled in order opposite to that in V.
-	atomic.StoreInt32(&l.filterLength, int32(len(filter)))
+	l.filterLength.Store(int32(len(filter)))
 	l.verbosity.set(verbosity)
 }
 
@@ -930,7 +930,7 @@ func (l *loggingT) output(s severity.Severity, logger *logWriter, buf *buffer.Bu
 	}
 	if s == severity.FatalLog {
 		// If we got here via Exit rather than Fatal, print no stacks.
-		if atomic.LoadUint32(&fatalNoStacks) > 0 {
+		if fatalNoStacks.Load() > 0 {
 			l.mu.Unlock()
 			isLocked = false
 			timeoutFlush(ExitFlushTimeout)
@@ -960,8 +960,8 @@ func (l *loggingT) output(s severity.Severity, logger *logWriter, buf *buffer.Bu
 	buffer.PutBuffer(buf)
 
 	if stats := severityStats[s]; stats != nil {
-		atomic.AddInt64(&stats.lines, 1)
-		atomic.AddInt64(&stats.bytes, int64(len(data)))
+		stats.lines.Add(1)
+		stats.bytes.Add(int64(len(data)))
 	}
 }
 
@@ -1368,7 +1368,7 @@ func VDepth(depth int, level Level) Verbose {
 
 	// It's off globally but vmodule may still be set.
 	// Here is another cheap but safe test to see if vmodule is enabled.
-	if atomic.LoadInt32(&logging.filterLength) > 0 {
+	if logging.filterLength.Load() > 0 {
 		// Now we need a proper lock to use the logging structure. The pcs field
 		// is shared so we must lock before accessing it. This is fairly expensive,
 		// but if V logging is enabled we're slow anyway.
@@ -1674,46 +1674,46 @@ func FatalfDepth(depth int, format string, args ...interface{}) {
 
 // fatalNoStacks is non-zero if we are to exit without dumping goroutine stacks.
 // It allows Exit and relatives to use the Fatal logs.
-var fatalNoStacks uint32
+var fatalNoStacks atomic.Uint32
 
 // Exit logs to the FATAL, ERROR, WARNING, and INFO logs, then calls OsExit(1).
 // Arguments are handled in the manner of fmt.Print; a newline is appended if missing.
 func Exit(args ...interface{}) {
-	atomic.StoreUint32(&fatalNoStacks, 1)
+	fatalNoStacks.Store(1)
 	logging.print(severity.FatalLog, logging.logger, logging.filter, args...)
 }
 
 // ExitDepth acts as Exit but uses depth to determine which call frame to log.
 // ExitDepth(0, "msg") is the same as Exit("msg").
 func ExitDepth(depth int, args ...interface{}) {
-	atomic.StoreUint32(&fatalNoStacks, 1)
+	fatalNoStacks.Store(1)
 	logging.printDepth(severity.FatalLog, logging.logger, logging.filter, depth, args...)
 }
 
 // Exitln logs to the FATAL, ERROR, WARNING, and INFO logs, then calls OsExit(1).
 func Exitln(args ...interface{}) {
-	atomic.StoreUint32(&fatalNoStacks, 1)
+	fatalNoStacks.Store(1)
 	logging.println(severity.FatalLog, logging.logger, logging.filter, args...)
 }
 
 // ExitlnDepth acts as Exitln but uses depth to determine which call frame to log.
 // ExitlnDepth(0, "msg") is the same as Exitln("msg").
 func ExitlnDepth(depth int, args ...interface{}) {
-	atomic.StoreUint32(&fatalNoStacks, 1)
+	fatalNoStacks.Store(1)
 	logging.printlnDepth(severity.FatalLog, logging.logger, logging.filter, depth, args...)
 }
 
 // Exitf logs to the FATAL, ERROR, WARNING, and INFO logs, then calls OsExit(1).
 // Arguments are handled in the manner of fmt.Printf; a newline is appended if missing.
 func Exitf(format string, args ...interface{}) {
-	atomic.StoreUint32(&fatalNoStacks, 1)
+	fatalNoStacks.Store(1)
 	logging.printf(severity.FatalLog, logging.logger, logging.filter, format, args...)
 }
 
 // ExitfDepth acts as Exitf but uses depth to determine which call frame to log.
 // ExitfDepth(0, "msg", args...) is the same as Exitf("msg", args...).
 func ExitfDepth(depth int, format string, args ...interface{}) {
-	atomic.StoreUint32(&fatalNoStacks, 1)
+	fatalNoStacks.Store(1)
 	logging.printfDepth(severity.FatalLog, logging.logger, logging.filter, depth, format, args...)
 }
 

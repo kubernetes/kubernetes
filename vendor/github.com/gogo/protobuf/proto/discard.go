@@ -78,7 +78,7 @@ func (a *InternalMessageInfo) DiscardUnknown(m Message) {
 type discardInfo struct {
 	typ reflect.Type
 
-	initialized int32 // 0: only typ is valid, 1: everything is valid
+	initialized atomic.Int32 // 0: only typ is valid, 1: everything is valid
 	lock        sync.Mutex
 
 	fields       []discardFieldInfo
@@ -111,7 +111,7 @@ func (di *discardInfo) discard(src pointer) {
 		return // Nothing to do.
 	}
 
-	if atomic.LoadInt32(&di.initialized) == 0 {
+	if di.initialized.Load() == 0 {
 		di.computeDiscardInfo()
 	}
 
@@ -140,7 +140,7 @@ func (di *discardInfo) discard(src pointer) {
 func (di *discardInfo) computeDiscardInfo() {
 	di.lock.Lock()
 	defer di.lock.Unlock()
-	if di.initialized != 0 {
+	if di.initialized.Load() != 0 {
 		return
 	}
 	t := di.typ
@@ -248,7 +248,7 @@ func (di *discardInfo) computeDiscardInfo() {
 		di.unrecognized = toField(&f)
 	}
 
-	atomic.StoreInt32(&di.initialized, 1)
+	di.initialized.Store(1)
 }
 
 func discardLegacy(m Message) {

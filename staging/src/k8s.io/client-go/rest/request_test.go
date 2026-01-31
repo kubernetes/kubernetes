@@ -4081,10 +4081,10 @@ func TestRetryableConditions(t *testing.T) {
 }
 
 func TestRequestConcurrencyWithRetry(t *testing.T) {
-	var attempts int32
+	var attempts atomic.Int32
 	client := clientForFunc(func(req *http.Request) (*http.Response, error) {
 		defer func() {
-			atomic.AddInt32(&attempts, 1)
+			attempts.Add(1)
 		}()
 
 		// always send a retry-after response
@@ -4122,8 +4122,8 @@ func TestRequestConcurrencyWithRetry(t *testing.T) {
 
 	// we expect (concurrency*req.maxRetries+1) attempts to be recorded
 	expected := concurrency * (req.maxRetries + 1)
-	if atomic.LoadInt32(&attempts) != int32(expected) {
-		t.Errorf("Expected attempts: %d, but got: %d", expected, attempts)
+	if attempts.Load() != int32(expected) {
+		t.Errorf("Expected attempts: %d, but got: %d", expected, attempts.Load())
 	}
 }
 

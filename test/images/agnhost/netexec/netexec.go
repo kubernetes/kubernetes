@@ -48,7 +48,7 @@ var (
 	udpPort            = 8081
 	sctpPort           = -1
 	shellPath          = "/bin/sh"
-	serverReady        = &atomicBool{0}
+	serverReady        = &atomicBool{v: atomic.Int32{}}
 	certFile           = ""
 	privKeyFile        = ""
 	httpOverride       = ""
@@ -148,21 +148,21 @@ func init() {
 
 // atomicBool uses load/store operations on an int32 to simulate an atomic boolean.
 type atomicBool struct {
-	v int32
+	v atomic.Int32
 }
 
 // set sets the int32 to the given boolean.
 func (a *atomicBool) set(value bool) {
 	if value {
-		atomic.StoreInt32(&a.v, 1)
+		a.v.Store(1)
 		return
 	}
-	atomic.StoreInt32(&a.v, 0)
+	a.v.Store(0)
 }
 
 // get returns true if the int32 == 1
 func (a *atomicBool) get() bool {
-	return atomic.LoadInt32(&a.v) == 1
+	return a.v.Load() == 1
 }
 
 func main(cmd *cobra.Command, args []string) {

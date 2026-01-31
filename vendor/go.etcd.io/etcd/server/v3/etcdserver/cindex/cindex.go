@@ -56,11 +56,11 @@ type consistentIndex struct {
 	// consistentIndex represents the offset of an entry in a consistent replica log.
 	// It caches the "consistent_index" key's value.
 	// Accessed through atomics so must be 64-bit aligned.
-	consistentIndex uint64
+	consistentIndex atomic.Uint64
 	// term represents the RAFT term of committed entry in a consistent replica log.
 	// Accessed through atomics so must be 64-bit aligned.
 	// The value is being persisted in the backend since v3.5.
-	term uint64
+	term atomic.Uint64
 
 	// applyingIndex and applyingTerm are just temporary cache of the raftpb.Entry.Index
 	// and raftpb.Entry.Term, and they are not ready to be persisted yet. They will be
@@ -72,8 +72,8 @@ type consistentIndex struct {
 	//  can remove applyingIndex and applyingTerm, and save the e.Index and
 	//  e.Term to consistentIndex and term directly in applyEntries, and
 	//  persist them into db in the txPostLockInsideApplyHook.
-	applyingIndex uint64
-	applyingTerm  uint64
+	applyingIndex atomic.Uint64
+	applyingTerm  atomic.Uint64
 
 	// be is used for initial read consistentIndex
 	be Backend
@@ -88,7 +88,7 @@ func NewConsistentIndex(be Backend) ConsistentIndexer {
 }
 
 func (ci *consistentIndex) ConsistentIndex() uint64 {
-	if index := atomic.LoadUint64(&ci.consistentIndex); index > 0 {
+	if index := ci.consistentIndex.Load(); index > 0 {
 		return index
 	}
 	ci.mutex.Lock()
@@ -100,7 +100,7 @@ func (ci *consistentIndex) ConsistentIndex() uint64 {
 }
 
 func (ci *consistentIndex) UnsafeConsistentIndex() uint64 {
-	if index := atomic.LoadUint64(&ci.consistentIndex); index > 0 {
+	if index := ci.consistentIndex.Load(); index > 0 {
 		return index
 	}
 
@@ -110,13 +110,13 @@ func (ci *consistentIndex) UnsafeConsistentIndex() uint64 {
 }
 
 func (ci *consistentIndex) SetConsistentIndex(v uint64, term uint64) {
-	atomic.StoreUint64(&ci.consistentIndex, v)
-	atomic.StoreUint64(&ci.term, term)
+	ci.consistentIndex.Store(v)
+	ci.term.Store(term)
 }
 
 func (ci *consistentIndex) UnsafeSave(tx backend.UnsafeReadWriter) {
-	index := atomic.LoadUint64(&ci.consistentIndex)
-	term := atomic.LoadUint64(&ci.term)
+	index := ci.consistentIndex.Load()
+	term := ci.term.Load()
 	schema.UnsafeUpdateConsistentIndex(tx, index, term)
 }
 
@@ -129,43 +129,45 @@ func (ci *consistentIndex) SetBackend(be Backend) {
 }
 
 func (ci *consistentIndex) ConsistentApplyingIndex() (uint64, uint64) {
-	return atomic.LoadUint64(&ci.applyingIndex), atomic.LoadUint64(&ci.applyingTerm)
+	return ci.applyingIndex.Load(), ci.applyingTerm.Load()
 }
 
 func (ci *consistentIndex) SetConsistentApplyingIndex(v uint64, term uint64) {
-	atomic.StoreUint64(&ci.applyingIndex, v)
-	atomic.StoreUint64(&ci.applyingTerm, term)
+	ci.applyingIndex.Store(v)
+	ci.applyingTerm.Store(term)
 }
 
 func NewFakeConsistentIndex(index uint64) ConsistentIndexer {
-	return &fakeConsistentIndex{index: index}
+	f := &fakeConsistentIndex{}
+	f.index.Store(index)
+	return f
 }
 
 type fakeConsistentIndex struct {
-	index uint64
-	term  uint64
+	index atomic.Uint64
+	term  atomic.Uint64
 }
 
 func (f *fakeConsistentIndex) ConsistentIndex() uint64 {
-	return atomic.LoadUint64(&f.index)
+	return f.index.Load()
 }
 
 func (f *fakeConsistentIndex) ConsistentApplyingIndex() (uint64, uint64) {
-	return atomic.LoadUint64(&f.index), atomic.LoadUint64(&f.term)
+	return f.index.Load(), f.term.Load()
 }
 
 func (f *fakeConsistentIndex) UnsafeConsistentIndex() uint64 {
-	return atomic.LoadUint64(&f.index)
+	return f.index.Load()
 }
 
 func (f *fakeConsistentIndex) SetConsistentIndex(index uint64, term uint64) {
-	atomic.StoreUint64(&f.index, index)
-	atomic.StoreUint64(&f.term, term)
+	f.index.Store(index)
+	f.term.Store(term)
 }
 
 func (f *fakeConsistentIndex) SetConsistentApplyingIndex(index uint64, term uint64) {
-	atomic.StoreUint64(&f.index, index)
-	atomic.StoreUint64(&f.term, term)
+	f.index.Store(index)
+	f.term.Store(term)
 }
 
 func (f *fakeConsistentIndex) UnsafeSave(_ backend.UnsafeReadWriter) {}

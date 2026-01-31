@@ -186,7 +186,8 @@ func (pl *InterPodAffinity) PreScore(
 	state.namespaceLabels = GetNamespaceLabelsSnapshot(logger, pod.Namespace, pl.nsLister)
 
 	topoScores := make([]scoreMap, len(allNodes))
-	index := int32(-1)
+	var index atomic.Int32
+	index.Store(-1)
 	processNode := func(i int) {
 		nodeInfo := allNodes[i]
 
@@ -203,16 +204,16 @@ func (pl *InterPodAffinity) PreScore(
 			pl.processExistingPod(state, existingPod, nodeInfo, pod, topoScore)
 		}
 		if len(topoScore) > 0 {
-			topoScores[atomic.AddInt32(&index, 1)] = topoScore
+			topoScores[index.Add(1)] = topoScore
 		}
 	}
 	pl.parallelizer.Until(pCtx, len(allNodes), processNode, pl.Name())
 
-	if index == -1 {
+	if index.Load() == -1 {
 		return fwk.NewStatus(fwk.Skip)
 	}
 
-	for i := 0; i <= int(index); i++ {
+	for i := 0; i <= int(index.Load()); i++ {
 		state.topologyScore.append(topoScores[i])
 	}
 

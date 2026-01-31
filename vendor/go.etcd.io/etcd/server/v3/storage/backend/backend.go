@@ -94,13 +94,13 @@ type backend struct {
 	// 64-bit aligned, otherwise 32-bit tests will crash
 
 	// size is the number of bytes allocated in the backend
-	size int64
+	size atomic.Int64
 	// sizeInUse is the number of bytes actually used in the backend
-	sizeInUse int64
+	sizeInUse atomic.Int64
 	// commits counts number of commits since start
-	commits int64
+	commits atomic.Int64
 	// openReadTxN is the number of currently open read transactions in the backend
-	openReadTxN int64
+	openReadTxN atomic.Int64
 	// mlock prevents backend database file to be swapped
 	mlock bool
 
@@ -421,11 +421,11 @@ func (b *backend) Hash(ignores func(bucketName, keyName []byte) bool) (uint32, e
 }
 
 func (b *backend) Size() int64 {
-	return atomic.LoadInt64(&b.size)
+	return b.size.Load()
 }
 
 func (b *backend) SizeInUse() int64 {
-	return atomic.LoadInt64(&b.sizeInUse)
+	return b.sizeInUse.Load()
 }
 
 func (b *backend) run() {
@@ -456,7 +456,7 @@ func (b *backend) Close() error {
 
 // Commits returns total number of commits since start
 func (b *backend) Commits() int64 {
-	return atomic.LoadInt64(&b.commits)
+	return b.commits.Load()
 }
 
 func (b *backend) Defrag() error {
@@ -582,8 +582,8 @@ func (b *backend) defrag() error {
 
 	size := b.readTx.tx.Size()
 	db := b.readTx.tx.DB()
-	atomic.StoreInt64(&b.size, size)
-	atomic.StoreInt64(&b.sizeInUse, size-(int64(db.Stats().FreePageN)*int64(db.Info().PageSize)))
+	b.size.Store(size)
+	b.sizeInUse.Store(size - (int64(db.Stats().FreePageN) * int64(db.Info().PageSize)))
 
 	took := time.Since(now)
 	defragSec.Observe(took.Seconds())
@@ -673,9 +673,9 @@ func (b *backend) begin(write bool) *bolt.Tx {
 	size := tx.Size()
 	db := tx.DB()
 	stats := db.Stats()
-	atomic.StoreInt64(&b.size, size)
-	atomic.StoreInt64(&b.sizeInUse, size-(int64(stats.FreePageN)*int64(db.Info().PageSize)))
-	atomic.StoreInt64(&b.openReadTxN, int64(stats.OpenTxN))
+	b.size.Store(size)
+	b.sizeInUse.Store(size - (int64(stats.FreePageN) * int64(db.Info().PageSize)))
+	b.openReadTxN.Store(int64(stats.OpenTxN))
 
 	return tx
 }
@@ -691,7 +691,7 @@ func (b *backend) unsafeBegin(write bool) *bolt.Tx {
 }
 
 func (b *backend) OpenReadTxN() int64 {
-	return atomic.LoadInt64(&b.openReadTxN)
+	return b.openReadTxN.Load()
 }
 
 type snapshot struct {

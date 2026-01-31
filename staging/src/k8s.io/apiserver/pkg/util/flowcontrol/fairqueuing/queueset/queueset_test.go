@@ -197,8 +197,8 @@ func (us uniformScenario) exercise(t *testing.T) {
 		startTime:                 us.clk.Now(),
 		execSeatsIntegrators:      make([]fq.Integrator, len(us.clients)),
 		seatDemandIntegratorCheck: fq.NewNamedIntegrator(us.clk, us.name+"-seatDemandCheck"),
-		executions:                make([]int32, len(us.clients)),
-		rejects:                   make([]int32, len(us.clients)),
+		executions:                make([]atomic.Int32, len(us.clients)),
+		rejects:                   make([]atomic.Int32, len(us.clients)),
 	}
 	for _, uc := range us.clients {
 		uss.doSplit = uss.doSplit || uc.split
@@ -213,9 +213,9 @@ type uniformScenarioState struct {
 	doSplit                                                                                bool
 	execSeatsIntegrators                                                                   []fq.Integrator
 	seatDemandIntegratorCheck                                                              fq.Integrator
-	failedCount                                                                            uint64
+	failedCount                                                                            atomic.Uint64
 	expectedInqueueReqs, expectedInqueueSeats, expectedExecuting, expectedConcurrencyInUse string
-	executions, rejects                                                                    []int32
+	executions, rejects                                                                    []atomic.Int32
 }
 
 func (uss *uniformScenarioState) exercise() {
@@ -287,8 +287,8 @@ func (ust *uniformScenarioThread) callK(k int) {
 	req, idle := ust.uss.qs.StartRequest(ctx, &fcrequest.WorkEstimate{InitialSeats: ust.uc.initialSeats, FinalSeats: ust.uc.finalSeats, AdditionalLatency: ust.uc.padDuration}, ust.uc.hash, "", ust.fsName, ust.uss.name, []int{ust.i, ust.j, k}, nil)
 	ust.uss.t.Logf("%s: %d, %d, %d got req=%p, idle=%v", ust.uss.clk.Now().Format(nsTimeFmt), ust.i, ust.j, k, req, idle)
 	if req == nil {
-		atomic.AddUint64(&ust.uss.failedCount, 1)
-		atomic.AddInt32(&ust.uss.rejects[ust.i], 1)
+		ust.uss.failedCount.Add(1)
+		ust.uss.rejects[ust.i].Add(1)
 		returnSeatDemand(ust.uss.clk.Now())
 		return
 	}
@@ -303,7 +303,7 @@ func (ust *uniformScenarioThread) callK(k int) {
 	idle2 := req.Finish(func() {
 		executed = true
 		execStart := ust.uss.clk.Now()
-		atomic.AddInt32(&ust.uss.executions[ust.i], 1)
+		ust.uss.executions[ust.i].Add(1)
 		ust.execSeatsIntegrator.Add(float64(ust.uc.initialSeats))
 		ust.uss.t.Logf("%s: %d, %d, %d executing; width1=%d", execStart.Format(nsTimeFmt), ust.i, ust.j, k, ust.uc.initialSeats)
 		ust.uss.clk.EventAfterDuration(ust.genCallK(k+1), ust.uc.execDuration+ust.uc.thinkDuration)
@@ -315,8 +315,8 @@ func (ust *uniformScenarioThread) callK(k int) {
 	now := ust.uss.clk.Now()
 	ust.uss.t.Logf("%s: %d, %d, %d got executed=%v, idle2=%v", now.Format(nsTimeFmt), ust.i, ust.j, k, executed, idle2)
 	if !executed {
-		atomic.AddUint64(&ust.uss.failedCount, 1)
-		atomic.AddInt32(&ust.uss.rejects[ust.i], 1)
+		ust.uss.failedCount.Add(1)
+		ust.uss.rejects[ust.i].Add(1)
 		returnSeatDemand(ust.uss.clk.Now())
 	} else if now != returnTime {
 		ust.uss.t.Errorf("%s: %d, %d, %d returnTime=%s", now.Format(nsTimeFmt), ust.i, ust.j, k, returnTime.Format(nsTimeFmt))
@@ -404,9 +404,9 @@ func (uss *uniformScenarioState) evalTo(lim time.Time, last, expectFair bool, ma
 }
 
 func (uss *uniformScenarioState) finalReview() {
-	if uss.expectAllRequests && uss.failedCount > 0 {
-		uss.t.Errorf("Expected all requests to be successful but got %v failed requests", uss.failedCount)
-	} else if !uss.expectAllRequests && uss.failedCount == 0 {
+	if uss.expectAllRequests && uss.failedCount.Load() > 0 {
+		uss.t.Errorf("Expected all requests to be successful but got %v failed requests", uss.failedCount.Load())
+	} else if !uss.expectAllRequests && uss.failedCount.Load() == 0 {
 		uss.t.Errorf("Expected failed requests but all requests succeeded")
 	}
 	if uss.evalInqueueMetrics {
@@ -435,12 +435,12 @@ func (uss *uniformScenarioState) finalReview() {
 	expectedRejects := ""
 	for i := range uss.clients {
 		fsName := fmt.Sprintf("client%d", i)
-		if atomic.LoadInt32(&uss.executions[i]) > 0 {
+		if uss.executions[i].Load() > 0 {
 			uss.expectedExecuting = uss.expectedExecuting + fmt.Sprintf(`				apiserver_flowcontrol_current_executing_requests{flow_schema=%q,priority_level=%q} 0%s`, fsName, uss.name, "\n")
 			uss.expectedConcurrencyInUse = uss.expectedConcurrencyInUse + fmt.Sprintf(`				apiserver_flowcontrol_request_concurrency_in_use{flow_schema=%q,priority_level=%q} 0%s`, fsName, uss.name, "\n")
 		}
-		if atomic.LoadInt32(&uss.rejects[i]) > 0 {
-			expectedRejects = expectedRejects + fmt.Sprintf(`				apiserver_flowcontrol_rejected_requests_total{flow_schema=%q,priority_level=%q,reason=%q} %d%s`, fsName, uss.name, uss.rejectReason, uss.rejects[i], "\n")
+		if uss.rejects[i].Load() > 0 {
+			expectedRejects = expectedRejects + fmt.Sprintf(`				apiserver_flowcontrol_rejected_requests_total{flow_schema=%q,priority_level=%q,reason=%q} %d%s`, fsName, uss.name, uss.rejectReason, uss.rejects[i].Load(), "\n")
 		}
 	}
 	if uss.evalExecutingMetrics && len(uss.expectedExecuting) > 0 {
@@ -1091,19 +1091,23 @@ func TestContextCancel(t *testing.T) {
 	qs := qsComplete(qsc, 1)
 	counter.Add(1) // account for main activity of the goroutine running this test
 	ctx1 := context.Background()
-	pZero := func() *int32 { var zero int32; return &zero }
+	pZero := func() *atomic.Int32 {
+		var zero atomic.Int32
+		return &zero
+	}
+
 	// counts of calls to the QueueNoteFns
-	queueNoteCounts := map[int]map[bool]*int32{
+	queueNoteCounts := map[int]map[bool]*atomic.Int32{
 		1: {false: pZero(), true: pZero()},
 		2: {false: pZero(), true: pZero()},
 	}
 	queueNoteFn := func(fn int) func(inQueue bool) {
-		return func(inQueue bool) { atomic.AddInt32(queueNoteCounts[fn][inQueue], 1) }
+		return func(inQueue bool) { queueNoteCounts[fn][inQueue].Add(1) }
 	}
 	fatalErrs := []string{}
 	var errsLock sync.Mutex
 	expectQNCount := func(fn int, inQueue bool, expect int32) {
-		if a := atomic.LoadInt32(queueNoteCounts[fn][inQueue]); a != expect {
+		if a := queueNoteCounts[fn][inQueue].Load(); a != expect {
 			errsLock.Lock()
 			defer errsLock.Unlock()
 			fatalErrs = append(fatalErrs, fmt.Sprintf("Got %d calls to queueNoteFn%d(%v), expected %d", a, fn, inQueue, expect))

@@ -40,7 +40,7 @@ type tcpLB struct {
 	t         *testing.T
 	ln        net.Listener
 	serverURL string
-	dials     int32
+	dials     atomic.Int32
 }
 
 func (lb *tcpLB) handleConnection(in net.Conn, stopCh chan struct{}) {
@@ -62,7 +62,7 @@ func (lb *tcpLB) serve(stopCh chan struct{}) {
 	if err != nil {
 		lb.t.Fatalf("failed to accept: %v", err)
 	}
-	atomic.AddInt32(&lb.dials, 1)
+	lb.dials.Add(1)
 	go lb.handleConnection(conn, stopCh)
 }
 
@@ -150,7 +150,7 @@ func TestReconnectBrokenTCP(t *testing.T) {
 	if string(data) != "Hello, HTTP/2.0" {
 		t.Fatalf("unexpected response: %s", data)
 	}
-	dials := atomic.LoadInt32(&lb.dials)
+	dials := lb.dials.Load()
 	if dials != 2 {
 		t.Fatalf("expected %d dials, got %d", 2, dials)
 	}
@@ -227,7 +227,7 @@ func TestReconnectBrokenTCP_HTTP1(t *testing.T) {
 	if string(data) != "Hello, HTTP/1.1" {
 		t.Fatalf("unexpected response: %s", data)
 	}
-	dials := atomic.LoadInt32(&lb.dials)
+	dials := lb.dials.Load()
 	if dials != 2 {
 		t.Fatalf("expected %d dials, got %d", 2, dials)
 	}
@@ -321,7 +321,7 @@ func TestReconnectBrokenTCPInFlight_HTTP1(t *testing.T) {
 	if string(data) != "Hello, HTTP/1.1" {
 		t.Fatalf("unexpected response: %s", data)
 	}
-	dials := atomic.LoadInt32(&lb.dials)
+	dials := lb.dials.Load()
 	if dials != 2 {
 		t.Fatalf("expected %d dials, got %d", 2, dials)
 	}

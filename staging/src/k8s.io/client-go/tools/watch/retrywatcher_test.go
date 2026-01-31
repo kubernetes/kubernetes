@@ -55,15 +55,16 @@ func (o testObject) GetObjectKind() schema.ObjectKind { return schema.EmptyObjec
 func (o testObject) DeepCopyObject() runtime.Object   { return o }
 func (o testObject) GetResourceVersion() string       { return o.resourceVersion }
 
-func withCounter(w cache.Watcher) (*uint32, cache.WatcherWithContext) {
-	var counter uint32
-	return &counter, &cache.ListWatch{
-		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			atomic.AddUint32(&counter, 1)
-			return w.Watch(options)
-		},
-	}
+func withCounter(w cache.Watcher) (*atomic.Uint32, cache.WatcherWithContext) {
+    var counter atomic.Uint32
+    return &counter, &cache.ListWatch{
+        WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+            counter.Add(1)
+            return w.Watch(options)
+        },
+    }
 }
+
 
 func makeTestEvent(rv int) watch.Event {
 	return watch.Event{
@@ -592,7 +593,7 @@ func TestRetryWatcher(t *testing.T) {
 			// We always count with the last watch reestablishing which is imminent but still a race.
 			// We will wait for the last watch to reestablish to avoid it.
 			err = wait.PollImmediate(10*time.Millisecond, 10*time.Second, func() (done bool, err error) {
-				counter = atomic.LoadUint32(atomicCounter)
+				counter = atomicCounter.Load()
 				return counter == tc.watchCount, nil
 			})
 			if wait.Interrupted(err) {

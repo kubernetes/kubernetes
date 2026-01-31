@@ -203,7 +203,8 @@ func podMatchesAllAffinityTerms(terms []fwk.AffinityTerm, pod *v1.Pod) bool {
 //  2. Whether any AntiAffinityTerm matches the incoming pod
 func (pl *InterPodAffinity) getExistingAntiAffinityCounts(ctx context.Context, pod *v1.Pod, nsLabels labels.Set, nodes []fwk.NodeInfo) topologyToMatchedTermCount {
 	antiAffinityCountsList := make([]topologyToMatchedTermCountList, len(nodes))
-	index := int32(-1)
+	var index atomic.Int32
+	index.Store(-1)
 	processNode := func(i int) {
 		nodeInfo := nodes[i]
 		node := nodeInfo.Node()
@@ -213,14 +214,14 @@ func (pl *InterPodAffinity) getExistingAntiAffinityCounts(ctx context.Context, p
 			antiAffinityCounts.appendWithAntiAffinityTerms(existingPod.GetRequiredAntiAffinityTerms(), pod, nsLabels, node, 1)
 		}
 		if len(antiAffinityCounts) != 0 {
-			antiAffinityCountsList[atomic.AddInt32(&index, 1)] = antiAffinityCounts
+			antiAffinityCountsList[index.Add(1)] = antiAffinityCounts
 		}
 	}
 	pl.parallelizer.Until(ctx, len(nodes), processNode, pl.Name())
 
 	result := make(topologyToMatchedTermCount)
 	// Traditional for loop is slightly faster in this case than its "for range" equivalent.
-	for i := 0; i <= int(index); i++ {
+	for i := 0; i <= int(index.Load()); i++ {
 		result.mergeWithList(antiAffinityCountsList[i])
 	}
 
@@ -240,7 +241,8 @@ func (pl *InterPodAffinity) getIncomingAffinityAntiAffinityCounts(ctx context.Co
 
 	affinityCountsList := make([]topologyToMatchedTermCountList, len(allNodes))
 	antiAffinityCountsList := make([]topologyToMatchedTermCountList, len(allNodes))
-	index := int32(-1)
+	var index atomic.Int32
+	index.Store(-1)
 	processNode := func(i int) {
 		nodeInfo := allNodes[i]
 		node := nodeInfo.Node()
@@ -255,14 +257,14 @@ func (pl *InterPodAffinity) getIncomingAffinityAntiAffinityCounts(ctx context.Co
 		}
 
 		if len(affinity) > 0 || len(antiAffinity) > 0 {
-			k := atomic.AddInt32(&index, 1)
+			k := index.Add(1)
 			affinityCountsList[k] = affinity
 			antiAffinityCountsList[k] = antiAffinity
 		}
 	}
 	pl.parallelizer.Until(ctx, len(allNodes), processNode, pl.Name())
 
-	for i := 0; i <= int(index); i++ {
+	for i := 0; i <= int(index.Load()); i++ {
 		affinityCounts.mergeWithList(affinityCountsList[i])
 		antiAffinityCounts.mergeWithList(antiAffinityCountsList[i])
 	}

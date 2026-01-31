@@ -60,7 +60,7 @@ import (
 // clientConnectionCounter counts the number of connections a client has
 // initiated (equal to the number of http2Clients created). Must be accessed
 // atomically.
-var clientConnectionCounter uint64
+var clientConnectionCounter atomic.Uint64
 
 var goAwayLoopyWriterTimeout = 5 * time.Second
 
@@ -68,7 +68,7 @@ var metadataFromOutgoingContextRaw = internal.FromOutgoingContextRaw.(func(conte
 
 // http2Client implements the ClientTransport interface with HTTP2.
 type http2Client struct {
-	lastRead  int64 // Keep this field 64-bit aligned. Accessed atomically.
+	lastRead  atomic.Int64 // Keep this field 64-bit aligned. Accessed atomically.
 	ctx       context.Context
 	cancel    context.CancelFunc
 	ctxDone   <-chan struct{} // Cache the ctx.Done() chan.
@@ -455,7 +455,7 @@ func NewHTTP2Client(connectCtx, ctx context.Context, addr resolver.Address, opts
 		}
 	}
 
-	t.connectionID = atomic.AddUint64(&clientConnectionCounter, 1)
+	t.connectionID = clientConnectionCounter.Add(1)
 
 	if err := t.framer.writer.Flush(); err != nil {
 		return nil, err
@@ -792,7 +792,7 @@ func (t *http2Client) NewStream(ctx context.Context, callHdr *CallHdr) (*ClientS
 		s.write(recvMsg{err: err})
 		close(s.done)
 		// If headerChan isn't closed, then close it.
-		if atomic.CompareAndSwapUint32(&s.headerChanClosed, 0, 1) {
+		if s.headerChanClosed.CompareAndSwap(0, 1) {
 			close(s.headerChan)
 		}
 	}
@@ -949,7 +949,7 @@ func (t *http2Client) closeStream(s *ClientStream, err error, rst bool, rstCode 
 		s.write(recvMsg{err: err})
 	}
 	// If headerChan isn't closed, then close it.
-	if atomic.CompareAndSwapUint32(&s.headerChanClosed, 0, 1) {
+	if s.headerChanClosed.CompareAndSwap(0, 1) {
 		s.noHeaders = true
 		close(s.headerChan)
 	}
@@ -1440,7 +1440,7 @@ func (t *http2Client) operateHeaders(frame *http2.MetaHeadersFrame) {
 	}
 	endStream := frame.StreamEnded()
 	s.bytesReceived.Store(true)
-	initialHeader := atomic.LoadUint32(&s.headerChanClosed) == 0
+	initialHeader := s.headerChanClosed.Load() == 0
 
 	if !initialHeader && !endStream {
 		// As specified by gRPC over HTTP2, a HEADERS frame (and associated CONTINUATION frames) can only appear at the start or end of a stream. Therefore, second HEADERS frame must have EOS bit set.
@@ -1574,7 +1574,7 @@ func (t *http2Client) operateHeaders(frame *http2.MetaHeadersFrame) {
 		// If headerChan hasn't been closed yet (expected, given we checked it
 		// above, but something else could have potentially closed the whole
 		// stream).
-		if atomic.CompareAndSwapUint32(&s.headerChanClosed, 0, 1) {
+		if s.headerChanClosed.CompareAndSwap(0, 1) {
 			s.headerValid = true
 			// These values can be set without any synchronization because
 			// stream goroutine will read it only after seeing a closed
@@ -1649,7 +1649,7 @@ func (t *http2Client) reader(errCh chan<- error) {
 	}
 	close(errCh)
 	if t.keepaliveEnabled {
-		atomic.StoreInt64(&t.lastRead, time.Now().UnixNano())
+		t.lastRead.Store(time.Now().UnixNano())
 	}
 
 	// loop to keep reading incoming messages on this transport.
@@ -1657,7 +1657,7 @@ func (t *http2Client) reader(errCh chan<- error) {
 		t.controlBuf.throttle()
 		frame, err := t.framer.readFrame()
 		if t.keepaliveEnabled {
-			atomic.StoreInt64(&t.lastRead, time.Now().UnixNano())
+			t.lastRead.Store(time.Now().UnixNano())
 		}
 		if err != nil {
 			// Abort an active stream if the http2.Framer returns a
@@ -1731,7 +1731,7 @@ func (t *http2Client) keepalive() {
 	for {
 		select {
 		case <-timer.C:
-			lastRead := atomic.LoadInt64(&t.lastRead)
+			lastRead := t.lastRead.Load()
 			if lastRead > prevNano {
 				// There has been read activity since the last time we were here.
 				outstandingPing = false

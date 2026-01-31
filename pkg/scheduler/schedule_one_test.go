@@ -3740,7 +3740,7 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
-			if test.expectedCount != plugin.NumFilterCalled {
+			if test.expectedCount != plugin.NumFilterCalled.Load() {
 				t.Errorf("predicate was called %d times, expected is %d", plugin.NumFilterCalled, test.expectedCount)
 			}
 		})
@@ -4347,7 +4347,7 @@ func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
-			if test.expectedCount != plugin.NumFilterCalled {
+			if test.expectedCount != plugin.NumFilterCalled.Load() {
 				t.Errorf("predicate was called %d times, expected is %d", plugin.NumFilterCalled, test.expectedCount)
 			}
 		})

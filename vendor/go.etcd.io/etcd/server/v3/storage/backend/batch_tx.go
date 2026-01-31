@@ -19,7 +19,6 @@ import (
 	"errors"
 	"math"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"go.uber.org/zap"
@@ -275,7 +274,7 @@ func (t *batchTx) commit(stop bool) {
 		spillSec.Observe(t.tx.Stats().SpillTime.Seconds())
 		writeSec.Observe(t.tx.Stats().WriteTime.Seconds())
 		commitSec.Observe(time.Since(start).Seconds())
-		atomic.AddInt64(&t.backend.commits, 1)
+		t.backend.commits.Add(1)
 
 		t.pending = 0
 		if err != nil {

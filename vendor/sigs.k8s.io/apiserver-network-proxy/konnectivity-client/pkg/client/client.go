@@ -135,12 +135,12 @@ type grpcTunnel struct {
 	// started is an atomic bool represented as a 0 or 1, and set to true when a single-use tunnel has been started (dialed).
 	// started should only be accessed through atomic methods.
 	// TODO: switch this to an atomic.Bool once the client is exclusively buit with go1.19+
-	started uint32
+	started atomic.Uint32
 
 	// closing is an atomic bool represented as a 0 or 1, and set to true when the tunnel is being closed.
 	// closing should only be accessed through atomic methods.
 	// TODO: switch this to an atomic.Bool once the client is exclusively buit with go1.19+
-	closing uint32
+	closing atomic.Uint32
 
 	// Stores the current metrics.ClientConnectionStatus
 	prevStatus atomic.Value
@@ -202,8 +202,8 @@ func newUnstartedTunnel(stream client.ProxyService_ProxyClient, c clientConn) *g
 		conns:              connectionManager{conns: make(map[int64]*conn)},
 		readTimeoutSeconds: 10,
 		done:               make(chan struct{}),
-		started:            0,
 	}
+	t.started.Store(0)
 	s := metrics.ClientConnectionStatusCreated
 	t.prevStatus.Store(s)
 	metrics.Metrics.GetClientConnectionsMetric().WithLabelValues(string(s)).Inc()
@@ -392,7 +392,7 @@ func (t *grpcTunnel) DialContext(requestCtx context.Context, protocol, address s
 }
 
 func (t *grpcTunnel) dialContext(requestCtx context.Context, protocol, address string) (net.Conn, error) {
-	prevStarted := atomic.SwapUint32(&t.started, 1)
+	prevStarted := t.started.Swap(1)
 	if prevStarted != 0 {
 		return nil, &dialFailure{"single-use dialer already dialed", metrics.DialFailureAlreadyStarted}
 	}
@@ -509,12 +509,12 @@ func (t *grpcTunnel) sendDialClose(dialID int64) error {
 }
 
 func (t *grpcTunnel) closeTunnel() {
-	atomic.StoreUint32(&t.closing, 1)
+	t.closing.Store(1)
 	t.grpcConn.Close()
 }
 
 func (t *grpcTunnel) isClosing() bool {
-	return atomic.LoadUint32(&t.closing) != 0
+	return t.closing.Load() != 0
 }
 
 func (t *grpcTunnel) Send(pkt *client.Packet) error {

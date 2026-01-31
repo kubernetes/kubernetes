@@ -52,12 +52,12 @@ import (
 	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	configv1 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1"
-	"k8s.io/kubernetes/pkg/scheduler/backend/api_cache"
-	"k8s.io/kubernetes/pkg/scheduler/backend/api_dispatcher"
+	apicache "k8s.io/kubernetes/pkg/scheduler/backend/api_cache"
+	apidispatcher "k8s.io/kubernetes/pkg/scheduler/backend/api_dispatcher"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
+	apicalls "k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
@@ -1242,10 +1242,10 @@ func TestDryRunPreemption(t *testing.T) {
 				for i := range got {
 					candidates = append(candidates, candidate{victims: got[i].Victims(), name: got[i].Name()})
 				}
-				if fakePlugin.NumFilterCalled-prevNumFilterCalled != tt.expectedNumFilterCalled[cycle] {
-					t.Errorf("cycle %d: got NumFilterCalled=%d, want %d", cycle, fakePlugin.NumFilterCalled-prevNumFilterCalled, tt.expectedNumFilterCalled[cycle])
+				if fakePlugin.NumFilterCalled.Add(-prevNumFilterCalled) != tt.expectedNumFilterCalled[cycle] {
+					t.Errorf("cycle %d: got NumFilterCalled=%d, want %d", cycle, fakePlugin.NumFilterCalled.Add(-prevNumFilterCalled), tt.expectedNumFilterCalled[cycle])
 				}
-				prevNumFilterCalled = fakePlugin.NumFilterCalled
+				prevNumFilterCalled = fakePlugin.NumFilterCalled.Load()
 				if diff := cmp.Diff(tt.expected[cycle], candidates, cmp.AllowUnexported(candidate{})); diff != "" {
 					t.Errorf("cycle %d: unexpected candidates (-want, +got): %s", cycle, diff)
 				}

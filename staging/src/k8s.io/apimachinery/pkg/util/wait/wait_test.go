@@ -349,11 +349,11 @@ DRAIN:
 
 type fakePoller struct {
 	max  int
-	used int32 // accessed with atomics
+	used atomic.Int32 // accessed with atomics
 	wg   sync.WaitGroup
 }
 
-func fakeTicker(max int, used *int32, doneFunc func()) waitFunc {
+func fakeTicker(max int, used *atomic.Int32, doneFunc func()) waitFunc {
 	return func(done <-chan struct{}) <-chan struct{} {
 		ch := make(chan struct{})
 		go func() {
@@ -366,7 +366,7 @@ func fakeTicker(max int, used *int32, doneFunc func()) waitFunc {
 					return
 				}
 				if used != nil {
-					atomic.AddInt32(used, 1)
+					used.Add(1)
 				}
 			}
 		}()
@@ -396,7 +396,7 @@ func TestPoll(t *testing.T) {
 	if invocations != 1 {
 		t.Errorf("Expected exactly one invocation, got %d", invocations)
 	}
-	used := atomic.LoadInt32(&fp.used)
+	used := fp.used.Load()
 	if used != 1 {
 		t.Errorf("Expected exactly one tick, got %d", used)
 	}
@@ -415,7 +415,7 @@ func TestPollError(t *testing.T) {
 		t.Fatalf("Expected error %v, got none %v", expectedError, err)
 	}
 	fp.wg.Wait()
-	used := atomic.LoadInt32(&fp.used)
+	used := fp.used.Load()
 	if used != 1 {
 		t.Errorf("Expected exactly one tick, got %d", used)
 	}
@@ -438,7 +438,7 @@ func TestPollImmediate(t *testing.T) {
 	if invocations != 1 {
 		t.Errorf("Expected exactly one invocation, got %d", invocations)
 	}
-	used := atomic.LoadInt32(&fp.used)
+	used := fp.used.Load()
 	if used != 0 {
 		t.Errorf("Expected exactly zero ticks, got %d", used)
 	}
@@ -457,7 +457,7 @@ func TestPollImmediateError(t *testing.T) {
 		t.Fatalf("Expected error %v, got none %v", expectedError, err)
 	}
 	// We don't need to wait for fp.wg, as pollImmediate shouldn't call waitFunc at all.
-	used := atomic.LoadInt32(&fp.used)
+	used := fp.used.Load()
 	if used != 0 {
 		t.Errorf("Expected exactly zero ticks, got %d", used)
 	}

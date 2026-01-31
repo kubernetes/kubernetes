@@ -65,7 +65,7 @@ type droppedRequestsStats struct {
 	retryAfterUpdateUnix int64
 }
 
-func newDroppedRequestsStats(nowUnix int64) *droppedRequestsStats {
+func newDroppedRequestsStats(_ int64) *droppedRequestsStats {
 	result := &droppedRequestsStats{
 		// We assume that we can bump at any time after first dropped request.
 		retryAfterUpdateUnix: 0,

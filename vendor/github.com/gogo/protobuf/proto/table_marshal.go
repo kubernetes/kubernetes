@@ -60,7 +60,7 @@ type marshalInfo struct {
 	extensions   field                      // offset of XXX_InternalExtensions
 	v1extensions field                      // offset of XXX_extensions
 	sizecache    field                      // offset of XXX_sizecache
-	initialized  int32                      // 0 -- only typ is set, 1 -- fully initialized
+	initialized  atomic.Int32               // 0 -- only typ is set, 1 -- fully initialized
 	messageset   bool                       // uses message set wire format
 	hasmarshaler bool                       // has custom marshaler
 	sync.RWMutex                            // protect extElems map, also for initialization
@@ -168,7 +168,7 @@ func getMessageMarshalInfo(msg interface{}, a *InternalMessageInfo) *marshalInfo
 // size is the main function to compute the size of the encoded data of a message.
 // ptr is the pointer to the message.
 func (u *marshalInfo) size(ptr pointer) int {
-	if atomic.LoadInt32(&u.initialized) == 0 {
+	if u.initialized.Load() == 0 {
 		u.computeMarshalInfo()
 	}
 
@@ -241,7 +241,7 @@ func (u *marshalInfo) cachedsize(ptr pointer) int {
 // ptr is the pointer to the message.
 // If deterministic is true, map is marshaled in deterministic order.
 func (u *marshalInfo) marshal(b []byte, ptr pointer, deterministic bool) ([]byte, error) {
-	if atomic.LoadInt32(&u.initialized) == 0 {
+	if u.initialized.Load() == 0 {
 		u.computeMarshalInfo()
 	}
 
@@ -327,7 +327,7 @@ func (u *marshalInfo) marshal(b []byte, ptr pointer, deterministic bool) ([]byte
 func (u *marshalInfo) computeMarshalInfo() {
 	u.Lock()
 	defer u.Unlock()
-	if u.initialized != 0 { // non-atomic read is ok as it is protected by the lock
+	if u.initialized.Load() != 0 { // non-atomic read is ok as it is protected by the lock
 		return
 	}
 
@@ -349,7 +349,7 @@ func (u *marshalInfo) computeMarshalInfo() {
 	// NOTE: This is not efficient.
 	if reflect.PtrTo(t).Implements(marshalerType) {
 		u.hasmarshaler = true
-		atomic.StoreInt32(&u.initialized, 1)
+		u.initialized.Store(1)
 		return
 	}
 
@@ -427,7 +427,7 @@ func (u *marshalInfo) computeMarshalInfo() {
 	// fields are marshaled in tag order on the wire.
 	sort.Sort(byTag(u.fields))
 
-	atomic.StoreInt32(&u.initialized, 1)
+	u.initialized.Store(1)
 }
 
 // helper for sorting fields by tag

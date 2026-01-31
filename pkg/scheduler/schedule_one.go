@@ -652,7 +652,7 @@ func (sched *Scheduler) findNodesThatPassFilters(
 	}
 
 	errCh := parallelize.NewResultChannel[error]()
-	var feasibleNodesLen int32
+	var feasibleNodesLen atomic.Int32
 	ctx, cancel := context.WithCancelCause(ctx)
 	defer cancel(errors.New("findNodesThatPassFilters has completed"))
 
@@ -673,10 +673,10 @@ func (sched *Scheduler) findNodesThatPassFilters(
 			return
 		}
 		if status.IsSuccess() {
-			length := atomic.AddInt32(&feasibleNodesLen, 1)
+			length := feasibleNodesLen.Add(1)
 			if length > numNodesToFind {
 				cancel(errors.New("findNodesThatPassFilters has found enough nodes"))
-				atomic.AddInt32(&feasibleNodesLen, -1)
+				feasibleNodesLen.Add(-1)
 			} else {
 				feasibleNodes[length-1] = nodeInfo
 			}
@@ -697,7 +697,7 @@ func (sched *Scheduler) findNodesThatPassFilters(
 	// Stops searching for more nodes once the configured number of feasible nodes
 	// are found.
 	schedFramework.Parallelizer().Until(ctx, numAllNodes, checkNode, metrics.Filter)
-	feasibleNodes = feasibleNodes[:feasibleNodesLen]
+	feasibleNodes = feasibleNodes[:feasibleNodesLen.Load()]
 	for _, item := range result {
 		if item == nil {
 			continue

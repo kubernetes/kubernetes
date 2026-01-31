@@ -68,7 +68,7 @@ type batchSpanProcessor struct {
 	o BatchSpanProcessorOptions
 
 	queue   chan ReadOnlySpan
-	dropped uint32
+	dropped atomic.Uint32
 
 	inst *observ.BSP
 
@@ -295,7 +295,7 @@ func (bsp *batchSpanProcessor) exportSpans(ctx context.Context) error {
 	}
 
 	if l := len(bsp.batch); l > 0 {
-		global.Debug("exporting spans", "count", len(bsp.batch), "total_dropped", atomic.LoadUint32(&bsp.dropped))
+		global.Debug("exporting spans", "count", len(bsp.batch), "total_dropped", bsp.dropped.Load())
 		if bsp.inst != nil {
 			bsp.inst.Processed(ctx, int64(l))
 		}
@@ -423,7 +423,7 @@ func (bsp *batchSpanProcessor) enqueueDrop(ctx context.Context, sd ReadOnlySpan)
 	case bsp.queue <- sd:
 		return true
 	default:
-		atomic.AddUint32(&bsp.dropped, 1)
+		bsp.dropped.Add( 1)
 		if bsp.inst != nil {
 			bsp.inst.ProcessedQueueFull(ctx, 1)
 		}

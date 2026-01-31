@@ -183,21 +183,19 @@ func TestSharedLookup(t *testing.T) {
 	var chewie = &authenticator.Response{User: &user.DefaultInfo{Name: "chewbacca"}}
 
 	t.Run("actually shared", func(t *testing.T) {
-		var lookups uint32
+		var lookups atomic.Uint32
 		c := make(chan struct{})
 		a := New(authenticator.TokenFunc(func(ctx context.Context, token string) (*authenticator.Response, bool, error) {
 			<-c
-			atomic.AddUint32(&lookups, 1)
+			lookups.Add(1)
 			return chewie, true, nil
 		}), true, time.Minute, 0)
 
 		var wg sync.WaitGroup
-		for i := 0; i < 10; i++ {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+		for range 10 {
+			wg.Go(func() {
 				a.AuthenticateToken(context.Background(), "")
-			}()
+			})
 		}
 
 		// no good way to make sure that all the callers are queued so we sleep.
@@ -205,8 +203,8 @@ func TestSharedLookup(t *testing.T) {
 		close(c)
 		wg.Wait()
 
-		if lookups > 3 {
-			t.Fatalf("unexpected number of lookups: got=%d, wanted less than 3", lookups)
+		if lookups.Load() > 3 {
+			t.Fatalf("unexpected number of lookups: got=%d, wanted less than 3", lookups.Load())
 		}
 	})
 
@@ -283,11 +281,11 @@ func TestCachedAuditAnnotations(t *testing.T) {
 	snorlax := &authenticator.Response{User: &user.DefaultInfo{Name: "snorlax"}}
 
 	t.Run("annotations from cache", func(t *testing.T) {
-		var lookups uint32
+		var lookups atomic.Uint32
 		c := make(chan struct{})
 		a := New(authenticator.TokenFunc(func(ctx context.Context, token string) (*authenticator.Response, bool, error) {
 			<-c
-			atomic.AddUint32(&lookups, 1)
+			lookups.Add(1)
 			audit.AddAuditAnnotation(ctx, "snorlax", "rocks")
 			audit.AddAuditAnnotation(ctx, "pandas", "are amazing")
 			return snorlax, true, nil
@@ -326,8 +324,8 @@ func TestCachedAuditAnnotations(t *testing.T) {
 			t.Errorf("expected all annoations to be processed: %d", queued)
 		}
 
-		if lookups > 3 {
-			t.Errorf("unexpected number of lookups: got=%d, wanted less than 3", lookups)
+		if lookups.Load() > 3 {
+			t.Errorf("unexpected number of lookups: got=%d, wanted less than 3", lookups.Load())
 		}
 	})
 
@@ -506,11 +504,11 @@ func (s *singleBenchmark) bench(b *testing.B) {
 	const maxInFlight = 40
 	chokepoint := make(chan struct{}, maxInFlight)
 	// lookup count
-	var lookups uint64
+	var lookups atomic.Uint64
 
 	a := newWithClock(
 		authenticator.TokenFunc(func(ctx context.Context, token string) (*authenticator.Response, bool, error) {
-			atomic.AddUint64(&lookups, 1)
+			lookups.Add(1)
 
 			chokepoint <- struct{}{}
 			defer func() { <-chokepoint }()
@@ -538,7 +536,7 @@ func (s *singleBenchmark) bench(b *testing.B) {
 	})
 	b.StopTimer()
 
-	b.ReportMetric(float64(lookups)/float64(b.N), "lookups/op")
+	b.ReportMetric(float64(lookups.Load())/float64(b.N), "lookups/op")
 }
 
 // Add a test version of the audit context with a pre-populated event for easy annotation

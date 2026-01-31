@@ -3,6 +3,7 @@ package ipvs
 import (
 	"fmt"
 	"net"
+	"sync/atomic"
 	"time"
 
 	"github.com/vishvananda/netlink/nl"
@@ -75,7 +76,7 @@ type Config struct {
 // Handle provides a namespace specific ipvs handle to program ipvs
 // rules.
 type Handle struct {
-	seq  uint32
+	seq  atomic.Uint32
 	sock *nl.NetlinkSocket
 }
 

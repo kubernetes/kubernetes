@@ -266,7 +266,7 @@ type eventLog struct {
 	LastErrorTime time.Time
 	discarded     int
 
-	refs int32 // how many buckets this is in
+	refs atomic.Int32 // how many buckets this is in
 }
 
 func (el *eventLog) reset() {
@@ -278,7 +278,7 @@ func (el *eventLog) reset() {
 	el.events = nil
 	el.LastErrorTime = time.Time{}
 	el.discarded = 0
-	el.refs = 0
+	el.refs.Store(0)
 }
 
 func (el *eventLog) hasRecentError(now time.Time, maxErrAge time.Duration) bool {
@@ -342,11 +342,11 @@ func (el *eventLog) printf(isErr bool, format string, a ...interface{}) {
 }
 
 func (el *eventLog) ref() {
-	atomic.AddInt32(&el.refs, 1)
+	el.refs.Add(1)
 }
 
 func (el *eventLog) unref() {
-	if atomic.AddInt32(&el.refs, -1) == 0 {
+	if el.refs.Add(-1) == 0 {
 		freeEventLog(el)
 	}
 }

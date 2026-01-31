@@ -56,7 +56,7 @@ func TestHighWaterMark(t *testing.T) {
 
 	m := int64(0)
 	wg := sync.WaitGroup{}
-	for i := 0; i < 300; i++ {
+	for range 300 {
 		wg.Add(1)
 		v := rand.Int63()
 		go func(v int64) {
@@ -68,8 +68,8 @@ func TestHighWaterMark(t *testing.T) {
 		}
 	}
 	wg.Wait()
-	if m != int64(h) {
-		t.Errorf("unexpected value, wanted %v, got %v", m, int64(h))
+	if m != int64(h.V.Load()) {
+		t.Errorf("unexpected value, wanted %v, got %v", m, int64(h.V.Load()))
 	}
 }
 
