@@ -501,7 +501,6 @@ message Subject {
 
   // `group` matches based on user group name.
   // +optional
-  // +k8s:optional
   optional GroupSubject group = 3;
 
   // `serviceAccount` matches ServiceAccounts.

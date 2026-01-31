@@ -163,8 +163,6 @@ message GroupSubject {
   // See https://github.com/kubernetes/apiserver/blob/master/pkg/authentication/user/user.go for some
   // well-known group names.
   // Required.
-  // +required
-  // +k8s:required
   optional string name = 1;
 }
 

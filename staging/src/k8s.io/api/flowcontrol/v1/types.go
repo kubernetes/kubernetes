@@ -234,7 +234,6 @@ type Subject struct {
 	User *UserSubject `json:"user,omitempty" protobuf:"bytes,2,opt,name=user"`
 	// `group` matches based on user group name.
 	// +optional
-	// +k8s:optional
 	Group *GroupSubject `json:"group,omitempty" protobuf:"bytes,3,opt,name=group"`
 	// `serviceAccount` matches ServiceAccounts.
 	// +optional
