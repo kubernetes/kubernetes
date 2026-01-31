@@ -192,7 +192,7 @@ func ValidateFlowSchemaSubject(subject *flowcontrol.Subject, fldPath *field.Path
 func ValidateServiceAccountSubject(subject *flowcontrol.ServiceAccountSubject, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if subject == nil {
-		return append(allErrs, field.Required(fldPath, "serviceAccount is required when subject kind is 'ServiceAccount'").MarkCoveredByDeclarative())
+		return append(allErrs, field.Required(fldPath, "serviceAccount is required when subject kind is 'ServiceAccount'"))
 	}
 	if len(subject.Name) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "").MarkCoveredByDeclarative())
@@ -207,7 +207,7 @@ func ValidateServiceAccountSubject(subject *flowcontrol.ServiceAccountSubject, f
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("namespace"), subject.Namespace, msg))
 		}
 	} else {
-		allErrs = append(allErrs, field.Required(fldPath.Child("namespace"), "must specify namespace for service account"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("namespace"), "must specify namespace for service account").MarkCoveredByDeclarative())
 	}
 
 	return allErrs
