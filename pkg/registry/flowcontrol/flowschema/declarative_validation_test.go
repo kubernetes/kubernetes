@@ -52,8 +52,14 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		"valid": {
 			input: mkValidFlowSchema(),
 		},
-		"group subject name is required": {
-			input: mkValidFlowSchema(tweakGroupSubjectName("")),
+		"service account subject name is required": {
+			input: mkValidFlowSchema(tweakServiceAccountSubjectName("")),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "rules").Index(0).Child("subjects").Index(0).Child("group.name"), "").MarkCoveredByDeclarative(),
+			},
+		},
+		"service account subject namespace is required": {
+			input: mkValidFlowSchema(tweakServiceAccountSubjectNamespace("")),
 			expectedErrs: field.ErrorList{
 				field.Required(field.NewPath("spec", "rules").Index(0).Child("subjects").Index(0).Child("group.name"), "").MarkCoveredByDeclarative(),
 			},
@@ -84,8 +90,14 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			oldObj:    mkValidFlowSchema(),
 			updateObj: mkValidFlowSchema(),
 		},
-		"group subject name is required": {
-			updateObj: mkValidFlowSchema(tweakGroupSubjectName("")),
+		"service account subject name is required": {
+			updateObj: mkValidFlowSchema(tweakServiceAccountSubjectName("")),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "rules").Index(0).Child("subjects").Index(0).Child("group.name"), "").MarkCoveredByDeclarative(),
+			},
+		},
+		"service account subject namespace is required": {
+			updateObj: mkValidFlowSchema(tweakServiceAccountSubjectNamespace("")),
 			expectedErrs: field.ErrorList{
 				field.Required(field.NewPath("spec", "rules").Index(0).Child("subjects").Index(0).Child("group.name"), "").MarkCoveredByDeclarative(),
 			},
@@ -147,8 +159,13 @@ func mkValidFlowSchema(tweaks ...func(obj *flowcontrol.FlowSchema)) flowcontrol.
 	return obj
 }
 
-func tweakGroupSubjectName(name string) func(*flowcontrol.FlowSchema) {
+func tweakServiceAccountSubjectName(name string) func(*flowcontrol.FlowSchema) {
 	return func(fs *flowcontrol.FlowSchema) {
-		fs.Spec.Rules[0].Subjects[0].Group.Name = name
+		fs.Spec.Rules[0].Subjects[0].ServiceAccount.Name = name
+	}
+}
+func tweakServiceAccountSubjectNamespace(namespace string) func(*flowcontrol.FlowSchema) {
+	return func(fs *flowcontrol.FlowSchema) {
+		fs.Spec.Rules[0].Subjects[0].ServiceAccount.Namespace = namespace
 	}
 }
