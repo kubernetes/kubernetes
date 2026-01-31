@@ -145,24 +145,7 @@ func Validate_PolicyRulesWithSubjects(ctx context.Context, op operation.Operatio
 // to declarative validation rules in the API schema.
 func Validate_Subject(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *flowcontrolv1.Subject) (errs field.ErrorList) {
 	// field flowcontrolv1.Subject.Kind has no validation
-
-	// field flowcontrolv1.Subject.User
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *flowcontrolv1.UserSubject, oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
-			}
-			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
-			}
-			return
-		}(fldPath.Child("user"), obj.User, safe.Field(oldObj, func(oldObj *flowcontrolv1.Subject) *flowcontrolv1.UserSubject { return oldObj.User }), oldObj != nil)...)
+	// field flowcontrolv1.Subject.User has no validation
 
 	// field flowcontrolv1.Subject.Group
 	errs = append(errs,

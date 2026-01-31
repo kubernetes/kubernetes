@@ -147,10 +147,11 @@ func Validate_PolicyRulesWithSubjects(ctx context.Context, op operation.Operatio
 // to declarative validation rules in the API schema.
 func Validate_Subject(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *flowcontrolv1beta1.Subject) (errs field.ErrorList) {
 	// field flowcontrolv1beta1.Subject.Kind has no validation
+	// field flowcontrolv1beta1.Subject.User has no validation
 
-	// field flowcontrolv1beta1.Subject.User
+	// field flowcontrolv1beta1.Subject.Group
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *flowcontrolv1beta1.UserSubject, oldValueCorrelated bool) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *flowcontrolv1beta1.GroupSubject, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
@@ -162,16 +163,6 @@ func Validate_Subject(ctx context.Context, op operation.Operation, fldPath *fiel
 			}
 			if earlyReturn {
 				return // do not proceed
-			}
-			return
-		}(fldPath.Child("user"), obj.User, safe.Field(oldObj, func(oldObj *flowcontrolv1beta1.Subject) *flowcontrolv1beta1.UserSubject { return oldObj.User }), oldObj != nil)...)
-
-	// field flowcontrolv1beta1.Subject.Group
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *flowcontrolv1beta1.GroupSubject, oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_GroupSubject(ctx, op, fldPath, obj, oldObj)...)

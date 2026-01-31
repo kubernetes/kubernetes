@@ -502,7 +502,6 @@ message Subject {
 
   // `user` matches based on username.
   // +optional
-  // +k8s:optional
   optional UserSubject user = 2;
 
   // `group` matches based on user group name.

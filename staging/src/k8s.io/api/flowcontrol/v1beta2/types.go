@@ -233,7 +233,6 @@ type Subject struct {
 	Kind SubjectKind `json:"kind" protobuf:"bytes,1,opt,name=kind"`
 	// `user` matches based on username.
 	// +optional
-	// +k8s:optional
 	User *UserSubject `json:"user,omitempty" protobuf:"bytes,2,opt,name=user"`
 	// `group` matches based on user group name.
 	// +optional
