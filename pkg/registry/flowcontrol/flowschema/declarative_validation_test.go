@@ -121,9 +121,10 @@ func mkValidFlowSchema(tweaks ...func(obj *flowcontrol.FlowSchema)) flowcontrol.
 				{
 					Subjects: []flowcontrol.Subject{
 						{
-							Kind: flowcontrol.SubjectKindGroup,
-							Group: &flowcontrol.GroupSubject{
-								Name: "system:kube-controller-manager",
+							Kind: flowcontrol.SubjectKindServiceAccount,
+							ServiceAccount: &flowcontrol.ServiceAccountSubject{
+								Name:      "service account name",
+								Namespace: "service account namespace",
 							},
 						},
 					},

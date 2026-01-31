@@ -240,6 +240,7 @@ type Subject struct {
 	Group *GroupSubject `json:"group,omitempty" protobuf:"bytes,3,opt,name=group"`
 	// `serviceAccount` matches ServiceAccounts.
 	// +optional
+	// +k8s:optional
 	ServiceAccount *ServiceAccountSubject `json:"serviceAccount,omitempty" protobuf:"bytes,4,opt,name=serviceAccount"`
 }
 
@@ -275,9 +276,13 @@ type GroupSubject struct {
 type ServiceAccountSubject struct {
 	// `namespace` is the namespace of matching ServiceAccount objects.
 	// Required.
+	// +required
+	// +k8s:required
 	Namespace string `json:"namespace" protobuf:"bytes,1,opt,name=namespace"`
 	// `name` is the name of matching ServiceAccount objects, or "*" to match regardless of name.
 	// Required.
+	// +required
+	// +k8s:required
 	Name string `json:"name" protobuf:"bytes,2,opt,name=name"`
 }
 

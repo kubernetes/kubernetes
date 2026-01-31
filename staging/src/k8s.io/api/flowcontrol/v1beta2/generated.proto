@@ -475,10 +475,14 @@ message ResourcePolicyRule {
 message ServiceAccountSubject {
   // `namespace` is the namespace of matching ServiceAccount objects.
   // Required.
+  // +required
+  // +k8s:required
   optional string namespace = 1;
 
   // `name` is the name of matching ServiceAccount objects, or "*" to match regardless of name.
   // Required.
+  // +required
+  // +k8s:required
   optional string name = 2;
 }
 
@@ -502,6 +506,7 @@ message Subject {
 
   // `serviceAccount` matches ServiceAccounts.
   // +optional
+  // +k8s:optional
   optional ServiceAccountSubject serviceAccount = 4;
 }
 

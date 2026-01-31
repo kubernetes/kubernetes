@@ -192,10 +192,10 @@ func ValidateFlowSchemaSubject(subject *flowcontrol.Subject, fldPath *field.Path
 func ValidateServiceAccountSubject(subject *flowcontrol.ServiceAccountSubject, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if subject == nil {
-		return append(allErrs, field.Required(fldPath, "serviceAccount is required when subject kind is 'ServiceAccount'"))
+		return append(allErrs, field.Required(fldPath, "serviceAccount is required when subject kind is 'ServiceAccount'").MarkCoveredByDeclarative())
 	}
 	if len(subject.Name) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "").MarkCoveredByDeclarative())
 	} else if subject.Name != flowcontrol.NameAll {
 		for _, msg := range apimachineryvalidation.ValidateServiceAccountName(subject.Name, false) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), subject.Name, msg))
@@ -229,10 +229,10 @@ func ValidateUserSubject(subject *flowcontrol.UserSubject, fldPath *field.Path) 
 func ValidateGroupSubject(subject *flowcontrol.GroupSubject, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if subject == nil {
-		return append(allErrs, field.Required(fldPath, "group is required when subject kind is 'Group'").MarkCoveredByDeclarative())
+		return append(allErrs, field.Required(fldPath, "group is required when subject kind is 'Group'"))
 	}
 	if len(subject.Name) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "").MarkCoveredByDeclarative())
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
 	}
 	return allErrs
 }

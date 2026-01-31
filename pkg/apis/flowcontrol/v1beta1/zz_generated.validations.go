@@ -143,6 +143,50 @@ func Validate_PolicyRulesWithSubjects(ctx context.Context, op operation.Operatio
 	return errs
 }
 
+// Validate_ServiceAccountSubject validates an instance of ServiceAccountSubject according
+// to declarative validation rules in the API schema.
+func Validate_ServiceAccountSubject(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *flowcontrolv1beta1.ServiceAccountSubject) (errs field.ErrorList) {
+	// field flowcontrolv1beta1.ServiceAccountSubject.Namespace
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("namespace"), &obj.Namespace, safe.Field(oldObj, func(oldObj *flowcontrolv1beta1.ServiceAccountSubject) *string { return &oldObj.Namespace }), oldObj != nil)...)
+
+	// field flowcontrolv1beta1.ServiceAccountSubject.Name
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("name"), &obj.Name, safe.Field(oldObj, func(oldObj *flowcontrolv1beta1.ServiceAccountSubject) *string { return &oldObj.Name }), oldObj != nil)...)
+
+	return errs
+}
+
 // Validate_Subject validates an instance of Subject according
 // to declarative validation rules in the API schema.
 func Validate_Subject(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *flowcontrolv1beta1.Subject) (errs field.ErrorList) {
@@ -156,6 +200,18 @@ func Validate_Subject(ctx context.Context, op operation.Operation, fldPath *fiel
 			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
+			// call the type's validation function
+			errs = append(errs, Validate_GroupSubject(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("group"), obj.Group, safe.Field(oldObj, func(oldObj *flowcontrolv1beta1.Subject) *flowcontrolv1beta1.GroupSubject { return oldObj.Group }), oldObj != nil)...)
+
+	// field flowcontrolv1beta1.Subject.ServiceAccount
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *flowcontrolv1beta1.ServiceAccountSubject, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
 			// call field-attached validations
 			earlyReturn := false
 			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
@@ -165,10 +221,11 @@ func Validate_Subject(ctx context.Context, op operation.Operation, fldPath *fiel
 				return // do not proceed
 			}
 			// call the type's validation function
-			errs = append(errs, Validate_GroupSubject(ctx, op, fldPath, obj, oldObj)...)
+			errs = append(errs, Validate_ServiceAccountSubject(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("group"), obj.Group, safe.Field(oldObj, func(oldObj *flowcontrolv1beta1.Subject) *flowcontrolv1beta1.GroupSubject { return oldObj.Group }), oldObj != nil)...)
+		}(fldPath.Child("serviceAccount"), obj.ServiceAccount, safe.Field(oldObj, func(oldObj *flowcontrolv1beta1.Subject) *flowcontrolv1beta1.ServiceAccountSubject {
+			return oldObj.ServiceAccount
+		}), oldObj != nil)...)
 
-	// field flowcontrolv1beta1.Subject.ServiceAccount has no validation
 	return errs
 }

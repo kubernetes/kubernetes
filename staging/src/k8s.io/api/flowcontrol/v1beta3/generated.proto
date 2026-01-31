@@ -165,8 +165,6 @@ message GroupSubject {
   // See https://github.com/kubernetes/apiserver/blob/master/pkg/authentication/user/user.go for some
   // well-known group names.
   // Required.
-  // +required
-  // +k8s:required
   optional string name = 1;
 }
 
@@ -479,10 +477,14 @@ message ResourcePolicyRule {
 message ServiceAccountSubject {
   // `namespace` is the namespace of matching ServiceAccount objects.
   // Required.
+  // +required
+  // +k8s:required
   optional string namespace = 1;
 
   // `name` is the name of matching ServiceAccount objects, or "*" to match regardless of name.
   // Required.
+  // +required
+  // +k8s:required
   optional string name = 2;
 }
 
@@ -501,11 +503,11 @@ message Subject {
 
   // `group` matches based on user group name.
   // +optional
-  // +k8s:optional
   optional GroupSubject group = 3;
 
   // `serviceAccount` matches ServiceAccounts.
   // +optional
+  // +k8s:optional
   optional ServiceAccountSubject serviceAccount = 4;
 }
 
