@@ -2426,6 +2426,11 @@ func describeCronJob(cronJob *batchv1.CronJob, events *corev1.EventList) (string
 		printAnnotationsMultiline(w, "Annotations", cronJob.Annotations)
 		w.Write(LEVEL_0, "Schedule:\t%s\n", cronJob.Spec.Schedule)
 		w.Write(LEVEL_0, "Concurrency Policy:\t%s\n", cronJob.Spec.ConcurrencyPolicy)
+		if cronJob.Spec.TimeZone != nil && len(*cronJob.Spec.TimeZone) > 0 {
+            w.Write(LEVEL_0, "Time Zone:\t%s\n", *cronJob.Spec.TimeZone)
+        } else {
+            w.Write(LEVEL_0, "Time Zone:\t<none>\n")
+        }
 		w.Write(LEVEL_0, "Suspend:\t%s\n", printBoolPtr(cronJob.Spec.Suspend))
 		if cronJob.Spec.SuccessfulJobsHistoryLimit != nil {
 			w.Write(LEVEL_0, "Successful Job History Limit:\t%d\n", *cronJob.Spec.SuccessfulJobsHistoryLimit)
