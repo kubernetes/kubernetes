@@ -19,16 +19,17 @@ limitations under the License.
 package cm
 
 import (
-	"reflect"
-	"strconv"
-	"testing"
-	"time"
+        "reflect"
+        "strconv"
+        "testing"
+        "time"
 
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	pkgfeatures "k8s.io/kubernetes/pkg/features"
+        v1 "k8s.io/api/core/v1"
+        "k8s.io/apimachinery/pkg/api/resource"
+        "k8s.io/apimachinery/pkg/types"
+        utilfeature "k8s.io/apiserver/pkg/util/feature"
+        featuregatetesting "k8s.io/component-base/featuregate/testing"
+        pkgfeatures "k8s.io/kubernetes/pkg/features"
 )
 
 // getResourceList returns a ResourceList with the
@@ -1048,5 +1049,340 @@ func TestResourceConfigForPodWithEnforceMemoryQoS(t *testing.T) {
 		if !reflect.DeepEqual(actual.Unified, testCase.expected.Unified) {
 			t.Errorf("unexpected result, test: %v, unified not as expected", testName)
 		}
+	}
+}
+// TestMilliCPUToShares tests the MilliCPUToShares function which converts
+// milliCPU values to Linux CFS CPU shares.
+func TestMilliCPUToShares(t *testing.T) {
+	testCases := []struct {
+		name     string
+		input    int64
+		expected uint64
+	}{
+		{
+			name:     "zero milliCPU returns MinShares",
+			input:    0,
+			expected: MinShares,
+		},
+		{
+			name:     "1 milliCPU returns MinShares (below minimum)",
+			input:    1,
+			expected: MinShares,
+		},
+		{
+			name:     "very small milliCPU returns MinShares",
+			input:    2,
+			expected: MinShares,
+		},
+		{
+			name:     "1000m (1 CPU) returns 1024 shares",
+			input:    1000,
+			expected: 1024,
+		},
+		{
+			name:     "500m returns 512 shares",
+			input:    500,
+			expected: 512,
+		},
+		{
+			name:     "100m returns 102 shares",
+			input:    100,
+			expected: 102,
+		},
+		{
+			name:     "2000m (2 CPUs) returns 2048 shares",
+			input:    2000,
+			expected: 2048,
+		},
+		{
+			name:     "very large milliCPU is capped at MaxShares",
+			input:    1000000,
+			expected: MaxShares,
+		},
+		{
+			name:     "exactly at MaxShares boundary",
+			input:    256000, // 256 CPUs worth
+			expected: MaxShares,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := MilliCPUToShares(tc.input)
+			if actual != tc.expected {
+				t.Errorf("MilliCPUToShares(%d) = %d, expected %d", tc.input, actual, tc.expected)
+			}
+		})
+	}
+}
+
+// TestGetPodCgroupNameSuffix tests the GetPodCgroupNameSuffix function which
+// generates the cgroup name suffix for a pod based on its UID.
+func TestGetPodCgroupNameSuffix(t *testing.T) {
+	testCases := []struct {
+		name     string
+		podUID   string
+		expected string
+	}{
+		{
+			name:     "standard pod UID",
+			podUID:   "abc-123-def-456",
+			expected: "pod" + "abc-123-def-456",
+		},
+		{
+			name:     "empty pod UID",
+			podUID:   "",
+			expected: "pod",
+		},
+		{
+			name:     "UUID format pod UID",
+			podUID:   "550e8400-e29b-41d4-a716-446655440000",
+			expected: "pod" + "550e8400-e29b-41d4-a716-446655440000",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := GetPodCgroupNameSuffix(types.UID(tc.podUID))
+			if actual != tc.expected {
+				t.Errorf("GetPodCgroupNameSuffix(%s) = %s, expected %s", tc.podUID, actual, tc.expected)
+			}
+		})
+	}
+}
+
+// TestNodeAllocatableRoot tests the NodeAllocatableRoot function which
+// returns the cgroup path for the node allocatable cgroup.
+func TestNodeAllocatableRoot(t *testing.T) {
+	testCases := []struct {
+		name          string
+		cgroupRoot    string
+		cgroupsPerQOS bool
+		cgroupDriver  string
+		expected      string
+	}{
+		{
+			name:          "cgroupfs driver without QOS",
+			cgroupRoot:    "/kubepods",
+			cgroupsPerQOS: false,
+			cgroupDriver:  "cgroupfs",
+			expected:      "/kubepods",
+		},
+		{
+			name:          "cgroupfs driver with QOS",
+			cgroupRoot:    "/kubepods",
+			cgroupsPerQOS: true,
+			cgroupDriver:  "cgroupfs",
+			expected:      "/kubepods/kubepods",
+		},
+		{
+			name:          "systemd driver without QOS",
+			cgroupRoot:    "/kubepods",
+			cgroupsPerQOS: false,
+			cgroupDriver:  "systemd",
+			expected:      "/kubepods.slice",
+		},
+		{
+			name:          "systemd driver with QOS",
+			cgroupRoot:    "/kubepods",
+			cgroupsPerQOS: true,
+			cgroupDriver:  "systemd",
+			expected:      "/kubepods.slice/kubepods-kubepods.slice",
+		},
+		{
+			name:          "empty cgroup root with cgroupfs",
+			cgroupRoot:    "",
+			cgroupsPerQOS: false,
+			cgroupDriver:  "cgroupfs",
+			expected:      "/",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := NodeAllocatableRoot(tc.cgroupRoot, tc.cgroupsPerQOS, tc.cgroupDriver)
+			if actual != tc.expected {
+				t.Errorf("NodeAllocatableRoot(%s, %v, %s) = %s, expected %s",
+					tc.cgroupRoot, tc.cgroupsPerQOS, tc.cgroupDriver, actual, tc.expected)
+			}
+		})
+	}
+}
+
+// TestCPURequestsFromConfig tests the CPURequestsFromConfig function which
+// extracts CPU request quantity from a ResourceConfig.
+func TestCPURequestsFromConfig(t *testing.T) {
+	shares100 := uint64(102) // ~100m CPU
+	shares1000 := uint64(1024)
+	sharesZero := uint64(0)
+
+	testCases := []struct {
+		name        string
+		config      *ResourceConfig
+		expectNil   bool
+		expectedVal int64 // milliCPU
+	}{
+		{
+			name:      "nil config returns nil",
+			config:    nil,
+			expectNil: true,
+		},
+		{
+			name:      "zero shares returns nil",
+			config:    &ResourceConfig{CPUShares: &sharesZero},
+			expectNil: true,
+		},
+		{
+			name:        "102 shares returns 100m CPU",
+			config:      &ResourceConfig{CPUShares: &shares100},
+			expectNil:   false,
+			expectedVal: 100,
+		},
+		{
+			name:        "1024 shares returns 1000m (1 CPU)",
+			config:      &ResourceConfig{CPUShares: &shares1000},
+			expectNil:   false,
+			expectedVal: 1000,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := CPURequestsFromConfig(tc.config)
+			if tc.expectNil {
+				if actual != nil {
+					t.Errorf("CPURequestsFromConfig() = %v, expected nil", actual)
+				}
+			} else {
+				if actual == nil {
+					t.Fatalf("CPURequestsFromConfig() = nil, expected non-nil")
+				}
+				actualVal := actual.MilliValue()
+				if actualVal != tc.expectedVal {
+					t.Errorf("CPURequestsFromConfig().MilliValue() = %d, expected %d", actualVal, tc.expectedVal)
+				}
+			}
+		})
+	}
+}
+
+// TestCPULimitsFromConfig tests the CPULimitsFromConfig function which
+// extracts CPU limit quantity from a ResourceConfig.
+func TestCPULimitsFromConfig(t *testing.T) {
+	period := uint64(100000) // 100ms
+	periodZero := uint64(0)
+	quota100m := int64(10000)   // 10ms = 100m CPU with 100ms period
+	quota1000m := int64(100000) // 100ms = 1 CPU with 100ms period
+	quotaNoLimit := int64(-1)
+
+	testCases := []struct {
+		name        string
+		config      *ResourceConfig
+		expectNil   bool
+		expectedVal int64 // milliCPU
+	}{
+		{
+			name:      "nil config returns nil",
+			config:    nil,
+			expectNil: true,
+		},
+		{
+			name:      "zero period returns nil",
+			config:    &ResourceConfig{CPUPeriod: &periodZero, CPUQuota: &quota100m},
+			expectNil: true,
+		},
+		{
+			name:      "no limit quota returns nil",
+			config:    &ResourceConfig{CPUPeriod: &period, CPUQuota: &quotaNoLimit},
+			expectNil: true,
+		},
+		{
+			name:        "100m CPU quota",
+			config:      &ResourceConfig{CPUPeriod: &period, CPUQuota: &quota100m},
+			expectNil:   false,
+			expectedVal: 100,
+		},
+		{
+			name:        "1 CPU quota",
+			config:      &ResourceConfig{CPUPeriod: &period, CPUQuota: &quota1000m},
+			expectNil:   false,
+			expectedVal: 1000,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := CPULimitsFromConfig(tc.config)
+			if tc.expectNil {
+				if actual != nil {
+					t.Errorf("CPULimitsFromConfig() = %v, expected nil", actual)
+				}
+			} else {
+				if actual == nil {
+					t.Fatalf("CPULimitsFromConfig() = nil, expected non-nil")
+				}
+				actualVal := actual.MilliValue()
+				if actualVal != tc.expectedVal {
+					t.Errorf("CPULimitsFromConfig().MilliValue() = %d, expected %d", actualVal, tc.expectedVal)
+				}
+			}
+		})
+	}
+}
+
+// TestMemoryLimitsFromConfig tests the MemoryLimitsFromConfig function which
+// extracts memory limit quantity from a ResourceConfig.
+func TestMemoryLimitsFromConfig(t *testing.T) {
+	memZero := int64(0)
+	mem100Mi := int64(100 * 1024 * 1024)
+	mem1Gi := int64(1024 * 1024 * 1024)
+
+	testCases := []struct {
+		name        string
+		config      *ResourceConfig
+		expectNil   bool
+		expectedVal int64 // bytes
+	}{
+		{
+			name:      "nil config returns nil",
+			config:    nil,
+			expectNil: true,
+		},
+		{
+			name:      "zero memory returns nil",
+			config:    &ResourceConfig{Memory: &memZero},
+			expectNil: true,
+		},
+		{
+			name:        "100Mi memory",
+			config:      &ResourceConfig{Memory: &mem100Mi},
+			expectNil:   false,
+			expectedVal: mem100Mi,
+		},
+		{
+			name:        "1Gi memory",
+			config:      &ResourceConfig{Memory: &mem1Gi},
+			expectNil:   false,
+			expectedVal: mem1Gi,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := MemoryLimitsFromConfig(tc.config)
+			if tc.expectNil {
+				if actual != nil {
+					t.Errorf("MemoryLimitsFromConfig() = %v, expected nil", actual)
+				}
+			} else {
+				if actual == nil {
+					t.Fatalf("MemoryLimitsFromConfig() = nil, expected non-nil")
+				}
+				actualVal := actual.Value()
+				if actualVal != tc.expectedVal {
+					t.Errorf("MemoryLimitsFromConfig().Value() = %d, expected %d", actualVal, tc.expectedVal)
+				}
+			}
+		})
 	}
 }
