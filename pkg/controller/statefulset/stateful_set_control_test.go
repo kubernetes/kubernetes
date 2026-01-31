@@ -886,7 +886,7 @@ func TestStatefulSetControl_getSetRevisions(t *testing.T) {
 		if len(revisions) != test.expectedCount {
 			t.Errorf("%s: want %d revisions got %d", test.name, test.expectedCount, len(revisions))
 		}
-		if test.err && err == nil {
+		if test.err {
 			t.Errorf("%s: expected error", test.name)
 		}
 		if !test.err && !history.EqualRevision(current, test.expectedCurrent) {
@@ -2090,9 +2090,6 @@ func TestStatefulSetControlRollback(t *testing.T) {
 			t.Fatalf("%s: %s", test.name, err)
 		}
 		if err := updateStatefulSetControl(set, ssc, om, assertUpdateInvariants); err != nil {
-			t.Fatalf("%s: %s", test.name, err)
-		}
-		if err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
 		pods, err = om.podsLister.Pods(set.Namespace).List(selector)

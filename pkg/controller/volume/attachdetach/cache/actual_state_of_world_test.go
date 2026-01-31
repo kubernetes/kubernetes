@@ -629,7 +629,7 @@ func Test_GetAttachedVolumes_Positive_OneVolumeTwoNodes(t *testing.T) {
 		t.Fatalf("Failed to get volume plugin from spec %v, %v", volumeSpec, err)
 	}
 	uniqueVolumeName, err := volumeutil.GetUniqueVolumeNameFromSpec(plugin, volumeSpec)
-	if err != nil || plugin == nil {
+	if err != nil || uniqueVolumeName == "" {
 		t.Fatalf("Failed to get uniqueVolumeName from spec %v, %v", volumeSpec, err)
 	}
 	logger, _ := ktesting.NewTestContext(t)
@@ -927,9 +927,6 @@ func Test_MarkDesireToDetach_Positive_MarkedAddVolumeNodeReset(t *testing.T) {
 	if markDesireToDetachErr != nil {
 		t.Fatalf("RemoveVolumeFromReportAsAttached failed. Expected: <no error> Actual: <%v>", markDesireToDetachErr)
 	}
-	if addErr != nil {
-		t.Fatalf("AddVolumeNode failed. Expected: <no error> Actual: <%v>", addErr)
-	}
 
 	// Assert
 	attachedVolumes := asw.GetAttachedVolumes()
@@ -1224,7 +1221,7 @@ func Test_GetAttachedVolumesForNode_Positive_OneVolumeTwoNodes(t *testing.T) {
 		t.Fatalf("Failed to get volume plugin from spec %v, %v", volumeSpec, err)
 	}
 	uniqueVolumeName, err := volumeutil.GetUniqueVolumeNameFromSpec(plugin, volumeSpec)
-	if err != nil || plugin == nil {
+	if err != nil || uniqueVolumeName == "" {
 		t.Fatalf("Failed to get uniqueVolumeName from spec %v, %v", volumeSpec, err)
 	}
 	generatedVolumeName1, add1Err := asw.AddVolumeNode(logger, uniqueVolumeName, volumeSpec, node1Name, devicePath, true)
@@ -1269,7 +1266,7 @@ func Test_OneVolumeTwoNodes_TwoDevicePaths(t *testing.T) {
 		t.Fatalf("Failed to get volume plugin from spec %v, %v", volumeSpec, err)
 	}
 	uniqueVolumeName, err := volumeutil.GetUniqueVolumeNameFromSpec(plugin, volumeSpec)
-	if err != nil || plugin == nil {
+	if err != nil || uniqueVolumeName == "" {
 		t.Fatalf("Failed to get uniqueVolumeName from spec %v, %v", volumeSpec, err)
 	}
 	generatedVolumeName1, add1Err := asw.AddVolumeNode(logger, uniqueVolumeName, volumeSpec, node1Name, devicePath1, true)
