@@ -96,31 +96,6 @@ func Validate_FlowSchemaSpec(ctx context.Context, op operation.Operation, fldPat
 	return errs
 }
 
-// Validate_GroupSubject validates an instance of GroupSubject according
-// to declarative validation rules in the API schema.
-func Validate_GroupSubject(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *flowcontrolv1beta2.GroupSubject) (errs field.ErrorList) {
-	// field flowcontrolv1beta2.GroupSubject.Name
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
-			}
-			// call field-attached validations
-			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
-			}
-			return
-		}(fldPath.Child("name"), &obj.Name, safe.Field(oldObj, func(oldObj *flowcontrolv1beta2.GroupSubject) *string { return &oldObj.Name }), oldObj != nil)...)
-
-	return errs
-}
-
 // Validate_PolicyRulesWithSubjects validates an instance of PolicyRulesWithSubjects according
 // to declarative validation rules in the API schema.
 func Validate_PolicyRulesWithSubjects(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *flowcontrolv1beta2.PolicyRulesWithSubjects) (errs field.ErrorList) {
@@ -192,18 +167,7 @@ func Validate_ServiceAccountSubject(ctx context.Context, op operation.Operation,
 func Validate_Subject(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *flowcontrolv1beta2.Subject) (errs field.ErrorList) {
 	// field flowcontrolv1beta2.Subject.Kind has no validation
 	// field flowcontrolv1beta2.Subject.User has no validation
-
-	// field flowcontrolv1beta2.Subject.Group
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *flowcontrolv1beta2.GroupSubject, oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
-			}
-			// call the type's validation function
-			errs = append(errs, Validate_GroupSubject(ctx, op, fldPath, obj, oldObj)...)
-			return
-		}(fldPath.Child("group"), obj.Group, safe.Field(oldObj, func(oldObj *flowcontrolv1beta2.Subject) *flowcontrolv1beta2.GroupSubject { return oldObj.Group }), oldObj != nil)...)
+	// field flowcontrolv1beta2.Subject.Group has no validation
 
 	// field flowcontrolv1beta2.Subject.ServiceAccount
 	errs = append(errs,
