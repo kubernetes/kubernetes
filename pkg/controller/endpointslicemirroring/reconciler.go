@@ -61,7 +61,8 @@ type reconciler struct {
 // reconcile takes an Endpoints resource and ensures that corresponding
 // EndpointSlices exist. It creates, updates, or deletes EndpointSlices to
 // ensure the desired set of addresses are represented by EndpointSlices.
-func (r *reconciler) reconcile(logger klog.Logger, endpoints *corev1.Endpoints, existingSlices []*discovery.EndpointSlice) error {
+func (r *reconciler) reconcile(ctx context.Context, endpoints *corev1.Endpoints, existingSlices []*discovery.EndpointSlice) error {
+	logger := klog.FromContext(ctx)
 	// Calculate desired state.
 	d := newDesiredCalc()
 
@@ -167,7 +168,7 @@ func (r *reconciler) reconcile(logger klog.Logger, endpoints *corev1.Endpoints, 
 	endpointsNN := types.NamespacedName{Name: endpoints.Name, Namespace: endpoints.Namespace}
 	r.metricsCache.UpdateEndpointPortCache(endpointsNN, epMetrics)
 
-	return r.finalize(endpoints, slices)
+	return r.finalize(ctx, endpoints, slices)
 }
 
 // reconcileByPortMapping compares the endpoints found in existing slices with
@@ -237,7 +238,7 @@ func (r *reconciler) reconcileByPortMapping(
 }
 
 // finalize creates, updates, and deletes slices as specified
-func (r *reconciler) finalize(endpoints *corev1.Endpoints, slices slicesByAction) error {
+func (r *reconciler) finalize(ctx context.Context, endpoints *corev1.Endpoints, slices slicesByAction) error {
 	// If there are slices to create and delete, recycle the slices marked for
 	// deletion by replacing creates with updates of slices that would otherwise
 	// be deleted.
@@ -249,7 +250,7 @@ func (r *reconciler) finalize(endpoints *corev1.Endpoints, slices slicesByAction
 	// being deleted.
 	if endpoints.DeletionTimestamp == nil {
 		for _, endpointSlice := range slices.toCreate {
-			createdSlice, err := epsClient.Create(context.TODO(), endpointSlice, metav1.CreateOptions{})
+			createdSlice, err := epsClient.Create(ctx, endpointSlice, metav1.CreateOptions{})
 			if err != nil {
 				// If the namespace is terminating, creates will continue to fail. Simply drop the item.
 				if errors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
@@ -263,7 +264,7 @@ func (r *reconciler) finalize(endpoints *corev1.Endpoints, slices slicesByAction
 	}
 
 	for _, endpointSlice := range slices.toUpdate {
-		updatedSlice, err := epsClient.Update(context.TODO(), endpointSlice, metav1.UpdateOptions{})
+		updatedSlice, err := epsClient.Update(ctx, endpointSlice, metav1.UpdateOptions{})
 		if err != nil {
 			return fmt.Errorf("failed to update %s EndpointSlice for Endpoints %s/%s: %v", endpointSlice.Name, endpoints.Namespace, endpoints.Name, err)
 		}
@@ -272,7 +273,7 @@ func (r *reconciler) finalize(endpoints *corev1.Endpoints, slices slicesByAction
 	}
 
 	for _, endpointSlice := range slices.toDelete {
-		err := epsClient.Delete(context.TODO(), endpointSlice.Name, metav1.DeleteOptions{})
+		err := epsClient.Delete(ctx, endpointSlice.Name, metav1.DeleteOptions{})
 		if err != nil {
 			return fmt.Errorf("failed to delete %s EndpointSlice for Endpoints %s/%s: %v", endpointSlice.Name, endpoints.Namespace, endpoints.Name, err)
 		}
@@ -285,11 +286,11 @@ func (r *reconciler) finalize(endpoints *corev1.Endpoints, slices slicesByAction
 
 // deleteEndpoints deletes any associated EndpointSlices and cleans up any
 // Endpoints references from the metricsCache.
-func (r *reconciler) deleteEndpoints(namespace, name string, endpointSlices []*discovery.EndpointSlice) error {
+func (r *reconciler) deleteEndpoints(ctx context.Context, namespace, name string, endpointSlices []*discovery.EndpointSlice) error {
 	r.metricsCache.DeleteEndpoints(types.NamespacedName{Namespace: namespace, Name: name})
 	var errs []error
 	for _, endpointSlice := range endpointSlices {
-		err := r.client.DiscoveryV1().EndpointSlices(namespace).Delete(context.TODO(), endpointSlice.Name, metav1.DeleteOptions{})
+		err := r.client.DiscoveryV1().EndpointSlices(namespace).Delete(ctx, endpointSlice.Name, metav1.DeleteOptions{})
 		if err != nil {
 			errs = append(errs, err)
 		}
