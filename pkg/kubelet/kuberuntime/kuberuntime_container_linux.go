@@ -92,8 +92,8 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *v1.C
 func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(pod *v1.Pod, container *v1.Container, enforceMemoryQoS bool) *runtimeapi.LinuxContainerResources {
 	// set linux container resources
 	var cpuRequest *resource.Quantity
-	if _, cpuRequestExists := container.Resources.Requests[v1.ResourceCPU]; cpuRequestExists {
-		cpuRequest = container.Resources.Requests.Cpu()
+	if cpuReq, cpuRequestExists := req[v1.ResourceCPU]; cpuRequestExists {
+		 cpuRequest = cpuReq.DeepCopy()
 	}
 	lcr := m.calculateLinuxResources(cpuRequest, container.Resources.Limits.Cpu(), container.Resources.Limits.Memory())
 
