@@ -295,7 +295,14 @@ func (o *CopyOptions) copyToPod(src, dest fileSpec, options *exec.ExecOptions) e
 		// If no error, dest.File was found to be a directory.
 		// Copy specified src into it
 		destFile = destFile.Join(srcFile.Base())
-	}
+	} else if errors.Is(err, context.DeadlineExceeded) {
+		// we haven't decided destination is directory or not because context timeout is exceeded.
+		// That's why, we should shortcut the process in here.
+		return err
+	} else {
+	// Destination exists but is NOT a directory → proceed as-is
+	// (or handle other errors here if needed)
+}
 
 	go func(src localPath, dest remotePath, writer io.WriteCloser) {
 		defer writer.Close()
