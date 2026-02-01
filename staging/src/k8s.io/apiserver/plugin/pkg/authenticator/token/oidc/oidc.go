@@ -62,6 +62,7 @@ import (
 	"k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/lazy"
 	"k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/apiserver/pkg/server/egressselector"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	certutil "k8s.io/client-go/util/cert"
@@ -91,7 +92,7 @@ type Options struct {
 	KeySet oidc.KeySet
 
 	// PEM encoded root certificate contents of the provider.  Mutually exclusive with Client.
-	CAContentProvider CAContentProvider
+	CAContentProvider dynamiccertificates.CAContentProvider
 
 	// EgressLookup allows for optional opt-in egress configuration via a custom dialer.  Mutually exclusive with Client.
 	EgressLookup egressselector.Lookup
@@ -124,11 +125,6 @@ type Options struct {
 
 	// now is used for testing. It defaults to time.Now.
 	now func() time.Time
-}
-
-// Subset of dynamiccertificates.CAContentProvider that can be used to dynamically load root CAs.
-type CAContentProvider interface {
-	CurrentCABundleContent() []byte
 }
 
 // initVerifier creates a new ID token verifier for the given configuration and issuer URL.  On success, calls setVerifier with the

@@ -265,8 +265,7 @@ func newJWTAuthenticator(serverLifecycle context.Context, config *apiserver.Auth
 	var jwtAuthenticators []authenticator.Token
 	var healthChecks []func() error
 	for _, jwtAuthenticator := range config.JWT {
-		// TODO remove this CAContentProvider indirection
-		var oidcCAContent oidc.CAContentProvider
+		var oidcCAContent dynamiccertificates.CAContentProvider
 		if len(jwtAuthenticator.Issuer.CertificateAuthority) > 0 {
 			var oidcCAError error
 			oidcCAContent, oidcCAError = dynamiccertificates.NewStaticCAContent("oidc-authenticator", []byte(jwtAuthenticator.Issuer.CertificateAuthority))
