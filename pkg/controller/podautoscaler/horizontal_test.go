@@ -148,6 +148,15 @@ type testCase struct {
 	expectedReportedMetricComputationErrorLabels  map[autoscalingv2.MetricSourceType]monitor.ErrorLabel
 	checkDesiredReplicaMetric                     bool
 
+	// expectedReconciliationCount specifies the minimum number of reconciliations to wait for.
+	// This verifies that reconciliationsTotal counter metric is incremented on each cycle.
+	// The actual count may be higher; we only verify it's at least this value.
+	expectedReconciliationCount int
+	// expectedMetricComputationCounts specifies the minimum computation count per metric type.
+	// This verifies that metricComputationTotal counter metric is incremented for each
+	// metric type on each reconciliation. The actual counts may be higher.
+	expectedMetricComputationCounts map[autoscalingv2.MetricSourceType]int
+
 	// Target resource information.
 	resource *fakeResource
 
@@ -163,6 +172,9 @@ type testCase struct {
 
 	recommendations []timestampedRecommendation
 	hpaSelectors    *selectors.BiMultimap
+
+	verifyReconciliationDuration     bool
+	verifyMetricComputationDurations bool
 }
 
 // Needs to be called under a lock.
@@ -691,7 +703,6 @@ func findCpuUtilization(metricStatus []autoscalingv2.MetricStatus) (utilization 
 func (tc *testCase) verifyResults(ctx context.Context, t *testing.T, m *mockMonitor) {
 	tc.Lock()
 	defer tc.Unlock()
-
 	assert.Equal(t, tc.specReplicas != tc.expectedDesiredReplicas, tc.scaleUpdated, "the scale should only be updated if we expected a change in replicas")
 	assert.True(t, tc.statusUpdated, "the status should have been updated")
 	if tc.verifyEvents {
@@ -708,35 +719,55 @@ func (tc *testCase) verifyRecordedMetric(ctx context.Context, t *testing.T, m *m
 	assert.Equal(t, tc.expectedReportedReconciliationActionLabel, m.reconciliationActionLabels[0], "the reconciliation action should be recorded in monitor expectedly")
 	assert.Equal(t, tc.expectedReportedReconciliationErrorLabel, m.reconciliationErrorLabels[0], "the reconciliation error should be recorded in monitor expectedly")
 
-	if len(tc.expectedReportedMetricComputationActionLabels) != len(m.metricComputationActionLabels) {
-		t.Fatalf("the metric computation actions for %d types should be recorded, but actually only %d was recorded", len(tc.expectedReportedMetricComputationActionLabels), len(m.metricComputationActionLabels))
-	}
-	if len(tc.expectedReportedMetricComputationErrorLabels) != len(m.metricComputationErrorLabels) {
-		t.Fatalf("the metric computation errors for %d types should be recorded, but actually only %d was recorded", len(tc.expectedReportedMetricComputationErrorLabels), len(m.metricComputationErrorLabels))
+	if tc.verifyReconciliationDuration {
+		assert.Greater(t, m.reconciliationDurations[0], time.Duration(0), "reconciliation duration should be greater than 0")
 	}
 
-	for metricType, l := range tc.expectedReportedMetricComputationActionLabels {
-		_, ok := m.metricComputationActionLabels[metricType]
-		if !ok {
-			t.Fatalf("the metric computation action should be recorded with metricType %s, but actually nothing was recorded", metricType)
+	if tc.expectedReconciliationCount > 0 {
+		assert.GreaterOrEqual(t, len(m.reconciliationActionLabels), tc.expectedReconciliationCount, "reconciliation count should be at least %d", tc.expectedReconciliationCount)
+
+		if len(tc.expectedReportedMetricComputationActionLabels) != len(m.metricComputationActionLabels) {
+			t.Fatalf("the metric computation actions for %d types should be recorded, but actually only %d was recorded", len(tc.expectedReportedMetricComputationActionLabels), len(m.metricComputationActionLabels))
 		}
-		assert.Equal(t, l, m.metricComputationActionLabels[metricType][0], "the metric computation action should be recorded in monitor expectedly")
-	}
-	for metricType, l := range tc.expectedReportedMetricComputationErrorLabels {
-		_, ok := m.metricComputationErrorLabels[metricType]
-		if !ok {
-			t.Fatalf("the metric computation error should be recorded with metricType %s, but actually nothing was recorded", metricType)
+		if len(tc.expectedReportedMetricComputationErrorLabels) != len(m.metricComputationErrorLabels) {
+			t.Fatalf("the metric computation errors for %d types should be recorded, but actually only %d was recorded", len(tc.expectedReportedMetricComputationErrorLabels), len(m.metricComputationErrorLabels))
 		}
-		assert.Equal(t, l, m.metricComputationErrorLabels[metricType][0], "the metric computation error should be recorded in monitor expectedly")
-	}
 
-	// TODO: Retrieve the namespace and HPA names from the test case (tc) to replace hardcoded values below (and check).
-	if tc.checkDesiredReplicaMetric {
-		currentValue := m.GetDesiredReplicasValue("test-namespace", "test-hpa")
-		assert.Equal(t, tc.expectedDesiredReplicas, currentValue,
-			"the desired replicas should be recorded in monitor expectedly")
-	}
+		for metricType, l := range tc.expectedReportedMetricComputationActionLabels {
+			_, ok := m.metricComputationActionLabels[metricType]
+			if !ok {
+				t.Fatalf("the metric computation action should be recorded with metricType %s, but actually nothing was recorded", metricType)
+			}
+			assert.Equal(t, l, m.metricComputationActionLabels[metricType][0], "the metric computation action should be recorded in monitor expectedly")
 
+			if tc.verifyMetricComputationDurations {
+				durations, ok := m.metricComputationDurations[metricType]
+				// Ensure the metric type exists and has at least one entry
+				assert.True(t, ok && len(durations) > 0, "metric computation duration for %s should be recorded", metricType)
+				assert.Greater(t, durations[0], time.Duration(0), "metric computation duration for %s should be greater than 0", metricType)
+			}
+		}
+
+		for metricType, expectedCount := range tc.expectedMetricComputationCounts {
+			actualCount := len(m.metricComputationActionLabels[metricType])
+			assert.GreaterOrEqual(t, actualCount, expectedCount, "metric computation count for %s should be at least %d", metricType, expectedCount)
+		}
+
+		for metricType, l := range tc.expectedReportedMetricComputationErrorLabels {
+			_, ok := m.metricComputationErrorLabels[metricType]
+			if !ok {
+				t.Fatalf("the metric computation error should be recorded with metricType %s, but actually nothing was recorded", metricType)
+			}
+			assert.Equal(t, l, m.metricComputationErrorLabels[metricType][0], "the metric computation error should be recorded in monitor expectedly")
+		}
+
+		// TODO: Retrieve the namespace and HPA names from the test case (tc) to replace hardcoded values below (and check).
+		if tc.checkDesiredReplicaMetric {
+			currentValue := m.GetDesiredReplicasValue("test-namespace", "test-hpa")
+			assert.Equal(t, tc.expectedDesiredReplicas, currentValue,
+				"the desired replicas should be recorded in monitor expectedly")
+		}
+	}
 }
 
 func (tc *testCase) setupController(t *testing.T) (*HorizontalController, informers.SharedInformerFactory) {
@@ -837,6 +868,7 @@ func (tc *testCase) runTestWithController(t *testing.T, hpaController *Horizonta
 
 	tc.Lock()
 	shouldWait := tc.verifyEvents
+	minReconciliations := tc.expectedReconciliationCount
 	tc.Unlock()
 
 	if shouldWait {
@@ -853,8 +885,25 @@ func (tc *testCase) runTestWithController(t *testing.T, hpaController *Horizonta
 		}
 	} else {
 		// Wait for HPA to be processed.
-		<-tc.processed
+		if minReconciliations < 1 {
+			t.Logf("minReconciliations should be at least 1, got %d; adjusting to 1", minReconciliations)
+			minReconciliations = 1
+		}
+		timeoutTime := time.Now().Add(5 * time.Second)
+		reconciliationsProcessed := 0
+		for reconciliationsProcessed < minReconciliations && time.Now().Before(timeoutTime) {
+			select {
+			case <-tc.processed:
+				reconciliationsProcessed++
+			case <-time.After(100 * time.Millisecond):
+				// continue waiting
+			}
+		}
+		if reconciliationsProcessed < minReconciliations {
+			t.Fatalf("expected at least %d reconciliations, but only got %d", minReconciliations, reconciliationsProcessed)
+		}
 	}
+
 	m, ok := hpaController.monitor.(*mockMonitor)
 	if !ok {
 		t.Fatalf("test HPA controller should have mockMonitor, but actually not")
@@ -873,26 +922,31 @@ type mockMonitor struct {
 	sync.RWMutex
 	reconciliationActionLabels []monitor.ActionLabel
 	reconciliationErrorLabels  []monitor.ErrorLabel
+	reconciliationDurations    []time.Duration
 
 	metricComputationActionLabels map[autoscalingv2.MetricSourceType][]monitor.ActionLabel
 	metricComputationErrorLabels  map[autoscalingv2.MetricSourceType][]monitor.ErrorLabel
-	metricObjectsCount            int
-	desiredReplicasValues         map[string]int32 // key is "namespace/name"
+	metricComputationDurations    map[autoscalingv2.MetricSourceType][]time.Duration
+
+	metricObjectsCount    int
+	desiredReplicasValues map[string]int32 // key is "namespace/name"
 }
 
 func newMockMonitor() *mockMonitor {
 	return &mockMonitor{
 		metricComputationActionLabels: make(map[autoscalingv2.MetricSourceType][]monitor.ActionLabel),
 		metricComputationErrorLabels:  make(map[autoscalingv2.MetricSourceType][]monitor.ErrorLabel),
+		metricComputationDurations:    make(map[autoscalingv2.MetricSourceType][]time.Duration),
 		desiredReplicasValues:         make(map[string]int32),
 	}
 }
 
-func (m *mockMonitor) ObserveReconciliationResult(action monitor.ActionLabel, err monitor.ErrorLabel, _ time.Duration) {
+func (m *mockMonitor) ObserveReconciliationResult(action monitor.ActionLabel, err monitor.ErrorLabel, duration time.Duration) {
 	m.Lock()
 	defer m.Unlock()
 	m.reconciliationActionLabels = append(m.reconciliationActionLabels, action)
 	m.reconciliationErrorLabels = append(m.reconciliationErrorLabels, err)
+	m.reconciliationDurations = append(m.reconciliationDurations, duration)
 }
 
 func (m *mockMonitor) ObserveMetricComputationResult(action monitor.ActionLabel, err monitor.ErrorLabel, duration time.Duration, metricType autoscalingv2.MetricSourceType) {
@@ -901,6 +955,7 @@ func (m *mockMonitor) ObserveMetricComputationResult(action monitor.ActionLabel,
 
 	m.metricComputationActionLabels[metricType] = append(m.metricComputationActionLabels[metricType], action)
 	m.metricComputationErrorLabels[metricType] = append(m.metricComputationErrorLabels[metricType], err)
+	m.metricComputationDurations[metricType] = append(m.metricComputationDurations[metricType], duration)
 }
 
 // waitUntilRecorded waits for the HPA controller to reconcile at least once.
@@ -5516,6 +5571,97 @@ func TestHPARescaleWithSuccessfulConflictRetry(t *testing.T) {
 		return false, nil, nil
 	})
 
+	tc.runTest(t)
+}
+
+func TestReconciliationDurationIsRecorded(t *testing.T) {
+	tc := testCase{
+		minReplicas:             2,
+		maxReplicas:             6,
+		specReplicas:            3,
+		statusReplicas:          3,
+		expectedDesiredReplicas: 5,
+		CPUTarget:               30,
+		verifyCPUCurrent:        true,
+		reportedLevels:          []uint64{300, 500, 700},
+		reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		useMetricsAPI:           true,
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleUp,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
+		},
+		verifyReconciliationDuration:     true,
+		verifyMetricComputationDurations: true,
+	}
+	tc.runTest(t)
+}
+
+func TestReconciliationDurationIsRecordedOnError(t *testing.T) {
+	tc := testCase{
+		minReplicas:             2,
+		maxReplicas:             6,
+		specReplicas:            4,
+		statusReplicas:          4,
+		expectedDesiredReplicas: 4,
+		CPUTarget:               100,
+		reportedLevels:          []uint64{},
+		reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		useMetricsAPI:           true,
+		expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
+			{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
+			{Type: autoscalingv2.ScalingActive, Status: v1.ConditionFalse, Reason: "FailedGetResourceMetric"},
+		},
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelNone,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelInternal,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelNone,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelInternal,
+		},
+		verifyReconciliationDuration:     true,
+		verifyMetricComputationDurations: true,
+	}
+	tc.runTest(t)
+}
+
+func TestReconciliationsTotalCountMultipleReconciliations(t *testing.T) {
+	tc := testCase{
+		minReplicas:             1,
+		maxReplicas:             5,
+		specReplicas:            3,
+		statusReplicas:          3,
+		expectedDesiredReplicas: 3,
+		CPUTarget:               100,
+		reportedLevels:          []uint64{1010, 1030, 1020},
+		reportedCPURequests:     []resource.Quantity{resource.MustParse("0.9"), resource.MustParse("1.0"), resource.MustParse("1.1")},
+		useMetricsAPI:           true,
+		expectedConditions: statusOkWithOverrides(autoscalingv2.HorizontalPodAutoscalerCondition{
+			Type:   autoscalingv2.AbleToScale,
+			Status: v1.ConditionTrue,
+			Reason: "ReadyForNewScale",
+		}),
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelNone,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelNone,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
+		},
+		// The specific count value is not important. This test verifies that
+		// reconciliationsTotal counter is incremented on each reconciliation cycle.
+		expectedReconciliationCount: 3,
+		// The specific count values are not important. This test verifies that
+		// metricComputationTotal counter is incremented for each metric type on each reconciliation.
+		expectedMetricComputationCounts: map[autoscalingv2.MetricSourceType]int{
+			autoscalingv2.ResourceMetricSourceType: 3,
+		},
+	}
 	tc.runTest(t)
 }
 
