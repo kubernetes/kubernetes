@@ -2487,27 +2487,6 @@ func (kl *Kubelet) rejectPod(ctx context.Context, pod *v1.Pod, reason, message s
 		Message:  PodRejectionMessagePrefix + message})
 }
 
-// isLocallyRejected checks if a pod has already been rejected. These pods
-// have never had containers created, have a Failed phase and a specific
-// status that is forced by rejectPod() call. The only distinctive feature
-// they have from other pods is the presence of a specific status: empty
-// and having a message with the prefix PodRejectionMessagePrefix.
-// This function looks for the message in both statusManager (current
-// session rejection) and, if not found, in status from API server (rejection
-// that was already synced to the API in case of a kubelet restart).
-func (kl *Kubelet) isLocallyRejected(pod *v1.Pod) bool {
-	localStatus, found := kl.statusManager.GetPodStatus(pod.UID)
-	if found && strings.HasPrefix(localStatus.Message, PodRejectionMessagePrefix) {
-		return true
-	}
-
-	if strings.HasPrefix(pod.Status.Message, PodRejectionMessagePrefix) {
-		return true
-	}
-
-	return false
-}
-
 func recordAdmissionRejection(reason string) {
 	// It is possible that the "reason" label can have high cardinality.
 	// To avoid this metric from exploding, we create an allowlist of known
@@ -2884,15 +2863,14 @@ func (kl *Kubelet) HandlePodUpdates(ctx context.Context, pods []*v1.Pod) {
 		}
 
 		// Skip rejected pods during UPDATE operations.
-		//
-		// Pods always arrive as ADD before UPDATE (guaranteed by the config layer).
-		// If a pod failed admission in HandlePodAdditions, it was never sent to
-		// pod_workers and won't be known to the worker. UPDATE operations for such
-		// pods should be ignored because:
+		// Pods always arrive as ADD before UPDATE (enforced by the config layer).
+		// If a pod failed admission in HandlePodAdditions, it was rejected and
+		// never sent to pod_workers. UPDATE operations for such pods should be
+		// ignored because:
 		// 1. No containers exist - nothing to sync or clean up
 		// 2. The pod is already in terminal Failed state
 		// 3. REMOVE operation will eventually clean up podManager
-		if !kl.podWorkers.IsPodKnownToWorker(pod.UID) {
+		if kl.isLocallyRejected(pod) {
 			continue
 		}
 
