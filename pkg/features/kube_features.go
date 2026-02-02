@@ -700,7 +700,7 @@ const (
 	PodLevelResources featuregate.Feature = "PodLevelResources"
 
 	// owner: @harishankarr7
-	// key: https://github.com/kubernetes/kubernetes/issues/136120
+	// issue: https://github.com/kubernetes/kubernetes/issues/136120
 	//
 	// Enables defaulting of pod-level resource limits based on container limits
 	// in PrepareForCreate and PrepareForUpdate hooks.
