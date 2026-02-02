@@ -23,7 +23,7 @@ ARG BINARY
 COPY --chmod=755 ${BINARY} /binary_to_set
 # We apply cap_net_bind_service so that kube-apiserver can be run as
 # non-root and still listen on port less than 1024
-RUN ["/usr/sbin/setcap", "cap_net_bind_service=+ep", "/binary_to_set"]
+RUN ["setcap", "cap_net_bind_service=+ep", "/binary_to_set"]
 
 FROM --platform=linux/$TARGETARCH ${BASEIMAGE}
 ARG BINARY
