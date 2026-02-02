@@ -60,6 +60,9 @@ type Error struct {
 	// This field is used to distinguish errors that are exclusively declarative and lack an imperative counterpart.
 	DeclarativeNative bool
 
+	// OriginatingFromImperative denotes these errors are originating from  the hand written validations.
+	OriginatingFromImperative bool
+
 	// ValidationStabilityLevel denotes the validation stability level of the declarative validation from this error is returned. This should be used in the declarative validations only.
 	ValidationStabilityLevel ValidationStabilityLevel
 }
@@ -522,6 +525,18 @@ func (e *Error) MarkBeta() *Error {
 func (list ErrorList) MarkBeta() ErrorList {
 	for _, err := range list {
 		err.ValidationStabilityLevel = stabilityLevelBeta
+	}
+	return list
+}
+
+func (e *Error) MarkOriginatingFromImperative() *Error {
+	e.OriginatingFromImperative = true
+	return e
+}
+
+func (list ErrorList) MarkOriginatingFromImperative() ErrorList {
+	for _, err := range list {
+		err.OriginatingFromImperative = true
 	}
 	return list
 }
