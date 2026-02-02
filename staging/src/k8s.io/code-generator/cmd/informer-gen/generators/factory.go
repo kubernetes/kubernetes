@@ -200,10 +200,6 @@ func (f *sharedInformerFactory) Start(stopCh <-chan struct{}) {
 
 	for informerType, informer := range f.informers {
 		if !f.startedInformers[informerType] {
-			// We need a new variable in each loop iteration,
-			// otherwise the goroutine would use the loop variable
-			// and that keeps changing.
-			informer := informer
 			f.wg.Go(func() {
 				informer.Run(stopCh)
 			})
