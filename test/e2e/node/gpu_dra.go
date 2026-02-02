@@ -71,7 +71,7 @@ var _ = SIGDescribe(feature.DynamicResourceAllocation, "GPU", framework.WithSeri
 		framework.Logf("Total GPUs found via DRA: %d", gpuCount)
 	})
 
-	f.It("should allocate single GPU via ResourceClaim and run nvidia-smi", func(ctx context.Context) {
+	f.It("should allocate single GPU via ResourceClaim and run nvidia-smi and cuda-demo-suite", func(ctx context.Context) {
 		ginkgo.By("Creating a ResourceClaim for a single GPU")
 		claim := &resourceapi.ResourceClaim{
 			ObjectMeta: metav1.ObjectMeta{
@@ -105,9 +105,21 @@ var _ = SIGDescribe(feature.DynamicResourceAllocation, "GPU", framework.WithSeri
 					ResourceClaimName: &claim.Name,
 				}},
 				Containers: []v1.Container{{
-					Name:    "nvidia-smi",
-					Image:   "nvidia/cuda:12.5.0-devel-ubuntu22.04",
-					Command: []string{"nvidia-smi"},
+					Name:  "nvidia-smi",
+					Image: "nvidia/cuda:12.5.0-devel-ubuntu22.04",
+					Command: []string{
+						"bash",
+						"-c",
+						`
+nvidia-smi
+apt-get update -y && \
+	DEBIAN_FRONTEND=noninteractive apt-get install -y --allow-unauthenticated cuda-demo-suite-12-5
+/usr/local/cuda/extras/demo_suite/deviceQuery
+/usr/local/cuda/extras/demo_suite/vectorAdd
+/usr/local/cuda/extras/demo_suite/bandwidthTest --device=all --csv
+/usr/local/cuda/extras/demo_suite/busGrind -a
+`,
+					},
 					Resources: v1.ResourceRequirements{
 						Claims: []v1.ResourceClaim{{Name: "gpu"}},
 					},
@@ -122,13 +134,15 @@ var _ = SIGDescribe(feature.DynamicResourceAllocation, "GPU", framework.WithSeri
 		err = e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name)
 		framework.ExpectNoError(err)
 
-		ginkgo.By("Checking pod logs for GPU detection")
+		ginkgo.By("Checking pod logs for GPU detection and CUDA tests")
 		logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, "nvidia-smi")
 		framework.ExpectNoError(err)
-		framework.Logf("nvidia-smi output:\n%s", logs)
+		framework.Logf("nvidia-smi and cuda-demo-suite output:\n%s", logs)
 		gomega.Expect(logs).To(gomega.ContainSubstring("NVIDIA-SMI"))
 		gomega.Expect(logs).To(gomega.ContainSubstring("Driver Version:"))
 		gomega.Expect(logs).To(gomega.ContainSubstring("CUDA Version:"))
+		gomega.Expect(logs).To(gomega.ContainSubstring("deviceQuery, CUDA Driver"))
+		gomega.Expect(logs).To(gomega.ContainSubstring("Result = PASS"))
 	})
 
 	f.It("should run TensorFlow matrix multiplication via DRA", func(ctx context.Context) {
