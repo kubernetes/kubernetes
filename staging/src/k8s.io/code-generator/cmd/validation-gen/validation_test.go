@@ -492,7 +492,7 @@ func TestDiscoverStruct(t *testing.T) {
 		name                   string
 		typeToTest             *types.Type
 		expectErr              error
-		expectedStabilityLevel validators.StabilityLevel
+		expectedStabilityLevel validators.TagStabilityLevel
 	}{
 		{
 			name: "simple struct with stable validations",
@@ -524,7 +524,7 @@ func TestDiscoverStruct(t *testing.T) {
 				},
 			},
 			expectErr:              nil,
-			expectedStabilityLevel: validators.Stable,
+			expectedStabilityLevel: validators.TagStabilityLevelStable,
 		},
 		{
 			name: "struct with non-stable validation on a field",
@@ -541,7 +541,7 @@ func TestDiscoverStruct(t *testing.T) {
 				},
 			},
 			expectErr:              nil,
-			expectedStabilityLevel: validators.Alpha,
+			expectedStabilityLevel: validators.TagStabilityLevelAlpha,
 		},
 		{
 			name: "struct with declarative native fields with stable validations",
@@ -571,7 +571,7 @@ func TestDiscoverStruct(t *testing.T) {
 				},
 			},
 			expectErr:              nil,
-			expectedStabilityLevel: validators.Stable,
+			expectedStabilityLevel: validators.TagStabilityLevelStable,
 		},
 		{
 			name: "struct with declarative native field string with non-stable validations",
@@ -629,7 +629,7 @@ func TestDiscoverStruct(t *testing.T) {
 				},
 			},
 			expectErr:              nil,
-			expectedStabilityLevel: validators.Stable,
+			expectedStabilityLevel: validators.TagStabilityLevelStable,
 		},
 		{
 			name: "struct with a field whose type has non-stable validations",
@@ -656,7 +656,7 @@ func TestDiscoverStruct(t *testing.T) {
 				},
 			},
 			expectErr:              nil,
-			expectedStabilityLevel: validators.Alpha,
+			expectedStabilityLevel: validators.TagStabilityLevelAlpha,
 		},
 	}
 	for _, tc := range testCases {

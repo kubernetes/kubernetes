@@ -247,29 +247,29 @@ type ListSelectorTerm struct {
 	Value any
 }
 
-// StabilityLevel indicates the stability of a validation tag.
-type StabilityLevel string
+// TagStabilityLevel indicates the stability of a validation tag.
+type TagStabilityLevel string
 
 const (
-	// Alpha indicates that a tag's semantics may change in the future.
-	Alpha StabilityLevel = "Alpha"
-	// Beta indicates that a tag's semantics will remain unchanged for the
+	// TagStabilityLevelAlpha indicates that a tag's semantics may change in the future.
+	TagStabilityLevelAlpha TagStabilityLevel = "Alpha"
+	// TagStabilityLevelBeta indicates that a tag's semantics will remain unchanged for the
 	// foreseeable future. This is used for soaking tags before qualifying to stable.
-	Beta StabilityLevel = "Beta"
-	// Stable indicates that a tag's semantics will remain unchanged for the
+	TagStabilityLevelBeta TagStabilityLevel = "Beta"
+	// TagStabilityLevelStable indicates that a tag's semantics will remain unchanged for the
 	// foreseeable future.
-	Stable StabilityLevel = "Stable"
+	TagStabilityLevelStable TagStabilityLevel = "Stable"
 )
 
-var stabilityOrder = map[StabilityLevel]int{
-	Alpha:  0,
-	Beta:   1,
-	Stable: 2,
+var stabilityOrder = map[TagStabilityLevel]int{
+	TagStabilityLevelAlpha:  0,
+	TagStabilityLevelBeta:   1,
+	TagStabilityLevelStable: 2,
 }
 
 // Min returns the minimum of two stability levels, or an error if either
 // stability level is unknown.
-func (s StabilityLevel) Min(other StabilityLevel) (StabilityLevel, error) {
+func (s TagStabilityLevel) Min(other TagStabilityLevel) (TagStabilityLevel, error) {
 	sOrder, okS := stabilityOrder[s]
 	if !okS {
 		return "", fmt.Errorf("unknown stability level %q", s)
@@ -290,7 +290,7 @@ type TagDoc struct {
 	// Tag is the tag name, without the leading '+'.
 	Tag string
 	// StabilityLevel is the stability level of the tag.
-	StabilityLevel StabilityLevel
+	StabilityLevel TagStabilityLevel
 	// Args lists any arguments this tag might take.
 	Args []TagArgDoc `json:",omitempty"`
 	// Usage is how the tag is used, including arguments.

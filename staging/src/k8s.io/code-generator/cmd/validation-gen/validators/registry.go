@@ -60,7 +60,7 @@ func (reg *registry) addTagValidator(tv TagValidator) {
 		panic(fmt.Sprintf("tag %q was registered twice", name))
 	}
 	switch level := tv.Docs().StabilityLevel; level {
-	case Alpha, Beta, Stable:
+	case TagStabilityLevelAlpha, TagStabilityLevelBeta, TagStabilityLevelStable:
 		// valid
 	case "":
 		panic(fmt.Sprintf("tag %q is missing stability level", name))
@@ -289,11 +289,11 @@ type Validator interface {
 	Docs() []TagDoc
 
 	// Stability returns the stability level for a given tag.
-	Stability(tag string) (StabilityLevel, error)
+	Stability(tag string) (TagStabilityLevel, error)
 }
 
 // Stability returns the stability level for a given tag.
-func (reg *registry) Stability(tag string) (StabilityLevel, error) {
+func (reg *registry) Stability(tag string) (TagStabilityLevel, error) {
 	tagName := strings.TrimPrefix(tag, "+")
 	tv, ok := reg.tagValidators[tagName]
 	if !ok {

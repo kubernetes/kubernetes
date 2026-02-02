@@ -134,7 +134,7 @@ func (stv subfieldTagValidator) GetValidations(context Context, tag codetags.Tag
 func (stv subfieldTagValidator) Docs() TagDoc {
 	return TagDoc{
 		Tag:            stv.TagName(),
-		StabilityLevel: Stable,
+		StabilityLevel: TagStabilityLevelStable,
 		Scopes:         stv.ValidScopes().UnsortedList(),
 		Description:    "Declares a validation for a subfield of a struct.",
 		Args: []TagArgDoc{{

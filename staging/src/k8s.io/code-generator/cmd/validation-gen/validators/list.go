@@ -182,7 +182,7 @@ func (lttv listTypeTagValidator) GetValidations(context Context, tag codetags.Ta
 func (lttv listTypeTagValidator) Docs() TagDoc {
 	doc := TagDoc{
 		Tag:            lttv.TagName(),
-		StabilityLevel: Stable,
+		StabilityLevel: TagStabilityLevelStable,
 		Scopes:         lttv.ValidScopes().UnsortedList(),
 		Description:    "Declares a list field's semantic type and ownership behavior. atomic: single ownership, set: shared ownership with uniqueness, map: shared ownership with key-based uniqueness.",
 		Payloads: []TagPayloadDoc{{
@@ -250,7 +250,7 @@ func (lmktv listMapKeyTagValidator) GetValidations(context Context, tag codetags
 func (lmktv listMapKeyTagValidator) Docs() TagDoc {
 	doc := TagDoc{
 		Tag:            lmktv.TagName(),
-		StabilityLevel: Stable,
+		StabilityLevel: TagStabilityLevelStable,
 		Scopes:         lmktv.ValidScopes().UnsortedList(),
 		Description:    "Declares a named sub-field of a list's value-type to be part of the list-map key.",
 		Payloads: []TagPayloadDoc{{
@@ -319,7 +319,7 @@ func (utv uniqueTagValidator) GetValidations(context Context, tag codetags.Tag) 
 func (utv uniqueTagValidator) Docs() TagDoc {
 	doc := TagDoc{
 		Tag:            utv.TagName(),
-		StabilityLevel: Alpha,
+		StabilityLevel: TagStabilityLevelAlpha,
 		Scopes:         utv.ValidScopes().UnsortedList(),
 		Description:    "Declares that a list field's elements are unique. This tag can be used with listType=atomic to add uniqueness constraints, or independently to specify uniqueness semantics.",
 		Payloads: []TagPayloadDoc{{
@@ -369,7 +369,7 @@ func (cutv customUniqueTagValidator) GetValidations(context Context, tag codetag
 func (cutv customUniqueTagValidator) Docs() TagDoc {
 	doc := TagDoc{
 		Tag:            cutv.TagName(),
-		StabilityLevel: Alpha,
+		StabilityLevel: TagStabilityLevelAlpha,
 		Scopes:         cutv.ValidScopes().UnsortedList(),
 		Description:    "Indicates that uniqueness validation for this list is implemented via custom, handwritten validation. This disables generation of uniqueness validation for this list.",
 		Payloads:       nil,
