@@ -285,7 +285,11 @@ func (m *kubeGenericRuntimeManager) calculateLinuxResources(cpuRequest, cpuLimit
 	} else {
 		// if cpuRequest.Amount is nil, then MilliCPUToShares will return the minimal number
 		// of CPU shares.
-		cpuShares = int64(cm.MilliCPUToShares(cpuRequest.MilliValue()))
+		var milliCPU int64
+		if cpuRequest != nil {
+			milliCPU = cpuRequest.MilliValue()
+		}
+		cpuShares = int64(cm.MilliCPUToShares(milliCPU))
 	}
 	resources.CpuShares = cpuShares
 	if memLimit != 0 {
