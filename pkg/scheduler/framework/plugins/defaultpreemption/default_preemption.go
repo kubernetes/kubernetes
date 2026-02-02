@@ -135,7 +135,7 @@ func New(_ context.Context, dpArgs runtime.Object, fh fwk.Handle, fts feature.Fe
 	// Default behavior: Sort by descending priority, then by descending runtime duration as secondary ordering.
 	pl.MoreImportantPod = util.MoreImportantPod
 
-	pl.MoreImportantVictim = MoreImportantVictim
+	pl.MoreImportantVictim = moreImportantVictim
 
 	pl.CanPlacePods = func(
 		ctx context.Context,
@@ -332,7 +332,7 @@ func (pl *DefaultPreemption) SelectVictimsOnDomain(
 	}
 
 	sort.Slice(potentialVictims, func(i, j int) bool {
-		return pl.MoreImportantVictim(potentialVictims[i], potentialVictims[j])
+		return moreImportantVictim(potentialVictims[i], potentialVictims[j])
 	})
 
 	violatingVictims, nonViolatingVictims := filterVictimsWithPDBViolation(potentialVictims, pdbs)
@@ -358,32 +358,42 @@ func (pl *DefaultPreemption) SelectVictimsOnDomain(
 
 		return fits.IsSuccess(), nil
 	}
+
+	var victimsToPreempt []preemption.PreemptionUnit
 	for _, v := range violatingVictims {
 		if fits, err := reprieveVictim(v); err != nil {
 			return nil, 0, fwk.AsStatus(err)
 		} else if !fits {
+			victimsToPreempt = append(victimsToPreempt, v)
 			numViolatingVictim++
 		}
 	}
 
-	var victimsToPreempt []preemption.PreemptionUnit
 	if len(nonViolatingVictims) > 0 {
 		currentReprievedCount := 0
 
+		var searchErr error
+
 		cutoff := sort.Search(len(nonViolatingVictims)+1, func(targetCount int) bool {
 
+			var err error
 			// Move Right: We need to reprieve MORE victims (Add them back to snapshot)
 			if targetCount > currentReprievedCount {
 				for i := currentReprievedCount; i < targetCount; i++ {
-					addPods(nonViolatingVictims[i])
+					err = addPods(nonViolatingVictims[i])
 				}
 			}
 
 			// Move Left: We went too far, need to preempt victims again (Remove from snapshot)
 			if targetCount < currentReprievedCount {
 				for i := targetCount; i < currentReprievedCount; i++ {
-					removePods(nonViolatingVictims[i])
+					err = removePods(nonViolatingVictims[i])
 				}
+			}
+
+			if err != nil {
+				searchErr = err
+				return true
 			}
 
 			// Update Cursor
@@ -396,27 +406,32 @@ func (pl *DefaultPreemption) SelectVictimsOnDomain(
 			return !fits.IsSuccess()
 		})
 
-		// 'cutoff' is the first count that caused a failure.
-		// Therefore, the maximum safe count is 'cutoff - 1'.
-		maxSafeReprieveCount := cutoff - 1
-		if maxSafeReprieveCount < 0 {
-			maxSafeReprieveCount = 0
+		if searchErr != nil {
+			return nil, 0, fwk.AsStatus(searchErr)
 		}
 
+		// 'cutoff' is the first count that caused a failure.
+		// Therefore, the maximum safe count is 'cutoff - 1'.
+		maxSafeReprieveCount := max(cutoff-1, 0)
+
 		for i, v := range nonViolatingVictims {
+			var err error
 			if i < maxSafeReprieveCount {
 				// This victim is safe.
 				// Ensure it is added back to snapshot if you plan to reuse this domain state.
 				if currentReprievedCount <= i {
-					addPods(v)
+					err = addPods(v)
 				}
 			} else {
 				// This victim must die.
 				victimsToPreempt = append(victimsToPreempt, v)
 				// Ensure it is removed from snapshot
 				if currentReprievedCount > i {
-					removePods(v)
+					err = removePods(v)
 				}
+			}
+			if err != nil {
+				return nil, 0, fwk.AsStatus(err)
 			}
 		}
 	}
@@ -559,7 +574,7 @@ func podTerminatingByPreemption(p *v1.Pod) bool {
 	return false
 }
 
-func MoreImportantVictim(v1, v2 preemption.PreemptionUnit) bool {
+func moreImportantVictim(v1, v2 preemption.PreemptionUnit) bool {
 	p1 := v1.Priority()
 	p2 := v2.Priority()
 	if p1 != p2 {

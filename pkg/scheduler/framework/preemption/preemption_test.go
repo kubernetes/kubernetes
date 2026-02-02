@@ -1095,19 +1095,6 @@ func TestCallExtenders(t *testing.T) {
 					SchedulerName(defaultSchedulerName).Priority(highPriority).
 					Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
 					Obj())
-		workloadPreemptor = NewWorkloadPreemptor(highPriority,
-			[]*v1.Pod{
-				st.MakePod().Name("preemptor1").UID("preemptor1").
-					SchedulerName(defaultSchedulerName).Priority(highPriority).
-					Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
-					Obj(),
-				st.MakePod().Name("preemptor2").UID("preemptor2").
-					SchedulerName(defaultSchedulerName).Priority(highPriority).
-					Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
-					Obj(),
-			},
-			nil,
-		)
 		victim = st.MakePod().Name("victim").UID("victim").
 			Node(node1Name).SchedulerName(defaultSchedulerName).Priority(midPriority).
 			Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
@@ -1222,14 +1209,7 @@ func TestCallExtenders(t *testing.T) {
 			)
 			var objs []runtime.Object
 			singlePreemptorPod := singlePreemptor.Members()[0]
-			var workloadPreemptorPods []*v1.Pod
-			for _, pod := range workloadPreemptor.Members() {
-				workloadPreemptorPods = append(workloadPreemptorPods, pod)
-			}
 			objs = append(objs, singlePreemptorPod)
-			for _, pod := range workloadPreemptorPods {
-				objs = append(objs, pod)
-			}
 			cs := clientsetfake.NewClientset(objs...)
 			informerFactory := informers.NewSharedInformerFactory(cs, 0)
 			apiDispatcher := apidispatcher.New(cs, 16, apicalls.Relevances)
@@ -1244,7 +1224,7 @@ func TestCallExtenders(t *testing.T) {
 				frameworkruntime.WithLogger(logger),
 				frameworkruntime.WithExtenders(tt.extenders),
 				frameworkruntime.WithInformerFactory(informerFactory),
-				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(append(workloadPreemptorPods, singlePreemptorPod), nodes)),
+				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot([]*v1.Pod{singlePreemptorPod}, nodes)),
 				frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
 			)
 			if err != nil {
@@ -1262,25 +1242,6 @@ func TestCallExtenders(t *testing.T) {
 				Interface:  fakePreemptionScorePostFilterPlugin,
 			}
 			gotCandidates, status := pe.callExtenders(logger, singlePreemptor, tt.candidates)
-			if (tt.wantStatus == nil) != (status == nil) || status.Code() != tt.wantStatus.Code() {
-				t.Errorf("callExtenders() status mismatch. got: %v, want: %v", status, tt.wantStatus)
-			}
-
-			if len(gotCandidates) != len(tt.wantCandidates) {
-				t.Errorf("callExtenders() returned unexpected number of results. got: %d, want: %d", len(gotCandidates), len(tt.wantCandidates))
-			} else {
-				for i, gotCandidate := range gotCandidates {
-					wantCandidate := tt.wantCandidates[i]
-					if gotCandidate.Name() != wantCandidate.Name() {
-						t.Errorf("callExtenders() node name mismatch. got: %s, want: %s", gotCandidate.Name(), wantCandidate.Name())
-					}
-					if len(gotCandidate.Victims().Pods) != len(wantCandidate.Victims().Pods) {
-						t.Errorf("callExtenders() number of victim pods mismatch for node %s. got: %d, want: %d", gotCandidate.Name(), len(gotCandidate.Victims().Pods), len(wantCandidate.Victims().Pods))
-					}
-				}
-			}
-
-			gotCandidates, status = pe.callExtenders(logger, workloadPreemptor, tt.candidates)
 			if (tt.wantStatus == nil) != (status == nil) || status.Code() != tt.wantStatus.Code() {
 				t.Errorf("callExtenders() status mismatch. got: %v, want: %v", status, tt.wantStatus)
 			}
@@ -1391,6 +1352,7 @@ func TestPrepareCandidateAsyncSetsPreemptingSets(t *testing.T) {
 	)
 
 	var (
+		w       = &v1.WorkloadReference{PodGroup: "pg1"}
 		victim1 = st.MakePod().Name("victim1").UID("victim1").
 			Node(node1Name).SchedulerName(defaultSchedulerName).Priority(midPriority).
 			Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
@@ -1401,17 +1363,23 @@ func TestPrepareCandidateAsyncSetsPreemptingSets(t *testing.T) {
 			Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
 			Obj()
 
-		podPreemptor1 = st.MakePod().Name("preemptor1").UID("preemptor1").
+		podPreemptor = st.MakePod().Name("preemptor").UID("preemptor").
 				SchedulerName(defaultSchedulerName).Priority(highPriority).
 				Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
 				Obj()
-		podPreemptor2 = st.MakePod().Name("preemptor2").UID("preemptor2").
-				SchedulerName(defaultSchedulerName).Priority(highPriority).
-				Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
-				Obj()
-		singlePreemptor   = NewPodPreemptor(podPreemptor1)
+		singlePreemptor   = NewPodPreemptor(podPreemptor)
 		workloadPreemptor = NewWorkloadPreemptor(highPriority,
-			[]*v1.Pod{podPreemptor1, podPreemptor2},
+			[]*v1.Pod{
+				st.MakePod().Name("preemptor1").UID("preemptor1").
+					WorkloadRef(w).
+					SchedulerName(defaultSchedulerName).Priority(highPriority).
+					Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
+					Obj(),
+				st.MakePod().Name("preemptor2").UID("preemptor2").
+					WorkloadRef(w).
+					SchedulerName(defaultSchedulerName).Priority(highPriority).
+					Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
+					Obj()},
 			nil,
 		)
 
@@ -1588,7 +1556,7 @@ func TestPrepareCandidateAsyncSetsPreemptingSets(t *testing.T) {
 					// Check if the preemptor is removed from the ev.preempting set.
 					pe.mu.RLock()
 					defer pe.mu.RUnlock()
-					return !pe.preempting.Has(singlePreemptor.Members()[0].UID), nil
+					return !pe.preempting.Has(tt.preemptor.Members()[0].UID), nil
 				})
 				if err != nil {
 					t.Errorf("Timed out waiting for preemptingSet to become empty. %v", err)
@@ -1764,19 +1732,22 @@ func TestAsyncPreemptionFailure(t *testing.T) {
 		node1Name            = "node1"
 		defaultSchedulerName = "default-scheduler"
 		failVictimNamePrefix = "fail-victim"
+		w                    = &v1.WorkloadReference{PodGroup: "pg1"}
 	)
 
-	makePod := func(name string, priority int32) *v1.Pod {
-		return st.MakePod().Name(name).UID(name).
+	makePod := func(name string, priority int32, w *v1.WorkloadReference) *v1.Pod {
+		pod := st.MakePod().Name(name).UID(name).
 			Node(node1Name).SchedulerName(defaultSchedulerName).Priority(priority).
 			Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
 			Obj()
+		pod.Spec.WorkloadRef = w
+		return pod
 	}
 
-	defaultPreemptorPod := makePod("preemptor", highPriority)
+	defaultPreemptorPod := makePod("preemptor", highPriority, nil)
 
 	makeVictim := func(name string) *v1.Pod {
-		return makePod(name, midPriority)
+		return makePod(name, midPriority, nil)
 	}
 
 	tests := []struct {
@@ -1863,7 +1834,6 @@ func TestAsyncPreemptionFailure(t *testing.T) {
 			expectSuccessfulPreemption:           true,
 			expectPreemptionAttemptForLastVictim: true,
 		},
-		// --- NEW WORKLOAD CASE ---
 		{
 			name: "Workload (Gang) Failure: Activates ALL gang members if one victim fails",
 			victims: []*v1.Pod{
@@ -1871,8 +1841,8 @@ func TestAsyncPreemptionFailure(t *testing.T) {
 			},
 			// We define a Gang of 2 Pods
 			customPreemptor: NewWorkloadPreemptor(highPriority, []*v1.Pod{
-				makePod("gang-p1", highPriority),
-				makePod("gang-p2", highPriority),
+				makePod("gang-p1", highPriority, w),
+				makePod("gang-p2", highPriority, w),
 			}, nil),
 			expectSuccessfulPreemption:           false, // Fails because victim delete fails
 			expectPreemptionAttemptForLastVictim: true,

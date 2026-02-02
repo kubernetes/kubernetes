@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -524,12 +525,7 @@ func getMockCanPlacePodsFunc(blockingRules []blockingRule) CanPlacePodsFunc {
 			// Check if ANY blocking victim is still on the node
 			isBlocked := false
 			for _, pod := range node.GetPods() {
-				for _, blocker := range rule.blockingVictims {
-					if pod.GetPod().Name == blocker {
-						isBlocked = true
-						break
-					}
-				}
+				isBlocked = slices.Contains(rule.blockingVictims, pod.GetPod().Name)
 				if isBlocked {
 					break
 				}
@@ -654,7 +650,7 @@ func TestDryRunPreemption(t *testing.T) {
 					},
 				},
 			},
-			expectedNumFilterCalled: []int32{6},
+			expectedNumFilterCalled: []int32{8},
 		},
 		{
 			name: "a pod that would fit on the nodes, but other pods running are higher priority, no preemption would happen",
@@ -703,7 +699,7 @@ func TestDryRunPreemption(t *testing.T) {
 					},
 				},
 			},
-			expectedNumFilterCalled: []int32{8},
+			expectedNumFilterCalled: []int32{9},
 		},
 		{
 			name: "mixed priority pods are preempted",
@@ -734,7 +730,7 @@ func TestDryRunPreemption(t *testing.T) {
 					},
 				},
 			},
-			expectedNumFilterCalled: []int32{6},
+			expectedNumFilterCalled: []int32{7},
 		},
 		{
 			name: "mixed priority pods are preempted, pick later StartTime one when priorities are equal",
@@ -765,7 +761,7 @@ func TestDryRunPreemption(t *testing.T) {
 					},
 				},
 			},
-			expectedNumFilterCalled: []int32{6}, // no preemption would happen on node2 and no filter call is counted.
+			expectedNumFilterCalled: []int32{7}, // no preemption would happen on node2 and no filter call is counted.
 		},
 		{
 			name: "pod with anti-affinity is preempted",
@@ -834,7 +830,7 @@ func TestDryRunPreemption(t *testing.T) {
 					},
 				},
 			},
-			expectedNumFilterCalled: []int32{7}, // node-a (3), node-b (2), node-x (0)
+			expectedNumFilterCalled: []int32{8},
 		},
 		{
 			name: "get Unschedulable in the preemption phase when the filter plugins filtering the nodes",
@@ -886,7 +882,7 @@ func TestDryRunPreemption(t *testing.T) {
 					},
 				},
 			},
-			expectedNumFilterCalled: []int32{5},
+			expectedNumFilterCalled: []int32{6},
 		},
 		{
 			name: "preemption with violation of the pdb with pod whose eviction was processed, the victim doesn't belong to DisruptedPods",
@@ -921,7 +917,7 @@ func TestDryRunPreemption(t *testing.T) {
 					},
 				},
 			},
-			expectedNumFilterCalled: []int32{5},
+			expectedNumFilterCalled: []int32{6},
 		},
 		{
 			name: "preemption with violation of the pdb with pod whose eviction was processed, the victim belongs to DisruptedPods",
@@ -956,7 +952,7 @@ func TestDryRunPreemption(t *testing.T) {
 					},
 				},
 			},
-			expectedNumFilterCalled: []int32{4},
+			expectedNumFilterCalled: []int32{5},
 		},
 		{
 			name: "preemption with violation of the pdb with pod whose eviction was processed, the victim which belongs to DisruptedPods is treated as 'nonViolating'",
@@ -993,7 +989,7 @@ func TestDryRunPreemption(t *testing.T) {
 					},
 				},
 			},
-			expectedNumFilterCalled: []int32{6},
+			expectedNumFilterCalled: []int32{7},
 		},
 		{
 			name: "all nodes are possible candidates, but DefaultPreemptionArgs limits to 2",
@@ -1030,7 +1026,7 @@ func TestDryRunPreemption(t *testing.T) {
 					},
 				},
 			},
-			expectedNumFilterCalled: []int32{6},
+			expectedNumFilterCalled: []int32{8},
 		},
 		{
 			name: "some nodes are not possible candidates, DefaultPreemptionArgs limits to 2",
@@ -1067,7 +1063,7 @@ func TestDryRunPreemption(t *testing.T) {
 					},
 				},
 			},
-			expectedNumFilterCalled: []int32{6},
+			expectedNumFilterCalled: []int32{8},
 		},
 		{
 			name: "preemption offset across multiple scheduling cycles and wrap around",
@@ -1136,7 +1132,7 @@ func TestDryRunPreemption(t *testing.T) {
 					},
 				},
 			},
-			expectedNumFilterCalled: []int32{6, 6, 6},
+			expectedNumFilterCalled: []int32{8, 8, 8},
 		},
 		{
 			name: "preemption looks past numCandidates until a non-PDB violating node is found",
@@ -1193,7 +1189,7 @@ func TestDryRunPreemption(t *testing.T) {
 					},
 				},
 			},
-			expectedNumFilterCalled: []int32{15},
+			expectedNumFilterCalled: []int32{13},
 		},
 		{
 			name: "gang of 2 pods fits by preempting victims on two different nodes",
@@ -1779,9 +1775,7 @@ func TestSelectBestCandidate(t *testing.T) {
 
 			var objs []runtime.Object
 			var preemptorPods []*v1.Pod
-			for _, pod := range tt.preemptor.Members() {
-				preemptorPods = append(preemptorPods, pod)
-			}
+			preemptorPods = append(preemptorPods, tt.preemptor.Members()...)
 			for _, pod := range preemptorPods {
 				objs = append(objs, pod)
 			}
@@ -1879,7 +1873,7 @@ func TestCustomSelection(t *testing.T) {
 			containsName[name] = true
 		}
 		return func(domain preemption.Domain, victim preemption.PreemptionUnit, preemptor preemption.Preemptor) bool {
-			for name, _ := range victim.AffectedNodes() {
+			for name := range victim.AffectedNodes() {
 				if !containsName[name] {
 					return false
 				}
@@ -2150,9 +2144,7 @@ func TestCustomSelection(t *testing.T) {
 			var objs []runtime.Object
 
 			var premptorPods []*v1.Pod
-			for _, pod := range tt.preemptor.Members() {
-				premptorPods = append(premptorPods, pod)
-			}
+			premptorPods = append(premptorPods, tt.preemptor.Members()...)
 
 			for _, pod := range premptorPods {
 				objs = append(objs, pod)
@@ -2347,9 +2339,7 @@ func TestCustomOrdering(t *testing.T) {
 
 			var objs []runtime.Object
 			var podsToPreempt []*v1.Pod
-			for _, pod := range tt.preemptor.Members() {
-				podsToPreempt = append(podsToPreempt, pod)
-			}
+			podsToPreempt = append(podsToPreempt, tt.preemptor.Members()...)
 			for _, pod := range podsToPreempt {
 				objs = append(objs, pod)
 			}
@@ -2921,7 +2911,7 @@ func TestPreempt(t *testing.T) {
 					}
 
 					state := framework.NewCycleState()
-					for _, pod := range test.preemptor.Members() {
+					for _, pod := range preemptorPods {
 						// Some tests rely on PreFilter plugin to compute its CycleState.
 						if _, s, _ := schedFramework.RunPreFilterPlugins(ctx, state, pod); !s.IsSuccess() {
 							t.Errorf("Unexpected preFilterStatus: %v", s)
@@ -2980,11 +2970,17 @@ func TestPreempt(t *testing.T) {
 
 					// Make sure that the DisruptionTarget condition has been added to the pod status
 					for _, patchedPod := range patchedPods {
+						var message string
+						if test.preemptor.IsWorkload() {
+							message = fmt.Sprintf("%s: preempting to accommodate a higher priority workload", patchedPod.Spec.SchedulerName)
+						} else {
+							message = fmt.Sprintf("%s: preempting to accommodate a higher priority pod", patchedPod.Spec.SchedulerName)
+						}
 						expectedPodCondition := &v1.PodCondition{
 							Type:    v1.DisruptionTarget,
 							Status:  v1.ConditionTrue,
 							Reason:  v1.PodReasonPreemptionByScheduler,
-							Message: fmt.Sprintf("%s: preempting to accommodate a higher priority pod", patchedPod.Spec.SchedulerName),
+							Message: message,
 						}
 
 						_, condition := apipod.GetPodCondition(&patchedPod.Status, v1.DisruptionTarget)

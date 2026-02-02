@@ -225,7 +225,7 @@ func (d *domain) GetAllPossibleVictims() []PreemptionUnit {
 						nodeName := gp.GetPod().Spec.NodeName
 						// Use the global lister to find the node, even if it's not in domain
 						if n, err := d.nodeInfoLister.Get(nodeName); err == nil {
-							gangNodes = append(gangNodes, n)
+							gangNodes = append(gangNodes, n.Snapshot())
 						}
 					}
 
