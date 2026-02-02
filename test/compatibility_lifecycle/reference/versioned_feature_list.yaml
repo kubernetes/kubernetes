@@ -1255,6 +1255,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.34"
+- name: PodLevelResourcesFixUpdateDefaulting
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.36"
 - name: PodLifecycleSleepAction
   versionedSpecs:
   - default: false
