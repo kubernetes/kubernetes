@@ -60,6 +60,7 @@ type qosContainerManagerImpl struct {
 	getNodeAllocatable func() v1.ResourceList
 	cgroupRoot         CgroupName
 	qosReserved        map[v1.ResourceName]int64
+	cpuIdleEnabled     bool
 }
 
 func NewQOSContainerManager(subsystems *CgroupSubsystems, cgroupRoot CgroupName, nodeConfig NodeConfig, cgroupManager CgroupManager) (QOSContainerManager, error) {
@@ -136,6 +137,9 @@ func (m *qosContainerManagerImpl) Start(ctx context.Context, getNodeAllocatable 
 	m.getNodeAllocatable = getNodeAllocatable
 	m.activePods = activePods
 
+	// Initialize CPU idle support
+	m.cpuIdleEnabled = m.validateCPUIdleSupport(logger)
+
 	// update qos cgroup tiers on startup and in periodic intervals
 	// to ensure desired state is in sync with actual state.
 	go wait.Until(func() {
@@ -192,9 +196,21 @@ func (m *qosContainerManagerImpl) setCPUCgroupConfig(configs map[v1.PodQOSClass]
 		}
 	}
 
-	// make sure best effort is always 2 shares
-	bestEffortCPUShares := uint64(MinShares)
-	configs[v1.PodQOSBestEffort].ResourceParameters.CPUShares = &bestEffortCPUShares
+	// Configure BestEffort QoS CPU settings
+	// When cpu.idle is enabled, the kernel forces cpu.shares=1 and locks it,
+	// so we skip setting CPUShares to avoid write errors.
+	if m.cpuIdleEnabled {
+		// Set cpu.idle=1 for SCHED_IDLE scheduling
+		if configs[v1.PodQOSBestEffort].ResourceParameters.Unified == nil {
+			configs[v1.PodQOSBestEffort].ResourceParameters.Unified = make(map[string]string)
+		}
+		configs[v1.PodQOSBestEffort].ResourceParameters.Unified["cpu.idle"] = "1"
+		// Do not set CPUShares - kernel will enforce cpu.shares=1 when cpu.idle=1
+	} else {
+		// When feature is disabled, use traditional cpu.shares approach
+		bestEffortCPUShares := uint64(MinShares)
+		configs[v1.PodQOSBestEffort].ResourceParameters.CPUShares = &bestEffortCPUShares
+	}
 
 	// set burstable shares based on current observe state
 	burstableCPUShares := MilliCPUToShares(burstablePodCPURequest)
@@ -283,6 +299,40 @@ func (m *qosContainerManagerImpl) retrySetMemoryReserve(logger klog.Logger, conf
 			configs[qos].ResourceParameters.Memory = &usage
 		}
 	}
+}
+
+// validateCPUIdleSupport checks if CPU idle (SCHED_IDLE) is supported on the system.
+// It requires:
+// - CPUIdleQoS feature gate to be enabled
+// - cgroup v2 unified mode
+// - kernel version >= 5.4
+// - cpu.idle file to be available
+func (m *qosContainerManagerImpl) validateCPUIdleSupport(logger klog.Logger) bool {
+	// Check if feature gate is enabled
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUIdleQoS) {
+		return false
+	}
+
+	// Check if cgroup v2 is enabled
+	if !libcontainercgroups.IsCgroup2UnifiedMode() {
+		logger.Info("CPUIdleQoS requires cgroup v2, feature disabled")
+		return false
+	}
+
+	// Check kernel version (cpu.idle was added in kernel 5.4)
+	if !isKernelVersionAtLeast(logger, 5, 4) {
+		logger.Info("CPUIdleQoS requires kernel version >= 5.4, feature disabled")
+		return false
+	}
+
+	// Check if cpu.idle is available
+	if !isCPUIdleAvailable(logger) {
+		logger.Info("cpu.idle not available on this system, CPUIdleQoS feature disabled")
+		return false
+	}
+
+	logger.Info("CPUIdleQoS feature enabled")
+	return true
 }
 
 // setMemoryQoS sums the memory requests of all pods in the Burstable class,

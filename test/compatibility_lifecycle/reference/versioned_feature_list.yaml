@@ -321,6 +321,12 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.12"
+- name: CPUIdleQoS
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.36"
 - name: CPUManagerPolicyAlphaOptions
   versionedSpecs:
   - default: false

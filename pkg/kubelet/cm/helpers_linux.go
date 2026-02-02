@@ -28,6 +28,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
@@ -35,6 +36,7 @@ import (
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/util"
+	utilkernel "k8s.io/kubernetes/pkg/util/kernel"
 )
 
 const (
@@ -396,4 +398,38 @@ func quotaToMilliCPU(quota int64, period int64) int64 {
 		return int64(0)
 	}
 	return (quota * MilliCPUToCPU) / period
+}
+
+// isKernelVersionAtLeast checks if the current kernel version is at least the specified version.
+// Returns true if the kernel version is >= major.minor, false otherwise.
+func isKernelVersionAtLeast(logger klog.Logger, major, minor int) bool {
+	kernelVersion, err := utilkernel.GetVersion()
+	if err != nil {
+		logger.Error(err, "Failed to get kernel version")
+		return false
+	}
+
+	requiredVersion := version.MustParseGeneric(fmt.Sprintf("%d.%d", major, minor))
+	return kernelVersion.AtLeast(requiredVersion)
+}
+
+// isCPUIdleAvailable checks if cpu.idle is available on the system.
+// It checks if the cpu.idle file exists in the cgroup v2 root.
+// Returns true if cpu.idle is available, false otherwise.
+func isCPUIdleAvailable(logger klog.Logger) bool {
+	// cpu.idle is only available in cgroup v2
+	if !libcontainercgroups.IsCgroup2UnifiedMode() {
+		return false
+	}
+
+	// Check if cpu.idle file exists in cgroup root
+	cpuIdlePath := filepath.Join(util.CgroupRoot, "cpu.idle")
+	if _, err := os.Stat(cpuIdlePath); err != nil {
+		if !os.IsNotExist(err) {
+			logger.Error(err, "Failed to check cpu.idle availability", "path", cpuIdlePath)
+		}
+		return false
+	}
+
+	return true
 }

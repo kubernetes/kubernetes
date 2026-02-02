@@ -80,6 +80,13 @@ const (
 	// Enable nodes to change CPUCFSQuotaPeriod
 	CPUCFSQuotaPeriod featuregate.Feature = "CustomCPUCFSQuotaPeriod"
 
+	// owner: @AutuSnow
+	//
+	// Enables setting cpu.idle=1 (SCHED_IDLE) for BestEffort QoS cgroups to provide
+	// true idle priority scheduling, reducing latency interference from BestEffort pods.
+	// Requires cgroup v2 and kernel version >= 5.4.
+	CPUIdleQoS featuregate.Feature = "CPUIdleQoS"
+
 	// owner: @fromanirh
 	// beta: see below.
 	//
@@ -1135,6 +1142,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.12"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
+	CPUIdleQoS: {
+		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	CPUManagerPolicyAlphaOptions: {
 		{Version: version.MustParse("1.23"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -2124,6 +2135,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	AuthorizePodWebsocketUpgradeCreatePermission: {},
 
 	CPUCFSQuotaPeriod: {},
+
+	CPUIdleQoS: {},
 
 	CPUManagerPolicyAlphaOptions: {},
 
