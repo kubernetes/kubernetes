@@ -149,7 +149,7 @@ func TestRetryOnConflictWithContext(t *testing.T) {
 		i++
 		return testErr
 	})
-	if err != testErr {
+	if !stderrors.Is(err, testErr) {
 		t.Errorf("expected testErr, got: %v", err)
 	}
 	if i != 1 {
@@ -264,7 +264,7 @@ func TestOnErrorWithContext(t *testing.T) {
 		i++
 		return testErr
 	})
-	if err != testErr {
+	if !stderrors.Is(err, testErr) {
 		t.Errorf("expected testErr, got: %v", err)
 	}
 	if i != 1 {
