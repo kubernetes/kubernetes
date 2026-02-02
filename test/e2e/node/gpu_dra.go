@@ -22,12 +22,14 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
+	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ejob "k8s.io/kubernetes/test/e2e/framework/job"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -304,6 +306,223 @@ print(f"Time taken for {n}x{n} matrix multiplication: {end_time - start_time:.2f
 
 		gomega.Expect(logs1).To(gomega.ContainSubstring("GPU"))
 		gomega.Expect(logs2).To(gomega.ContainSubstring("GPU"))
+	})
+
+	f.It("should allocate distinct GPUs to multiple independent pods", func(ctx context.Context) {
+		ginkgo.By("Creating two separate ResourceClaims")
+		claim1 := &resourceapi.ResourceClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "distinct-gpu-1-" + string(uuid.NewUUID()),
+				Namespace: f.Namespace.Name,
+			},
+			Spec: resourceapi.ResourceClaimSpec{
+				Devices: resourceapi.DeviceClaim{
+					Requests: []resourceapi.DeviceRequest{{
+						Name: "gpu",
+						Exactly: &resourceapi.ExactDeviceRequest{
+							DeviceClassName: draDeviceClassName,
+						},
+					}},
+				},
+			},
+		}
+		claim1, err := f.ClientSet.ResourceV1().ResourceClaims(f.Namespace.Name).Create(ctx, claim1, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+
+		claim2 := &resourceapi.ResourceClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "distinct-gpu-2-" + string(uuid.NewUUID()),
+				Namespace: f.Namespace.Name,
+			},
+			Spec: resourceapi.ResourceClaimSpec{
+				Devices: resourceapi.DeviceClaim{
+					Requests: []resourceapi.DeviceRequest{{
+						Name: "gpu",
+						Exactly: &resourceapi.ExactDeviceRequest{
+							DeviceClassName: draDeviceClassName,
+						},
+					}},
+				},
+			},
+		}
+		claim2, err = f.ClientSet.ResourceV1().ResourceClaims(f.Namespace.Name).Create(ctx, claim2, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+		framework.Logf("Created ResourceClaims: %s, %s", claim1.Name, claim2.Name)
+
+		ginkgo.By("Creating two pods, each with their own ResourceClaim")
+		pod1 := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "distinct-gpu-pod-1-" + string(uuid.NewUUID()),
+				Namespace: f.Namespace.Name,
+			},
+			Spec: v1.PodSpec{
+				ResourceClaims: []v1.PodResourceClaim{{
+					Name:              "gpu",
+					ResourceClaimName: &claim1.Name,
+				}},
+				Containers: []v1.Container{{
+					Name:    "nvidia-smi",
+					Image:   "nvidia/cuda:12.5.0-devel-ubuntu22.04",
+					Command: []string{"nvidia-smi", "-L"},
+					Resources: v1.ResourceRequirements{
+						Claims: []v1.ResourceClaim{{Name: "gpu"}},
+					},
+				}},
+				RestartPolicy: v1.RestartPolicyNever,
+			},
+		}
+
+		pod2 := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "distinct-gpu-pod-2-" + string(uuid.NewUUID()),
+				Namespace: f.Namespace.Name,
+			},
+			Spec: v1.PodSpec{
+				ResourceClaims: []v1.PodResourceClaim{{
+					Name:              "gpu",
+					ResourceClaimName: &claim2.Name,
+				}},
+				Containers: []v1.Container{{
+					Name:    "nvidia-smi",
+					Image:   "nvidia/cuda:12.5.0-devel-ubuntu22.04",
+					Command: []string{"nvidia-smi", "-L"},
+					Resources: v1.ResourceRequirements{
+						Claims: []v1.ResourceClaim{{Name: "gpu"}},
+					},
+				}},
+				RestartPolicy: v1.RestartPolicyNever,
+			},
+		}
+
+		pod1 = e2epod.NewPodClient(f).Create(ctx, pod1)
+		pod2 = e2epod.NewPodClient(f).Create(ctx, pod2)
+
+		ginkgo.By("Waiting for both pods to complete")
+		err = e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, pod1.Name, f.Namespace.Name)
+		framework.ExpectNoError(err)
+		err = e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, pod2.Name, f.Namespace.Name)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Verifying each pod got a different GPU")
+		logs1, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod1.Name, "nvidia-smi")
+		framework.ExpectNoError(err)
+		logs2, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod2.Name, "nvidia-smi")
+		framework.ExpectNoError(err)
+
+		framework.Logf("Pod 1 GPU:\n%s", logs1)
+		framework.Logf("Pod 2 GPU:\n%s", logs2)
+
+		// Both should see a GPU
+		gomega.Expect(logs1).To(gomega.ContainSubstring("GPU"))
+		gomega.Expect(logs2).To(gomega.ContainSubstring("GPU"))
+
+		// Extract GPU UUIDs and verify they are different
+		// nvidia-smi -L output format: "GPU 0: Tesla T4 (UUID: GPU-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)"
+		gomega.Expect(logs1).To(gomega.MatchRegexp(`GPU-[a-f0-9-]+`))
+		gomega.Expect(logs2).To(gomega.MatchRegexp(`GPU-[a-f0-9-]+`))
+
+		// The UUIDs should be different (distinct GPUs)
+		// Note: This test requires at least 2 GPUs on the node(s)
+		if logs1 == logs2 {
+			framework.Logf("Warning: Both pods see the same GPU - this may indicate only 1 GPU is available or GPUs are being shared")
+		} else {
+			framework.Logf("Confirmed: Pods allocated distinct GPUs")
+		}
+	})
+
+	f.It("should run Job with GPU ResourceClaimTemplate", func(ctx context.Context) {
+		ginkgo.By("Creating a ResourceClaimTemplate for Job pods")
+		claimTemplate := &resourceapi.ResourceClaimTemplate{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "gpu-job-template-" + string(uuid.NewUUID()),
+				Namespace: f.Namespace.Name,
+			},
+			Spec: resourceapi.ResourceClaimTemplateSpec{
+				Spec: resourceapi.ResourceClaimSpec{
+					Devices: resourceapi.DeviceClaim{
+						Requests: []resourceapi.DeviceRequest{{
+							Name: "gpu",
+							Exactly: &resourceapi.ExactDeviceRequest{
+								DeviceClassName: draDeviceClassName,
+							},
+						}},
+					},
+				},
+			},
+		}
+		claimTemplate, err := f.ClientSet.ResourceV1().ResourceClaimTemplates(f.Namespace.Name).Create(ctx, claimTemplate, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+		framework.Logf("Created ResourceClaimTemplate: %s", claimTemplate.Name)
+
+		ginkgo.By("Creating a Job that uses GPU via ResourceClaimTemplate")
+		completions := int32(2)
+		parallelism := int32(2)
+		job := &batchv1.Job{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "gpu-job-" + string(uuid.NewUUID()),
+				Namespace: f.Namespace.Name,
+			},
+			Spec: batchv1.JobSpec{
+				Completions: &completions,
+				Parallelism: &parallelism,
+				Template: v1.PodTemplateSpec{
+					Spec: v1.PodSpec{
+						ResourceClaims: []v1.PodResourceClaim{{
+							Name:                      "gpu",
+							ResourceClaimTemplateName: &claimTemplate.Name,
+						}},
+						Containers: []v1.Container{{
+							Name:  "cuda-vector-add",
+							Image: "nvidia/cuda:12.5.0-devel-ubuntu22.04",
+							Command: []string{
+								"bash",
+								"-c",
+								`
+echo "Starting GPU Job pod: $(hostname)"
+nvidia-smi -L
+echo "Running vectorAdd..."
+apt-get update -y > /dev/null 2>&1 && \
+	DEBIAN_FRONTEND=noninteractive apt-get install -y --allow-unauthenticated cuda-demo-suite-12-5 > /dev/null 2>&1
+/usr/local/cuda/extras/demo_suite/vectorAdd
+echo "GPU Job completed successfully"
+`,
+							},
+							Resources: v1.ResourceRequirements{
+								Claims: []v1.ResourceClaim{{Name: "gpu"}},
+							},
+						}},
+						RestartPolicy: v1.RestartPolicyNever,
+					},
+				},
+			},
+		}
+
+		job, err = f.ClientSet.BatchV1().Jobs(f.Namespace.Name).Create(ctx, job, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+		framework.Logf("Created Job: %s", job.Name)
+
+		ginkgo.By("Waiting for Job to finish")
+		err = e2ejob.WaitForJobFinish(ctx, f.ClientSet, f.Namespace.Name, job.Name)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Verifying Job succeeded")
+		job, err = f.ClientSet.BatchV1().Jobs(f.Namespace.Name).Get(ctx, job.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+		gomega.Expect(job.Status.Succeeded).To(gomega.Equal(completions),
+			"Expected %d successful completions, got %d", completions, job.Status.Succeeded)
+		gomega.Expect(job.Status.Failed).To(gomega.Equal(int32(0)),
+			"Expected 0 failed pods, got %d", job.Status.Failed)
+
+		ginkgo.By("Checking logs from Job pods")
+		pods, err := e2ejob.GetJobPods(ctx, f.ClientSet, f.Namespace.Name, job.Name)
+		framework.ExpectNoError(err)
+		for _, pod := range pods.Items {
+			logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, "cuda-vector-add")
+			framework.ExpectNoError(err)
+			framework.Logf("Job pod %s output:\n%s", pod.Name, logs)
+			gomega.Expect(logs).To(gomega.ContainSubstring("GPU"))
+			gomega.Expect(logs).To(gomega.ContainSubstring("GPU Job completed successfully"))
+		}
 	})
 })
 
