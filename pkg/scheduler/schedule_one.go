@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 	utiltrace "k8s.io/utils/trace"
@@ -197,7 +198,7 @@ func (sched *Scheduler) schedulingCycle(
 	assumedPodInfo := podInfo.DeepCopy()
 	assumedPod := assumedPodInfo.Pod
 	// assume modifies `assumedPod` by setting NodeName=scheduleResult.SuggestedHost
-	err = sched.assume(logger, assumedPod, scheduleResult.SuggestedHost)
+	err = sched.assume(logger, assumedPod, scheduleResult.SuggestedHost, state)
 	if err != nil {
 		// This is most probably result of a BUG in retrying logic.
 		// We report an error here so that pod scheduling can be retried.
@@ -958,12 +959,15 @@ func (h *nodeScoreHeap) Pop() interface{} {
 
 // assume signals to the cache that a pod is already in the cache, so that binding can be asynchronous.
 // assume modifies `assumed`.
-func (sched *Scheduler) assume(logger klog.Logger, assumed *v1.Pod, host string) error {
+func (sched *Scheduler) assume(logger klog.Logger, assumed *v1.Pod, host string, state fwk.CycleState) error {
 	// Optimistically assume that the binding will succeed and send it to apiserver
 	// in the background.
 	// If the binding fails, scheduler will release resources allocated to assumed pod
 	// immediately.
 	assumed.Spec.NodeName = host
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRANativeResources) {
+		assumed.Status.NativeResourceClaimStatus = dynamicresources.ExtractPodNativeResourceClaimStatus(logger, state, host)
+	}
 
 	if err := sched.Cache.AssumePod(logger, assumed); err != nil {
 		logger.Error(err, "Scheduler cache AssumePod failed")
