@@ -216,7 +216,12 @@ func (s *Snapshot) AssumePod(podInfo *framework.PodInfo) error {
 	if !ok {
 		return fmt.Errorf("assumed node %q not found in the snapshot", pod.Spec.NodeName)
 	}
+	// Calling AddPodInfo increases the Generation number of the nodeInfo.
+	// Since this operation only affects the snapshot,
+	// we should keep the old number to remain consistent with the cached value.
+	oldGeneration := nodeInfo.Generation
 	nodeInfo.AddPodInfo(podInfo)
+	nodeInfo.Generation = oldGeneration
 	s.assumedPods[key] = pod
 	return nil
 }
@@ -235,7 +240,12 @@ func (s *Snapshot) ForgetPod(logger klog.Logger, pod *v1.Pod) error {
 	delete(s.assumedPods, key)
 	nodeName := assumedPod.Spec.NodeName
 	if nodeInfo, ok := s.nodeInfoMap[nodeName]; ok {
+		// Calling RemovePod increases the Generation number of the nodeInfo.
+		// Since this operation only affects the snapshot,
+		// we should keep the old number to remain consistent with the cached value.
+		oldGeneration := nodeInfo.Generation
 		nodeInfo.RemovePod(logger, pod)
+		nodeInfo.Generation = oldGeneration
 	}
 	return nil
 }

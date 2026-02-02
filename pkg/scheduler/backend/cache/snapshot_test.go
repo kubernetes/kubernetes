@@ -555,6 +555,10 @@ func TestSnapshot_AssumeForget(t *testing.T) {
 				}
 			}
 
+			nodeInfos, err := snapshot.List()
+			if err != nil {
+				t.Fatalf("Failed to list snapshotted nodes: %v", err)
+			}
 			for nodeName, expectedPods := range tt.expectedPodsOnNodes {
 				nodeInfo, err := snapshot.Get(nodeName)
 				if err != nil {
@@ -568,6 +572,14 @@ func TestSnapshot_AssumeForget(t *testing.T) {
 					podName := p.GetPod().Name
 					if !expectedPods.Has(podName) {
 						t.Errorf("Unexpected pod %q on node %q", podName, nodeName)
+					}
+				}
+				// Safety check that nodeInfoList's pods were also updated.
+				for _, nInfo := range nodeInfos {
+					if nInfo.Node().Name == nodeInfo.Node().Name {
+						if diff := cmp.Diff(nodeInfo.GetPods(), nInfo.GetPods(), cmpopts.IgnoreUnexported(framework.PodInfo{})); diff != "" {
+							t.Errorf("Unexpected nodeInfo state in nodeInfoList (-want +got):\n%s", diff)
+						}
 					}
 				}
 			}
