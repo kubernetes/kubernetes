@@ -192,9 +192,14 @@ func (e *TokensController) Run(ctx context.Context, workers int) {
 }
 
 func (e *TokensController) queueServiceAccountSync(obj interface{}) {
+	if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
+		obj = tombstone.Obj
+	}
 	if serviceAccount, ok := obj.(*v1.ServiceAccount); ok {
 		e.syncServiceAccountQueue.Add(makeServiceAccountKey(serviceAccount))
+		return
 	}
+	utilruntime.HandleError(fmt.Errorf("error decoding object, invalid type: %T", obj))
 }
 
 func (e *TokensController) queueServiceAccountUpdateSync(oldObj interface{}, newObj interface{}) {

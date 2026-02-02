@@ -736,3 +736,29 @@ func verifyAttachDetachCalls(t *testing.T, testPlugin *controllervolumetesting.T
 		t.Fatalf("Fatal error encountered in the testing volume plugin")
 	}
 }
+
+func TestPodDelete_Tombstone(t *testing.T) {
+	_, tCtx := ktesting.NewTestContext(t)
+	fakeKubeClient := controllervolumetesting.CreateTestClient(tCtx.Logger())
+	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
+
+	adc := createADC(t, tCtx, fakeKubeClient, informerFactory,
+		append(controllervolumetesting.CreateTestPlugin(false), csi.ProbeVolumePlugins()...))
+
+	pod := controllervolumetesting.NewPodWithVolume("pod1", "vol1", "node1")
+	volumeName := v1.UniqueVolumeName(csiPDUniqueNamePrefix + "pdName")
+
+	adc.desiredStateOfWorld.AddNode("node1")
+	adc.podAdd(tCtx.Logger(), pod)
+
+	if !adc.desiredStateOfWorld.VolumeExists(volumeName, "node1") {
+		t.Fatalf("expected volume %s to exist in dsw", volumeName)
+	}
+
+	// Tombstone
+	adc.podDelete(tCtx.Logger(), kcache.DeletedFinalStateUnknown{Key: "mynamespace/pod1", Obj: pod})
+
+	if adc.desiredStateOfWorld.VolumeExists(volumeName, "node1") {
+		t.Errorf("expected volume %s to be removed from dsw", volumeName)
+	}
+}
