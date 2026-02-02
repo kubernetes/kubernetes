@@ -87,7 +87,7 @@ type store struct {
 	watcher            *watcher
 	leaseManager       *leaseManager
 	decoder            Decoder
-	listErrAggrFactory func() storage.ListErrorAggregator
+	listErrAggrFactory func() storage.ListItemErrors
 
 	resourcePrefix string
 	newListFunc    func() runtime.Object
@@ -116,18 +116,18 @@ type objState struct {
 // defaultListErrorAggregatorFactory returns the default list error
 // aggregator that maintains backward compatibility, which is abort
 // the list operation as soon as it encounters the first error
-func defaultListErrorAggregatorFactory() storage.ListErrorAggregator { return &abortOnFirstError{} }
+func defaultListErrorAggregatorFactory() storage.ListItemErrors { return &abortOnFirstError{} }
 
 // LIST aborts on the first error it encounters (backward compatible)
 type abortOnFirstError struct {
 	err error
 }
 
-func (a *abortOnFirstError) Aggregate(key string, err error) bool {
+func (a *abortOnFirstError) Append(key string, err error) bool {
 	a.err = err
 	return true
 }
-func (a *abortOnFirstError) Err() error { return a.err }
+func (a *abortOnFirstError) Aggregate() error { return a.err }
 
 // New returns an etcd3 implementation of storage.Interface.
 func New(c *kubernetes.Client, compactor Compactor, codec runtime.Codec, newFunc, newListFunc func() runtime.Object, prefix, resourcePrefix string, groupResource schema.GroupResource, transformer value.Transformer, leaseManagerConfig LeaseManagerConfig, decoder Decoder, versioner storage.Versioner) (*store, error) {
@@ -957,8 +957,8 @@ func (s *store) streamChunks(ctx context.Context, keyPrefix string, withRev int6
 	}, true
 }
 
-func (s *store) finalizeList(listObj runtime.Object, pred storage.SelectionPredicate, rev uint64, continueValue string, remainingItemCount *int64, aggregator ListErrorAggregator, v reflect.Value) error {
-	if err := aggregator.Err(); err != nil {
+func (s *store) finalizeList(listObj runtime.Object, pred storage.SelectionPredicate, rev uint64, continueValue string, remainingItemCount *int64, aggregator storage.ListItemErrors, v reflect.Value) error {
+	if err := aggregator.Aggregate(); err != nil {
 		return err
 	}
 	if v.IsNil() {
@@ -974,11 +974,11 @@ func (s *store) finalizeList(listObj runtime.Object, pred storage.SelectionPredi
 	return nil
 }
 
-func (s *store) processListItem(ctx context.Context, kv *mvccpb.KeyValue, pred storage.SelectionPredicate, newItemFunc func() runtime.Object, aggregator ListErrorAggregator, v reflect.Value) (bool, error) {
+func (s *store) processListItem(ctx context.Context, kv *mvccpb.KeyValue, pred storage.SelectionPredicate, newItemFunc func() runtime.Object, aggregator storage.ListItemErrors, v reflect.Value) (bool, error) {
 	data, _, err := s.transformer.TransformFromStorage(ctx, kv.Value, authenticatedDataString(kv.Key))
 	if err != nil {
-		if done := aggregator.Aggregate(string(kv.Key), storage.NewInternalError(fmt.Errorf("unable to transform key %q: %w", kv.Key, err))); done {
-			return false, aggregator.Err()
+		if done := aggregator.Append(string(kv.Key), storage.NewInternalError(fmt.Errorf("unable to transform key %q: %w", kv.Key, err))); done {
+			return false, aggregator.Aggregate()
 		}
 		return false, nil
 	}
@@ -994,8 +994,8 @@ func (s *store) processListItem(ctx context.Context, kv *mvccpb.KeyValue, pred s
 	obj, err := s.decoder.DecodeListItem(ctx, data, uint64(kv.ModRevision), newItemFunc)
 	if err != nil {
 		recordDecodeError(s.groupResource, string(kv.Key))
-		if done := aggregator.Aggregate(string(kv.Key), err); done {
-			return false, aggregator.Err()
+		if done := aggregator.Append(string(kv.Key), err); done {
+			return false, aggregator.Aggregate()
 		}
 		return false, nil
 	}
@@ -1009,7 +1009,7 @@ func (s *store) processListItem(ctx context.Context, kv *mvccpb.KeyValue, pred s
 }
 
 // appendChunk appends the kvs matching pred to v.
-func (s *store) appendChunk(ctx context.Context, kvs []*mvccpb.KeyValue, pred storage.SelectionPredicate, newItemFunc func() runtime.Object, aggregator ListErrorAggregator, v reflect.Value, paging bool) (lastKey []byte, evaluated int, limitReached bool, err error) {
+func (s *store) appendChunk(ctx context.Context, kvs []*mvccpb.KeyValue, pred storage.SelectionPredicate, newItemFunc func() runtime.Object, aggregator storage.ListItemErrors, v reflect.Value, paging bool) (lastKey []byte, evaluated int, limitReached bool, err error) {
 	// avoid small allocations for the result slice, since this can be called in many
 	// different contexts and we don't know how significantly the result will be filtered
 	if pred.Empty() {
