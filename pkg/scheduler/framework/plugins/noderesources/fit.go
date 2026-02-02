@@ -176,9 +176,6 @@ func (pl *Fit) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *f
 		EnablePodLevelResources:   pl.enablePodLevelResources,
 		EnableDRAExtendedResource: pl.enableDRAExtendedResource,
 	}
-	if pl.enableDRAExtendedResource {
-		return nil, fwk.NewStatus(fwk.Unschedulable, "signature disabled when dra extended resources enabled")
-	}
 	return []fwk.SignFragment{
 		{Key: fwk.ResourcesSignerName, Value: computePodResourceRequest(pod, opts)},
 	}, nil
