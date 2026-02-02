@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -269,8 +270,9 @@ func TestNewNodeInfo(t *testing.T) {
 				{Protocol: "TCP", Port: 8080}: {},
 			},
 		},
-		ImageStates:  map[string]*fwk.ImageStateSummary{},
-		PVCRefCounts: map[string]int{},
+		ImageStates:          map[string]*fwk.ImageStateSummary{},
+		PVCRefCounts:         map[string]int{},
+		NativeDRAClaimStates: map[types.UID]*fwk.NativeDRAClaimAllocationState{},
 		Pods: []fwk.PodInfo{
 			&PodInfo{
 				Pod: &v1.Pod{
@@ -378,8 +380,9 @@ func TestNodeInfoClone(t *testing.T) {
 						{Protocol: "TCP", Port: 8080}: {},
 					},
 				},
-				ImageStates:  map[string]*fwk.ImageStateSummary{},
-				PVCRefCounts: map[string]int{},
+				ImageStates:          map[string]*fwk.ImageStateSummary{},
+				PVCRefCounts:         map[string]int{},
+				NativeDRAClaimStates: map[types.UID]*fwk.NativeDRAClaimAllocationState{},
 				Pods: []fwk.PodInfo{
 					&PodInfo{
 						Pod: &v1.Pod{
@@ -468,8 +471,9 @@ func TestNodeInfoClone(t *testing.T) {
 						{Protocol: "TCP", Port: 8080}: {},
 					},
 				},
-				ImageStates:  map[string]*fwk.ImageStateSummary{},
-				PVCRefCounts: map[string]int{},
+				ImageStates:          map[string]*fwk.ImageStateSummary{},
+				PVCRefCounts:         map[string]int{},
+				NativeDRAClaimStates: map[types.UID]*fwk.NativeDRAClaimAllocationState{},
 				Pods: []fwk.PodInfo{
 					&PodInfo{
 						Pod: &v1.Pod{
@@ -550,24 +554,26 @@ func TestNodeInfoClone(t *testing.T) {
 		},
 		{
 			nodeInfo: &NodeInfo{
-				Requested:        &Resource{},
-				NonZeroRequested: &Resource{},
-				Allocatable:      &Resource{},
-				Generation:       3,
-				UsedPorts:        fwk.HostPortInfo{},
-				ImageStates:      map[string]*fwk.ImageStateSummary{},
-				PVCRefCounts:     map[string]int{},
-				DeclaredFeatures: ndf.NewFeatureSet("FeatureA", "FeatureB"),
+				Requested:            &Resource{},
+				NonZeroRequested:     &Resource{},
+				Allocatable:          &Resource{},
+				Generation:           3,
+				UsedPorts:            fwk.HostPortInfo{},
+				ImageStates:          map[string]*fwk.ImageStateSummary{},
+				PVCRefCounts:         map[string]int{},
+				NativeDRAClaimStates: map[types.UID]*fwk.NativeDRAClaimAllocationState{},
+				DeclaredFeatures:     ndf.NewFeatureSet("FeatureA", "FeatureB"),
 			},
 			expected: &NodeInfo{
-				Requested:        &Resource{},
-				NonZeroRequested: &Resource{},
-				Allocatable:      &Resource{},
-				Generation:       3,
-				UsedPorts:        fwk.HostPortInfo{},
-				ImageStates:      map[string]*fwk.ImageStateSummary{},
-				PVCRefCounts:     map[string]int{},
-				DeclaredFeatures: ndf.NewFeatureSet("FeatureA", "FeatureB"),
+				Requested:            &Resource{},
+				NonZeroRequested:     &Resource{},
+				Allocatable:          &Resource{},
+				Generation:           3,
+				UsedPorts:            fwk.HostPortInfo{},
+				ImageStates:          map[string]*fwk.ImageStateSummary{},
+				PVCRefCounts:         map[string]int{},
+				NativeDRAClaimStates: map[types.UID]*fwk.NativeDRAClaimAllocationState{},
+				DeclaredFeatures:     ndf.NewFeatureSet("FeatureA", "FeatureB"),
 			},
 		},
 	}
@@ -744,8 +750,9 @@ func TestNodeInfoAddPod(t *testing.T) {
 				{Protocol: "TCP", Port: 8080}: {},
 			},
 		},
-		ImageStates:  map[string]*fwk.ImageStateSummary{},
-		PVCRefCounts: map[string]int{"node_info_cache_test/pvc-1": 2, "node_info_cache_test/pvc-2": 1},
+		ImageStates:          map[string]*fwk.ImageStateSummary{},
+		PVCRefCounts:         map[string]int{"node_info_cache_test/pvc-1": 2, "node_info_cache_test/pvc-2": 1},
+		NativeDRAClaimStates: map[types.UID]*fwk.NativeDRAClaimAllocationState{},
 		Pods: []fwk.PodInfo{
 			&PodInfo{
 				Pod: &v1.Pod{
@@ -994,8 +1001,9 @@ func TestNodeInfoRemovePod(t *testing.T) {
 						{Protocol: "TCP", Port: 8080}: {},
 					},
 				},
-				ImageStates:  map[string]*fwk.ImageStateSummary{},
-				PVCRefCounts: map[string]int{"node_info_cache_test/pvc-1": 1},
+				ImageStates:          map[string]*fwk.ImageStateSummary{},
+				NativeDRAClaimStates: map[types.UID]*fwk.NativeDRAClaimAllocationState{},
+				PVCRefCounts:         map[string]int{"node_info_cache_test/pvc-1": 1},
 				Pods: []fwk.PodInfo{
 					&PodInfo{
 						Pod: &v1.Pod{
@@ -1160,8 +1168,9 @@ func TestNodeInfoRemovePod(t *testing.T) {
 						{Protocol: "TCP", Port: 8080}: {},
 					},
 				},
-				ImageStates:  map[string]*fwk.ImageStateSummary{},
-				PVCRefCounts: map[string]int{},
+				ImageStates:          map[string]*fwk.ImageStateSummary{},
+				PVCRefCounts:         map[string]int{},
+				NativeDRAClaimStates: map[types.UID]*fwk.NativeDRAClaimAllocationState{},
 				Pods: []fwk.PodInfo{
 					&PodInfo{
 						Pod: &v1.Pod{
@@ -1234,6 +1243,85 @@ func TestNodeInfoRemovePod(t *testing.T) {
 			test.expectedNodeInfo.Generation = ni.Generation
 			if diff := cmp.Diff(test.expectedNodeInfo, ni, nodeInfoCmpOpts...); diff != "" {
 				t.Errorf("Unexpected NodeInfo (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestNodeInfoNativeDRAClaims(t *testing.T) {
+	tests := []struct {
+		name          string
+		initialStates map[types.UID]*fwk.NativeDRAClaimAllocationState
+		checkClaimUID types.UID
+		wantAllocated bool
+		wantStates    map[types.UID]*fwk.NativeDRAClaimAllocationState
+	}{
+		{
+			name:          "nil states",
+			initialStates: nil,
+			checkClaimUID: "claim1-uid",
+			wantAllocated: false,
+			wantStates:    nil,
+		},
+		{
+			name:          "empty states",
+			initialStates: map[types.UID]*fwk.NativeDRAClaimAllocationState{},
+			checkClaimUID: "claim1-uid",
+			wantAllocated: false,
+			wantStates:    map[types.UID]*fwk.NativeDRAClaimAllocationState{},
+		},
+		{
+			name: "claim not present",
+			initialStates: map[types.UID]*fwk.NativeDRAClaimAllocationState{
+				"claim2-uid": {ConsumerPods: sets.New[types.UID]("pod2-uid")},
+			},
+			checkClaimUID: "claim1-uid",
+			wantAllocated: false,
+			wantStates: map[types.UID]*fwk.NativeDRAClaimAllocationState{
+				"claim2-uid": {ConsumerPods: sets.New[types.UID]("pod2-uid")},
+			},
+		},
+		{
+			name: "claim present but no consumers",
+			initialStates: map[types.UID]*fwk.NativeDRAClaimAllocationState{
+				"claim1-uid": {ConsumerPods: sets.New[types.UID]()},
+			},
+			checkClaimUID: "claim1-uid",
+			wantAllocated: false,
+			wantStates: map[types.UID]*fwk.NativeDRAClaimAllocationState{
+				"claim1-uid": {ConsumerPods: sets.New[types.UID]()},
+			},
+		},
+		{
+			name: "claim present with consumers",
+			initialStates: map[types.UID]*fwk.NativeDRAClaimAllocationState{
+				"claim1-uid": {ConsumerPods: sets.New[types.UID]("pod1-uid")},
+				"claim2-uid": {ConsumerPods: sets.New[types.UID]("pod2-uid")},
+			},
+			checkClaimUID: "claim1-uid",
+			wantAllocated: true,
+			wantStates: map[types.UID]*fwk.NativeDRAClaimAllocationState{
+				"claim1-uid": {ConsumerPods: sets.New[types.UID]("pod1-uid")},
+				"claim2-uid": {ConsumerPods: sets.New[types.UID]("pod2-uid")},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ni := &NodeInfo{
+				NativeDRAClaimStates: tt.initialStates,
+			}
+
+			nativeDRAState := ni.NativeDRAClaimStates[tt.checkClaimUID]
+			gotAllocated := (nativeDRAState != nil && nativeDRAState.ConsumerPods.Len() > 0)
+			if gotAllocated != tt.wantAllocated {
+				t.Errorf("claim %v allocation - got: %v, want: %v", tt.checkClaimUID, gotAllocated, tt.wantAllocated)
+			}
+
+			gotStates := ni.GetNativeResourceDRAClaimStates()
+			if diff := cmp.Diff(tt.wantStates, gotStates, cmp.AllowUnexported(fwk.NativeDRAClaimAllocationState{})); diff != "" {
+				t.Errorf("GetNativeResourceDRAClaimStates() returned diff (-want +got):\n%s", diff)
 			}
 		})
 	}
@@ -1439,10 +1527,13 @@ func TestFitError_Error(t *testing.T) {
 }
 
 var (
+	cpu100m       = resource.MustParse("100m")
+	mem200M       = resource.MustParse("200Mi")
 	cpu500m       = resource.MustParse("500m")
 	mem500M       = resource.MustParse("500Mi")
 	cpu700m       = resource.MustParse("700m")
 	mem800M       = resource.MustParse("800Mi")
+	cpu1000m      = resource.MustParse("1000m")
 	cpu1200m      = resource.MustParse("1200m")
 	mem1200M      = resource.MustParse("1200Mi")
 	restartAlways = v1.ContainerRestartPolicyAlways
@@ -1450,12 +1541,15 @@ var (
 
 func TestPodInfoCalculateResources(t *testing.T) {
 	testCases := []struct {
-		name                     string
-		containers               []v1.Container
-		podResources             *v1.ResourceRequirements
-		podLevelResourcesEnabled bool
-		expectedResource         fwk.PodResource
-		initContainers           []v1.Container
+		name                         string
+		containers                   []v1.Container
+		podResources                 *v1.ResourceRequirements
+		podLevelResourcesEnabled     bool
+		draNativeResourcesEnabled    bool
+		podNativeResourceClaimStatus []v1.PodNativeResourceClaimStatus
+		expectedResource             fwk.PodResource
+		initContainers               []v1.Container
+		overhead                     *v1.ResourceList
 	}{
 		{
 			name:       "requestless container",
@@ -1680,17 +1774,270 @@ func TestPodInfoCalculateResources(t *testing.T) {
 				Non0Mem: schedutil.DefaultMemoryRequest,
 			},
 		},
+		{
+			name:                      "DRA gate disabled, with native resource claim",
+			draNativeResourcesEnabled: false,
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    cpu500m,
+							v1.ResourceMemory: mem500M,
+						},
+					},
+				},
+			},
+			podNativeResourceClaimStatus: []v1.PodNativeResourceClaimStatus{
+				{
+					ClaimInfo: v1.ObjectReference{UID: "claim1-uid"},
+					Resources: []v1.NativeResourceAllocation{
+						{ResourceName: v1.ResourceCPU, Quantity: cpu100m},
+						{ResourceName: v1.ResourceMemory, Quantity: mem200M},
+					},
+				},
+			},
+			expectedResource: fwk.PodResource{
+				Resource: &Resource{
+					MilliCPU: cpu500m.MilliValue(),
+					Memory:   mem500M.Value(),
+				},
+				Non0CPU: cpu500m.MilliValue(),
+				Non0Mem: mem500M.Value(),
+			},
+		},
+		{
+			name:                      "container with DRA native resource claim",
+			draNativeResourcesEnabled: true,
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    cpu500m,
+							v1.ResourceMemory: mem500M,
+						},
+					},
+				},
+			},
+			podNativeResourceClaimStatus: []v1.PodNativeResourceClaimStatus{
+				{
+					ClaimInfo: v1.ObjectReference{UID: "claim1-uid"},
+					Resources: []v1.NativeResourceAllocation{
+						{ResourceName: v1.ResourceCPU, Quantity: cpu100m},
+						{ResourceName: v1.ResourceMemory, Quantity: mem200M},
+					},
+				},
+			},
+			expectedResource: fwk.PodResource{
+				Resource: &Resource{
+					MilliCPU: cpu500m.MilliValue() + cpu100m.MilliValue(),
+					Memory:   mem500M.Value() + mem200M.Value(),
+				},
+				Non0CPU: cpu500m.MilliValue() + cpu100m.MilliValue(),
+				Non0Mem: mem500M.Value() + mem200M.Value(),
+			},
+		},
+		{
+			name:                      "Multiple DRA native resource claims",
+			draNativeResourcesEnabled: true,
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    cpu500m,
+							v1.ResourceMemory: mem500M,
+						},
+					},
+				},
+			},
+			podNativeResourceClaimStatus: []v1.PodNativeResourceClaimStatus{
+				{
+					ClaimInfo: v1.ObjectReference{UID: "claim1-uid"},
+					Resources: []v1.NativeResourceAllocation{
+						{ResourceName: v1.ResourceCPU, Quantity: cpu100m},
+						{ResourceName: v1.ResourceMemory, Quantity: mem200M},
+					},
+				},
+				{
+					ClaimInfo: v1.ObjectReference{UID: "claim2-uid"},
+					Resources: []v1.NativeResourceAllocation{
+						{ResourceName: v1.ResourceCPU, Quantity: cpu100m},
+					},
+				},
+			},
+			expectedResource: fwk.PodResource{
+				Resource: &Resource{
+					MilliCPU: cpu500m.MilliValue() + cpu100m.MilliValue() + cpu100m.MilliValue(),
+					Memory:   mem500M.Value() + mem200M.Value(),
+				},
+				Non0CPU: cpu500m.MilliValue() + cpu100m.MilliValue() + cpu100m.MilliValue(),
+				Non0Mem: mem500M.Value() + mem200M.Value(),
+			},
+		},
+		{
+			name:                      "Single DRA claim with multiple resources",
+			draNativeResourcesEnabled: true,
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    cpu500m,
+							v1.ResourceMemory: mem500M,
+						},
+					},
+				},
+			},
+			podNativeResourceClaimStatus: []v1.PodNativeResourceClaimStatus{
+				{
+					ClaimInfo: v1.ObjectReference{UID: "claim1-uid"},
+					Resources: []v1.NativeResourceAllocation{
+						{ResourceName: v1.ResourceCPU, Quantity: cpu100m},
+						{ResourceName: v1.ResourceMemory, Quantity: mem200M},
+						{ResourceName: v1.ResourceCPU, Quantity: cpu1000m},
+					},
+				},
+			},
+			expectedResource: fwk.PodResource{
+				Resource: &Resource{
+					MilliCPU: cpu500m.MilliValue() + cpu100m.MilliValue() + cpu1000m.MilliValue(),
+					Memory:   mem500M.Value() + mem200M.Value(),
+				},
+				Non0CPU: cpu500m.MilliValue() + cpu100m.MilliValue() + cpu1000m.MilliValue(),
+				Non0Mem: mem500M.Value() + mem200M.Value(),
+			},
+		},
+		{
+			name:                      "DRA Native Resources with Init Container",
+			draNativeResourcesEnabled: true,
+			initContainers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    cpu1200m, // Higher than app container
+							v1.ResourceMemory: mem500M,
+						},
+					},
+				},
+			},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    cpu500m,
+							v1.ResourceMemory: mem1200M, // Higher than init container
+						},
+					},
+				},
+			},
+			podNativeResourceClaimStatus: []v1.PodNativeResourceClaimStatus{
+				{
+					ClaimInfo: v1.ObjectReference{UID: "claim1-uid"},
+					Resources: []v1.NativeResourceAllocation{
+						{ResourceName: v1.ResourceCPU, Quantity: cpu100m},
+						{ResourceName: v1.ResourceMemory, Quantity: mem200M},
+					},
+				},
+			},
+			expectedResource: fwk.PodResource{
+				Resource: &Resource{
+					MilliCPU: cpu1200m.MilliValue() + cpu100m.MilliValue(), // max(cpu500m, cpu1200m) + draCpu
+					Memory:   mem1200M.Value() + mem200M.Value(),           // max(mem500M, mem1200M) + draMem
+				},
+				Non0CPU: cpu1200m.MilliValue() + cpu100m.MilliValue(),
+				Non0Mem: mem1200M.Value() + mem200M.Value(),
+			},
+		},
+		{
+			name:                      "DRA Native Resources with Pod Level Resources",
+			draNativeResourcesEnabled: true,
+			podLevelResourcesEnabled:  true,
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    cpu500m,
+							v1.ResourceMemory: mem500M,
+						},
+					},
+				},
+			},
+			podResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    cpu700m,
+					v1.ResourceMemory: mem800M,
+				},
+			},
+			podNativeResourceClaimStatus: []v1.PodNativeResourceClaimStatus{
+				{
+					ClaimInfo: v1.ObjectReference{UID: "claim1-uid"},
+					Resources: []v1.NativeResourceAllocation{
+						{ResourceName: v1.ResourceCPU, Quantity: cpu100m},
+						{ResourceName: v1.ResourceMemory, Quantity: mem200M},
+					},
+				},
+			},
+			expectedResource: fwk.PodResource{
+				Resource: &Resource{
+					MilliCPU: cpu700m.MilliValue(), // pod level requests determines the overall footprint
+					Memory:   mem800M.Value(),      // pod level requests determines the overall footprint
+				},
+				Non0CPU: cpu700m.MilliValue(),
+				Non0Mem: mem800M.Value(),
+			},
+		},
+		{
+			name:                      "DRA Native Resources with Pod Overhead",
+			draNativeResourcesEnabled: true,
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    cpu500m,
+							v1.ResourceMemory: mem500M,
+						},
+					},
+				},
+			},
+			podNativeResourceClaimStatus: []v1.PodNativeResourceClaimStatus{
+				{
+					ClaimInfo: v1.ObjectReference{UID: "claim1-uid"},
+					Resources: []v1.NativeResourceAllocation{
+						{ResourceName: v1.ResourceCPU, Quantity: cpu100m},
+						{ResourceName: v1.ResourceMemory, Quantity: mem200M},
+					},
+				},
+			},
+			// Pod Overhead
+			overhead: &v1.ResourceList{
+				v1.ResourceCPU:    cpu100m,
+				v1.ResourceMemory: mem200M,
+			},
+			expectedResource: fwk.PodResource{
+				Resource: &Resource{
+					MilliCPU: cpu500m.MilliValue() + cpu100m.MilliValue() + cpu100m.MilliValue(), // container + dra + overhead
+					Memory:   mem500M.Value() + mem200M.Value() + mem200M.Value(),                // container + dra + overhead
+				},
+				Non0CPU: cpu500m.MilliValue() + cpu100m.MilliValue() + cpu100m.MilliValue(),
+				Non0Mem: mem500M.Value() + mem200M.Value() + mem200M.Value(),
+			},
+		},
 	}
-
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevelResourcesEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANativeResources, tc.draNativeResourcesEnabled)
+			podSpec := v1.PodSpec{
+				Resources:      tc.podResources,
+				Containers:     tc.containers,
+				InitContainers: tc.initContainers,
+			}
+			if tc.overhead != nil {
+				podSpec.Overhead = *tc.overhead
+			}
 			podInfo := PodInfo{
 				Pod: &v1.Pod{
-					Spec: v1.PodSpec{
-						Resources:      tc.podResources,
-						Containers:     tc.containers,
-						InitContainers: tc.initContainers,
+					Spec: podSpec,
+					Status: v1.PodStatus{
+						NativeResourceClaimStatus: tc.podNativeResourceClaimStatus,
 					},
 				},
 			}
@@ -2422,5 +2769,139 @@ func TestUpdateUsedPorts_PodRemove(t *testing.T) {
 		if diff := cmp.Diff(tc.want, ni.UsedPorts); diff != "" {
 			t.Errorf("updateUsedPorts() unexpected diff (-want, +got):\n%s", diff)
 		}
+	}
+}
+
+func TestUpdateNativeDRAClaimState(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANativeResources, true)
+
+	tests := []struct {
+		name          string
+		initialState  map[types.UID]*fwk.NativeDRAClaimAllocationState
+		pod           *v1.Pod
+		sign          int64
+		expectedState map[types.UID]*fwk.NativeDRAClaimAllocationState
+	}{
+		{
+			name:         "Add pod with single claim",
+			initialState: map[types.UID]*fwk.NativeDRAClaimAllocationState{},
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "pod1-uid"},
+				Status: v1.PodStatus{
+					NativeResourceClaimStatus: []v1.PodNativeResourceClaimStatus{
+						{ClaimInfo: v1.ObjectReference{UID: "claim1-uid"}},
+					},
+				},
+			},
+			sign: 1,
+			expectedState: map[types.UID]*fwk.NativeDRAClaimAllocationState{
+				"claim1-uid": {ConsumerPods: sets.New[types.UID]("pod1-uid")},
+			},
+		},
+		{
+			name:         "Add pod with multiple claims",
+			initialState: map[types.UID]*fwk.NativeDRAClaimAllocationState{},
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "pod1-uid"},
+				Status: v1.PodStatus{
+					NativeResourceClaimStatus: []v1.PodNativeResourceClaimStatus{
+						{ClaimInfo: v1.ObjectReference{UID: "claim1-uid"}},
+						{ClaimInfo: v1.ObjectReference{UID: "claim2-uid"}},
+					},
+				},
+			},
+			sign: 1,
+			expectedState: map[types.UID]*fwk.NativeDRAClaimAllocationState{
+				"claim1-uid": {ConsumerPods: sets.New[types.UID]("pod1-uid")},
+				"claim2-uid": {ConsumerPods: sets.New[types.UID]("pod1-uid")},
+			},
+		},
+		{
+			name: "Add multiple pods with the same claim",
+			initialState: map[types.UID]*fwk.NativeDRAClaimAllocationState{
+				"claim1-uid": {ConsumerPods: sets.New[types.UID]("pod1-uid")},
+			},
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "pod2-uid"},
+				Status: v1.PodStatus{
+					NativeResourceClaimStatus: []v1.PodNativeResourceClaimStatus{
+						{ClaimInfo: v1.ObjectReference{UID: "claim1-uid"}},
+					},
+				},
+			},
+			sign: 1,
+			expectedState: map[types.UID]*fwk.NativeDRAClaimAllocationState{
+				"claim1-uid": {ConsumerPods: sets.New[types.UID]("pod1-uid", "pod2-uid")},
+			},
+		},
+		{
+			name: "Add multiple pods with different claims",
+			initialState: map[types.UID]*fwk.NativeDRAClaimAllocationState{
+				"claim1-uid": {ConsumerPods: sets.New[types.UID]("pod1-uid")},
+			},
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "pod2-uid"},
+				Status: v1.PodStatus{
+					NativeResourceClaimStatus: []v1.PodNativeResourceClaimStatus{
+						{ClaimInfo: v1.ObjectReference{UID: "claim2-uid"}},
+					},
+				},
+			},
+			sign: 1,
+			expectedState: map[types.UID]*fwk.NativeDRAClaimAllocationState{
+				"claim1-uid": {ConsumerPods: sets.New[types.UID]("pod1-uid")},
+				"claim2-uid": {ConsumerPods: sets.New[types.UID]("pod2-uid")},
+			},
+		},
+		{
+			name: "Remove pod with single claim",
+			initialState: map[types.UID]*fwk.NativeDRAClaimAllocationState{
+				"claim1-uid": {ConsumerPods: sets.New[types.UID]("pod1-uid")},
+			},
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "pod1-uid"},
+				Status: v1.PodStatus{
+					NativeResourceClaimStatus: []v1.PodNativeResourceClaimStatus{
+						{ClaimInfo: v1.ObjectReference{UID: "claim1-uid"}},
+					},
+				},
+			},
+			sign:          -1,
+			expectedState: map[types.UID]*fwk.NativeDRAClaimAllocationState{},
+		},
+		{
+			name: "Remove pod with shared claim",
+			initialState: map[types.UID]*fwk.NativeDRAClaimAllocationState{
+				"claim1-uid": {ConsumerPods: sets.New[types.UID]("pod1-uid", "pod2-uid")},
+				"claim2-uid": {ConsumerPods: sets.New[types.UID]("pod2-uid")},
+			},
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "pod2-uid"},
+				Status: v1.PodStatus{
+					NativeResourceClaimStatus: []v1.PodNativeResourceClaimStatus{
+						{ClaimInfo: v1.ObjectReference{UID: "claim1-uid"}},
+						{ClaimInfo: v1.ObjectReference{UID: "claim2-uid"}},
+					},
+				},
+			},
+			sign: -1,
+			expectedState: map[types.UID]*fwk.NativeDRAClaimAllocationState{
+				"claim1-uid": {ConsumerPods: sets.New[types.UID]("pod1-uid")},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ni := &NodeInfo{
+				NativeDRAClaimStates: tt.initialState,
+			}
+			podInfo, _ := NewPodInfo(tt.pod)
+			ni.updateNativeDRAClaimState(podInfo, tt.sign)
+
+			if diff := cmp.Diff(tt.expectedState, ni.NativeDRAClaimStates, cmp.AllowUnexported(fwk.NativeDRAClaimAllocationState{})); diff != "" {
+				t.Errorf("updateNativeDRAClaimState() returned diff (-want +got):\\n%s", diff)
+			}
+		})
 	}
 }
