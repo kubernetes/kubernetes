@@ -75,7 +75,8 @@ type listMetadata struct {
 
 	// customUnique indicates that k8s:customUnique is set on this list.
 	// It disables generation of uniqueness validation for this list.
-	customUnique bool
+	customUnique   bool
+	stabilityLevel ValidationStabilityLevel
 }
 
 // makeListMapMatchFunc generates a function that compares two list-map
@@ -140,6 +141,7 @@ func (lttv listTypeTagValidator) GetValidations(context Context, tag codetags.Ta
 		lm = &listMetadata{}
 		lttv.byPath[context.Path.String()] = lm
 	}
+	lm.stabilityLevel = context.StabilityLevel
 	if lm.ownership != "" {
 		return Validations{}, fmt.Errorf("listType cannot be specified more than once")
 	}
@@ -289,6 +291,8 @@ func (utv uniqueTagValidator) GetValidations(context Context, tag codetags.Tag) 
 		lm = &listMetadata{}
 		utv.byPath[context.Path.String()] = lm
 	}
+
+	lm.stabilityLevel = context.StabilityLevel
 
 	// If listType has already run and set a non-atomic ownership, this is an error.
 	if lm.ownership != "" && lm.ownership != ownershipSingle {
@@ -453,6 +457,9 @@ func (lv listValidator) GetValidations(context Context) (Validations, error) {
 		comment := "lists with set semantics require unique values"
 		f := Function("listValidator", DefaultFlags, validateUnique, Identifier(matchArg)).
 			WithComment(comment)
+		if lm.stabilityLevel != "" {
+			f = f.WithStabilityLevel(lm.stabilityLevel)
+		}
 		result.AddFunction(f)
 	}
 	if lm.semantic == semanticMap {
@@ -464,7 +471,7 @@ func (lv listValidator) GetValidations(context Context) (Validations, error) {
 		comment := "lists with map semantics require unique keys"
 
 		f := Function("listValidator", DefaultFlags, validateUnique, matchArg).
-			WithComment(comment)
+			WithComment(comment).WithStabilityLevel(lm.stabilityLevel)
 		result.AddFunction(f)
 	}
 

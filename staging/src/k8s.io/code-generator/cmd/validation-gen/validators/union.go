@@ -223,6 +223,9 @@ type union struct {
 	itemMembers map[string][]ListSelectorTerm
 	// isDeclarative indicates that the union is declarative.
 	isDeclarative bool
+
+	// stabilityLevel denotes the stability level of the corresponding union validation.
+	stabilityLevel ValidationStabilityLevel
 }
 
 type unionMember struct {
@@ -326,17 +329,18 @@ func processUnionValidations(context Context, unions unions, varPrefix string,
 				}
 
 				extraArgs := append([]any{supportVarName, discriminatorExtractor}, extractorArgs...)
-				fn := Function(tagName, DefaultFlags, discriminatedValidator, extraArgs...)
+				fn := Function(tagName, DefaultFlags, discriminatedValidator, extraArgs...).WithStabilityLevel(u.stabilityLevel)
 				if u.isDeclarative {
 					fn.Flags |= DeclarativeNative
 				}
+
 				result.Functions = append(result.Functions, fn)
 			} else {
 				supportVar := Variable(supportVarName, Function(tagName, DefaultFlags, newUnionMembership, getMemberArgs(u, context, false)...))
 				result.Variables = append(result.Variables, supportVar)
 
 				extraArgs := append([]any{supportVarName}, extractorArgs...)
-				fn := Function(tagName, DefaultFlags, undiscriminatedValidator, extraArgs...)
+				fn := Function(tagName, DefaultFlags, undiscriminatedValidator, extraArgs...).WithStabilityLevel(u.stabilityLevel)
 				if u.isDeclarative {
 					fn.Flags |= DeclarativeNative
 				}
@@ -418,6 +422,10 @@ func processDiscriminatorValidations(shared map[string]unions, context Context, 
 	unionArg, _ := tag.NamedArg("union") // optional
 	u := shared[context.ParentPath.String()].getOrCreate(unionArg.Value)
 
+	if context.StabilityLevel != "" {
+		u.stabilityLevel = context.StabilityLevel
+	}
+
 	var discriminatorFieldName string
 	if jsonAnnotation, ok := tags.LookupJSON(*context.Member); ok {
 		discriminatorFieldName = jsonAnnotation.Name
@@ -480,6 +488,9 @@ func processFieldMemberValidations(shared map[string]unions, context Context, ta
 	u := shared[context.ParentPath.String()].getOrCreate(unionArg.Value)
 	u.members = append(u.members, unionMember{fieldName, memberName})
 
+	if context.StabilityLevel != "" {
+		u.stabilityLevel = context.StabilityLevel
+	}
 	u.fieldMembers = append(u.fieldMembers, context.Member)
 
 	return nil
@@ -511,6 +522,10 @@ func processListMemberValidations(shared map[string]unions, context Context, tag
 	unionArg, _ := tag.NamedArg("union") // optional
 	u := shared[context.ParentPath.String()].getOrCreate(unionArg.Value)
 	u.members = append(u.members, unionMember{fieldName, memberName})
+
+	if context.StabilityLevel != "" {
+		u.stabilityLevel = context.StabilityLevel
+	}
 
 	if _, found := u.itemMembers[fieldName]; found {
 		return fmt.Errorf("list-item union member %q already exists", fieldName)

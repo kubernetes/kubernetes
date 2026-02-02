@@ -32,14 +32,20 @@ const (
 )
 
 func init() {
-	shared := map[string]sets.Set[validate.UpdateConstraint]{}
+	shared := map[string]*updateMetadata{}
 	RegisterFieldValidator(updateFieldValidator{byFieldPath: shared})
 	RegisterTagValidator(updateTagCollector{byFieldPath: shared})
 }
 
+// updateMetadata collects constraints for a field, supporting both normal and shadow validation.
+type updateMetadata struct {
+	constraints    sets.Set[validate.UpdateConstraint]
+	stabilityLevel ValidationStabilityLevel
+}
+
 // updateTagCollector collects +k8s:update tags
 type updateTagCollector struct {
-	byFieldPath map[string]sets.Set[validate.UpdateConstraint]
+	byFieldPath map[string]*updateMetadata
 }
 
 func (updateTagCollector) Init(_ Config) {}
@@ -68,16 +74,19 @@ func (utc updateTagCollector) GetValidations(context Context, tag codetags.Tag) 
 		return Validations{}, fmt.Errorf("unknown +k8s:update constraint: %s", tag.Value)
 	}
 
-	// Initialize set if doesn't exist
+	// Initialize metadata if doesn't exist
 	fieldPath := context.Path.String()
 	if utc.byFieldPath[fieldPath] == nil {
-		utc.byFieldPath[fieldPath] = sets.New[validate.UpdateConstraint]()
+		utc.byFieldPath[fieldPath] = &updateMetadata{constraints: sets.New[validate.UpdateConstraint]()}
 	}
+	um := utc.byFieldPath[fieldPath]
+
+	um.stabilityLevel = context.StabilityLevel
 
 	// Add this constraint to the set for this field
-	utc.byFieldPath[fieldPath].Insert(constraint)
+	um.constraints.Insert(constraint)
 
-	if err := utc.validateConstraintsForType(context, utc.byFieldPath[fieldPath].UnsortedList()); err != nil {
+	if err := utc.validateConstraintsForType(context, um.constraints.UnsortedList()); err != nil {
 		return Validations{}, err
 	}
 
@@ -142,7 +151,7 @@ func (utc updateTagCollector) Docs() TagDoc {
 
 // updateFieldValidator processes all collected update tags and generates validations
 type updateFieldValidator struct {
-	byFieldPath map[string]sets.Set[validate.UpdateConstraint]
+	byFieldPath map[string]*updateMetadata
 }
 
 func (updateFieldValidator) Init(_ Config) {}
@@ -164,12 +173,13 @@ var (
 )
 
 func (ufv updateFieldValidator) GetValidations(context Context) (Validations, error) {
-	constraintSet, ok := ufv.byFieldPath[context.Path.String()]
-	if !ok || constraintSet.Len() == 0 {
+	um := ufv.byFieldPath[context.Path.String()]
+
+	if um == nil || um.constraints.Len() == 0 {
 		return Validations{}, nil
 	}
 
-	constraints := constraintSet.UnsortedList()
+	constraints := um.constraints.UnsortedList()
 
 	t := util.NonPointer(util.NativeType(context.Type))
 	if t.Kind == types.Slice || t.Kind == types.Map {
@@ -177,7 +187,22 @@ func (ufv updateFieldValidator) GetValidations(context Context) (Validations, er
 		return Validations{}, fmt.Errorf("update constraints are currently not supported on list or map fields")
 	}
 
-	return ufv.generateValidation(context, constraints)
+	v, err := ufv.generateValidation(context, constraints)
+	if err != nil {
+		return Validations{}, err
+	}
+
+	level := um.stabilityLevel
+	if context.StabilityLevel != "" {
+		level = context.StabilityLevel
+	}
+
+	if level != "" {
+		for i := range v.Functions {
+			v.Functions[i] = v.Functions[i].WithStabilityLevel(level)
+		}
+	}
+	return v, nil
 }
 
 func (ufv updateFieldValidator) generateValidation(context Context, constraints []validate.UpdateConstraint) (Validations, error) {
