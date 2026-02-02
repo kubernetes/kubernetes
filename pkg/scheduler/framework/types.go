@@ -738,11 +738,14 @@ func (pi *PodInfo) CalculateResource() fwk.PodResource {
 	inPlacePodVerticalScalingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling)
 	podLevelResourcesEnabled := utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources)
 	inPlacePodLevelResourcesVerticalScalingEnabled := utilfeature.DefaultMutableFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling)
+	nativeResourceDRAEnabled := utilfeature.DefaultFeatureGate.Enabled(features.DRANativeResources)
+
 	requests := resourcehelper.PodRequests(pi.Pod, resourcehelper.PodResourcesOptions{
 		UseStatusResources: inPlacePodVerticalScalingEnabled,
 		InPlacePodLevelResourcesVerticalScalingEnabled: inPlacePodLevelResourcesVerticalScalingEnabled,
 		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-		SkipPodLevelResources: !podLevelResourcesEnabled,
+		SkipPodLevelResources:           !podLevelResourcesEnabled,
+		UseDRANativeResourceClaimStatus: nativeResourceDRAEnabled,
 	})
 	isPodLevelResourcesSet := podLevelResourcesEnabled && resourcehelper.IsPodLevelRequestsSet(pi.Pod)
 	nonMissingContainerRequests := getNonMissingContainerRequests(requests, isPodLevelResourcesSet)
@@ -752,8 +755,9 @@ func (pi *PodInfo) CalculateResource() fwk.PodResource {
 			UseStatusResources: inPlacePodVerticalScalingEnabled,
 			InPlacePodLevelResourcesVerticalScalingEnabled: inPlacePodLevelResourcesVerticalScalingEnabled,
 			// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-			SkipPodLevelResources:       !podLevelResourcesEnabled,
-			NonMissingContainerRequests: nonMissingContainerRequests,
+			SkipPodLevelResources:           !podLevelResourcesEnabled,
+			NonMissingContainerRequests:     nonMissingContainerRequests,
+			UseDRANativeResourceClaimStatus: nativeResourceDRAEnabled,
 		})
 	}
 	non0CPU := non0Requests[v1.ResourceCPU]
