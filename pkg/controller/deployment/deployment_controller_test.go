@@ -377,75 +377,61 @@ func TestReentrantRollback(t *testing.T) {
 }
 
 // TestPodDeletionEnqueuesRecreateDeployment ensures that the deletion of a pod
-// will requeue a Recreate deployment iff there is no other pod returned from the
-// client.
+// will requeue a Recreate deployment regardless of whether other pods exist.
 func TestPodDeletionEnqueuesRecreateDeployment(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
-
-	f := newFixture(t)
-
-	foo := newDeployment("foo", 1, nil, nil, nil, map[string]string{"foo": "bar"})
-	foo.Spec.Strategy.Type = apps.RecreateDeploymentStrategyType
-	rs := newReplicaSet(foo, "foo-1", 1)
-	pod := generatePodFromRS(rs)
-
-	f.dLister = append(f.dLister, foo)
-	f.rsLister = append(f.rsLister, rs)
-	f.objects = append(f.objects, foo, rs)
-
-	c, _, err := f.newController(ctx)
-	if err != nil {
-		t.Fatalf("error creating Deployment controller: %v", err)
-	}
-	enqueued := false
-	c.enqueueDeployment = func(d *apps.Deployment) {
-		if d.Name == "foo" {
-			enqueued = true
-		}
+	tests := []struct {
+		name      string
+		otherPods bool
+	}{
+		{
+			name:      "last pod deleted",
+			otherPods: false,
+		},
+		{
+			name:      "pod with siblings deleted",
+			otherPods: true,
+		},
 	}
 
-	c.deletePod(logger, pod)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			f := newFixture(t)
 
-	if !enqueued {
-		t.Errorf("expected deployment %q to be queued after pod deletion", foo.Name)
-	}
-}
+			foo := newDeployment("foo", 1, nil, nil, nil, map[string]string{"foo": "bar"})
+			foo.Spec.Strategy.Type = apps.RecreateDeploymentStrategyType
+			rs := newReplicaSet(foo, "foo-1", 1)
+			pod := generatePodFromRS(rs)
 
-// TestPodDeletionDoesntEnqueueRecreateDeployment ensures that the deletion of a pod
-// will not requeue a Recreate deployment iff there are other pods returned from the
-// client.
-func TestPodDeletionDoesntEnqueueRecreateDeployment(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
+			f.dLister = append(f.dLister, foo)
+			f.rsLister = append(f.rsLister, rs)
+			f.objects = append(f.objects, foo, rs)
+			f.podLister = append(f.podLister, pod)
 
-	f := newFixture(t)
+			if tc.otherPods {
+				// Add a sibling pod
+				pod2 := generatePodFromRS(rs)
+				pod2.Name = "foo-2"
+				f.podLister = append(f.podLister, pod2)
+			}
 
-	foo := newDeployment("foo", 1, nil, nil, nil, map[string]string{"foo": "bar"})
-	foo.Spec.Strategy.Type = apps.RecreateDeploymentStrategyType
-	rs1 := newReplicaSet(foo, "foo-1", 1)
-	rs2 := newReplicaSet(foo, "foo-1", 1)
-	pod1 := generatePodFromRS(rs1)
-	pod2 := generatePodFromRS(rs2)
+			c, _, err := f.newController(ctx)
+			if err != nil {
+				t.Fatalf("error creating Deployment controller: %v", err)
+			}
+			enqueued := false
+			c.enqueueDeployment = func(d *apps.Deployment) {
+				if d.Name == "foo" {
+					enqueued = true
+				}
+			}
 
-	f.dLister = append(f.dLister, foo)
-	// Let's pretend this is a different pod. The gist is that the pod lister needs to
-	// return a non-empty list.
-	f.podLister = append(f.podLister, pod1, pod2)
+			c.deletePod(logger, pod)
 
-	c, _, err := f.newController(ctx)
-	if err != nil {
-		t.Fatalf("error creating Deployment controller: %v", err)
-	}
-	enqueued := false
-	c.enqueueDeployment = func(d *apps.Deployment) {
-		if d.Name == "foo" {
-			enqueued = true
-		}
-	}
-
-	c.deletePod(logger, pod1)
-
-	if enqueued {
-		t.Errorf("expected deployment %q not to be queued after pod deletion", foo.Name)
+			if !enqueued {
+				t.Errorf("expected deployment %q to be queued after pod deletion", foo.Name)
+			}
+		})
 	}
 }
 
@@ -484,47 +470,6 @@ func TestPodDeletionPartialReplicaSetOwnershipEnqueueRecreateDeployment(t *testi
 
 	if !enqueued {
 		t.Errorf("expected deployment %q to be queued after pod deletion", foo.Name)
-	}
-}
-
-// TestPodDeletionPartialReplicaSetOwnershipDoesntEnqueueRecreateDeployment that the
-// deletion of a pod will not requeue a Recreate deployment iff there are other pods
-// returned from the client in the case where a deployment has multiple replica sets,
-// some of which have empty owner references.
-func TestPodDeletionPartialReplicaSetOwnershipDoesntEnqueueRecreateDeployment(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
-
-	f := newFixture(t)
-
-	foo := newDeployment("foo", 1, nil, nil, nil, map[string]string{"foo": "bar"})
-	foo.Spec.Strategy.Type = apps.RecreateDeploymentStrategyType
-	rs1 := newReplicaSet(foo, "foo-1", 1)
-	rs2 := newReplicaSet(foo, "foo-2", 2)
-	rs2.OwnerReferences = nil
-	pod := generatePodFromRS(rs1)
-
-	f.dLister = append(f.dLister, foo)
-	f.rsLister = append(f.rsLister, rs1, rs2)
-	f.objects = append(f.objects, foo, rs1, rs2)
-	// Let's pretend this is a different pod. The gist is that the pod lister needs to
-	// return a non-empty list.
-	f.podLister = append(f.podLister, pod)
-
-	c, _, err := f.newController(ctx)
-	if err != nil {
-		t.Fatalf("error creating Deployment controller: %v", err)
-	}
-	enqueued := false
-	c.enqueueDeployment = func(d *apps.Deployment) {
-		if d.Name == "foo" {
-			enqueued = true
-		}
-	}
-
-	c.deletePod(logger, pod)
-
-	if enqueued {
-		t.Errorf("expected deployment %q not to be queued after pod deletion", foo.Name)
 	}
 }
 
