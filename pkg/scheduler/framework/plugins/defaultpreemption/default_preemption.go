@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"math/rand"
 	"sort"
+	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
@@ -347,7 +348,12 @@ func (pl *DefaultPreemption) SelectVictimsOnDomain(
 			if err := removePods(v); err != nil {
 				return false, err
 			}
-			// logger.V(5).Info("Pod is a potential preemption victim on node", "pod", klog.KObj(pi.GetPod()), "node", klog.KObj(nodeInfo.Node()))
+			var names []string
+			for _, p := range v.Pods() {
+				names = append(names, p.GetPod().Name)
+			}
+			pods := strings.Join(names, ",")
+			logger.V(5).Info("Pods are potential preemption victims on domain", "Pods", pods, "domain", domain.GetName())
 		}
 
 		return fits.IsSuccess(), nil
@@ -364,9 +370,6 @@ func (pl *DefaultPreemption) SelectVictimsOnDomain(
 	if len(nonViolatingVictims) > 0 {
 		currentReprievedCount := 0
 
-		// Search range is [0, N+1]. We are searching for the "Breaking Point".
-		// sort.Search finds the smallest index 'i' where the function returns true.
-		// We define true as "It does NOT fit".
 		cutoff := sort.Search(len(nonViolatingVictims)+1, func(targetCount int) bool {
 
 			// Move Right: We need to reprieve MORE victims (Add them back to snapshot)
@@ -393,8 +396,8 @@ func (pl *DefaultPreemption) SelectVictimsOnDomain(
 			return !fits.IsSuccess()
 		})
 
-		// 'breakingPoint' is the first count that caused a failure.
-		// Therefore, the maximum safe count is 'breakingPoint - 1'.
+		// 'cutoff' is the first count that caused a failure.
+		// Therefore, the maximum safe count is 'cutoff - 1'.
 		maxSafeReprieveCount := cutoff - 1
 		if maxSafeReprieveCount < 0 {
 			maxSafeReprieveCount = 0
