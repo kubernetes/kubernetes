@@ -184,6 +184,12 @@ func (sched *Scheduler) schedulingCycle(
 			logger.V(5).Info("Status after running PostFilter plugins for pod", "pod", klog.KObj(pod), "status", msg)
 		}
 
+		// Run PostFilterReview plugins to observe the PostFilter result.
+		// These plugins always run regardless of PostFilter outcome.
+		if schedFramework.HasPostFilterReviewPlugins() {
+			schedFramework.RunPostFilterReviewPlugins(ctx, state, pod, result, status)
+		}
+
 		var nominatingInfo *fwk.NominatingInfo
 		if result != nil {
 			nominatingInfo = result.NominatingInfo

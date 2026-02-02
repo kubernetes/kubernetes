@@ -197,6 +197,12 @@ type Framework interface {
 	// cluster state to make the pod potentially schedulable in a future scheduling cycle.
 	RunPostFilterPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, filteredNodeStatusMap fwk.NodeToStatusReader) (*fwk.PostFilterResult, *fwk.Status)
 
+	// RunPostFilterReviewPlugins runs the set of configured PostFilterReview plugins.
+	// PostFilterReview plugins are informational and always execute after PostFilter completes,
+	// regardless of the PostFilter result. They receive the final PostFilterResult and Status
+	// for observation purposes but cannot affect the scheduling decision.
+	RunPostFilterReviewPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, result *fwk.PostFilterResult, status *fwk.Status)
+
 	// Get a "node hint" for a given pod. A node hint is the name of a node provided by the batching code when information
 	// from the previous scheduling cycle can be reused for this cycle.
 	// If the batching code cannot provide a hint, the function returns "".
@@ -256,6 +262,9 @@ type Framework interface {
 
 	// HasPostFilterPlugins returns true if at least one PostFilter plugin is defined.
 	HasPostFilterPlugins() bool
+
+	// HasPostFilterReviewPlugins returns true if at least one PostFilterReview plugin is registered.
+	HasPostFilterReviewPlugins() bool
 
 	// HasScorePlugins returns true if at least one Score plugin is defined.
 	HasScorePlugins() bool

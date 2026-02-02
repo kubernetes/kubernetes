@@ -62,10 +62,11 @@ type frameworkImpl struct {
 	preEnqueuePlugins    []fwk.PreEnqueuePlugin
 	enqueueExtensions    []fwk.EnqueueExtensions
 	queueSortPlugins     []fwk.QueueSortPlugin
-	preFilterPlugins     []fwk.PreFilterPlugin
-	filterPlugins        []fwk.FilterPlugin
-	postFilterPlugins    []fwk.PostFilterPlugin
-	preScorePlugins      []fwk.PreScorePlugin
+	preFilterPlugins        []fwk.PreFilterPlugin
+	filterPlugins           []fwk.FilterPlugin
+	postFilterPlugins       []fwk.PostFilterPlugin
+	postFilterReviewPlugins []fwk.PostFilterReviewPlugin
+	preScorePlugins         []fwk.PreScorePlugin
 	scorePlugins         []fwk.ScorePlugin
 	reservePlugins       []fwk.ReservePlugin
 	preBindPlugins       []fwk.PreBindPlugin
@@ -399,6 +400,11 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 		f.pluginsMap[name] = p
 
 		f.fillEnqueueExtensions(p)
+
+		// Register PostFilterReview plugins automatically
+		if reviewPlugin, ok := p.(fwk.PostFilterReviewPlugin); ok {
+			f.postFilterReviewPlugins = append(f.postFilterReviewPlugins, reviewPlugin)
+		}
 	}
 
 	// initialize plugins per individual extension points
@@ -1145,6 +1151,111 @@ func (f *frameworkImpl) runPostFilterPlugin(ctx context.Context, pl fwk.PostFilt
 	return r, s
 }
 
+// RunPostFilterReviewPlugins runs the set of configured PostFilterReview plugins.
+// PostFilterReview plugins are informational and always execute after PostFilter.
+// Errors and return values are logged but do not affect the scheduling decision.
+func (f *frameworkImpl) RunPostFilterReviewPlugins(
+	ctx context.Context,
+	state fwk.CycleState,
+	pod *v1.Pod,
+	result *fwk.PostFilterResult,
+	status *fwk.Status,
+) {
+	// Check if the feature gate is enabled
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PostFilterReview) {
+		return
+	}
+
+	startTime := time.Now()
+	defer func() {
+		metrics.FrameworkExtensionPointDuration.WithLabelValues(
+			metrics.PostFilterReview,
+			status.Code().String(),
+			f.profileName,
+		).Observe(metrics.SinceInSeconds(startTime))
+	}()
+
+	logger := klog.FromContext(ctx)
+	verboseLogs := logger.V(4).Enabled()
+	if verboseLogs {
+		logger = klog.LoggerWithName(logger, "PostFilterReview")
+	}
+
+	for _, pl := range f.postFilterReviewPlugins {
+		pluginCtx := ctx
+		if verboseLogs {
+			logger := klog.LoggerWithName(logger, pl.Name())
+			pluginCtx = klog.NewContext(pluginCtx, logger)
+		}
+
+		// Create timeout context for this plugin
+		pluginCtx, cancel := context.WithTimeout(pluginCtx, f.pluginTimeout)
+
+		func() {
+			defer cancel()
+			defer func() {
+				if r := recover(); r != nil {
+					// Log panic but don't crash scheduler
+					logger.Error(nil, "PostFilterReview plugin panicked",
+						"plugin", pl.Name(),
+						"pod", klog.KObj(pod),
+						"panic", r,
+					)
+					if state.ShouldRecordPluginMetrics() {
+						f.metricsRecorder.ObservePluginDurationAsync(
+							metrics.PostFilterReview,
+							pl.Name(),
+							"panic",
+							metrics.SinceInSeconds(startTime),
+						)
+					}
+				}
+			}()
+
+			pluginStartTime := time.Now()
+			pluginStatus := pl.PostFilterReview(pluginCtx, state, pod, result, status)
+
+			// Log and record metrics
+			if pluginStatus != nil && !pluginStatus.IsSuccess() {
+				if verboseLogs {
+					logger.Info("PostFilterReview plugin returned status",
+						"plugin", pl.Name(),
+						"pod", klog.KObj(pod),
+						"status", pluginStatus,
+					)
+				}
+			}
+
+			if pluginCtx.Err() == context.DeadlineExceeded {
+				logger.Error(nil, "PostFilterReview plugin timed out",
+					"plugin", pl.Name(),
+					"pod", klog.KObj(pod),
+					"timeout", f.pluginTimeout,
+				)
+				if state.ShouldRecordPluginMetrics() {
+					f.metricsRecorder.ObservePluginDurationAsync(
+						metrics.PostFilterReview,
+						pl.Name(),
+						"timeout",
+						metrics.SinceInSeconds(pluginStartTime),
+					)
+				}
+			} else if state.ShouldRecordPluginMetrics() {
+				code := "success"
+				if pluginStatus != nil {
+					code = pluginStatus.Code().String()
+				}
+				f.metricsRecorder.ObservePluginDurationAsync(
+					metrics.PostFilterReview,
+					pl.Name(),
+					code,
+					metrics.SinceInSeconds(pluginStartTime),
+				)
+			}
+		}()
+	}
+}
+
 // RunFilterPluginsWithNominatedPods runs the set of configured filter plugins
 // for nominated pod on the given node.
 // This function is called from two different places: Schedule and Preempt.
@@ -1879,6 +1990,11 @@ func (f *frameworkImpl) HasFilterPlugins() bool {
 // HasPostFilterPlugins returns true if at least one postFilter plugin is defined.
 func (f *frameworkImpl) HasPostFilterPlugins() bool {
 	return len(f.postFilterPlugins) > 0
+}
+
+// HasPostFilterReviewPlugins returns true if at least one PostFilterReview plugin is registered.
+func (f *frameworkImpl) HasPostFilterReviewPlugins() bool {
+	return len(f.postFilterReviewPlugins) > 0
 }
 
 // HasScorePlugins returns true if at least one score plugin is defined.

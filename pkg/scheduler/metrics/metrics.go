@@ -71,6 +71,7 @@ const (
 	PreFilterExtensionAddPod    = "PreFilterExtensionAddPod"
 	PreFilterExtensionRemovePod = "PreFilterExtensionRemovePod"
 	PostFilter                  = "PostFilter"
+	PostFilterReview            = "PostFilterReview"
 	PreScore                    = "PreScore"
 	Score                       = "Score"
 	ScoreExtensionNormalize     = "ScoreExtensionNormalize"

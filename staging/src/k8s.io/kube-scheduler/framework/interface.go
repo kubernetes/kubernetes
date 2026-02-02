@@ -536,6 +536,38 @@ type PostFilterPlugin interface {
 	PostFilter(ctx context.Context, state CycleState, pod *v1.Pod, filteredNodeStatusMap NodeToStatusReader) (*PostFilterResult, *Status)
 }
 
+// PostFilterReviewPlugin is an informational extension point for plugins that need
+// to observe the final result of PostFilter execution.
+//
+// PostFilterReview is called after all PostFilter plugins complete, regardless of
+// the outcome. This extension point:
+// - ALWAYS executes (cannot be skipped based on PostFilter results)
+// - Receives the final PostFilterResult and Status
+// - Should NOT modify cluster state synchronously (use async operations)
+// - Return values are ignored by the framework
+//
+// Common use cases:
+// - Observing preemption outcomes for co-scheduling
+// - Updating external state based on scheduling results
+// - Collecting metrics about PostFilter behavior
+// - Implementing retry policies for pod groups
+type PostFilterReviewPlugin interface {
+	Plugin
+
+	// PostFilterReview is called after PostFilter plugins complete.
+	//
+	// Parameters:
+	// - ctx: context for the scheduling cycle
+	// - state: scheduling cycle state
+	// - pod: the pod being scheduled
+	// - result: the final PostFilterResult (may be nil)
+	// - status: the final Status from RunPostFilterPlugins
+	//
+	// Return value is currently unused but reserved for future extensions.
+	PostFilterReview(ctx context.Context, state CycleState, pod *v1.Pod,
+		result *PostFilterResult, status *Status) *Status
+}
+
 // PreScorePlugin is an interface for "PreScore" plugin. PreScore is an
 // informational extension point. Plugins will be called with a list of nodes
 // that passed the filtering phase. A plugin may use this data to update internal

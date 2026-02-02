@@ -224,6 +224,13 @@ func (pl *TestPlugin) PostFilter(_ context.Context, _ fwk.CycleState, _ *v1.Pod,
 	return nil, fwk.NewStatus(fwk.Code(pl.inj.PostFilterStatus), injectReason)
 }
 
+func (pl *TestPlugin) PostFilterReview(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ *fwk.PostFilterResult, _ *fwk.Status) *fwk.Status {
+	if pl.inj.PostFilterReviewCalled != nil {
+		*pl.inj.PostFilterReviewCalled = true
+	}
+	return fwk.NewStatus(fwk.Code(pl.inj.PostFilterReviewStatus), injectReason)
+}
+
 func (pl *TestPlugin) PreScore(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) *fwk.Status {
 	return fwk.NewStatus(fwk.Code(pl.inj.PreScoreStatus), injectReason)
 }
@@ -3743,6 +3750,8 @@ type injectedResult struct {
 	PreFilterRemovePodStatus int                  `json:"preFilterRemovePodStatus,omitempty"`
 	FilterStatus             int                  `json:"filterStatus,omitempty"`
 	PostFilterStatus         int                  `json:"postFilterStatus,omitempty"`
+	PostFilterReviewStatus   int                  `json:"postFilterReviewStatus,omitempty"`
+	PostFilterReviewCalled   *bool                `json:"postFilterReviewCalled,omitempty"`
 	PreScoreStatus           int                  `json:"preScoreStatus,omitempty"`
 	ReserveStatus            int                  `json:"reserveStatus,omitempty"`
 	PreBindPreFlightStatus   int                  `json:"preBindPreFlightStatus,omitempty"`
@@ -3842,4 +3851,81 @@ func BuildNodeInfos(nodes []*v1.Node) []fwk.NodeInfo {
 		res[i].SetNode(nodes[i])
 	}
 	return res
+}
+
+// TestPostFilterReviewPlugins verifies that PostFilterReview plugins always execute
+// after PostFilter, regardless of the PostFilter result.
+func TestPostFilterReviewPlugins(t *testing.T) {
+	tests := []struct {
+		name               string
+		postFilterStatus   fwk.Code
+		wantReviewCalled   bool
+	}{
+		{
+			name:             "PostFilter Success - Review still runs",
+			postFilterStatus: fwk.Success,
+			wantReviewCalled: true,
+		},
+		{
+			name:             "PostFilter Unschedulable - Review runs",
+			postFilterStatus: fwk.Unschedulable,
+			wantReviewCalled: true,
+		},
+		{
+			name:             "PostFilter Error - Review runs",
+			postFilterStatus: fwk.Error,
+			wantReviewCalled: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			
+			reviewCalled := false
+			testPlugin := &TestPlugin{
+				name: "TestPlugin",
+				inj: injectedResult{
+					PostFilterStatus:       int(tt.postFilterStatus),
+					PostFilterReviewCalled: &reviewCalled,
+				},
+			}
+
+			registry := Registry{}
+			if err := registry.Register("TestPlugin",
+				func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+					return testPlugin, nil
+				}); err != nil {
+				t.Fatalf("Failed to register plugin: %v", err)
+			}
+
+			cfgPls := &config.Plugins{
+				PostFilter: config.PluginSet{
+					Enabled: []config.Plugin{{Name: "TestPlugin"}},
+				},
+			}
+
+			profile := &config.KubeSchedulerProfile{
+				SchedulerName: "test-scheduler",
+				Plugins:       cfgPls,
+			}
+
+			fw, err := NewFramework(ctx, registry, profile)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// Run PostFilter
+			state := fwk.NewCycleState()
+			pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-pod", UID: types.UID("test-pod-uid")}}
+			result, status := fw.RunPostFilterPlugins(ctx, state, pod, nil)
+
+			// Run PostFilterReview
+			fw.RunPostFilterReviewPlugins(ctx, state, pod, result, status)
+
+			if reviewCalled != tt.wantReviewCalled {
+				t.Errorf("PostFilterReview called = %v, want %v", reviewCalled, tt.wantReviewCalled)
+			}
+		})
+	}
 }

@@ -750,6 +750,13 @@ const (
 	// similar to how `metadata.annotations` behaves.
 	PodTopologyLabelsAdmission featuregate.Feature = "PodTopologyLabelsAdmission"
 
+	// owner: @romanbaron
+	// kep: https://github.com/omer-dayan/enhancements/pull/1
+	//
+	// Enables the PostFilterReview extension point in the scheduler framework,
+	// allowing plugins to observe PostFilter results unconditionally.
+	PostFilterReview featuregate.Feature = "PostFilterReview"
+
 	// owner: @seans3
 	// kep: http://kep.k8s.io/4006
 	//
@@ -1619,6 +1626,12 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	PostFilterReview: {
+		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	},
+
 	PortForwardWebsockets: {
 		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
@@ -2320,6 +2333,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	PodSchedulingReadiness: {},
 
 	PodTopologyLabelsAdmission: {},
+
+	PostFilterReview: {},
 
 	PortForwardWebsockets: {},
 
