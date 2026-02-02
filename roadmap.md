@@ -1,103 +1,105 @@
 # Project Roadmap
 
-**Generated:** 2026-02-02 14:47:00
+**Generated:** 2026-02-02 14:52:13
 **Repository:** omer-dayan/kubernetes
 **Open Issues:** 2
 
-## Overview
+## Executive Summary
 
-This roadmap outlines the planned work based on current open issues. Issues are analyzed for dependencies and prioritized accordingly.
+This roadmap provides a prioritized view of all open issues. Issues are automatically analyzed and categorized to help the team focus on the most critical work first.
+
+**Priority Breakdown:**
+- 🔴 **Critical:** 0
+0 issue(s) - Immediate attention required
+- 🟠 **High:** 2 issue(s) - Important bugs and issues
+- 🟡 **Medium:** 0
+0 issue(s) - Enhancements and improvements
+- 🟢 **Low:** 0
+0 issue(s) - Nice-to-have improvements
 
 ---
 
-## Priority Analysis
+## Prioritized Issues
 
-### High Priority Issues
+### 🟠 High Priority
+
+Important issues that should be addressed soon to maintain quality and user experience.
 
 
 #### Issue #2: [Scheduler] Add an extension after PostFilter that will always execute
 
+**Priority:** HIGH
 **Status:** OPEN
 **Author:** romanbaron
 **Created:** 2026-02-02T12:46:59Z
 **URL:** https://github.com/omer-dayan/kubernetes/issues/2
 
-**Description:**
-```
-### What would you like to be added?
-
-I am a plugin developer, the plugin will have different actions according to the preemption result. For example, mark the podGorup (API in schedule-plugins) as failed and reject all the pods when failed to preempt, or I will mark the pods as schedulable (I will limit the number of times to schedule any pods in PodGroup for the performance).
-But when any of the plugin return code other than fwk.Unschedulable, scheduler will skip all plugins after that. This makes difficult to implement the PostFilter:
-
-If we run coscheduling before preemption, we can not know the preempt result.
-If we run coscheduling after preemption and preempt return error (for example the pod is deleted when in schedulingCycle), we are not able to reject the podGroup because the scheduling stop the iteration for the PostFilter.
-
-
-### Why is this needed?
-```
+**Summary:**
+I am a plugin developer, the plugin will have different actions according to the preemption result. For example, mark the podGorup (API in schedule-plugins) as failed and reject all the pods when failed to preempt, or I will mark the pods as schedulable (I will limit the number of times to schedule any pods in PodGroup for the performance). But when any of the plugin return code other than fwk.Unschedulable, scheduler will skip all plugins after that. This makes difficult to implement the PostFilter: If we run coscheduling before preemption, we can not know the preempt result. 
 
 **Action Items:**
-- [ ] Review issue details
-- [ ] Investigate root cause
-- [ ] Implement fix
-- [ ] Test solution
-- [ ] Close issue
+- [ ] Detailed investigation of root cause
+- [ ] Reproduce issue in test environment
+- [ ] Develop and test fix
+- [ ] Code review and merge
+- [ ] Verify fix and close issue
 
 ---
 
-
 #### Issue #1: Pod Controller does not working
 
+**Priority:** HIGH
 **Status:** OPEN
 **Author:** omer-dayan
 **Created:** 2026-02-02T12:24:55Z
 **URL:** https://github.com/omer-dayan/kubernetes/issues/1
 
-**Description:**
-```
-### What happened?
-
-It does not work
-
-### What did you expect to happen?
-
-It does not work
-
-### How can we reproduce it (as minimally and precisely as possible)?
-```
+**Summary:**
+It does not work It does not work It does not work 
 
 **Action Items:**
-- [ ] Review issue details
-- [ ] Investigate root cause
-- [ ] Implement fix
-- [ ] Test solution
-- [ ] Close issue
+- [ ] Detailed investigation of root cause
+- [ ] Reproduce issue in test environment
+- [ ] Develop and test fix
+- [ ] Code review and merge
+- [ ] Verify fix and close issue
 
 ---
 
+## Dependencies & Blockers
 
-## Dependencies
-
-*Dependencies will be analyzed during detailed issue review. Check for:*
-- Dependencies between issues
+*To be identified during issue review:*
+- Cross-issue dependencies
 - External library or infrastructure dependencies
-- Prerequisite tasks or configurations
+- Required prerequisite work
 
-## Timeline
+## Development Timeline
 
-- **Immediate:** Address high-priority issues
-- **Short-term:** Review and triage new issues
-- **Medium-term:** Implement fixes and improvements
-- **Long-term:** Maintain stability and performance
+### Immediate (This Week)
+- Address all critical priority issues
+- Begin work on high priority bugs
 
-## Next Steps
+### Short-term (1-2 Weeks)
+- Complete high priority issues
+- Start medium priority enhancements
 
-1. Review all open issues
-2. Assign priorities and owners
-3. Identify dependencies and blockers
-4. Create implementation plan
-5. Begin development work
+### Medium-term (1 Month)
+- Address remaining medium priority items
+- Plan for low priority improvements
+
+### Long-term (Ongoing)
+- Maintain stability and performance
+- Continue monitoring for new issues
+- Regular maintenance and updates
+
+## Recommended Next Steps
+
+1. **Triage Meeting:** Review all critical and high priority issues with the team
+2. **Assignment:** Assign owners to top priority issues
+3. **Investigation:** Gather more details on issues lacking information
+4. **Planning:** Create detailed implementation plans for complex issues
+5. **Development:** Begin implementation work on prioritized items
 
 ---
 
-*This roadmap is automatically generated by the issue monitoring system and updates when issues change.*
+*This roadmap is automatically generated by the issue monitoring system. Priorities are assigned based on issue content analysis and are updated whenever issues change.*
