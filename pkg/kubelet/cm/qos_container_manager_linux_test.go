@@ -138,96 +138,88 @@ func createTestQOSContainerManager(logger klog.Logger) (*qosContainerManagerImpl
 }
 
 func TestQoSContainerCgroup(t *testing.T) {
-	// Test 1: setMemoryQoS functionality
-	t.Run("setMemoryQoS", func(t *testing.T) {
-		logger, _ := ktesting.NewTestContext(t)
-		m, err := createTestQOSContainerManager(logger)
-		assert.NoError(t, err)
+	logger, _ := ktesting.NewTestContext(t)
+	m, err := createTestQOSContainerManager(logger)
+	assert.NoError(t, err)
 
-		qosConfigs := map[v1.PodQOSClass]*CgroupConfig{
-			v1.PodQOSGuaranteed: {
-				Name:               m.qosContainersInfo.Guaranteed,
-				ResourceParameters: &ResourceConfig{},
-			},
-			v1.PodQOSBurstable: {
-				Name:               m.qosContainersInfo.Burstable,
-				ResourceParameters: &ResourceConfig{},
-			},
-			v1.PodQOSBestEffort: {
-				Name:               m.qosContainersInfo.BestEffort,
-				ResourceParameters: &ResourceConfig{},
-			},
-		}
+	qosConfigs := map[v1.PodQOSClass]*CgroupConfig{
+		v1.PodQOSGuaranteed: {
+			Name:               m.qosContainersInfo.Guaranteed,
+			ResourceParameters: &ResourceConfig{},
+		},
+		v1.PodQOSBurstable: {
+			Name:               m.qosContainersInfo.Burstable,
+			ResourceParameters: &ResourceConfig{},
+		},
+		v1.PodQOSBestEffort: {
+			Name:               m.qosContainersInfo.BestEffort,
+			ResourceParameters: &ResourceConfig{},
+		},
+	}
 
-		m.setMemoryQoS(logger, qosConfigs)
+	m.setMemoryQoS(logger, qosConfigs)
 
-		burstableMin := resource.MustParse("384Mi")
-		guaranteedMin := resource.MustParse("128Mi")
-		assert.Equal(t, qosConfigs[v1.PodQOSGuaranteed].ResourceParameters.Unified["memory.min"], strconv.FormatInt(burstableMin.Value()+guaranteedMin.Value(), 10))
-		assert.Equal(t, qosConfigs[v1.PodQOSBurstable].ResourceParameters.Unified["memory.min"], strconv.FormatInt(burstableMin.Value(), 10))
-	})
+	burstableMin := resource.MustParse("384Mi")
+	guaranteedMin := resource.MustParse("128Mi")
+	assert.Equal(t, qosConfigs[v1.PodQOSGuaranteed].ResourceParameters.Unified["memory.min"], strconv.FormatInt(burstableMin.Value()+guaranteedMin.Value(), 10))
+	assert.Equal(t, qosConfigs[v1.PodQOSBurstable].ResourceParameters.Unified["memory.min"], strconv.FormatInt(burstableMin.Value(), 10))
+}
 
-	// Test 2: CPUIdleForBestEffortQoS feature with setCPUCgroupConfig
-	t.Run("CPUIdleForBestEffortQoS", func(t *testing.T) {
-		tests := []struct {
-			name                    string
-			cpuIdleFeatureEnabled   bool
-			expectBestEffortCPUIdle bool
-		}{
-			{
-				name:                    "CPUIdle feature enabled",
-				cpuIdleFeatureEnabled:   true,
-				expectBestEffortCPUIdle: true,
-			},
-			{
-				name:                    "CPUIdle feature disabled",
-				cpuIdleFeatureEnabled:   false,
-				expectBestEffortCPUIdle: false,
-			},
-		}
+func TestCPUIdleForBestEffortQoS(t *testing.T) {
+	tests := []struct {
+		name                    string
+		cpuIdleFeatureEnabled   bool
+		expectBestEffortCPUIdle bool
+	}{
+		{
+			name:                    "CPUIdle feature enabled",
+			cpuIdleFeatureEnabled:   true,
+			expectBestEffortCPUIdle: true,
+		},
+		{
+			name:                    "CPUIdle feature disabled",
+			cpuIdleFeatureEnabled:   false,
+			expectBestEffortCPUIdle: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			m, err := createTestQOSContainerManager(logger)
+			assert.NoError(t, err)
 
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-				logger, _ := ktesting.NewTestContext(t)
-				m, err := createTestQOSContainerManager(logger)
-				assert.NoError(t, err)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.CPUIdleForBestEffortQoS, tt.cpuIdleFeatureEnabled)
 
-				// Set feature gate
-				if tt.cpuIdleFeatureEnabled {
-					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.CPUIdleForBestEffortQoS, true)
-				}
+			// Test setCPUCgroupConfig which handles CPUIdleForBestEffortQoS
+			configs := map[v1.PodQOSClass]*CgroupConfig{
+				v1.PodQOSGuaranteed: {
+					Name:               NewCgroupName(RootCgroupName, "guaranteed"),
+					ResourceParameters: &ResourceConfig{},
+				},
+				v1.PodQOSBurstable: {
+					Name:               NewCgroupName(RootCgroupName, "burstable"),
+					ResourceParameters: &ResourceConfig{},
+				},
+				v1.PodQOSBestEffort: {
+					Name:               NewCgroupName(RootCgroupName, "besteffort"),
+					ResourceParameters: &ResourceConfig{},
+				},
+			}
 
-				// Test setCPUCgroupConfig which handles CPUIdleForBestEffortQoS
-				configs := map[v1.PodQOSClass]*CgroupConfig{
-					v1.PodQOSGuaranteed: {
-						Name:               NewCgroupName(RootCgroupName, "guaranteed"),
-						ResourceParameters: &ResourceConfig{},
-					},
-					v1.PodQOSBurstable: {
-						Name:               NewCgroupName(RootCgroupName, "burstable"),
-						ResourceParameters: &ResourceConfig{},
-					},
-					v1.PodQOSBestEffort: {
-						Name:               NewCgroupName(RootCgroupName, "besteffort"),
-						ResourceParameters: &ResourceConfig{},
-					},
-				}
+			// Call setCPUCgroupConfig
+			err = m.setCPUCgroupConfig(configs)
+			assert.NoError(t, err)
 
-				// Call setCPUCgroupConfig
-				err = m.setCPUCgroupConfig(configs)
-				assert.NoError(t, err)
+			// The actual behavior depends on whether we're running on cgroup v2 or v1
+			// We can't easily mock libcontainercgroups.IsCgroup2UnifiedMode()
+			// So we just verify the structure is correct
+			assert.NotNil(t, configs[v1.PodQOSBestEffort].ResourceParameters)
 
-				// The actual behavior depends on whether we're running on cgroup v2 or v1
-				// We can't easily mock libcontainercgroups.IsCgroup2UnifiedMode()
-				// So we just verify the structure is correct
-				assert.NotNil(t, configs[v1.PodQOSBestEffort].ResourceParameters)
-
-				// If feature is enabled and we're on cgroup v2, cpu.idle would be set
-				// If feature is disabled or on cgroup v1, cpu.shares would be set
-				// We document this behavior but can't fully test without mocking
-			})
-		}
-	})
+			// If feature is enabled and we're on cgroup v2, cpu.idle would be set
+			// If feature is disabled or on cgroup v1, cpu.shares would be set
+			// We document this behavior but can't fully test without mocking
+		})
+	}
 }
 
 // fakeCgroupManager is used because Start() requires a functional
@@ -600,117 +592,117 @@ func TestQOSCPUConfigUpdate(t *testing.T) {
 		})
 	}
 
+}
+func TestCPUIdleForBestEffortQOSConfigUpdate(t *testing.T) {
 	// Additional test: CPUIdleForBestEffortQoS feature gate
-	t.Run("CPUIdleForBestEffortQoS", func(t *testing.T) {
-		tests := []struct {
-			name                      string
-			cpuIdleFeatureEnabled     bool
-			expectBestEffortCPUIdle   bool
-			expectBestEffortCPUShares bool
-		}{
-			{
-				name:                    "CPUIdle enabled - BestEffort should use cpu.idle",
-				cpuIdleFeatureEnabled:   true,
-				expectBestEffortCPUIdle: true,
-			},
-			{
-				name:                      "CPUIdle disabled - BestEffort should use cpu.shares",
-				cpuIdleFeatureEnabled:     false,
-				expectBestEffortCPUShares: true,
-			},
-		}
+	tests := []struct {
+		name                      string
+		cpuIdleFeatureEnabled     bool
+		expectBestEffortCPUIdle   bool
+		expectBestEffortCPUShares bool
+	}{
+		{
+			name:                    "CPUIdle enabled - BestEffort should use cpu.idle",
+			cpuIdleFeatureEnabled:   true,
+			expectBestEffortCPUIdle: true,
+		},
+		{
+			name:                      "CPUIdle disabled - BestEffort should use cpu.shares",
+			cpuIdleFeatureEnabled:     false,
+			expectBestEffortCPUShares: true,
+		},
+	}
 
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-				logger, ctx := ktesting.NewTestContext(t)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
 
-				testContainerManager, err := createTestQOSContainerManager(logger)
-				if err != nil {
-					t.Fatalf("Unable to create Test Qos Container Manager: %s", err)
-				}
+			testContainerManager, err := createTestQOSContainerManager(logger)
+			if err != nil {
+				t.Fatalf("Unable to create Test Qos Container Manager: %s", err)
+			}
 
-				// Set feature gate
-				if tt.cpuIdleFeatureEnabled {
-					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.CPUIdleForBestEffortQoS, true)
-				}
+			// Set feature gate
+			if tt.cpuIdleFeatureEnabled {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.CPUIdleForBestEffortQoS, true)
+			}
 
-				fakecgroupManager := &fakeCgroupManager{}
-				testContainerManager.cgroupManager = fakecgroupManager
+			fakecgroupManager := &fakeCgroupManager{}
+			testContainerManager.cgroupManager = fakecgroupManager
 
-				ctx, cancel := context.WithCancel(ctx)
-				defer cancel()
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
 
-				// Use a simple pod list with besteffort pod
-				testPods := func() []*v1.Pod {
-					return []*v1.Pod{
-						{
-							ObjectMeta: metav1.ObjectMeta{
-								UID:       types.UID(uuid.NewUUID()),
-								Name:      "besteffort-pod",
-								Namespace: "test",
-							},
-							Spec: v1.PodSpec{
-								Containers: []v1.Container{
-									{
-										Name:  "foo",
-										Image: "busybox",
-									},
+			// Use a simple pod list with besteffort pod
+			testPods := func() []*v1.Pod {
+				return []*v1.Pod{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							UID:       types.UID(uuid.NewUUID()),
+							Name:      "besteffort-pod",
+							Namespace: "test",
+						},
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
+								{
+									Name:  "foo",
+									Image: "busybox",
 								},
 							},
 						},
-					}
+					},
 				}
+			}
 
-				err = testContainerManager.Start(ctx, func() v1.ResourceList { return v1.ResourceList{} }, testPods)
-				if err != nil {
-					t.Fatalf("Start() failed: %s", err)
+			err = testContainerManager.Start(ctx, func() v1.ResourceList { return v1.ResourceList{} }, testPods)
+			if err != nil {
+				t.Fatalf("Start() failed: %s", err)
+			}
+
+			err = testContainerManager.UpdateCgroups(logger)
+			if err != nil {
+				t.Fatalf("Error in UpdateCgroups(): %s", err)
+			}
+			cancel()
+
+			// Wait for updates
+			time.Sleep(time.Millisecond * 50)
+
+			fakecgroupManager.mutex.Lock()
+			updates := append([]*CgroupConfig(nil), fakecgroupManager.updates...)
+			fakecgroupManager.mutex.Unlock()
+
+			// Find BestEffort config
+			var bestEffortConfig *CgroupConfig
+			for _, config := range updates {
+				if strings.HasSuffix(config.Name.ToCgroupfs(), "besteffort") {
+					bestEffortConfig = config
+					break
 				}
+			}
 
-				err = testContainerManager.UpdateCgroups(logger)
-				if err != nil {
-					t.Fatalf("Error in UpdateCgroups(): %s", err)
+			if bestEffortConfig == nil {
+				t.Fatal("BestEffort config not found in updates")
+			}
+
+			// Verify behavior based on feature gate
+			if tt.expectBestEffortCPUIdle {
+				// When CPUIdle is enabled, we expect cpu.idle to be set in Unified
+				if bestEffortConfig.ResourceParameters.Unified == nil {
+					t.Error("Expected Unified resources to be set when CPUIdle is enabled")
+				} else if idle, exists := bestEffortConfig.ResourceParameters.Unified[Cgroup2CPUIdle]; !exists || idle != "1" {
+					t.Errorf("Expected cpu.idle=1, got: %v", bestEffortConfig.ResourceParameters.Unified[Cgroup2CPUIdle])
 				}
-				cancel()
+			}
 
-				// Wait for updates
-				time.Sleep(time.Millisecond * 50)
-
-				fakecgroupManager.mutex.Lock()
-				updates := append([]*CgroupConfig(nil), fakecgroupManager.updates...)
-				fakecgroupManager.mutex.Unlock()
-
-				// Find BestEffort config
-				var bestEffortConfig *CgroupConfig
-				for _, config := range updates {
-					if strings.HasSuffix(config.Name.ToCgroupfs(), "besteffort") {
-						bestEffortConfig = config
-						break
-					}
+			if tt.expectBestEffortCPUShares {
+				// When CPUIdle is disabled, we expect cpu.shares to be set
+				if bestEffortConfig.ResourceParameters.CPUShares == nil {
+					t.Error("Expected CPUShares to be set when CPUIdle is disabled")
+				} else if *bestEffortConfig.ResourceParameters.CPUShares != MinShares {
+					t.Errorf("Expected CPUShares=%d, got: %d", MinShares, *bestEffortConfig.ResourceParameters.CPUShares)
 				}
-
-				if bestEffortConfig == nil {
-					t.Fatal("BestEffort config not found in updates")
-				}
-
-				// Verify behavior based on feature gate
-				if tt.expectBestEffortCPUIdle {
-					// When CPUIdle is enabled, we expect cpu.idle to be set in Unified
-					if bestEffortConfig.ResourceParameters.Unified == nil {
-						t.Error("Expected Unified resources to be set when CPUIdle is enabled")
-					} else if idle, exists := bestEffortConfig.ResourceParameters.Unified[Cgroup2CPUIdle]; !exists || idle != "1" {
-						t.Errorf("Expected cpu.idle=1, got: %v", bestEffortConfig.ResourceParameters.Unified[Cgroup2CPUIdle])
-					}
-				}
-
-				if tt.expectBestEffortCPUShares {
-					// When CPUIdle is disabled, we expect cpu.shares to be set
-					if bestEffortConfig.ResourceParameters.CPUShares == nil {
-						t.Error("Expected CPUShares to be set when CPUIdle is disabled")
-					} else if *bestEffortConfig.ResourceParameters.CPUShares != MinShares {
-						t.Errorf("Expected CPUShares=%d, got: %d", MinShares, *bestEffortConfig.ResourceParameters.CPUShares)
-					}
-				}
-			})
-		}
-	})
+			}
+		})
+	}
 }
