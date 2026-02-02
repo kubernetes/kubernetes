@@ -154,28 +154,10 @@ func (reg *registry) ExtractValidations(context Context, tags ...codetags.Tag) (
 	if !reg.initialized.Load() {
 		panic("registry.init() was not called")
 	}
-	validations := Validations{}
-
-	// Run tag-validators first.
-	phases := reg.sortTagsIntoPhases(tags)
-	for _, tags := range phases {
-		for _, tag := range tags {
-			tv := reg.tagValidators[tag.Name]
-			// At this point we know tv exists and is not nil due to the upfront check
-			if scopes := tv.ValidScopes(); !scopes.Has(context.Scope) {
-				return Validations{}, fmt.Errorf("tag %q cannot be specified on %s", tv.TagName(), context.Scope)
-			}
-			if err := typeCheck(tag, tv.Docs()); err != nil {
-				return Validations{}, fmt.Errorf("tag %q: %w", tv.TagName(), err)
-			}
-			if theseValidations, err := tv.GetValidations(context, tag); err != nil {
-				return Validations{}, fmt.Errorf("tag %q: %w", tv.TagName(), err)
-			} else {
-				validations.Add(theseValidations)
-			}
-		}
+	validations, err := reg.ExtractTagValidations(context, tags...)
+	if err != nil {
+		return Validations{}, err
 	}
-
 	// Run type-validators after tag validators are done.
 	if context.Scope == ScopeType {
 		// Run all type-validators.
@@ -200,6 +182,33 @@ func (reg *registry) ExtractValidations(context Context, tags ...codetags.Tag) (
 		}
 	}
 
+	return validations, nil
+}
+
+func (reg *registry) ExtractTagValidations(context Context, tags ...codetags.Tag) (Validations, error) {
+	if !reg.initialized.Load() {
+		panic("registry.init() was not called")
+	}
+	validations := Validations{}
+	// Run tag-validators first.
+	phases := reg.sortTagsIntoPhases(tags)
+	for _, tags := range phases {
+		for _, tag := range tags {
+			tv := reg.tagValidators[tag.Name]
+			// At this point we know tv exists and is not nil due to the upfront check
+			if scopes := tv.ValidScopes(); !scopes.Has(context.Scope) {
+				return Validations{}, fmt.Errorf("tag %q cannot be specified on %s", tv.TagName(), context.Scope)
+			}
+			if err := typeCheck(tag, tv.Docs()); err != nil {
+				return Validations{}, fmt.Errorf("tag %q: %w", tv.TagName(), err)
+			}
+			if theseValidations, err := tv.GetValidations(context, tag); err != nil {
+				return Validations{}, fmt.Errorf("tag %q: %w", tv.TagName(), err)
+			} else {
+				validations.Add(theseValidations)
+			}
+		}
+	}
 	return validations, nil
 }
 
@@ -284,6 +293,11 @@ type Validator interface {
 	// or more validations, which will later be rendered by the code-generation
 	// logic.
 	ExtractValidations(context Context, Tags ...codetags.Tag) (Validations, error)
+
+	// ExtractTagValidations extracts all validations associated with the given tags.
+	// Some tag validators may return empty validations and update internal state
+	// that is then used by FieldValidators.
+	ExtractTagValidations(context Context, Tags ...codetags.Tag) (Validations, error)
 
 	// Docs returns documentation for each known tag.
 	Docs() []TagDoc
