@@ -230,6 +230,9 @@ type Context struct {
 	// Constants provides access to all constants of the type being
 	// validated.  Only set when Scope is ScopeType.
 	Constants []*Constant
+
+	// StabilityLevel indicates the stability on the corresponding validation.
+	StabilityLevel ValidationStabilityLevel
 }
 
 // Constant represents a constant value.
@@ -266,6 +269,16 @@ var stabilityOrder = map[TagStabilityLevel]int{
 	TagStabilityLevelBeta:   1,
 	TagStabilityLevelStable: 2,
 }
+
+// Validation stability level denotes the stability of a validation.
+type ValidationStabilityLevel string
+
+const (
+	// Alpha denotes the declarative validations should be run with the handwritten validation. But the handwritten validations are the authoritative.
+	ValidationStabilityLevelAlpha ValidationStabilityLevel = "Alpha"
+	// Beta denotes the declarative validations should be run with the handwritten validation. Declarative validations are authoritative.
+	ValidationStabilityLevelBeta ValidationStabilityLevel = "Beta"
+)
 
 // Min returns the minimum of two stability levels, or an error if either
 // stability level is unknown.
@@ -527,6 +540,9 @@ type FunctionGen struct {
 	// Comments holds optional comments that should be added to the generated
 	// code (without the leading "//").
 	Comments []string
+
+	// StabilityLevel indicates the stability level of the corresponding validation.
+	StabilityLevel ValidationStabilityLevel
 }
 
 // WithTypeArgs returns a derived FunctionGen with type arguments.
@@ -550,6 +566,12 @@ func (fg FunctionGen) WithComments(comments ...string) FunctionGen {
 // WithComment returns a new FunctionGen with a comment.
 func (fg FunctionGen) WithComment(comment string) FunctionGen {
 	return fg.WithComments(comment)
+}
+
+// WithStabilityLevel returns a new FunctionGen with the given stability level.
+func (fg FunctionGen) WithStabilityLevel(level ValidationStabilityLevel) FunctionGen {
+	fg.StabilityLevel = level
+	return fg
 }
 
 // Variable creates a VariableGen for a given variable name and init value.
