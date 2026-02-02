@@ -1,8 +1,8 @@
 # Project Roadmap
 
-**Generated:** 2026-02-02 14:52:13
+**Generated:** 2026-02-02 15:19:56
 **Repository:** omer-dayan/kubernetes
-**Open Issues:** 2
+**Open Issues:** 1
 
 ## Executive Summary
 
@@ -11,7 +11,7 @@ This roadmap provides a prioritized view of all open issues. Issues are automati
 **Priority Breakdown:**
 - 🔴 **Critical:** 0
 0 issue(s) - Immediate attention required
-- 🟠 **High:** 2 issue(s) - Important bugs and issues
+- 🟠 **High:** 1 issue(s) - Important bugs and issues
 - 🟡 **Medium:** 0
 0 issue(s) - Enhancements and improvements
 - 🟢 **Low:** 0
@@ -36,26 +36,6 @@ Important issues that should be addressed soon to maintain quality and user expe
 
 **Summary:**
 I am a plugin developer, the plugin will have different actions according to the preemption result. For example, mark the podGorup (API in schedule-plugins) as failed and reject all the pods when failed to preempt, or I will mark the pods as schedulable (I will limit the number of times to schedule any pods in PodGroup for the performance). But when any of the plugin return code other than fwk.Unschedulable, scheduler will skip all plugins after that. This makes difficult to implement the PostFilter: If we run coscheduling before preemption, we can not know the preempt result. 
-
-**Action Items:**
-- [ ] Detailed investigation of root cause
-- [ ] Reproduce issue in test environment
-- [ ] Develop and test fix
-- [ ] Code review and merge
-- [ ] Verify fix and close issue
-
----
-
-#### Issue #1: Pod Controller does not working
-
-**Priority:** HIGH
-**Status:** OPEN
-**Author:** omer-dayan
-**Created:** 2026-02-02T12:24:55Z
-**URL:** https://github.com/omer-dayan/kubernetes/issues/1
-
-**Summary:**
-It does not work It does not work It does not work 
 
 **Action Items:**
 - [ ] Detailed investigation of root cause
