@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 	utiltrace "k8s.io/utils/trace"
@@ -322,7 +323,7 @@ func (sched *Scheduler) assumeAndReserve(
 	assumedPodInfo := podInfo.DeepCopy()
 	assumedPod := assumedPodInfo.Pod
 	// assume modifies `assumedPod` by setting NodeName=scheduleResult.SuggestedHost
-	err := sched.assume(logger, assumedPodInfo, scheduleResult.SuggestedHost)
+	err := sched.assume(logger, state, assumedPodInfo, scheduleResult.SuggestedHost)
 	if err != nil {
 		// This is most probably result of a BUG in retrying logic.
 		// We report an error here so that pod scheduling can be retried.
@@ -1103,12 +1104,19 @@ func (h *nodeScoreHeap) Pop() interface{} {
 
 // assume signals to the cache that a pod is already in the cache, so that binding can be asynchronous.
 // When called during pod group scheduling cycle, pod is assumed in the snapshot instead.
-func (sched *Scheduler) assume(logger klog.Logger, assumedPodInfo *framework.QueuedPodInfo, host string) error {
+func (sched *Scheduler) assume(logger klog.Logger, state fwk.CycleState, assumedPodInfo *framework.QueuedPodInfo, host string) error {
 	// Optimistically assume that the binding will succeed and send it to apiserver
 	// in the background.
 	// If the binding fails, scheduler will release resources allocated to assumed pod
 	// immediately.
 	assumedPodInfo.Pod.Spec.NodeName = host
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRANativeResources) {
+		// If DRANativeResources is enabled, copy the calculated native resource claim status
+		// from the cycle state to the assumed pod's status. This ensures that the scheduler's
+		// cached version of the pod reflects the native resources allocated by the DRA plugin,
+		// making this information available for NodeInfo cache update.
+		assumedPodInfo.Pod.Status.NativeResourceClaimStatus = dynamicresources.ExtractPodNativeResourceClaimStatus(logger, state, host)
+	}
 
 	if assumedPodInfo.NeedsPodGroupScheduling {
 		err := sched.nodeInfoSnapshot.AssumePod(assumedPodInfo.PodInfo)
