@@ -107,6 +107,10 @@ type stateData struct {
 
 	// nodeAllocations caches the result of Filter for the nodes, its key is node name.
 	nodeAllocations map[string]nodeAllocation
+
+	// Set to true if any ResourceClaim for the pod uses a DeviceClass
+	// that manages native resources.
+	hasNativeResourceClaims bool
 }
 
 func (d *stateData) Clone() fwk.StateData {
@@ -132,6 +136,8 @@ type nodeAllocation struct {
 	// containerResourceRequestMappings has the container, extended resource, and device request mappings
 	// calculated at the Filter phase, and used at the PreBind phase.
 	containerResourceRequestMappings []v1.ContainerExtendedResourceRequest
+	// Stores the calculated native resource allocations to be passed to PreBind.
+	nativeResourceClaimStatus []v1.PodNativeResourceClaimStatus
 }
 
 // DynamicResources is a plugin that ensures that ResourceClaims are allocated.
@@ -480,6 +486,14 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 					if status := pl.validateDeviceClass(logger, request.Exactly.DeviceClassName, request.Name); status != nil {
 						return nil, status
 					}
+					managesNativeResources, status := pl.deviceClassManagesNativeResource(logger, request.Exactly.DeviceClassName)
+					if status != nil {
+						return nil, status
+					}
+					if managesNativeResources {
+						s.hasNativeResourceClaims = true
+						claims.insertNativeResourceClaim(claim)
+					}
 				case len(request.FirstAvailable) > 0:
 					if !pl.fts.EnableDRAPrioritizedList {
 						return nil, statusUnschedulable(logger, fmt.Sprintf("resource claim %s, request %s: has subrequests, but the DRAPrioritizedList feature is disabled", klog.KObj(claim), request.Name))
@@ -488,6 +502,14 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 						qualRequestName := strings.Join([]string{request.Name, subRequest.Name}, "/")
 						if status := pl.validateDeviceClass(logger, subRequest.DeviceClassName, qualRequestName); status != nil {
 							return nil, status
+						}
+						managesNativeResources, status := pl.deviceClassManagesNativeResource(logger, subRequest.DeviceClassName)
+						if status != nil {
+							return nil, status
+						}
+						if managesNativeResources {
+							s.hasNativeResourceClaims = true
+							claims.insertNativeResourceClaim(claim)
 						}
 					}
 				default:
@@ -687,6 +709,7 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 
 	// Use allocator to check the node and cache the result in case that the node is picked.
 	var allocations []resourceapi.AllocationResult
+	var nativeClaimStatus []v1.PodNativeResourceClaimStatus
 	if state.allocator != nil {
 		allocCtx := ctx
 		if loggerV := logger.V(5); loggerV.Enabled() {
@@ -739,6 +762,19 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 		if len(a) != len(claimsToAllocate) {
 			return statusUnschedulable(logger, "cannot allocate all claims", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaims", klog.KObjSlice(claimsToAllocate))
 		}
+
+		if pl.fts.EnableDRANativeResources && state.hasNativeResourceClaims {
+			allocationsMap := make(map[types.UID]*resourceapi.AllocationResult)
+			for i, claim := range claimsToAllocate {
+				if i < len(a) {
+					allocationsMap[claim.UID] = &a[i]
+				}
+			}
+			nativeClaimStatus, status = pl.calculateAndCheckNativeResources(ctx, state, pod, nodeInfo, allocationsMap)
+			if status != nil {
+				return status
+			}
+		}
 		// Reserve uses this information.
 		allocations = a
 	}
@@ -768,6 +804,7 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 			allocationResults:                allocations,
 			extendedResourceClaim:            nodeExtendedResourceClaim,
 			containerResourceRequestMappings: containerResourceRequestMappings,
+			nativeResourceClaimStatus:        nativeClaimStatus,
 		}
 	}
 
@@ -1076,6 +1113,12 @@ func (pl *DynamicResources) PreBind(ctx context.Context, cs fwk.CycleState, pod 
 			}
 			// Updated here such that Unreserve can work with patched claim.
 			state.claims.set(index, claim)
+		}
+	}
+
+	if pl.fts.EnableDRANativeResources {
+		if status := pl.patchNativeResourceClaimStatus(ctx, state, pod, nodeName); status != nil {
+			return status
 		}
 	}
 

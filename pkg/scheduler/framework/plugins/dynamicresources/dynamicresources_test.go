@@ -37,6 +37,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
@@ -98,6 +99,8 @@ var (
 	extendedResourceName         = "example.com/gpu"
 	extendedResourceName2        = "example.com/gpu2"
 	implicitExtendedResourceName = "deviceclass.resource.kubernetes.io/my-resource-class"
+	nativeResourceDriver         = "native-resource-driver"
+	nativeResourceCapacityName   = resourceapi.QualifiedName("example.com/cpus")
 
 	deviceClass = &resourceapi.DeviceClass{
 		ObjectMeta: metav1.ObjectMeta{
@@ -118,6 +121,14 @@ var (
 		},
 		Spec: resourceapi.DeviceClassSpec{
 			ExtendedResourceName: &extendedResourceName2,
+		},
+	}
+	deviceClassWithNativeResource = &resourceapi.DeviceClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: className,
+		},
+		Spec: resourceapi.DeviceClassSpec{
+			ManagesNativeResources: ptr.To(true),
 		},
 	}
 	podWithClaimName = st.MakePod().Name(podName).Namespace(namespace).
@@ -179,9 +190,24 @@ var (
 		Obj()
 
 	// Node with "instance-1" device and no device attributes.
-	workerNode           = &st.MakeNode().Name(nodeName).Label("kubernetes.io/hostname", nodeName).Node
-	workerNodeSlice      = st.MakeResourceSlice(nodeName, driver).Device("instance-1").Obj()
-	largeWorkerNodeSlice = st.MakeResourceSlice(nodeName, driver).Device("instance-1").Device("instance-2").Device("instance-3").Device("instance-4").Obj()
+	workerNode                        = &st.MakeNode().Name(nodeName).Label("kubernetes.io/hostname", nodeName).Node
+	workerNodeSlice                   = st.MakeResourceSlice(nodeName, driver).Device("instance-1").Obj()
+	largeWorkerNodeSlice              = st.MakeResourceSlice(nodeName, driver).Device("instance-1").Device("instance-2").Device("instance-3").Device("instance-4").Obj()
+	workerNodeWithCapacity            = &st.MakeNode().Name(nodeName).Label("kubernetes.io/hostname", nodeName).Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "10", v1.ResourceMemory: "10Gi"}).Node
+	workerNodeSliceWithNativeResource = func() *resourceapi.ResourceSlice {
+		nativeSlice := st.MakeResourceSlice(nodeName, nativeResourceDriver).Device("numa-0-cpus",
+			map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
+				nativeResourceCapacityName: {Value: apiresource.MustParse("10")},
+			},
+		).Obj()
+		nativeSlice.Spec.Devices[0].AllowMultipleAllocations = ptr.To(true)
+		nativeSlice.Spec.Devices[0].NativeResourceMappings = map[v1.ResourceName]resourceapi.NativeResourceMapping{
+			v1.ResourceCPU: {
+				CapacityKey: &nativeResourceCapacityName,
+			},
+		}
+		return nativeSlice
+	}
 
 	// Node with same device, but now with a "healthy" boolean attribute.
 	workerNode2      = &st.MakeNode().Name(node2Name).Label("kubernetes.io/hostname", node2Name).Node
@@ -254,6 +280,22 @@ var (
 			st.SubRequest("subreq-3", className, 2),
 			st.SubRequest("subreq-4", className, 1),
 		).Obj()
+	nativeResourceClaimWithCapacity = func() *resourceapi.ResourceClaim {
+		claim := st.MakeResourceClaim().
+			Name(claimName).
+			Namespace(namespace).
+			Request(className).
+			Obj()
+		claim.Spec.Devices.Requests[0].Exactly.Capacity = &resourceapi.CapacityRequirements{
+			Requests: map[resourceapi.QualifiedName]apiresource.Quantity{
+				nativeResourceCapacityName: apiresource.MustParse("1"),
+			},
+		}
+		return claim
+	}()
+	pendingNativeResourceClaimWithCapacity = st.FromResourceClaim(nativeResourceClaimWithCapacity).
+						OwnerReference(podName, podUID, podKind).
+						Obj()
 
 	pendingClaim = st.FromResourceClaim(claim).
 			OwnerReference(podName, podUID, podKind).
@@ -857,6 +899,22 @@ var (
 			},
 		}).
 		Obj()
+
+	nativeAllocationResult = &resourceapi.AllocationResult{
+		Devices: resourceapi.DeviceAllocationResult{
+			Results: []resourceapi.DeviceRequestAllocationResult{{
+				Driver:  nativeResourceDriver,
+				Pool:    nodeName,
+				Device:  "numa-0-cpus",
+				Request: "req-1",
+				ShareID: ptr.To(types.UID("share-123")),
+				ConsumedCapacity: map[resourceapi.QualifiedName]apiresource.Quantity{
+					nativeResourceCapacityName: apiresource.MustParse("1"),
+				},
+			}},
+		},
+		NodeSelector: st.MakeNodeSelector().In("metadata.name", []string{nodeName}, st.NodeSelectorTypeMatchFields).Obj(),
+	}
 )
 
 func taintDevices(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
@@ -966,6 +1024,7 @@ type result struct {
 // make changes only to a particular instance, then it must check the name.
 type change struct {
 	claim func(*resourceapi.ResourceClaim) *resourceapi.ResourceClaim
+	pod   func(*v1.Pod) *v1.Pod
 }
 type perNodeResult map[string]result
 
@@ -1056,6 +1115,10 @@ type testPluginCase struct {
 	enableDRADeviceBindingConditions bool
 	// EnableDRAResourceClaimDeviceStatus is set to true if the DRAResourceClaimDeviceStatus feature gate is enabled.
 	enableDRAResourceClaimDeviceStatus bool
+	// enableDRANativeResources is set to true if the DRANativeResources feature gate is enabled.
+	enableDRANativeResources bool
+	// enableDRAConsumableCapacity is set to true if the DRAConsumableCapacity feature gate is enabled.
+	enableDRAConsumableCapacity bool
 	// Feature gates. False is chosen so that the uncommon case
 	// doesn't need to be set.
 	disableDRA bool
@@ -2591,6 +2654,75 @@ func testPlugin(tCtx ktesting.TContext) {
 				},
 			},
 		},
+		"native-resource-claim-patch-pod-status": {
+			enableDRAResourceClaimDeviceStatus: true,
+			enableDRANativeResources:           true,
+			enableDRAConsumableCapacity:        true,
+			nodes:                              []*v1.Node{workerNodeWithCapacity},
+			pod:                                podWithClaimName,
+			claims:                             []*resourceapi.ResourceClaim{st.FromResourceClaim(nativeResourceClaimWithCapacity).OwnerReference(podName, podUID, podKind).Obj()},
+			classes:                            []*resourceapi.DeviceClass{deviceClassWithNativeResource},
+			objs:                               []apiruntime.Object{workerNodeSliceWithNativeResource(), podWithClaimName},
+			want: want{
+				prefilter: result{
+					status: nil,
+				},
+				filter: perNodeResult{
+					workerNode.Name: {
+						status: nil,
+					},
+				},
+				reserve: result{
+					inFlightClaims: []metav1.Object{
+						st.FromResourceClaim(pendingNativeResourceClaimWithCapacity).
+							Allocation(nativeAllocationResult).
+							Obj(),
+					},
+				},
+				prebind: result{
+					assumedClaim: st.FromResourceClaim(pendingNativeResourceClaimWithCapacity).
+						Allocation(nativeAllocationResult).
+						ReservedForPod(podName, types.UID(podUID)).
+						Obj(),
+					changes: change{
+						claim: func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							if claim.Name == claimName {
+								c := claim.DeepCopy()
+								c.Finalizers = []string{resourceapi.Finalizer}
+								alloc := nativeAllocationResult.DeepCopy()
+								c.Status.Allocation = alloc
+								c.Status.ReservedFor = []resourceapi.ResourceClaimConsumerReference{{Resource: "pods", Name: podName, UID: types.UID(podUID)}}
+								return c
+							}
+							return claim
+						},
+						pod: func(pod *v1.Pod) *v1.Pod {
+							if pod.Name == podName {
+								p := pod.DeepCopy()
+								p.Status.NativeResourceClaimStatus = []v1.PodNativeResourceClaimStatus{
+									{
+										ClaimInfo: v1.ObjectReference{
+											Name:      claimName,
+											Namespace: namespace,
+											UID:       "UID-0", // Match the actual UID
+										},
+										Containers: []string{},
+										Resources: []v1.NativeResourceAllocation{
+											{
+												ResourceName: v1.ResourceCPU,
+												Quantity:     resource.MustParse("1"),
+											},
+										},
+									},
+								}
+								return p
+							}
+							return pod
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for name, tc := range testcases {
@@ -2615,6 +2747,8 @@ func testPlugin(tCtx ktesting.TContext) {
 				EnableDynamicResourceAllocation:    !tc.disableDRA,
 				EnableDRAPrioritizedList:           tc.enableDRAPrioritizedList,
 				EnableDRAExtendedResource:          tc.enableDRAExtendedResource,
+				EnableDRANativeResources:           tc.enableDRANativeResources,
+				EnableDRAConsumableCapacity:        tc.enableDRAConsumableCapacity,
 			}
 
 			if tc.disableDRAAdminAccess {
@@ -2635,7 +2769,7 @@ func testPlugin(tCtx ktesting.TContext) {
 
 			status := testCtx.p.PreEnqueue(tCtx, tc.pod)
 			tCtx.Run("PreEnqueue", func(tCtx ktesting.TContext) {
-				testCtx.verify(tCtx, tc.want.preenqueue, initialObjects, nil, status)
+				testCtx.verify(tCtx, tc.want.preenqueue, initialObjects, tc.pod, nil, status)
 			})
 			if !status.IsSuccess() {
 				return
@@ -2645,7 +2779,7 @@ func testPlugin(tCtx ktesting.TContext) {
 			result, status := testCtx.p.PreFilter(tCtx, testCtx.state, tc.pod, []fwk.NodeInfo{nodeInfo})
 			tCtx.Run("prefilter", func(tCtx ktesting.TContext) {
 				assert.Equal(tCtx, tc.want.preFilterResult, result)
-				testCtx.verify(tCtx, tc.want.prefilter, initialObjects, result, status)
+				testCtx.verify(tCtx, tc.want.prefilter, initialObjects, tc.pod, result, status)
 			})
 			unschedulable := status.IsRejected()
 
@@ -2666,7 +2800,7 @@ func testPlugin(tCtx ktesting.TContext) {
 						}
 						status = testCtx.p.Filter(ctx, testCtx.state, tc.pod, nodeInfo)
 						nodeName := nodeInfo.Node().Name
-						testCtx.verify(tCtx, tc.want.filter.forNode(nodeName), initialObjects, nil, status)
+						testCtx.verify(tCtx, tc.want.filter.forNode(nodeName), initialObjects, tc.pod, nil, status)
 					})
 					if status.Code() == fwk.Success {
 						potentialNodes = append(potentialNodes, nodeInfo)
@@ -2692,7 +2826,7 @@ func testPlugin(tCtx ktesting.TContext) {
 					nodeName := potentialNode.Node().Name
 					tCtx.Run(fmt.Sprintf("score/%s", nodeName), func(tCtx ktesting.TContext) {
 						assert.Equal(tCtx, tc.want.scoreResult.forNode(nodeName), score)
-						testCtx.verify(tCtx, tc.want.score.forNode(nodeName), initialObjects, nil, status)
+						testCtx.verify(tCtx, tc.want.score.forNode(nodeName), initialObjects, tc.pod, nil, status)
 					})
 					scores = append(scores, fwk.NodeScore{Name: nodeName, Score: score})
 				}
@@ -2701,7 +2835,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				status := testCtx.p.NormalizeScore(tCtx, testCtx.state, tc.pod, scores)
 				tCtx.Run("normalizeScore", func(tCtx ktesting.TContext) {
 					assert.Equal(tCtx, tc.want.normalizeScoreResult, scores)
-					testCtx.verify(tCtx, tc.want.normalizeScore, initialObjects, nil, status)
+					testCtx.verify(tCtx, tc.want.normalizeScore, initialObjects, tc.pod, nil, status)
 				})
 			}
 
@@ -2723,7 +2857,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				initialObjects = testCtx.updateAPIServer(tCtx, initialObjects, tc.prepare.reserve)
 				status := testCtx.p.Reserve(tCtx, testCtx.state, tc.pod, selectedNodeName)
 				tCtx.Run("reserve", func(tCtx ktesting.TContext) {
-					testCtx.verify(tCtx, tc.want.reserve, initialObjects, nil, status)
+					testCtx.verify(tCtx, tc.want.reserve, initialObjects, tc.pod, nil, status)
 				})
 				if status.Code() != fwk.Success {
 					unschedulable = true
@@ -2736,14 +2870,14 @@ func testPlugin(tCtx ktesting.TContext) {
 					initialObjects = testCtx.updateAPIServer(tCtx, initialObjects, tc.prepare.unreserve)
 					testCtx.p.Unreserve(tCtx, testCtx.state, tc.pod, selectedNodeName)
 					tCtx.Run("unreserve", func(tCtx ktesting.TContext) {
-						testCtx.verify(tCtx, tc.want.unreserve, initialObjects, nil, status)
+						testCtx.verify(tCtx, tc.want.unreserve, initialObjects, tc.pod, nil, status)
 					})
 				} else {
 					if tc.want.unreserveBeforePreBind != nil {
 						initialObjects = testCtx.listAll(tCtx)
 						testCtx.p.Unreserve(tCtx, testCtx.state, tc.pod, selectedNodeName)
 						tCtx.Run("unreserveBeforePreBind", func(tCtx ktesting.TContext) {
-							testCtx.verify(tCtx, *tc.want.unreserveBeforePreBind, initialObjects, nil, status)
+							testCtx.verify(tCtx, *tc.want.unreserveBeforePreBind, initialObjects, tc.pod, nil, status)
 						})
 						return
 					}
@@ -2759,13 +2893,13 @@ func testPlugin(tCtx ktesting.TContext) {
 					})
 					preBindStatus := testCtx.p.PreBind(tCtx, testCtx.state, tc.pod, selectedNodeName)
 					tCtx.Run("prebind", func(tCtx ktesting.TContext) {
-						testCtx.verify(tCtx, tc.want.prebind, initialObjects, nil, preBindStatus)
+						testCtx.verify(tCtx, tc.want.prebind, initialObjects, tc.pod, nil, preBindStatus)
 					})
 					if tc.want.unreserveAfterBindFailure != nil {
 						initialObjects = testCtx.listAll(tCtx)
 						testCtx.p.Unreserve(tCtx, testCtx.state, tc.pod, selectedNodeName)
 						tCtx.Run("unreserverAfterBindFailure", func(tCtx ktesting.TContext) {
-							testCtx.verify(tCtx, *tc.want.unreserveAfterBindFailure, initialObjects, nil, status)
+							testCtx.verify(tCtx, *tc.want.unreserveAfterBindFailure, initialObjects, tc.pod, nil, status)
 						})
 					} else if status.IsSuccess() {
 						initialObjects = testCtx.listAll(tCtx)
@@ -2778,7 +2912,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				result, status := testCtx.p.PostFilter(tCtx, testCtx.state, tc.pod, nil /* filteredNodeStatusMap not used by plugin */)
 				tCtx.Run("postfilter", func(tCtx ktesting.TContext) {
 					assert.Equal(tCtx, tc.want.postFilterResult, result)
-					testCtx.verify(tCtx, tc.want.postfilter, initialObjects, nil, status)
+					testCtx.verify(tCtx, tc.want.postfilter, initialObjects, tc.pod, nil, status)
 				})
 			}
 			if tc.metrics != nil {
@@ -2808,7 +2942,7 @@ type testContext struct {
 	state           fwk.CycleState
 }
 
-func (tc *testContext) verify(tCtx ktesting.TContext, expected result, initialObjects []metav1.Object, result interface{}, status *fwk.Status) {
+func (tc *testContext) verify(tCtx ktesting.TContext, expected result, initialObjects []metav1.Object, testPod *v1.Pod, result interface{}, status *fwk.Status) {
 	tCtx.Helper()
 	if expected.status == nil {
 		assert.Nil(tCtx, status)
@@ -2839,15 +2973,54 @@ func (tc *testContext) verify(tCtx ktesting.TContext, expected result, initialOb
 		objects = []metav1.Object{}
 	}
 
+	// Separate objects by type for easier comparison
+	var wantClaims, actualClaims []metav1.Object
+	var wantPods, actualPods []metav1.Object
+
+	for _, obj := range wantObjects {
+		switch obj.(type) {
+		case *resourceapi.ResourceClaim:
+			wantClaims = append(wantClaims, obj)
+		case *v1.Pod:
+			wantPods = append(wantPods, obj)
+		}
+	}
+
+	for _, obj := range objects {
+		switch obj.(type) {
+		case *resourceapi.ResourceClaim:
+			actualClaims = append(actualClaims, obj)
+		case *v1.Pod:
+			actualPods = append(actualPods, obj)
+		}
+	}
+
 	// Sometimes assert strips the diff too much, let's do it ourselves...
 	ignoreFieldsInResourceClaims := []cmp.Option{
 		cmpopts.IgnoreFields(metav1.ObjectMeta{}, "UID", "ResourceVersion"),
 		cmpopts.IgnoreFields(resourceapi.AllocationResult{}, "AllocationTimestamp"),
 		// It does not matter which specific device is allocated for the testing purpose.
 		cmpopts.IgnoreFields(resourceapi.DeviceRequestAllocationResult{}, "Device"),
+		// ShareID is dynamically generated by the allocator for shared devices, so it cannot set in expected results.
+		cmpopts.IgnoreFields(resourceapi.DeviceRequestAllocationResult{}, "ShareID"),
 	}
-	if diff := cmp.Diff(wantObjects, objects, ignoreFieldsInResourceClaims...); diff != "" {
+	if diff := cmp.Diff(wantClaims, actualClaims, ignoreFieldsInResourceClaims...); diff != "" {
 		tCtx.Errorf("Stored objects are different (- expected, + actual):\n%s", diff)
+	}
+
+	if expected.changes.pod != nil && testPod != nil {
+		wantPod := expected.changes.pod(testPod.DeepCopy())
+		actualPod, err := tc.client.CoreV1().Pods(testPod.Namespace).Get(tCtx, testPod.Name, metav1.GetOptions{})
+		if err != nil {
+			tCtx.Fatalf("Failed to get pod %s/%s: %v", testPod.Namespace, testPod.Name, err)
+		}
+		ignorePodFields := []cmp.Option{
+			cmpopts.IgnoreFields(metav1.ObjectMeta{}, "ResourceVersion", "UID", "CreationTimestamp", "ManagedFields"),
+			cmpopts.EquateEmpty(),
+		}
+		if diff := cmp.Diff(wantPod, actualPod, ignorePodFields...); diff != "" {
+			tCtx.Errorf("Stored Pod %s/%s is different (- expected, + actual):\n%s", testPod.Namespace, testPod.Name, diff)
+		}
 	}
 
 	var expectAssumedClaims []metav1.Object
@@ -2949,6 +3122,10 @@ func (tc *testContext) updateAPIServer(tCtx ktesting.TContext, objects []metav1.
 				obj, err := tc.client.ResourceV1().ResourceClaims(obj.Namespace).Update(tCtx, obj, metav1.UpdateOptions{})
 				tCtx.ExpectNoError(err, "prepare update")
 				modified[i] = obj
+			case *v1.Pod:
+				obj, err := tc.client.CoreV1().Pods(obj.Namespace).Update(tCtx, obj, metav1.UpdateOptions{})
+				tCtx.ExpectNoError(err, "prepare update")
+				modified[i] = obj
 			default:
 				tCtx.Fatalf("unsupported object type %T", obj)
 			}
@@ -2978,6 +3155,10 @@ func update(objects []metav1.Object, updates change) []metav1.Object {
 			if updates.claim != nil {
 				obj = updates.claim(in)
 			}
+		case *v1.Pod:
+			if updates.pod != nil {
+				obj = updates.pod(in)
+			}
 		}
 		updated = append(updated, obj)
 	}
@@ -2989,7 +3170,6 @@ func setup(tCtx ktesting.TContext, args *config.DynamicResourcesArgs, nodes []*v
 	tCtx.Helper()
 
 	tc := &testContext{}
-
 	tc.client = fake.NewSimpleClientset(objs...)
 	reactor := createReactor(tc.client.Tracker(), failPatch)
 	tc.client.PrependReactor("*", "*", reactor)

@@ -37,6 +37,8 @@ type claimStore struct {
 	// initialExtendedResourceClaimUID is the initial extended resource claim UID from PreFilter phase.
 	// It is different from the UID set by API server when the in-memory, temproary claim is written to the API server in PreBind phase.
 	initialExtendedResourceClaimUID types.UID
+	// claims that includes native resource requests. will always be a subset of claims.
+	nativeClaims []*resourceapi.ResourceClaim
 }
 
 // newClaimStore stores the list of user-owned claims and the optional claim owned by the scheduler.
@@ -144,4 +146,19 @@ func (cs *claimStore) updateExtendedResourceClaim(c *resourceapi.ResourceClaim) 
 // It can only be called when extended resource claim exists.
 func (cs claimStore) getInitialExtendedResourceClaimUID() types.UID {
 	return cs.initialExtendedResourceClaimUID
+}
+
+func (cs *claimStore) insertNativeResourceClaim(claim *resourceapi.ResourceClaim) {
+	cs.nativeClaims = append(cs.nativeClaims, claim)
+}
+
+// nativeResourceClaims returns an iterator for native resource claims
+func (cs *claimStore) nativeResourceClaims() iter.Seq2[int, *resourceapi.ResourceClaim] {
+	return func(yield func(int, *resourceapi.ResourceClaim) bool) {
+		for i, claim := range cs.nativeClaims {
+			if !yield(i, claim) {
+				return
+			}
+		}
+	}
 }
