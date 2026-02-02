@@ -421,17 +421,16 @@ func PrepareKey(resourcePrefix, key string, recursive bool) (string, error) {
 	return key, nil
 }
 
-// ListErrorAggregator aggregates the error(s) that the LIST operation
-// encounters while retrieving object(s) from the storage
-type ListErrorAggregator interface {
-	// Aggregate aggregates the given error from list operation
-	// key: it identifies the given object in the storage.
-	// err: it represents the error the list operation encountered while
-	// retrieving the given object from the storage.
-	// done: true if the aggregation is done and the list operation should
-	// abort, otherwise the list operation will continue
-	Aggregate(key string, err error) bool
+// ListItemErrors stores a slice of item storage errors during LIST operations.
+// They are iteratively added, and eventually returned as an aggregated error. On
+// each Append, it signals whether it considers itself full or the error to be fatal.
+// In either case, the caller is supposed to not keep collecting, but return the
+// collection.
+type ListItemErrors interface {
+	// Append adds an item storage error for the given storage key during a LIST operation.
+	// The caller is expected to stop appending as soon as true is returned.
+	Append(key string, err error) bool
 
-	// Err returns the aggregated error
-	Err() error
+	// Aggregate returns the aggregated error
+	Aggregate() error
 }
