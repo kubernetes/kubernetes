@@ -110,8 +110,7 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 		}
 	}
 
-	// Sort slices by name to ensure a deterministic allocation order
-	// regardless of the order in which the DRA driver provides them.
+	// Sort slices by name to ensure a deterministic allocation order.
 	// Because the allocator uses a first-fit search, this allows driver authors
 	// to influence prioritization through their naming conventions.
 	sortSlicesByName(normalSlices)
@@ -197,7 +196,9 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 		result = append(result, pool)
 	}
 
-	// Sort both groups by name to ensure deterministic order.
+	// Sort pools by name to ensure a deterministic allocation order.
+	// Because the allocator uses a first-fit search, this allows driver authors
+	// to influence prioritization through their naming conventions.
 	sortPoolsByID(result)
 	sortPoolsByID(resultWithBindingConditions)
 

@@ -50,7 +50,6 @@ type DeviceClassLister = internal.DeviceClassLister
 type Features = internal.Features
 type DeviceID = internal.DeviceID
 
-// types_experimental
 type SharedDeviceID = internal.SharedDeviceID
 type ConsumedCapacityCollection = internal.ConsumedCapacityCollection
 type ConsumedCapacity = internal.ConsumedCapacity
@@ -1120,6 +1119,76 @@ func TestAllocator(t *testing.T,
 				localNodeSelector(node1),
 				deviceAllocationResult(req0, driverA, pool1, device1, false),
 				deviceAllocationResult(req0, driverA, pool2, device1, false),
+			)},
+		},
+		"lexicographical-sorting-pools": {
+			claimsToAllocate: objects(claimWithRequests(claim0, nil, request(req0, classA, 2))),
+			classes:          objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				// pool-3 before pool-2 before pool-1 in input.
+				sliceWithOneDevice(slice1, node1, resourcePool(pool3, 1), driverA),
+				sliceWithOneDevice(slice2, node1, resourcePool(pool2, 1), driverA),
+				sliceWithOneDevice(slice3, node1, resourcePool(pool1, 1), driverA),
+			),
+			node: node(node1, region1),
+
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req0, driverA, pool2, device1, false),
+			)},
+		},
+		"lexicographical-sorting-pools-with-binding-conditions": {
+			claimsToAllocate: objects(claimWithRequests(claim0, nil, request(req0, classA, 2))),
+			classes:          objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 1), driverA,
+					device(device1, nil, nil).withBindingConditions([]string{"Ready"}, nil),
+				),
+				sliceWithDevices(slice2, node1, resourcePool(pool3, 1), driverA, device(device2, nil, nil)),
+				sliceWithDevices(slice3, node1, resourcePool(pool2, 1), driverA, device(device3, nil, nil)),
+			),
+			node: node(node1, region1),
+
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool2, device3, false),
+				deviceAllocationResult(req0, driverA, pool3, device2, false),
+			)},
+		},
+		"lexicographical-sorting-slices": {
+			claimsToAllocate: objects(claimWithRequests(claim0, nil, request(req0, classA, 2))),
+			classes:          objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				// slice-3 before slice-2 before slice-1 in input.
+				sliceWithDevices(slice3, node1, resourcePool(pool1, 3), driverA, device(device3, nil, nil)),
+				sliceWithDevices(slice2, node1, resourcePool(pool1, 3), driverA, device(device2, nil, nil)),
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 3), driverA, device(device1, nil, nil)),
+			),
+			node: node(node1, region1),
+
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req0, driverA, pool1, device2, false),
+			)},
+		},
+		"lexicographical-sorting-slices-with-binding-conditions": {
+			claimsToAllocate: objects(claimWithRequests(claim0, nil, request(req0, classA, 2))),
+			classes:          objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 3), driverA,
+					device(device1, nil, nil).withBindingConditions([]string{"Ready"}, nil),
+				),
+				sliceWithDevices(slice3, node1, resourcePool(pool1, 3), driverA, device(device3, nil, nil)),
+				sliceWithDevices(slice2, node1, resourcePool(pool1, 3), driverA, device(device2, nil, nil)),
+			),
+			node: node(node1, region1),
+
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device2, false),
+				deviceAllocationResult(req0, driverA, pool1, device3, false),
 			)},
 		},
 		"obsolete-slice": {
@@ -6326,6 +6395,7 @@ func TestAllocator(t *testing.T,
 					t.Logf("allocated capacity: %v", allocation.ConsumedCapacity)
 				}
 			}
+			t.Logf("results: %+v", results)
 			g.Expect(results).To(gomega.ConsistOf(tc.expectResults...))
 
 			// Objects that the allocator had access to should not have been modified.
