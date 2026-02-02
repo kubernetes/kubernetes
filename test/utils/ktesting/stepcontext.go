@@ -16,11 +16,6 @@ limitations under the License.
 
 package ktesting
 
-// Deprecated: use tCtx.WithStep instead
-func WithStep(tCtx TContext, step string) TContext {
-	return tCtx.WithStep(step)
-}
-
 // WithStep creates a context where a prefix is added to all errors and log
 // messages, similar to how errors are wrapped. This can be nested, leaving a
 // trail of "bread crumbs" that help figure out where in a test some problem
@@ -35,12 +30,6 @@ func (tc *TC) WithStep(step string) *TC {
 	tc = tc.clone()
 	tc.steps += step + ": "
 	return tc
-}
-
-// Deprecated: use tCtx.Step instead
-func Step(tCtx TContext, step string, cb func(tCtx TContext)) {
-	tCtx.Helper()
-	tCtx.Step(step, cb)
 }
 
 // Step is useful when the context with the step information is

@@ -296,11 +296,6 @@ func run(tc *TC, name string, syncTest bool, cb func(tc *TC)) bool {
 	return false
 }
 
-// Deprecated: use tCtx.WithContext instead
-func WithContext(tCtx TContext, ctx context.Context) TContext {
-	return tCtx.WithContext(ctx)
-}
-
 // WithContext constructs a new TContext with a different Context instance.
 // This can be used in callbacks which receive a Context, for example
 // from Gomega:
@@ -320,11 +315,6 @@ func (tc *TC) WithContext(ctx context.Context) TContext {
 		tc = tc.WithLogger(logger)
 	}
 	return tc
-}
-
-// Deprecated: use tCtx.WithValue instead
-func WithValue(tCtx TContext, key, val any) TContext {
-	return tCtx.WithValue(key, val)
 }
 
 // WithValue wraps [context.WithValue] such that the result is again a TContext.
@@ -480,7 +470,7 @@ func (tc *TC) CleanupCtx(cb func(TContext)) {
 	if tb, ok := tc.TB().(ContextTB); ok {
 		// Use context from base TB (most likely Ginkgo).
 		tb.CleanupCtx(func(ctx context.Context) {
-			tCtx := WithContext(tc, ctx)
+			tCtx := tc.WithContext(ctx)
 			cb(tCtx)
 		})
 		return
@@ -491,7 +481,7 @@ func (tc *TC) CleanupCtx(cb func(TContext)) {
 		// context then has *no* deadline. In the code path above for
 		// Ginkgo, Ginkgo is more sophisticated and also applies
 		// timeouts to cleanup calls which accept a context.
-		childCtx := WithContext(tc, context.WithoutCancel(tc))
+		childCtx := tc.WithContext(context.WithoutCancel(tc))
 		cb(childCtx)
 	})
 }
