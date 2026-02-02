@@ -463,8 +463,13 @@ func (c *AssumeCache) Assume(obj interface{}) error {
 	c.pushEvent(objInfo.latestObj, obj)
 
 	// Only update the cached object
+	oldObj := objInfo.latestObj
 	objInfo.latestObj = obj
-	c.logger.V(4).Info("Assumed object", "description", c.description, "cacheKey", name, "version", newVersion)
+	if loggerV := c.logger.V(6); loggerV.Enabled() {
+		loggerV.Info("Assumed object", "description", c.description, "cacheKey", name, "version", newVersion, "oldObj", klog.Format(oldObj), "newObj", klog.Format(obj))
+	} else {
+		c.logger.V(5).Info("Assumed object", "description", c.description, "cacheKey", name, "version", newVersion)
+	}
 	return nil
 }
 
@@ -483,7 +488,7 @@ func (c *AssumeCache) Restore(objName string) {
 			c.pushEvent(objInfo.latestObj, objInfo.apiObj)
 			objInfo.latestObj = objInfo.apiObj
 		}
-		c.logger.V(4).Info("Restored object", "description", c.description, "cacheKey", objName)
+		c.logger.V(5).Info("Restored object", "description", c.description, "cacheKey", objName)
 	}
 }
 

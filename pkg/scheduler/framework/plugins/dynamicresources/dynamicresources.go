@@ -1149,6 +1149,14 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 	claimUIDs := []types.UID{claim.UID}
 	resourceClaimModified := false
 	defer func() {
+		// Creating the claim may have failed.
+		resourceVersion := ""
+		claimUID := types.UID("")
+		if claim != nil {
+			resourceVersion = claim.ResourceVersion
+			claimUID = claim.UID
+		}
+
 		// The scheduler was handling allocation. Now that has
 		// completed, either successfully or with a failure.
 		if resourceClaimModified {
@@ -1158,19 +1166,16 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 				// This can fail, but only for reasons that are okay (concurrent delete or update).
 				// Shouldn't happen in this case.
 				if err := pl.draManager.ResourceClaims().AssumeClaimAfterAPICall(claim); err != nil {
-					logger.V(5).Info("Claim not stored in assume cache", "err", err)
+					logger.V(5).Info("Claim not stored in assume cache", "err", err, "claim", klog.KObj(claim), "uid", claimUID, "resourceVersion", resourceVersion)
+				} else {
+					logger.V(5).Info("Claim stored in assume cache", "claim", klog.KObj(claim), "uid", claimUID, "resourceVersion", resourceVersion)
 				}
 			}
 		}
 		if allocation != nil {
 			for _, claimUID := range claimUIDs {
 				if deleted := pl.draManager.ResourceClaims().RemoveClaimPendingAllocation(claimUID); deleted {
-					// Creating the claim may have failed.
-					resourceVersion := ""
-					if claim != nil {
-						resourceVersion = claim.ResourceVersion
-					}
-					logger.V(5).Info("Released resource in allocation result", "claim", klog.KObj(claim), "uid", claimUID, "resourceVersion", resourceVersion, "allocation", klog.Format(allocation))
+					logger.V(5).Info("Removed claim from in-flight claims", "claim", klog.KObj(claim), "uid", claimUID, "resourceVersion", resourceVersion, "allocation", klog.Format(allocation))
 				}
 			}
 		}
