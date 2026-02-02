@@ -213,7 +213,8 @@ func (pl *InterPodAffinity) PreScore(
 		return fwk.NewStatus(fwk.Skip)
 	}
 
-	for i := 0; i <= int(index.Load()); i++ {
+	end := int(index.Load())
+	for i := 0; i <= end; i++ {
 		state.topologyScore.append(topoScores[i])
 	}
 

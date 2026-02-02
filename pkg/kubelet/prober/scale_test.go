@@ -220,7 +220,7 @@ func newFakePod(httpServer bool) (*fakePod, error) {
 					// exit when the listener is closed
 					return
 				}
-					f.numConnection.Add(1)
+				f.numConnection.Add(1)
 				// handle request but not block
 				go func(c net.Conn) {
 					defer c.Close()

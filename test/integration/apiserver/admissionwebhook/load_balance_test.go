@@ -349,7 +349,7 @@ func (c *connectionTrackingListener) Reset() {
 func (c *connectionTrackingListener) Accept() (net.Conn, error) {
 	conn, err := c.delegate.Accept()
 	if err == nil {
-		c.connections.Store(1)
+		c.connections.Add(1)
 	}
 	return conn, err
 }

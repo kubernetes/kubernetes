@@ -298,8 +298,8 @@ func TestUntilWithSync(t *testing.T) {
 
 			event, err := UntilWithSync(ctx, tc.lw, &corev1.Secret{}, tc.preconditionFunc, tc.conditionFunc)
 
-			if !reflect.DeepEqual(err, tc.expectedErr) {
-				t.Errorf("expected error %#v, got %#v", tc.expectedErr, err)
+			if !errors.Is(err, tc.expectedErr) {
+				t.Errorf("expected error %v, got %v", tc.expectedErr, err)
 			}
 
 			if !reflect.DeepEqual(event, tc.expectedEvent) {

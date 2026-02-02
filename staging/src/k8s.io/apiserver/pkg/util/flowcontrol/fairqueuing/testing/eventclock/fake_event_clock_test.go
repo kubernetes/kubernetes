@@ -77,7 +77,7 @@ func exerciseTestableEventClock(t *testing.T, ec TestableEventClock, fuzz time.D
 	now = endTime
 	var shouldRun int32
 	strictable = false
-	for i := 0; i < batchSize; i++ {
+	for i := range batchSize {
 		d := time.Duration(rand.Intn(30)-3) * time.Second
 		try(i%2 == 0, d >= 0, d)
 		if d <= 12*time.Second {
@@ -85,9 +85,11 @@ func exerciseTestableEventClock(t *testing.T, ec TestableEventClock, fuzz time.D
 		}
 	}
 	ec.SetTime(now.Add(13*time.Second - 1))
-	if numDone.Load() != batchSize+1+shouldRun {
-		t.Errorf("Expected %v, but %v ran", shouldRun, numDone.Load()-batchSize-1)
+	got := numDone.Load()
+	if got != batchSize+1+shouldRun {
+		t.Errorf("Expected %v, but %v ran", shouldRun, got-batchSize-1)
 	}
+
 	lastTime = now.Add(-3 * time.Second)
 	for i := int32(0); i < shouldRun; i++ {
 		nextTime := <-times

@@ -79,7 +79,7 @@ func TestCachingObject(t *testing.T) {
 	}
 	for _, encoder := range encoders {
 		if encoder.callsNumber.Load() != 1 {
-			t.Errorf("%s: unexpected number of encode() calls: %d", encoder.identifier, encoder.callsNumber)
+			t.Errorf("%s: unexpected number of encode() calls: %d", encoder.identifier, encoder.callsNumber.Load())
 		}
 	}
 }

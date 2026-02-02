@@ -34,7 +34,7 @@ func Wrapper(r webhook.AuthenticationInfoResolver) func(webhook.AuthenticationIn
 
 // NewAuthenticationInfoResolver creates a fake AuthenticationInfoResolver that counts cache misses on
 // every call to its methods.
-func NewAuthenticationInfoResolver(cacheMisses *int32) webhook.AuthenticationInfoResolver {
+func NewAuthenticationInfoResolver(cacheMisses *atomic.Int32) webhook.AuthenticationInfoResolver {
 	a := &authenticationInfoResolver{
 		restConfig: &rest.Config{
 			TLSClientConfig: rest.TLSClientConfig{
@@ -44,7 +44,7 @@ func NewAuthenticationInfoResolver(cacheMisses *int32) webhook.AuthenticationInf
 			},
 		},
 	}
-	a.cacheMisses.Store(*cacheMisses)
+	a.cacheMisses.Store(cacheMisses.Load())
 	return a
 }
 

@@ -1123,7 +1123,7 @@ func (jm *Controller) deleteActivePods(ctx context.Context, job *batch.Job, pods
 	errCh := make(chan error, len(pods))
 	var successfulDeletes, deletedReady atomic.Int32
 	successfulDeletes.Store(int32(len(pods)))
-	wg := sync.WaitGroup{}
+	var wg sync.WaitGroup
 	wg.Add(len(pods))
 	for i := range pods {
 		go func(pod *v1.Pod) {
@@ -1697,10 +1697,7 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 		}
 	}
 
-	rmAtLeast := active.Load() - wantActive
-	if rmAtLeast < 0 {
-		rmAtLeast = 0
-	}
+	rmAtLeast := max(active.Load() - wantActive, 0)
 	podsToDelete := activePodsForRemoval(job, jobCtx.activePods, int(rmAtLeast))
 	if len(podsToDelete) > MaxPodCreateDeletePerSync {
 		podsToDelete = podsToDelete[:MaxPodCreateDeletePerSync]

@@ -56,15 +56,14 @@ func (o testObject) DeepCopyObject() runtime.Object   { return o }
 func (o testObject) GetResourceVersion() string       { return o.resourceVersion }
 
 func withCounter(w cache.Watcher) (*atomic.Uint32, cache.WatcherWithContext) {
-    var counter atomic.Uint32
-    return &counter, &cache.ListWatch{
-        WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-            counter.Add(1)
-            return w.Watch(options)
-        },
-    }
+	var counter atomic.Uint32
+	return &counter, &cache.ListWatch{
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			counter.Add(1)
+			return w.Watch(options)
+		},
+	}
 }
-
 
 func makeTestEvent(rv int) watch.Event {
 	return watch.Event{
@@ -124,11 +123,11 @@ func fromRV(resourceVersion string, array []watch.Event) []watch.Event {
 }
 
 func closeAfterN(n int, source chan watch.Event) chan watch.Event {
-	result := make(chan watch.Event, 0)
+	result := make(chan watch.Event)
 	go func() {
 		defer close(result)
 		defer close(source)
-		for i := 0; i < n; i++ {
+		for range n {
 			result <- <-source
 		}
 	}()
@@ -162,8 +161,8 @@ func TestNewRetryWatcher(t *testing.T) {
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := NewRetryWatcher(tc.initialRV, nil)
-			if !reflect.DeepEqual(err, tc.err) {
-				t.Errorf("Expected error: %v, got: %v", tc.err, err)
+			if !errors.Is(err, tc.err) {
+				t.Errorf("Expected error %v, got %v", tc.err, err)
 			}
 		})
 	}

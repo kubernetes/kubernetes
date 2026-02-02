@@ -221,7 +221,8 @@ func (pl *InterPodAffinity) getExistingAntiAffinityCounts(ctx context.Context, p
 
 	result := make(topologyToMatchedTermCount)
 	// Traditional for loop is slightly faster in this case than its "for range" equivalent.
-	for i := 0; i <= int(index.Load()); i++ {
+	end := index.Load()
+	for i := int32(0); i <= end; i++ {
 		result.mergeWithList(antiAffinityCountsList[i])
 	}
 
@@ -264,7 +265,8 @@ func (pl *InterPodAffinity) getIncomingAffinityAntiAffinityCounts(ctx context.Co
 	}
 	pl.parallelizer.Until(ctx, len(allNodes), processNode, pl.Name())
 
-	for i := 0; i <= int(index.Load()); i++ {
+	end := index.Load()
+	for i := int32(0); i <= end; i++ {
 		affinityCounts.mergeWithList(affinityCountsList[i])
 		antiAffinityCounts.mergeWithList(antiAffinityCountsList[i])
 	}

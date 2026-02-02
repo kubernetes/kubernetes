@@ -697,7 +697,8 @@ func (sched *Scheduler) findNodesThatPassFilters(
 	// Stops searching for more nodes once the configured number of feasible nodes
 	// are found.
 	schedFramework.Parallelizer().Until(ctx, numAllNodes, checkNode, metrics.Filter)
-	feasibleNodes = feasibleNodes[:feasibleNodesLen.Load()]
+	len := feasibleNodesLen.Load()
+	feasibleNodes = feasibleNodes[:len]
 	for _, item := range result {
 		if item == nil {
 			continue
