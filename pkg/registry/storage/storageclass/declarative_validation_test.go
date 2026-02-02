@@ -96,7 +96,7 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			}),
 			expectedErrs: field.ErrorList{
 				field.Required(field.NewPath("provisioner"), ""),
-				field.Forbidden(field.NewPath("provisioner"), "updates to provisioner are forbidden."),
+				field.Forbidden(field.NewPath("provisioner"), "updates to provisioner are forbidden.").MarkOriginatingFromImperative(),
 			},
 		},
 	}
