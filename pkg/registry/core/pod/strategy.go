@@ -47,6 +47,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/warning"
 	"k8s.io/client-go/tools/cache"
+	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -83,6 +84,42 @@ func (podStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	return fields
 }
 
+// defaultPodResourceLimits sets pod-level limits from aggregated container limits
+// when pod-level requests are set but limits are not.
+// This is gated by PodLevelResources and PodLevelResourcesFixUpdateDefaulting.
+func defaultPodResourceLimits(pod *api.Pod) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) ||
+		!utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixUpdateDefaulting) {
+		return
+	}
+	if pod.Spec.Resources == nil ||
+		len(pod.Spec.Resources.Requests) == 0 ||
+		len(pod.Spec.Resources.Limits) > 0 {
+		return
+	}
+
+	// Convert internal pod -> v1 pod for aggregation helper
+	obj, err := legacyscheme.Scheme.ConvertToVersion(pod, apiv1.SchemeGroupVersion)
+	if err != nil {
+		return
+	}
+	v1Pod := obj.(*apiv1.Pod)
+	aggrLimits := resourcehelper.AggregateContainerLimits(v1Pod, resourcehelper.PodResourcesOptions{})
+
+	// Only default limits for resources explicitly requested at pod-level.
+	// Only default CPU and memory; other resources like hugepages should be explicitly set.
+	pod.Spec.Resources.Limits = api.ResourceList{}
+	for resName := range pod.Spec.Resources.Requests {
+		// Only default CPU and memory resources
+		if resName != api.ResourceCPU && resName != api.ResourceMemory {
+			continue
+		}
+		if q, ok := aggrLimits[apiv1.ResourceName(resName)]; ok {
+			pod.Spec.Resources.Limits[resName] = q
+		}
+	}
+}
+
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
 func (podStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	pod := obj.(*api.Pod)
@@ -93,7 +130,7 @@ func (podStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	}
 
 	podutil.DropDisabledPodFields(pod, nil)
-
+	defaultPodResourceLimits(pod)
 	applySchedulingGatedCondition(pod)
 	mutatePodAffinity(pod)
 	mutateTopologySpreadConstraints(pod)
@@ -418,6 +455,7 @@ func (podResizeStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 
 	*newPod = *dropNonResizeUpdates(newPod, oldPod)
 	podutil.DropDisabledPodFields(newPod, oldPod)
+	defaultPodResourceLimits(newPod)
 	updatePodGeneration(newPod, oldPod)
 }
 
