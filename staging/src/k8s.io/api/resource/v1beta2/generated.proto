@@ -882,6 +882,7 @@ message DeviceRequestAllocationResult {
   //
   // +required
   // +k8s:format=k8s-long-name-caseless
+  // +k8s:maxLength=63
   // +k8s:required
   optional string driver = 2;
 
@@ -1349,6 +1350,7 @@ message OpaqueDeviceConfiguration {
   //
   // +required
   // +k8s:required
+  // +k8s:maxLength=63
   // +k8s:format=k8s-long-name-caseless
   optional string driver = 1;
 

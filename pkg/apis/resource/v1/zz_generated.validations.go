@@ -1019,6 +1019,7 @@ func Validate_DeviceRequestAllocationResult(ctx context.Context, op operation.Op
 				return // do not proceed
 			}
 			errs = append(errs, validate.LongNameCaseless(ctx, op, fldPath, obj, oldObj)...)
+			errs = append(errs, validate.MaxLength(ctx, op, fldPath, obj, oldObj, 63)...)
 			return
 		}(fldPath.Child("driver"), &obj.Driver, safe.Field(oldObj, func(oldObj *resourcev1.DeviceRequestAllocationResult) *string { return &oldObj.Driver }), oldObj != nil)...)
 
@@ -1468,6 +1469,7 @@ func Validate_OpaqueDeviceConfiguration(ctx context.Context, op operation.Operat
 				return // do not proceed
 			}
 			errs = append(errs, validate.LongNameCaseless(ctx, op, fldPath, obj, oldObj)...)
+			errs = append(errs, validate.MaxLength(ctx, op, fldPath, obj, oldObj, 63)...)
 			return
 		}(fldPath.Child("driver"), &obj.Driver, safe.Field(oldObj, func(oldObj *resourcev1.OpaqueDeviceConfiguration) *string { return &oldObj.Driver }), oldObj != nil)...)
 

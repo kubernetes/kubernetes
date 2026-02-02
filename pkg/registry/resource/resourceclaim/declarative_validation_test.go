@@ -190,10 +190,17 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				field.Required(opaqueDriverPath, ""),
 			},
 		},
-		"invalid opaque driver, too long": {
+		"invalid opaque driver, too long - 64 characters": {
 			input: mkValidResourceClaim(tweakDeviceConfigWithDriver(strings.Repeat("a", 64))),
 			expectedErrs: field.ErrorList{
-				field.TooLong(opaqueDriverPath, "", 63),
+				field.TooLong(opaqueDriverPath, "", 63).WithOrigin("maxLength"),
+			},
+		},
+		"invalid opaque driver, too long - 255 characters": {
+			input: mkValidResourceClaim(tweakDeviceConfigWithDriver(strings.Repeat("a", 255))),
+			expectedErrs: field.ErrorList{
+				field.TooLong(opaqueDriverPath, "", 63).WithOrigin("maxLength"),
+				field.Invalid(opaqueDriverPath, "", "").WithOrigin("format=k8s-long-name-caseless"),
 			},
 		},
 		"invalid opaque driver, invalid character": {
@@ -849,11 +856,19 @@ func testValidateStatusUpdateForDeclarative(t *testing.T, apiVersion string) {
 				field.Required(driverPath, ""),
 			},
 		},
-		"invalid driver name, too long": {
+		"invalid driver name, too long - 64 characters": {
 			old:    mkValidResourceClaim(),
 			update: mkResourceClaimWithStatus(tweakStatusDeviceRequestAllocationResultDriver(strings.Repeat("a", 64))),
 			expectedErrs: field.ErrorList{
-				field.TooLong(driverPath, "", 63),
+				field.TooLong(driverPath, "", 63).WithOrigin("maxLength"),
+			},
+		},
+		"invalid driver name, too long - 255 characters": {
+			old:    mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(tweakStatusDeviceRequestAllocationResultDriver(strings.Repeat("a", 255))),
+			expectedErrs: field.ErrorList{
+				field.TooLong(driverPath, "", 63).WithOrigin("maxLength"),
+				field.Invalid(driverPath, "", "").WithOrigin("format=k8s-long-name-caseless"),
 			},
 		},
 		"invalid driver name, invalid character": {
