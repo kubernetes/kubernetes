@@ -1,5 +1,5 @@
 /*
-Copyright 2026 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,10 +17,11 @@ limitations under the License.
 package egressselector
 
 import (
-	"os"
 	"testing"
+
+	"k8s.io/kubernetes/test/integration/framework"
 )
 
 func TestMain(m *testing.M) {
-	os.Exit(m.Run())
+	framework.EtcdMain(m.Run)
 }
