@@ -1,8 +1,8 @@
 # Project Roadmap
 
-**Generated:** 2026-02-02 14:44:43
+**Generated:** 2026-02-02 14:47:00
 **Repository:** omer-dayan/kubernetes
-**Open Issues:** 1
+**Open Issues:** 2
 
 ## Overview
 
@@ -13,6 +13,37 @@ This roadmap outlines the planned work based on current open issues. Issues are 
 ## Priority Analysis
 
 ### High Priority Issues
+
+
+#### Issue #2: [Scheduler] Add an extension after PostFilter that will always execute
+
+**Status:** OPEN
+**Author:** romanbaron
+**Created:** 2026-02-02T12:46:59Z
+**URL:** https://github.com/omer-dayan/kubernetes/issues/2
+
+**Description:**
+```
+### What would you like to be added?
+
+I am a plugin developer, the plugin will have different actions according to the preemption result. For example, mark the podGorup (API in schedule-plugins) as failed and reject all the pods when failed to preempt, or I will mark the pods as schedulable (I will limit the number of times to schedule any pods in PodGroup for the performance).
+But when any of the plugin return code other than fwk.Unschedulable, scheduler will skip all plugins after that. This makes difficult to implement the PostFilter:
+
+If we run coscheduling before preemption, we can not know the preempt result.
+If we run coscheduling after preemption and preempt return error (for example the pod is deleted when in schedulingCycle), we are not able to reject the podGroup because the scheduling stop the iteration for the PostFilter.
+
+
+### Why is this needed?
+```
+
+**Action Items:**
+- [ ] Review issue details
+- [ ] Investigate root cause
+- [ ] Implement fix
+- [ ] Test solution
+- [ ] Close issue
+
+---
 
 
 #### Issue #1: Pod Controller does not working
