@@ -110,12 +110,12 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 		}
 	}
 
-	// Sort slices and the devices within them by name to ensure a deterministic
-	// allocation order regardless of the order in which the DRA driver provides them.
+	// Sort slices by name to ensure a deterministic allocation order
+	// regardless of the order in which the DRA driver provides them.
 	// Because the allocator uses a first-fit search, this allows driver authors
 	// to influence prioritization through their naming conventions.
-	sortSlicesAndDevicesByName(normalSlices)
-	sortSlicesAndDevicesByName(slicesWithBindingConditions)
+	sortSlicesByName(normalSlices)
+	sortSlicesByName(slicesWithBindingConditions)
 	// If there is a Device in the ResourceSlice that contains BindingConditions,
 	// the ResourceSlice should be sorted to be after the ResourceSlice without BindingConditions
 	// because then the allocation is going to prefer the simpler devices without
@@ -196,6 +196,11 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 		}
 		result = append(result, pool)
 	}
+
+	// Sort both groups by name to ensure deterministic order.
+	sortPoolsByID(result)
+	sortPoolsByID(resultWithBindingConditions)
+
 	if len(resultWithBindingConditions) != 0 {
 		result = append(result, resultWithBindingConditions...)
 	}
@@ -203,15 +208,16 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 	return result, nil
 }
 
-func sortSlicesAndDevicesByName(slicesToSort []*resourceapi.ResourceSlice) {
+func sortSlicesByName(slicesToSort []*resourceapi.ResourceSlice) {
 	slices.SortFunc(slicesToSort, func(a, b *resourceapi.ResourceSlice) int {
 		return cmp.Compare(a.Name, b.Name)
 	})
-	for _, slice := range slicesToSort {
-		slices.SortFunc(slice.Spec.Devices, func(a, b resourceapi.Device) int {
-			return cmp.Compare(a.Name, b.Name)
-		})
-	}
+}
+
+func sortPoolsByID(pools []*Pool) {
+	slices.SortFunc(pools, func(a, b *Pool) int {
+		return cmp.Compare(a.PoolID.String(), b.PoolID.String())
+	})
 }
 
 func addSlice(pools map[PoolID][]*draapi.ResourceSlice, s *resourceapi.ResourceSlice) error {

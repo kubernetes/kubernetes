@@ -50,6 +50,7 @@ type DeviceClassLister = internal.DeviceClassLister
 type Features = internal.Features
 type DeviceID = internal.DeviceID
 
+// types_experimental
 type SharedDeviceID = internal.SharedDeviceID
 type ConsumedCapacityCollection = internal.ConsumedCapacityCollection
 type ConsumedCapacity = internal.ConsumedCapacity
@@ -703,7 +704,7 @@ func requirements(request *resource.Quantity) map[resourceapi.QualifiedName]reso
 func multipleDeviceAllocationResults(request, driver, pool string, count, startIndex int) []resourceapi.DeviceRequestAllocationResult {
 	var results []resourceapi.DeviceRequestAllocationResult
 	for i := startIndex; i < startIndex+count; i++ {
-		results = append(results, deviceAllocationResult(request, driver, pool, fmt.Sprintf("device-%02d", i), false))
+		results = append(results, deviceAllocationResult(request, driver, pool, fmt.Sprintf("device-%d", i), false))
 	}
 	return results
 }
@@ -852,7 +853,7 @@ func sliceWithOneDevice(name string, nodeSelection, pool any, driver string) wra
 func sliceWithMultipleDevices(name string, nodeSelection, pool any, driver string, count int) wrapResourceSliceWithDevices {
 	var devices []wrapDevice
 	for i := 0; i < count; i++ {
-		devices = append(devices, device(fmt.Sprintf("device-%02d", i), nil, nil))
+		devices = append(devices, device(fmt.Sprintf("device-%d", i), nil, nil))
 	}
 	return sliceWithDevices(name, nodeSelection, pool, driver, devices...)
 }
@@ -2131,9 +2132,9 @@ func TestAllocator(t *testing.T,
 				allocationResultWithConfigs(
 					localNodeSelector(node1),
 					objects(
-						deviceAllocationResult(req0, driverA, pool1, "device-00", false),
-						deviceAllocationResult(req1, driverA, pool1, "device-01", false),
-						deviceAllocationResult(req2, driverB, pool1, "device-1", false),
+						deviceAllocationResult(req0, driverA, pool1, device0, false),
+						deviceAllocationResult(req1, driverA, pool1, device1, false),
+						deviceAllocationResult(req2, driverB, pool1, device1, false),
 					),
 					[]resourceapi.DeviceAllocationConfiguration{
 						{
@@ -3996,10 +3997,10 @@ func TestAllocator(t *testing.T,
 			node: node(node1, region1),
 			expectResults: []any{allocationResult(
 				localNodeSelector(node1),
-				deviceAllocationResult(req0SubReq1, driverA, pool1, "device-00", false),
-				deviceAllocationResult(req0SubReq1, driverA, pool1, "device-01", false),
-				deviceAllocationResult(req1, driverB, pool2, "device-00", false),
-				deviceAllocationResult(req1, driverB, pool2, "device-01", false),
+				deviceAllocationResult(req0SubReq1, driverA, pool1, "device-0", false),
+				deviceAllocationResult(req0SubReq1, driverA, pool1, "device-1", false),
+				deviceAllocationResult(req1, driverB, pool2, "device-0", false),
+				deviceAllocationResult(req1, driverB, pool2, "device-1", false),
 			)},
 			expectNumAllocateOneInvocations: 42,
 		},
