@@ -20,11 +20,11 @@ ARG SETCAP_IMAGE
 # to setup qemu for the builder.
 FROM --platform=linux/$BUILDARCH ${SETCAP_IMAGE}
 ARG BINARY
-COPY --chmod=755 ${BINARY} /set_cap_binary
+COPY --chmod=755 ${BINARY} /binary_to_set
 # We apply cap_net_bind_service so that kube-apiserver can be run as
 # non-root and still listen on port less than 1024
-RUN ["setcap", "cap_net_bind_service=+ep", "/set_cap_binary"]
+RUN ["/usr/sbin/setcap", "cap_net_bind_service=+ep", "/binary_to_set"]
 
 FROM --platform=linux/$TARGETARCH ${BASEIMAGE}
 ARG BINARY
-COPY --from=0 /set_cap_binary /usr/local/bin/${BINARY}
+COPY --from=0 /binary_to_set /usr/local/bin/${BINARY}
