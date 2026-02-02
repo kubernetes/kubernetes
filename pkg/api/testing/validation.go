@@ -336,6 +336,7 @@ func verifyValidationEquivalence(t *testing.T, expectedErrs field.ErrorList, run
 		})
 		declarativeBetaEnabledErrs = runValidations(ctx)
 
+		declarativeErrorMatcher := errOutputMatcher.ByErrorOrigination()
 		if len(expectedErrs) > 0 {
 			errOutputMatcher.Test(t, expectedErrs, declarativeBetaEnabledErrs)
 		} else if len(declarativeBetaEnabledErrs) != 0 {
