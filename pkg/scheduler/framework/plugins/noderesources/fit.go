@@ -177,8 +177,18 @@ func (pl *Fit) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *f
 		EnableDRAExtendedResource: pl.enableDRAExtendedResource,
 	}
 	if pl.enableDRAExtendedResource {
-		return nil, fwk.NewStatus(fwk.Unschedulable, "signature disabled when dra extended resources enabled")
+		podRequest := computePodResourceRequest(pod, opts)
+		for rName, rQuant := range podRequest.ScalarResources {
+			// Skip in case request quantity is zero
+			if rQuant == 0 {
+				continue
+			}
+			if shouldDelegateResourceToDRA(rName, nil, pl.draManager, opts) {
+				return nil, fwk.NewStatus(fwk.Unschedulable, "signature disabled when dra extended resources are used in the cluster")
+			}
+		}
 	}
+
 	return []fwk.SignFragment{
 		{Key: fwk.ResourcesSignerName, Value: computePodResourceRequest(pod, opts)},
 	}, nil
@@ -243,8 +253,10 @@ func shouldDelegateResourceToDRA(rName v1.ResourceName, nodeInfo fwk.NodeInfo, d
 		return false
 	}
 
-	if allocatable := nodeInfo.GetAllocatable().GetScalarResources()[rName]; allocatable > 0 {
-		return false
+	if nodeInfo != nil {
+		if allocatable := nodeInfo.GetAllocatable().GetScalarResources()[rName]; allocatable > 0 {
+			return false
+		}
 	}
 
 	if draManager == nil {
