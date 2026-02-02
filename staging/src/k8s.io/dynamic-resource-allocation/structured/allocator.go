@@ -227,7 +227,7 @@ var availableAllocators = []struct {
 			slices []*resourceapi.ResourceSlice,
 			celCache *cel.Cache,
 		) (Allocator, error) {
-			return incubating.NewAllocator(ctx, features, allocatedState.AllocatedDevices, classLister, slices, celCache)
+			return incubating.NewAllocator(ctx, features, allocatedState, classLister, slices, celCache)
 		},
 		nodeMatches: incubating.NodeMatches,
 	},
