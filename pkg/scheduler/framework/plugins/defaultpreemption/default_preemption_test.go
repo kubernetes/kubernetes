@@ -1242,8 +1242,9 @@ func TestDryRunPreemption(t *testing.T) {
 				for i := range got {
 					candidates = append(candidates, candidate{victims: got[i].Victims(), name: got[i].Name()})
 				}
-				if fakePlugin.NumFilterCalled.Add(-prevNumFilterCalled) != tt.expectedNumFilterCalled[cycle] {
-					t.Errorf("cycle %d: got NumFilterCalled=%d, want %d", cycle, fakePlugin.NumFilterCalled.Add(-prevNumFilterCalled), tt.expectedNumFilterCalled[cycle])
+				delta := fakePlugin.NumFilterCalled.Load() - prevNumFilterCalled
+				if delta != tt.expectedNumFilterCalled[cycle] {
+					t.Errorf("cycle %d: got NumFilterCalled=%d, want %d", cycle, delta, tt.expectedNumFilterCalled[cycle])
 				}
 				prevNumFilterCalled = fakePlugin.NumFilterCalled.Load()
 				if diff := cmp.Diff(tt.expected[cycle], candidates, cmp.AllowUnexported(candidate{})); diff != "" {
