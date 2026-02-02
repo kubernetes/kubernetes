@@ -18,6 +18,7 @@ package retry
 
 import (
 	"context"
+	stderrors "errors"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -65,7 +66,7 @@ func OnErrorWithContext(ctx context.Context, backoff wait.Backoff, retriable fun
 	})
 	// If the context was cancelled or the deadline was exceeded, return the context error.
 	// Otherwise, if we timed out (ran out of steps), return the last error we saw.
-	if err == context.Canceled || err == context.DeadlineExceeded {
+	if stderrors.Is(err, context.Canceled) || stderrors.Is(err, context.DeadlineExceeded) {
 		return err
 	}
 	if wait.Interrupted(err) {

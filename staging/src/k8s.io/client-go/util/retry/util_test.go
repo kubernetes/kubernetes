@@ -18,6 +18,7 @@ package retry
 
 import (
 	"context"
+	stderrors "errors"
 	"fmt"
 	"testing"
 	"time"
@@ -82,7 +83,7 @@ func TestRetryOnConflictWithContext(t *testing.T) {
 	err := RetryOnConflictWithContext(ctx, opts, func(context.Context) error {
 		return conflictErr
 	})
-	if err != context.Canceled {
+	if !stderrors.Is(err, context.Canceled) {
 		t.Errorf("expected context.Canceled, got: %v", err)
 	}
 
@@ -96,7 +97,7 @@ func TestRetryOnConflictWithContext(t *testing.T) {
 		}
 		return conflictErr
 	})
-	if err != context.Canceled {
+	if !stderrors.Is(err, context.Canceled) {
 		t.Errorf("expected context.Canceled, got: %v", err)
 	}
 
@@ -108,7 +109,7 @@ func TestRetryOnConflictWithContext(t *testing.T) {
 		i++
 		return conflictErr
 	})
-	if err != context.DeadlineExceeded {
+	if !stderrors.Is(err, context.DeadlineExceeded) {
 		t.Errorf("expected context.DeadlineExceeded, got: %v", err)
 	}
 	if i < 1 {
@@ -121,7 +122,7 @@ func TestRetryOnConflictWithContext(t *testing.T) {
 		i++
 		return conflictErr
 	})
-	if err != conflictErr {
+	if !stderrors.Is(err, conflictErr) {
 		t.Errorf("expected conflictErr, got: %v", err)
 	}
 	if i != opts.Steps {
@@ -189,7 +190,7 @@ func TestOnErrorWithContext(t *testing.T) {
 	testErr := fmt.Errorf("test error")
 	retriableErr := fmt.Errorf("retriable error")
 	retriable := func(err error) bool {
-		return err == retriableErr
+		return stderrors.Is(err, retriableErr)
 	}
 
 	// context cancelled before first attempt - returns context.Canceled immediately
@@ -198,7 +199,7 @@ func TestOnErrorWithContext(t *testing.T) {
 	err := OnErrorWithContext(ctx, opts, retriable, func(context.Context) error {
 		return testErr
 	})
-	if err != context.Canceled {
+	if !stderrors.Is(err, context.Canceled) {
 		t.Errorf("expected context.Canceled, got: %v", err)
 	}
 
@@ -212,7 +213,7 @@ func TestOnErrorWithContext(t *testing.T) {
 		}
 		return retriableErr
 	})
-	if err != context.Canceled {
+	if !stderrors.Is(err, context.Canceled) {
 		t.Errorf("expected context.Canceled, got: %v", err)
 	}
 
@@ -224,7 +225,7 @@ func TestOnErrorWithContext(t *testing.T) {
 		i++
 		return retriableErr
 	})
-	if err != context.DeadlineExceeded {
+	if !stderrors.Is(err, context.DeadlineExceeded) {
 		t.Errorf("expected context.DeadlineExceeded, got: %v", err)
 	}
 	if i < 1 {
@@ -237,7 +238,7 @@ func TestOnErrorWithContext(t *testing.T) {
 		i++
 		return retriableErr
 	})
-	if err != retriableErr {
+	if !stderrors.Is(err, retriableErr) {
 		t.Errorf("expected retriableErr, got: %v", err)
 	}
 	if i != opts.Steps {
