@@ -62,6 +62,7 @@ type qosContainerManagerImpl struct {
 	getNodeAllocatable func() v1.ResourceList
 	cgroupRoot         CgroupName
 	qosReserved        map[v1.ResourceName]int64
+	cpuidleSupported   bool
 }
 
 func NewQOSContainerManager(subsystems *CgroupSubsystems, cgroupRoot CgroupName, nodeConfig NodeConfig, cgroupManager CgroupManager) (QOSContainerManager, error) {
@@ -72,10 +73,11 @@ func NewQOSContainerManager(subsystems *CgroupSubsystems, cgroupRoot CgroupName,
 	}
 
 	return &qosContainerManagerImpl{
-		subsystems:    subsystems,
-		cgroupManager: cgroupManager,
-		cgroupRoot:    cgroupRoot,
-		qosReserved:   nodeConfig.QOSReserved,
+		subsystems:       subsystems,
+		cgroupManager:    cgroupManager,
+		cgroupRoot:       cgroupRoot,
+		qosReserved:      nodeConfig.QOSReserved,
+		cpuidleSupported: isCPUIdleSupported(),
 	}, nil
 }
 
@@ -113,9 +115,9 @@ func isCPUIdleSupported() bool {
 // If CPUIdleForBestEffortQoS feature gate is enabled and the node support cpu.idle feature,
 // set cpu.idle to 1 in Unified field of ResourceConfig.
 // Otherwise, set cpu.shares to MinShares.
-func setBestEffortResourceParemeter(rp *ResourceConfig) {
+func (m *qosContainerManagerImpl) setBestEffortResourceParemeter(rp *ResourceConfig) {
 	isCPUIdleFGEnabled := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUIdleForBestEffortQoS)
-	if isCPUIdleSupported() {
+	if m.cpuidleSupported {
 		if rp.Unified == nil {
 			rp.Unified = make(map[string]string)
 		}
@@ -152,7 +154,7 @@ func (m *qosContainerManagerImpl) Start(ctx context.Context, getNodeAllocatable 
 		resourceParameters := &ResourceConfig{}
 		// the BestEffort QoS class has a statically configured minShares value or set cpu.idle value if feature enabled
 		if qosClass == v1.PodQOSBestEffort {
-			setBestEffortResourceParemeter(resourceParameters)
+			m.setBestEffortResourceParemeter(resourceParameters)
 		}
 
 		// containerConfig object stores the cgroup specifications
@@ -242,7 +244,7 @@ func (m *qosContainerManagerImpl) setCPUCgroupConfig(configs map[v1.PodQOSClass]
 	}
 
 	// the BestEffort QoS class has a statically configured minShares value or set cpu.idle value if feature enabled
-	setBestEffortResourceParemeter(configs[v1.PodQOSBestEffort].ResourceParameters)
+	m.setBestEffortResourceParemeter(configs[v1.PodQOSBestEffort].ResourceParameters)
 
 	// set burstable shares based on current observe state
 	burstableCPUShares := MilliCPUToShares(burstablePodCPURequest)

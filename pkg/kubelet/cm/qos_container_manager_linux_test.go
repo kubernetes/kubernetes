@@ -27,6 +27,8 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/version"
+
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	resource "k8s.io/apimachinery/pkg/api/resource"
@@ -136,6 +138,17 @@ func createTestQOSContainerManager(logger klog.Logger) (*qosContainerManagerImpl
 
 	return qosContainerManager, nil
 }
+func isCPUIdleSupportedTest(kernelVersion string, isCgroupV2 bool) bool {
+	currentVersion := version.MustParseGeneric(kernelVersion)
+	requireVersion := version.MustParseGeneric("5.4")
+	if !currentVersion.AtLeast(requireVersion) {
+		return false
+	}
+	if !isCgroupV2 {
+		return false
+	}
+	return true
+}
 
 func TestQoSContainerCgroup(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
@@ -170,16 +183,29 @@ func TestCPUIdleForBestEffortQoS(t *testing.T) {
 		name                    string
 		cpuIdleFeatureEnabled   bool
 		expectBestEffortCPUIdle bool
+		isCgroupV2              bool
+		kernelVersion           string
 	}{
 		{
-			name:                    "CPUIdle feature enabled",
+			name:                    "CPUIdle feature enabled,cpuidle not support",
 			cpuIdleFeatureEnabled:   true,
 			expectBestEffortCPUIdle: true,
+			isCgroupV2:              true,
+			kernelVersion:           "5.5",
+		},
+		{
+			name:                    "CPUIdle feature enabled,but cpuidle not support",
+			cpuIdleFeatureEnabled:   true,
+			expectBestEffortCPUIdle: true,
+			isCgroupV2:              true,
+			kernelVersion:           "5.3",
 		},
 		{
 			name:                    "CPUIdle feature disabled",
 			cpuIdleFeatureEnabled:   false,
 			expectBestEffortCPUIdle: false,
+			isCgroupV2:              true,
+			kernelVersion:           "5.3",
 		},
 	}
 	for _, tt := range tests {
@@ -187,6 +213,7 @@ func TestCPUIdleForBestEffortQoS(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
 			m, err := createTestQOSContainerManager(logger)
 			assert.NoError(t, err)
+			m.cpuidleSupported = isCPUIdleSupportedTest(tt.kernelVersion, tt.isCgroupV2)
 
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.CPUIdleForBestEffortQoS, tt.cpuIdleFeatureEnabled)
 
@@ -600,16 +627,29 @@ func TestCPUIdleForBestEffortQOSConfigUpdate(t *testing.T) {
 		cpuIdleFeatureEnabled     bool
 		expectBestEffortCPUIdle   bool
 		expectBestEffortCPUShares bool
+		isCgroupV2                bool
+		kernelVersion             string
 	}{
 		{
-			name:                    "CPUIdle enabled - BestEffort should use cpu.idle",
+			name:                    "CPUIdle enabled & CPUIDLE support - BestEffort should use cpu.idle",
 			cpuIdleFeatureEnabled:   true,
 			expectBestEffortCPUIdle: true,
+			isCgroupV2:              true,
+			kernelVersion:           "5.5",
+		},
+		{
+			name:                    "CPUIdle enabled & CPUIDLE not support - BestEffort should use cpu.shares",
+			cpuIdleFeatureEnabled:   true,
+			expectBestEffortCPUIdle: false,
+			isCgroupV2:              true,
+			kernelVersion:           "5.3",
 		},
 		{
 			name:                      "CPUIdle disabled - BestEffort should use cpu.shares",
 			cpuIdleFeatureEnabled:     false,
 			expectBestEffortCPUShares: true,
+			isCgroupV2:                true,
+			kernelVersion:             "5.5",
 		},
 	}
 
@@ -621,6 +661,7 @@ func TestCPUIdleForBestEffortQOSConfigUpdate(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Unable to create Test Qos Container Manager: %s", err)
 			}
+			testContainerManager.cpuidleSupported = isCPUIdleSupportedTest(tt.kernelVersion, tt.isCgroupV2)
 			// Set feature gate
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.CPUIdleForBestEffortQoS, tt.cpuIdleFeatureEnabled)
 
