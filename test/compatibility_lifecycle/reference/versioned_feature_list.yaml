@@ -891,6 +891,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.34"
+  - default: true
+    lockToDefault: false
+    preRelease: GA
+    version: "1.36"
 - name: KubeletPodResourcesGet
   versionedSpecs:
   - default: false
@@ -901,6 +905,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.34"
+  - default: true
+    lockToDefault: false
+    preRelease: GA
+    version: "1.36"
 - name: KubeletPodResourcesListUseActivePods
   versionedSpecs:
   - default: false
