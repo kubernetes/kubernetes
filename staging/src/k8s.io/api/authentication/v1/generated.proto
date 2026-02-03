@@ -66,6 +66,7 @@ message SelfSubjectReview {
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // status is filled in by the server with the user attributes.
+  // +optional
   optional SelfSubjectReviewStatus status = 2;
 }
 
@@ -84,6 +85,7 @@ message TokenRequest {
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec holds information about the request being evaluated
+  // +optional
   optional TokenRequestSpec spec = 2;
 
   // status is filled in by the server and indicates whether the token can be authenticated.
@@ -99,6 +101,7 @@ message TokenRequestSpec {
   // token issued for multiple audiences may be used to authenticate
   // against any of the audiences listed but implies a high degree of
   // trust between the target audiences.
+  // +optional
   // +listType=atomic
   repeated string audiences = 1;
 
@@ -120,9 +123,11 @@ message TokenRequestSpec {
 // TokenRequestStatus is the result of a token request.
 message TokenRequestStatus {
   // token is the opaque bearer token.
+  // +optional
   optional string token = 1;
 
   // expirationTimestamp is the time of expiration of the returned token.
+  // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time expirationTimestamp = 2;
 }
 
@@ -136,6 +141,7 @@ message TokenReview {
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec holds information about the request being evaluated
+  // +required
   optional TokenReviewSpec spec = 2;
 
   // status is filled in by the server and indicates whether the request can be authenticated.
@@ -146,7 +152,7 @@ message TokenReview {
 // TokenReviewSpec is a description of the token authentication request.
 message TokenReviewSpec {
   // token is the opaque bearer token.
-  // +optional
+  // +required
   optional string token = 1;
 
   // audiences is a list of the identifiers that the resource server presented
