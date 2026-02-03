@@ -1276,6 +1276,7 @@ func (alloc *allocator) selectorsMatch(r requestIndices, device *draapi.Device, 
 
 		if err != nil {
 			// TODO (future): more detailed errors which reference class resp. claim.
+			err = cel.EnhanceRuntimeError(err)
 			if class != nil {
 				return false, fmt.Errorf("class %s: selector #%d: CEL runtime error: %w", class.Name, i, err)
 			}
