@@ -174,6 +174,16 @@ func tryDecodeSinglePod(logger klog.Logger, data []byte, defaultFn defaultFunc) 
 			return true, nil, ErrStaticPodTriedToUseResourceClaims
 		}
 	}
+	podSpec := newPod.Spec
+	if podSpec.Priority != nil && podSpec.PriorityClassName == "" {
+		logger.Info("Static Pod has Priority set without PriorityClassName. Mirror Pod creation will fail", "pod", klog.KObj(newPod), "priority", podSpec.Priority)
+	}
+	if podSpec.Priority != nil && *podSpec.Priority != 2000001000 {
+		logger.Info("Static Pod has Priority set to non-standard value. Mirror Pod creation will fail", "pod", klog.KObj(newPod), "priority", podSpec.Priority)
+	}
+	if podSpec.PriorityClassName != "" && podSpec.PriorityClassName != "system-node-critical" {
+		logger.Info("Static Pod has PriorityClassName set to non-standard value. Mirror Pod creation will fail", "pod", klog.KObj(newPod), "priorityClassName", podSpec.PriorityClassName)
+	}
 
 	return true, v1Pod, nil
 }
