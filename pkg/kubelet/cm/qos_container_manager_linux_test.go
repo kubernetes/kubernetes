@@ -621,11 +621,8 @@ func TestCPUIdleForBestEffortQOSConfigUpdate(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Unable to create Test Qos Container Manager: %s", err)
 			}
-
 			// Set feature gate
-			if tt.cpuIdleFeatureEnabled {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.CPUIdleForBestEffortQoS, true)
-			}
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.CPUIdleForBestEffortQoS, tt.cpuIdleFeatureEnabled)
 
 			fakecgroupManager := &fakeCgroupManager{}
 			testContainerManager.cgroupManager = fakecgroupManager
