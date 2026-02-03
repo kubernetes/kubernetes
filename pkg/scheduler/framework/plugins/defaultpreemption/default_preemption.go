@@ -28,11 +28,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
-
 	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
@@ -52,20 +53,26 @@ const Name = names.DefaultPreemption
 // problems if system pods are unable to find space.
 type IsEligiblePodFunc func(nodeInfo fwk.NodeInfo, victim fwk.PodInfo, preemptor *v1.Pod) bool
 
+// IsEligiblePreemptorFunc is a function which may be assigned to the DefaultPreemption plugin.
+// It determines whether the incoming preemptor (whether a single Pod or a collective PodGroup)
+// is allowed to initiate preemption against existing victims.
 type IsEligiblePreemptorFunc func(domain preemption.Domain, victim preemption.PreemptionUnit, preemptor preemption.Preemptor) bool
 
-// MoreImportantPodFunc is a function which may be assigned to the DefaultPreemption plugin.
-// Implementations should return true if the first pod is more important than the second pod
+// MoreImportantVictimFunc is a function which may be assigned to the DefaultPreemption plugin.
+// Implementations should return true if the first victim is more important than the second victim
 // and the second one should be considered for preemption before the first one.
 // For performance reasons, the search for nodes eligible for preemption is done by omitting all
 // eligible victims from a node then checking whether the preemptor fits on the node without them,
 // before adding back victims (starting from the most important) that still fit with the preemptor.
 // The default behavior is to not consider pod affinity between the preemptor and the victims,
 // as affinity between pods that are eligible to preempt each other isn't recommended.
-type MoreImportantPodFunc func(pod1, pod2 *v1.Pod) bool
-
 type MoreImportantVictimFunc func(victim1, victim2 preemption.PreemptionUnit) bool
 
+// CanPlacePodsFunc is a function used to verify if the preemptor's pods can be successfully
+// scheduled onto the target domain (a single Node or a set of Nodes) given the current
+// resource availability. This acts as the feasibility predicate during the preemption
+// simulation, confirming whether a specific set of evictions actually creates enough space
+// for the incoming workload.
 type CanPlacePodsFunc func(ctx context.Context,
 	state fwk.CycleState,
 	pods []*v1.Pod,
@@ -86,12 +93,14 @@ type DefaultPreemption struct {
 
 	IsEligiblePreemptor IsEligiblePreemptorFunc
 
-	// MoreImportantPod is used to sort eligible victims in-place in descending order of highest to
-	// lowest importance. Pods with higher importance are less likely to be preempted.
-	// The default behavior is to order pods by descending priority, then descending runtime duration
-	// for pods with equal priority.
-	MoreImportantPod MoreImportantPodFunc
-
+	// MoreImportantVictimFunc is a function which may be assigned to the DefaultPreemption plugin.
+	// Implementations should return true if the first victim is more important than the second victim
+	// and the second one should be considered for preemption before the first one.
+	// For performance reasons, the search for a suitable preemption domain is done by initially
+	// omitting all eligible victims from the domain, checking if the preemptor fits, and then
+	// adding back victims (starting from the most important) that can still coexist with the preemptor.
+	// The default behavior is to not consider affinity between the preemptor and the victims,
+	// as affinity between entities that are eligible to preempt each other isn't recommended.
 	MoreImportantVictim MoreImportantVictimFunc
 
 	CanPlacePods CanPlacePodsFunc
@@ -132,9 +141,6 @@ func New(_ context.Context, dpArgs runtime.Object, fh fwk.Handle, fts feature.Fe
 		return true
 	}
 
-	// Default behavior: Sort by descending priority, then by descending runtime duration as secondary ordering.
-	pl.MoreImportantPod = util.MoreImportantPod
-
 	pl.MoreImportantVictim = moreImportantVictim
 
 	pl.CanPlacePods = func(
@@ -161,8 +167,7 @@ func (pl *DefaultPreemption) PostFilter(ctx context.Context, state fwk.CycleStat
 
 	preemptor := preemption.NewPodPreemptor(pod)
 
-	result, status := pl.Evaluator.Preempt(ctx, state, preemptor, m) //TODO: preemptionPolicy into workload?
-	// Ask into kep,
+	result, status := pl.Evaluator.Preempt(ctx, state, preemptor, m)
 	msg := status.Message()
 	if len(msg) > 0 {
 		return result, fwk.NewStatus(status.Code(), "preemption: "+msg)
@@ -266,14 +271,6 @@ func (pl *DefaultPreemption) SelectVictimsOnDomain(
 		nodeToName[nodeInfo.Node().Name] = nodeInfo
 	}
 
-	piToPods := func(pis []fwk.PodInfo) []*v1.Pod {
-		var pods []*v1.Pod
-		for _, pi := range pis {
-			pods = append(pods, pi.GetPod())
-		}
-		return pods
-	}
-
 	removePods := func(pu preemption.PreemptionUnit) error {
 		for _, pi := range pu.Pods() {
 			nodeInfo := nodeToName[pi.GetPod().Spec.NodeName] // TODO: what if it's nominated?
@@ -302,7 +299,7 @@ func (pl *DefaultPreemption) SelectVictimsOnDomain(
 	}
 
 	var potentialVictims []preemption.PreemptionUnit
-	allPossiblyAffectedVictims := domain.GetAllPossibleVictims()
+	allPossiblyAffectedVictims := domain.GetAllPossibleVictims(pl.Evaluator.Handler.SnapshotSharedLister().NodeInfos())
 	for _, victim := range allPossiblyAffectedVictims {
 		if pl.isPreemptionAllowedForDomain(domain, victim, preemptor) {
 			potentialVictims = append(potentialVictims, victim)
@@ -444,7 +441,9 @@ func (pl *DefaultPreemption) SelectVictimsOnDomain(
 		if fits, err := reprieveVictim(v); err != nil {
 			return nil, 0, fwk.AsStatus(err)
 		} else if !fits {
-			podsToPreempt = append(podsToPreempt, piToPods(v.Pods())...)
+			for _, pi := range v.Pods() {
+				podsToPreempt = append(podsToPreempt, pi.GetPod())
+			}
 		}
 	}
 
@@ -509,7 +508,7 @@ func filterVictimsWithPDBViolation(victims []preemption.PreemptionUnit, pdbs []*
 	return violatingVictims, nonViolatingVictims
 }
 
-// PodEligibleToPreemptOthers returns one bool and one strinSelectVictimsOnNodeg. The bool
+// PodEligibleToPreemptOthers returns one bool and one string. The bool
 // indicates whether this pod should be considered for preempting other pods or
 // not. The string includes the reason if this pod isn't eligible.
 // There're several reasons:
@@ -574,17 +573,66 @@ func podTerminatingByPreemption(p *v1.Pod) bool {
 	return false
 }
 
+// moreImportantVictim decides which of two preemption units is considered more critical
+// to preserve during the victim selection process.
+//
+// When the scheduler searches for victims to evict, it attempts to "reprieve" (save)
+// the most important units first. Therefore, if this function returns true, 'v1' is
+// more likely to be kept on the node than 'v2'.
+//
+// The comparison logic follows this strict hierarchy:
+// 1. Priority: Higher priority units are always more important.
+//
+//  2. Workload Type (if WorkloadAwarePreemption is enabled):
+//     Atomic workloads (PodGroups) are considered more important than individual Pods
+//     of the same priority. This is because preempting a PodGroup implies evicting
+//     all its members, causing a larger disruption than evicting a single Pod.
+//
+//  3. Creation Time (for Single Pods):
+//     If both units are single Pods, the one with the older StartTime is more important.
+//     This honors the "first-come, first-served" principle and protects long-running
+//     pods from being churned by newer pods of equal priority.
+//
+//  4. Group Size (for PodGroups):
+//     If both units are PodGroups, the one with more members (larger size) is considered
+//     more important. This heuristic aims to avoid the expensive rescheduling cost
+//     associated with restarting massive distributed jobs.
+//
+//  5. Start Time (Tie-breaker for PodGroups):
+//     If sizes are equal, the group that started earlier (has the oldest pod)
+//     is more important. This rewards long-running jobs with stability.
 func moreImportantVictim(v1, v2 preemption.PreemptionUnit) bool {
 	p1 := v1.Priority()
 	p2 := v2.Priority()
 	if p1 != p2 {
 		return p1 > p2
 	}
-	if v1.IsWorkload() != v2.IsWorkload() {
-		return v1.IsWorkload()
+
+	workloadAwarePreemptionEnabeld := utilfeature.DefaultFeatureGate.Enabled(features.WorkloadAwarePreemption)
+	if workloadAwarePreemptionEnabeld && v1.IsPodGroup() != v2.IsPodGroup() {
+		return v1.IsPodGroup()
 	}
-	if !v1.IsWorkload() {
+	if !v1.IsPodGroup() {
 		return util.GetPodStartTime(v1.Pods()[0].GetPod()).Before(util.GetPodStartTime(v2.Pods()[0].GetPod()))
 	}
-	return len(v1.Pods()) > len(v2.Pods())
+
+	if len(v1.Pods()) != len(v2.Pods()) {
+		return len(v1.Pods()) > len(v2.Pods())
+	}
+
+	t1 := getEarliestPodStartTime(v1.Pods())
+	t2 := getEarliestPodStartTime(v2.Pods())
+	return t1.Before(t2)
+}
+
+// getEarliestPodStartTime finds the oldest StartTime among a list of PodInfos.
+func getEarliestPodStartTime(pods []fwk.PodInfo) *metav1.Time {
+	var earliest *metav1.Time
+	for _, p := range pods {
+		t := util.GetPodStartTime(p.GetPod())
+		if earliest == nil || (t != nil && t.Before(earliest)) {
+			earliest = t
+		}
+	}
+	return earliest
 }

@@ -40,10 +40,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/events"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
@@ -51,6 +53,7 @@ import (
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	fwk "k8s.io/kube-scheduler/framework"
 	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	configv1 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1"
 	apicache "k8s.io/kubernetes/pkg/scheduler/backend/api_cache"
@@ -158,6 +161,11 @@ func (pl *TestPlugin) Filter(ctx context.Context, state fwk.CycleState, pod *v1.
 	return nil
 }
 
+func updateWorkloadAwarePreemptionFlag(t featuregatetesting.TB, flag bool) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, flag)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WorkloadAwarePreemption, flag)
+}
+
 const (
 	LabelKeyIsViolatingPDB    = "test.kubernetes.io/is-violating-pdb"
 	LabelValueViolatingPDB    = "violating"
@@ -168,6 +176,88 @@ type blockingRule struct {
 	nodeName        string
 	blockingVictims []string
 	capacity        int
+}
+
+type workloadPreemptor struct {
+	preemption.Preemptor
+	priority         int32
+	pods             []*v1.Pod
+	isWorkload       bool
+	preemptionPolicy *v1.PreemptionPolicy
+}
+
+func (p *workloadPreemptor) Priority() int32 {
+	return p.priority
+}
+
+func (p *workloadPreemptor) IsPodGroup() bool {
+	return p.isWorkload
+}
+
+func (p *workloadPreemptor) Members() []*v1.Pod {
+	return p.pods
+}
+
+func (p *workloadPreemptor) IsEligibleToPreemptOthers() bool {
+	return p.preemptionPolicy == nil || *p.preemptionPolicy != v1.PreemptNever
+}
+
+func (p *workloadPreemptor) SupportExtenders() bool {
+	return !p.isWorkload
+}
+
+func (p *workloadPreemptor) GetNamespace() string {
+	if len(p.pods) > 0 {
+		return p.pods[0].Namespace
+	}
+	return ""
+}
+
+func (p *workloadPreemptor) GetName() string {
+	if len(p.pods) == 0 {
+		return "unknown"
+	}
+
+	firstPod := p.GetRepresentativePod()
+
+	if p.isWorkload {
+		ref := firstPod.Spec.WorkloadRef
+
+		// Start with the Workload Name (e.g., "my-job")
+		name := ref.Name
+
+		// Append PodGroup if distinct (e.g., "my-job/group-1")
+		if ref.PodGroup != "" {
+			name = name + "/" + ref.PodGroup
+		}
+
+		// Append ReplicaKey if present (e.g., "my-job/group-1/idx-0")
+		// This is crucial for distinguishing between retries of the same job.
+		if ref.PodGroupReplicaKey != "" {
+			name = name + "/" + ref.PodGroupReplicaKey
+		}
+
+		return name
+	}
+
+	return firstPod.Name
+}
+
+func (p *workloadPreemptor) GetRepresentativePod() *v1.Pod {
+	if len(p.pods) == 0 {
+		return nil
+	}
+
+	return p.pods[0]
+}
+
+func newPodGroupPreemptor(priority int32, members []*v1.Pod, preemptionPolicy *v1.PreemptionPolicy) preemption.Preemptor {
+	return &workloadPreemptor{
+		priority:         priority,
+		pods:             members,
+		isWorkload:       true,
+		preemptionPolicy: preemptionPolicy,
+	}
 }
 
 func TestPostFilter(t *testing.T) {
@@ -570,6 +660,7 @@ func TestDryRunPreemption(t *testing.T) {
 		expected                [][]candidate
 		expectedNumFilterCalled []int32
 		blockingRules           []blockingRule
+		workloadAwarePreemption bool
 	}{
 		{
 			name: "a pod that does not fit on any node",
@@ -1199,7 +1290,7 @@ func TestDryRunPreemption(t *testing.T) {
 			nodeNames: []string{"node1", "node2"},
 			// The Gang: 2 High Prio pods, each requiring Large Resources
 			preemptors: []preemption.Preemptor{
-				preemption.NewWorkloadPreemptor(highPriority,
+				newPodGroupPreemptor(highPriority,
 					[]*v1.Pod{
 						st.MakePod().Name("gang-p1").UID("gang-p1").WorkloadRef(w1).Priority(highPriority).Req(largeRes).Obj(),
 						st.MakePod().Name("gang-p2").UID("gang-p2").WorkloadRef(w1).Priority(highPriority).Req(largeRes).Obj(),
@@ -1229,12 +1320,13 @@ func TestDryRunPreemption(t *testing.T) {
 				{nodeName: "node1", blockingVictims: []string{"victim-n1"}, capacity: 1},
 				{nodeName: "node2", blockingVictims: []string{"victim-n2"}, capacity: 1},
 			},
+			workloadAwarePreemption: true,
 		},
 		{
 			name:      "gang of 2 pods fails because one member is blocked by non-preemptible pod",
 			nodeNames: []string{"node1", "node2"},
 			preemptors: []preemption.Preemptor{
-				preemption.NewWorkloadPreemptor(highPriority,
+				newPodGroupPreemptor(highPriority,
 					[]*v1.Pod{
 						st.MakePod().Name("gang-p1").UID("gang-p1").WorkloadRef(w1).Priority(highPriority).Req(largeRes).Obj(),
 						st.MakePod().Name("gang-p2").UID("gang-p2").WorkloadRef(w1).Priority(highPriority).Req(largeRes).Obj(),
@@ -1259,7 +1351,7 @@ func TestDryRunPreemption(t *testing.T) {
 			name:      "gang of 2 pods fits on a SINGLE node by preempting multiple victims there",
 			nodeNames: []string{"node1"},
 			preemptors: []preemption.Preemptor{
-				preemption.NewWorkloadPreemptor(highPriority,
+				newPodGroupPreemptor(highPriority,
 					[]*v1.Pod{
 						st.MakePod().Name("gang-p1").UID("gang-p1").WorkloadRef(w1).Priority(highPriority).Req(smallRes).Obj(),
 						st.MakePod().Name("gang-p2").UID("gang-p2").WorkloadRef(w1).Priority(highPriority).Req(smallRes).Obj(),
@@ -1288,12 +1380,13 @@ func TestDryRunPreemption(t *testing.T) {
 					},
 				},
 			},
+			workloadAwarePreemption: true,
 		},
 		{
 			name:      "gang of 2 pods requires preempting a Medium priority victim because Low alone is insufficient",
 			nodeNames: []string{"node1", "node2"},
 			preemptors: []preemption.Preemptor{
-				preemption.NewWorkloadPreemptor(highPriority,
+				newPodGroupPreemptor(highPriority,
 					[]*v1.Pod{
 						st.MakePod().Name("gang-p1").UID("gang-p1").WorkloadRef(w1).Priority(highPriority).Req(largeRes).Obj(),
 						st.MakePod().Name("gang-p2").UID("gang-p2").WorkloadRef(w1).Priority(highPriority).Req(largeRes).Obj(),
@@ -1311,6 +1404,7 @@ func TestDryRunPreemption(t *testing.T) {
 				{nodeName: "node1", blockingVictims: []string{"low-p-victim"}, capacity: 1},
 				{nodeName: "node2", blockingVictims: []string{"mid-p-victim"}, capacity: 1},
 			},
+			workloadAwarePreemption: true,
 			expected: [][]candidate{
 				{
 					candidate{
@@ -1352,7 +1446,7 @@ func TestDryRunPreemption(t *testing.T) {
 				{nodeName: "node1", blockingVictims: []string{"w1-p1"}, capacity: 1},
 				{nodeName: "node2", blockingVictims: []string{"w1-p2"}, capacity: 1},
 			},
-
+			workloadAwarePreemption: true,
 			expected: [][]candidate{
 				{
 					// Scenario A: Scheduler tries to fit preemptor on Node 1
@@ -1386,6 +1480,9 @@ func TestDryRunPreemption(t *testing.T) {
 	labelKeys := []string{"hostname", "zone", "region"}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+
+			updateWorkloadAwarePreemptionFlag(t, tt.workloadAwarePreemption)
+
 			nodes := make([]*v1.Node, len(tt.nodeNames))
 			fakeFilterRCMap := make(map[string]fwk.Code, len(tt.nodeNames))
 			for i, nodeName := range tt.nodeNames {
@@ -1529,13 +1626,14 @@ func TestSelectBestCandidate(t *testing.T) {
 		w3 = &v1.WorkloadReference{PodGroup: "pg3"}
 	)
 	tests := []struct {
-		name           string
-		registerPlugin tf.RegisterPluginFunc
-		nodeNames      []string
-		preemptor      preemption.Preemptor
-		pods           []*v1.Pod
-		expected       []string
-		blockingRules  []blockingRule
+		name                    string
+		registerPlugin          tf.RegisterPluginFunc
+		nodeNames               []string
+		preemptor               preemption.Preemptor
+		pods                    []*v1.Pod
+		expected                []string
+		blockingRules           []blockingRule
+		workloadAwarePreemption bool
 	}{
 		{
 			name:           "node with min highest priority pod is picked",
@@ -1675,7 +1773,7 @@ func TestSelectBestCandidate(t *testing.T) {
 			registerPlugin: tf.RegisterPluginAsExtensions(noderesources.Name, nodeResourcesFitFunc, "Filter", "PreFilter"),
 			nodeNames:      []string{"node1", "node2"},
 			// Preemptor: Gang of 2 High Priority Pods
-			preemptor: preemption.NewWorkloadPreemptor(highPriority,
+			preemptor: newPodGroupPreemptor(highPriority,
 				[]*v1.Pod{
 					st.MakePod().Name("gang-p1").UID("gang-p1").WorkloadRef(w1).Priority(highPriority).Req(largeRes).Obj(),
 					st.MakePod().Name("gang-p2").UID("gang-p2").WorkloadRef(w1).Priority(highPriority).Req(largeRes).Obj(),
@@ -1692,13 +1790,14 @@ func TestSelectBestCandidate(t *testing.T) {
 				{nodeName: "node1", blockingVictims: []string{"w2-p1", "w2-p2"}, capacity: 2},
 				{nodeName: "node2", blockingVictims: []string{"w3-p1", "w3-p2"}, capacity: 2},
 			},
-			expected: []string{"Cluster-Scope-pg1"},
+			workloadAwarePreemption: true,
+			expected:                []string{"Cluster-Scope-pg1"},
 		},
 		{
 			name:           "gang preemptor prefers node with FEWER victims (when priorities equal)",
 			registerPlugin: tf.RegisterPluginAsExtensions(noderesources.Name, nodeResourcesFitFunc, "Filter", "PreFilter"),
 			nodeNames:      []string{"node1", "node2"},
-			preemptor: preemption.NewWorkloadPreemptor(highPriority,
+			preemptor: newPodGroupPreemptor(highPriority,
 				[]*v1.Pod{
 					st.MakePod().Name("gang-p1").UID("gang-p1").WorkloadRef(w1).Priority(highPriority).Req(largeRes).Obj(),
 				}, nil),
@@ -1714,14 +1813,14 @@ func TestSelectBestCandidate(t *testing.T) {
 				{nodeName: "node1", blockingVictims: []string{"p1.1", "p1.2"}, capacity: 1},
 				{nodeName: "node2", blockingVictims: []string{"p2.1"}, capacity: 1},
 			},
-
-			expected: []string{"Cluster-Scope-pg1"},
+			workloadAwarePreemption: true,
+			expected:                []string{"Cluster-Scope-pg1"},
 		},
 		{
 			name:           "gang preemptor prefers node with NEWER victims (break tie with StartTime)",
 			registerPlugin: tf.RegisterPluginAsExtensions(noderesources.Name, nodeResourcesFitFunc, "Filter", "PreFilter"),
 			nodeNames:      []string{"node1", "node2"},
-			preemptor: preemption.NewWorkloadPreemptor(highPriority,
+			preemptor: newPodGroupPreemptor(highPriority,
 				[]*v1.Pod{
 					st.MakePod().Name("gang-p1").UID("gang-p1").WorkloadRef(w1).Priority(highPriority).Req(largeRes).Obj(),
 				}, nil),
@@ -1737,7 +1836,8 @@ func TestSelectBestCandidate(t *testing.T) {
 				{nodeName: "node1", blockingVictims: []string{"old-p1"}, capacity: 1},
 				{nodeName: "node2", blockingVictims: []string{"new-p1"}, capacity: 1},
 			},
-			expected: []string{"Cluster-Scope-pg1"},
+			workloadAwarePreemption: true,
+			expected:                []string{"Cluster-Scope-pg1"},
 		},
 		{
 			name:           "distributed gang victim: selection accounts for TOTAL victims across cluster (Side-Effect Check)",
@@ -1763,10 +1863,13 @@ func TestSelectBestCandidate(t *testing.T) {
 			},
 			// EXPECTED: Pick Node1 (1 Victim) over Node2 (2 Victims).
 			expected: []string{"node1"},
+
+			workloadAwarePreemption: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			updateWorkloadAwarePreemptionFlag(t, tt.workloadAwarePreemption)
 			getOffsetRand = rand.New(rand.NewSource(4)).Int31n
 			nodes := make([]*v1.Node, len(tt.nodeNames))
 			for i, nodeName := range tt.nodeNames {
@@ -1903,13 +2006,14 @@ func TestCustomSelection(t *testing.T) {
 	}
 
 	tests := []struct {
-		name              string
-		eligiblePreemptor IsEligiblePreemptorFunc
-		nodeNames         []string
-		preemptor         preemption.Preemptor
-		pods              []*v1.Pod
-		expected          map[string][]string
-		blockingRules     []blockingRule
+		name                    string
+		eligiblePreemptor       IsEligiblePreemptorFunc
+		nodeNames               []string
+		preemptor               preemption.Preemptor
+		pods                    []*v1.Pod
+		expected                map[string][]string
+		blockingRules           []blockingRule
+		workloadAwarePreemption bool
 	}{
 		{
 			name:              "filter for matching pod label: high priority",
@@ -2029,13 +2133,14 @@ func TestCustomSelection(t *testing.T) {
 				st.MakePod().Name("v3").UID("v3").Node("node3").Priority(lowPriority).Req(largeRes).StartTime(epochTime).Obj(),
 			},
 			// the lowPriority pod can be preempted but not the midPriority pod
-			expected: map[string][]string{"node2": {"v2"}, "node3": {"v3"}},
+			expected:                map[string][]string{"node2": {"v2"}, "node3": {"v3"}},
+			workloadAwarePreemption: true,
 		},
 		{
 			name:              "workload: filter for matching pod label: high priority",
 			eligiblePreemptor: victimLabelsAreEligible("preemptible", "yes"),
 			nodeNames:         []string{"node1", "node2", "node3", "node4"},
-			preemptor: preemption.NewWorkloadPreemptor(highPriority,
+			preemptor: newPodGroupPreemptor(highPriority,
 				[]*v1.Pod{st.MakePod().Name("gang-p1").UID("gang-p1").WorkloadRef(w1).Priority(highPriority).Req(largeRes).Obj()},
 				nil),
 			pods: []*v1.Pod{
@@ -2050,14 +2155,15 @@ func TestCustomSelection(t *testing.T) {
 				{nodeName: "node3", blockingVictims: []string{"v3"}, capacity: 1},
 				{nodeName: "node4", blockingVictims: []string{"v4"}, capacity: 1},
 			},
-			expected: map[string][]string{"Cluster-Scope-pg1": {"v3"}},
+			expected:                map[string][]string{"Cluster-Scope-pg1": {"v3"}},
+			workloadAwarePreemption: true,
 		},
 		{
 			name:              "workload: filter for matching pod label: mid priority",
 			eligiblePreemptor: victimLabelsAreEligible("preemptible", "yes"),
 			nodeNames:         []string{"node1", "node2", "node3", "node4"},
 			// Preemptor: Mid Priority Workload
-			preemptor: preemption.NewWorkloadPreemptor(midPriority,
+			preemptor: newPodGroupPreemptor(midPriority,
 				[]*v1.Pod{st.MakePod().Name("gang-p2").UID("gang-p2").WorkloadRef(w1).Priority(midPriority).Req(largeRes).Obj()},
 				nil),
 			pods: []*v1.Pod{
@@ -2072,13 +2178,14 @@ func TestCustomSelection(t *testing.T) {
 				{nodeName: "node3", blockingVictims: []string{"v3"}, capacity: 1},
 				{nodeName: "node4", blockingVictims: []string{"v4"}, capacity: 1},
 			},
-			expected: map[string][]string{"Cluster-Scope-pg1": {"v3"}},
+			workloadAwarePreemption: true,
+			expected:                map[string][]string{"Cluster-Scope-pg1": {"v3"}},
 		},
 		{
 			name:              "workload: filter for matching victim node: high priority",
 			eligiblePreemptor: domainNodeNamesAreEligible([]string{"node1"}),
 			nodeNames:         []string{"node1", "node2", "node3"},
-			preemptor: preemption.NewWorkloadPreemptor(highPriority,
+			preemptor: newPodGroupPreemptor(highPriority,
 				[]*v1.Pod{st.MakePod().Name("gang-p3").UID("gang-p3").WorkloadRef(w1).Priority(highPriority).Req(largeRes).Obj()},
 				nil),
 			pods: []*v1.Pod{
@@ -2093,13 +2200,14 @@ func TestCustomSelection(t *testing.T) {
 				{nodeName: "node2", blockingVictims: []string{"v4"}, capacity: 1},
 				{nodeName: "node3", blockingVictims: []string{"v5"}, capacity: 1},
 			},
-			expected: map[string][]string{"Cluster-Scope-pg1": {"v2", "v3"}},
+			workloadAwarePreemption: true,
+			expected:                map[string][]string{"Cluster-Scope-pg1": {"v2", "v3"}},
 		},
 		{
 			name:              "workload: only pods at or above specified priority can be preemptor",
 			eligiblePreemptor: priorityBelowThresholdCannotPreempt(highPriority),
 			nodeNames:         []string{"node1", "node2", "node3"},
-			preemptor: preemption.NewWorkloadPreemptor(highPriority,
+			preemptor: newPodGroupPreemptor(highPriority,
 				[]*v1.Pod{st.MakePod().Name("gang-p1").UID("gang-p1").WorkloadRef(w1).Priority(highPriority).Req(largeRes).Obj()},
 				nil),
 			pods: []*v1.Pod{
@@ -2112,13 +2220,14 @@ func TestCustomSelection(t *testing.T) {
 				{nodeName: "node2", blockingVictims: []string{"v2"}, capacity: 1},
 				{nodeName: "node3", blockingVictims: []string{"v3"}, capacity: 1},
 			},
-			expected: map[string][]string{"Cluster-Scope-pg1": {"v3"}},
+			expected:                map[string][]string{"Cluster-Scope-pg1": {"v3"}},
+			workloadAwarePreemption: true,
 		},
 		{
 			name:              "workload: only pods at or below specified priority can be preempted",
 			eligiblePreemptor: priorityAboveThresholdCannotBePreempted(midPriority),
 			nodeNames:         []string{"node1", "node2", "node3"},
-			preemptor: preemption.NewWorkloadPreemptor(highPriority,
+			preemptor: newPodGroupPreemptor(highPriority,
 				[]*v1.Pod{st.MakePod().Name("gang-p1").UID("gang-p1").WorkloadRef(w1).Priority(highPriority).Req(largeRes).Obj()},
 				nil),
 			pods: []*v1.Pod{
@@ -2131,11 +2240,14 @@ func TestCustomSelection(t *testing.T) {
 				{nodeName: "node2", blockingVictims: []string{"v2"}, capacity: 1},
 				{nodeName: "node3", blockingVictims: []string{"v3"}, capacity: 1},
 			},
-			expected: map[string][]string{"Cluster-Scope-pg1": {"v3"}},
+			expected:                map[string][]string{"Cluster-Scope-pg1": {"v3"}},
+			workloadAwarePreemption: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			updateWorkloadAwarePreemptionFlag(t, tt.workloadAwarePreemption)
+
 			nodes := make([]*v1.Node, len(tt.nodeNames))
 			for i, nodeName := range tt.nodeNames {
 				nodes[i] = st.MakeNode().Name(nodeName).Capacity(veryLargeRes).Obj()
@@ -2267,7 +2379,6 @@ func TestCustomOrdering(t *testing.T) {
 	tests := []struct {
 		name          string
 		orderVictims  MoreImportantVictimFunc
-		orderPods     MoreImportantPodFunc
 		nodeNames     []string
 		preemptor     preemption.Preemptor
 		pods          []*v1.Pod
@@ -2505,15 +2616,16 @@ func TestPreempt(t *testing.T) {
 
 	metrics.Register()
 	tests := []struct {
-		name           string
-		preemptor      preemption.Preemptor
-		pods           []*v1.Pod
-		extenders      []*tf.FakeExtender
-		nodeNames      []string
-		registerPlugin tf.RegisterPluginFunc
-		want           *fwk.PostFilterResult
-		blockingRules  []blockingRule
-		expectedPods   []string // list of preempted pods
+		name                    string
+		preemptor               preemption.Preemptor
+		pods                    []*v1.Pod
+		extenders               []*tf.FakeExtender
+		nodeNames               []string
+		registerPlugin          tf.RegisterPluginFunc
+		want                    *fwk.PostFilterResult
+		blockingRules           []blockingRule
+		expectedPods            []string // list of preempted pods
+		workloadAwarePreemption bool
 	}{
 		{
 			name:      "basic preemption logic",
@@ -2669,7 +2781,7 @@ func TestPreempt(t *testing.T) {
 		{
 			name: "workload: basic success - gang of 2 fits on a single node by preempting local victims",
 			// Preemptor: Gang of 2 High Prio Pods
-			preemptor: preemption.NewWorkloadPreemptor(highPriority,
+			preemptor: newPodGroupPreemptor(highPriority,
 				[]*v1.Pod{
 					st.MakePod().Name("gang-p1").UID("gang-p1").WorkloadRef(w1).Priority(highPriority).Req(largeRes).Obj(),
 					st.MakePod().Name("gang-p2").UID("gang-p2").WorkloadRef(w1).Priority(highPriority).Req(largeRes).Obj(),
@@ -2689,14 +2801,15 @@ func TestPreempt(t *testing.T) {
 				{nodeName: "node2", blockingVictims: []string{}, capacity: 0},
 			},
 			// Expected: Node1 nominated. Both victims preempted.
-			want:         framework.NewPostFilterResultWithNominatedNode("Cluster-Scope-pg1"),
-			expectedPods: []string{"victim-n1-1", "victim-n1-2"},
+			want:                    framework.NewPostFilterResultWithNominatedNode("Cluster-Scope-pg1"),
+			expectedPods:            []string{"victim-n1-1", "victim-n1-2"},
+			workloadAwarePreemption: true,
 		},
 		{
 			name: "workload: distributed success - gang fits by clearing TWO different nodes (atomic check)",
 			// Preemptor: Gang of 2 High Prio Pods
 			// Requirement: Need 2 slots.
-			preemptor: preemption.NewWorkloadPreemptor(highPriority,
+			preemptor: newPodGroupPreemptor(highPriority,
 				[]*v1.Pod{
 					st.MakePod().Name("gang-p1").UID("gang-p1").WorkloadRef(w1).Priority(highPriority).Req(largeRes).Obj(),
 					st.MakePod().Name("gang-p2").UID("gang-p2").WorkloadRef(w1).Priority(highPriority).Req(largeRes).Obj(),
@@ -2717,12 +2830,13 @@ func TestPreempt(t *testing.T) {
 				{nodeName: "node1", blockingVictims: []string{"victim-n1"}, capacity: 1},
 				{nodeName: "node2", blockingVictims: []string{"victim-n2"}, capacity: 1},
 			},
-			want:         framework.NewPostFilterResultWithNominatedNode("Cluster-Scope-pg1"),
-			expectedPods: []string{"victim-n1", "victim-n2"},
+			want:                    framework.NewPostFilterResultWithNominatedNode("Cluster-Scope-pg1"),
+			expectedPods:            []string{"victim-n1", "victim-n2"},
+			workloadAwarePreemption: true,
 		},
 		{
 			name: "workload: partial failure - gang needs 2 slots, only 1 node can be cleared",
-			preemptor: preemption.NewWorkloadPreemptor(highPriority,
+			preemptor: newPodGroupPreemptor(highPriority,
 				[]*v1.Pod{
 					st.MakePod().Name("gang-p1").UID("gang-p1").WorkloadRef(w1).Priority(highPriority).Req(largeRes).Obj(),
 					st.MakePod().Name("gang-p2").UID("gang-p2").WorkloadRef(w1).Priority(highPriority).Req(largeRes).Obj(),
@@ -2767,8 +2881,9 @@ func TestPreempt(t *testing.T) {
 				{nodeName: "node1", blockingVictims: []string{"w1-p1", "w1-p2"}, capacity: 1},
 			},
 			// Expected: Node1 selected. BOTH pods preempted (including collateral damage on Node2).
-			want:         framework.NewPostFilterResultWithNominatedNode("node1"),
-			expectedPods: []string{"w1-p1", "w1-p2"},
+			want:                    framework.NewPostFilterResultWithNominatedNode("node1"),
+			expectedPods:            []string{"w1-p1", "w1-p2"},
+			workloadAwarePreemption: true,
 		},
 	}
 
@@ -2777,6 +2892,7 @@ func TestPreempt(t *testing.T) {
 		for _, asyncAPICallsEnabled := range []bool{true, false} {
 			for _, test := range tests {
 				t.Run(fmt.Sprintf("%s (Async preemption enabled: %v, Async API calls enabled: %v)", test.name, asyncPreemptionEnabled, asyncAPICallsEnabled), func(t *testing.T) {
+					updateWorkloadAwarePreemptionFlag(t, test.workloadAwarePreemption)
 					client := clientsetfake.NewClientset()
 					informerFactory := informers.NewSharedInformerFactory(client, 0)
 					podInformer := informerFactory.Core().V1().Pods().Informer()
@@ -2971,7 +3087,7 @@ func TestPreempt(t *testing.T) {
 					// Make sure that the DisruptionTarget condition has been added to the pod status
 					for _, patchedPod := range patchedPods {
 						var message string
-						if test.preemptor.IsWorkload() {
+						if test.preemptor.IsPodGroup() {
 							message = fmt.Sprintf("%s: preempting to accommodate a higher priority workload", patchedPod.Spec.SchedulerName)
 						} else {
 							message = fmt.Sprintf("%s: preempting to accommodate a higher priority pod", patchedPod.Spec.SchedulerName)
