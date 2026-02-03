@@ -121,12 +121,28 @@ func (f *envVarFeatureGates) Enabled(key Feature) bool {
 // Features set via this method take precedence over
 // the features set via environment variables.
 func (f *envVarFeatureGates) Set(featureName Feature, featureValue bool) error {
+	return f.set(featureName, featureValue, false)
+}
+
+// SetForTesting sets the given feature to the given value. This method
+// bypasses the check for locked features and should only be used for
+// testing purposes.
+//
+// Features set via this method take precedence over
+// the features set via environment variables.
+func (f *envVarFeatureGates) SetForTesting(featureName Feature, featureValue bool) error {
+	return f.set(featureName, featureValue, true)
+}
+
+func (f *envVarFeatureGates) set(featureName Feature, featureValue bool, allowChangingLockedFeatures bool) error {
 	feature, ok := f.known[featureName]
 	if !ok {
 		return fmt.Errorf("feature %q is not registered in FeatureGates %q", featureName, f.callSiteName)
 	}
-	if feature.LockToDefault && feature.Default != featureValue {
-		return fmt.Errorf("cannot set feature gate %q to %v, feature is locked to %v", featureName, featureValue, feature.Default)
+	if !allowChangingLockedFeatures {
+		if feature.LockToDefault && feature.Default != featureValue {
+			return fmt.Errorf("cannot set feature gate %q to %v, feature is locked to %v", featureName, featureValue, feature.Default)
+		}
 	}
 
 	f.lockEnabledViaSetMethod.Lock()
