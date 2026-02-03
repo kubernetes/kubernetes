@@ -139,7 +139,11 @@ PREEXISTING_NETWORK_MODE=""
 
 KUBE_PROMPT_FOR_UPDATE=${KUBE_PROMPT_FOR_UPDATE:-"n"}
 # How long (in seconds) to wait for cluster initialization.
-KUBE_CLUSTER_INITIALIZATION_TIMEOUT=${KUBE_CLUSTER_INITIALIZATION_TIMEOUT:-300}
+#
+# This includes the time to download packages from a remote
+# repo like http://us-central1.gce.archive.ubuntu.com/ubuntu,
+# so this can vary quite a bit.
+KUBE_CLUSTER_INITIALIZATION_TIMEOUT=${KUBE_CLUSTER_INITIALIZATION_TIMEOUT:-600}
 
 function join_csv() {
   local IFS=','; echo "$*";
@@ -3582,6 +3586,7 @@ function check-cluster() {
       local elapsed
       elapsed=$(($(date +%s) - start_time))
       if [[ ${elapsed} -gt ${KUBE_CLUSTER_INITIALIZATION_TIMEOUT} ]]; then
+          echo
           echo -e "${color_red}Cluster failed to initialize within ${KUBE_CLUSTER_INITIALIZATION_TIMEOUT} seconds.${color_norm}" >&2
           echo "Last output from querying API server follows:" >&2
           echo "-----------------------------------------------------" >&2
