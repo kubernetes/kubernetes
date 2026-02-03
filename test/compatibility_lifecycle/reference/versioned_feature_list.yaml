@@ -347,6 +347,12 @@
     lockToDefault: true
     preRelease: GA
     version: "1.33"
+- name: CPUIdleForBestEffortQoS
+  versionedSpecs:
+  - default: true
+    lockToDefault: true
+    preRelease: Beta
+    version: "1.36"
 - name: CRDObservedGenerationTracking
   versionedSpecs:
   - default: false
