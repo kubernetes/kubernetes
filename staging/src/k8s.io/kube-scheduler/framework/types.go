@@ -23,6 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
 	"k8s.io/klog/v2"
@@ -287,6 +288,10 @@ type NodeInfo interface {
 	Snapshot() NodeInfo
 	// String returns representation of human readable format of this NodeInfo.
 	String() string
+	// IsNativeDRAClaimAllocated checks if the given native resource DRA claim UID has already been allocated on this node.
+	IsNativeResourceDRAClaimAllocated(claimUID types.UID) bool
+	// GetNativeDRAClaimStates returns the native DRA claim allocation states on this node.
+	GetNativeResourceDRAClaimStates() map[types.UID]*NativeDRAClaimAllocationState
 
 	// AddPodInfo adds pod information to this NodeInfo.
 	// Consider using this instead of AddPod if a PodInfo is already computed.
@@ -634,5 +639,20 @@ func (h HostPortInfo) sanitize(ip, protocol *string) {
 	}
 	if len(*protocol) == 0 {
 		*protocol = string(v1.ProtocolTCP)
+	}
+}
+
+// NativeDRAClaimAllocationState holds information about a native resource DRA claim's allocation on a node.
+type NativeDRAClaimAllocationState struct {
+	// Pods using this claim on this node.
+	ConsumerPods sets.Set[types.UID]
+}
+
+func (s *NativeDRAClaimAllocationState) Snapshot() *NativeDRAClaimAllocationState {
+	if s == nil {
+		return nil
+	}
+	return &NativeDRAClaimAllocationState{
+		ConsumerPods: s.ConsumerPods.Clone(),
 	}
 }

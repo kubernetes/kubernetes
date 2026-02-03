@@ -84,7 +84,7 @@ func (pl *DynamicResources) checkNativeResources(ctx context.Context, state *sta
 		return nil, nil
 	}
 
-	totalPodDemand, nativeClaimStatus, status := pl.getPodNativeResourceFootprint(ctx, pod, state, allocations)
+	totalPodDemand, nativeClaimStatus, status := pl.getPodNativeResourceFootprint(logger, nodeInfo, pod, state, allocations)
 	if status != nil {
 		return nil, status
 	}
@@ -149,6 +149,8 @@ func (pl *DynamicResources) buildNativeDRAInfo(pod *v1.Pod, claimByName map[stri
 				continue
 			}
 
+			hasNativeClaims := false
+
 			for _, result := range alloc.Devices.Results {
 				device, err := getDeviceFromManager(pl.draManager, result.Pool, result.Device)
 				if err != nil {
@@ -204,11 +206,14 @@ func (pl *DynamicResources) buildNativeDRAInfo(pod *v1.Pod, claimByName map[stri
 							Quantity:     quantity,
 						})
 					}
+					hasNativeClaims = true
 
 				}
 			}
 
-			nativeClaimInfo[actualClaim.UID] = currentClaimStatus
+			if hasNativeClaims {
+				nativeClaimInfo[actualClaim.UID] = currentClaimStatus
+			}
 		}
 	}
 
@@ -219,8 +224,26 @@ func (pl *DynamicResources) buildNativeDRAInfo(pod *v1.Pod, claimByName map[stri
 	return nativeClaimInfoList, nil
 }
 
-func (pl *DynamicResources) getPodNativeResourceFootprint(ctx context.Context, pod *v1.Pod, state *stateData, allocations map[string]*resourceapi.AllocationResult) (*framework.Resource, []v1.PodNativeResourceClaimStatus, *fwk.Status) {
-	logger := klog.FromContext(ctx)
+func (pl *DynamicResources) validateNativeDRAClaims(pod *v1.Pod, nodeInfo fwk.NodeInfo, nativeResourceClaimStatus []v1.PodNativeResourceClaimStatus) error {
+	if len(nativeResourceClaimStatus) == 0 {
+		return nil
+	}
+	if pod.Spec.Resources != nil {
+		return fmt.Errorf("cannot use pod level resources with native resource claims")
+	}
+	for _, claim := range nativeResourceClaimStatus {
+		claimStates := nodeInfo.GetNativeResourceDRAClaimStates()
+		state, ok := claimStates[claim.ClaimInfo.UID]
+		if ok && state != nil && state.ConsumerPods.Len() > 0 {
+			if state.ConsumerPods.Has(pod.UID) {
+				return fmt.Errorf("cannot share native resource claims across pods")
+			}
+		}
+	}
+	return nil
+}
+
+func (pl *DynamicResources) getPodNativeResourceFootprint(logger klog.Logger, nodeInfo fwk.NodeInfo, pod *v1.Pod, state *stateData, allocations map[string]*resourceapi.AllocationResult) (*framework.Resource, []v1.PodNativeResourceClaimStatus, *fwk.Status) {
 
 	claimByName := make(map[string]*resourceapi.ResourceClaim)
 	for _, claim := range state.claims.allUserClaims() {
@@ -245,6 +268,10 @@ func (pl *DynamicResources) getPodNativeResourceFootprint(ctx context.Context, p
 
 	podNativeDRAStatus, err := pl.buildNativeDRAInfo(pod, claimByName, finalAllocs, state)
 	if err != nil {
+		return nil, nil, statusError(logger, err)
+	}
+
+	if err := pl.validateNativeDRAClaims(pod, nodeInfo, podNativeDRAStatus); err != nil {
 		return nil, nil, statusError(logger, err)
 	}
 

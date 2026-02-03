@@ -26,6 +26,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -205,6 +206,9 @@ type NodeInfo struct {
 
 	// DeclaredFeatures is a set of features published by the node
 	DeclaredFeatures ndf.FeatureSet
+
+	// NativeDRAClaimStates tracks the state of DRA claims on this node.
+	NativeDRAClaimStates map[types.UID]*fwk.NativeDRAClaimAllocationState
 }
 
 func (n *NodeInfo) GetPods() []fwk.PodInfo {
@@ -252,6 +256,18 @@ func (n *NodeInfo) GetNodeDeclaredFeatures() ndf.FeatureSet {
 	return n.DeclaredFeatures
 }
 
+func (n *NodeInfo) IsNativeResourceDRAClaimAllocated(claimUID types.UID) bool {
+	if n.NativeDRAClaimStates == nil {
+		return false
+	}
+	state := n.NativeDRAClaimStates[claimUID]
+	return state != nil && state.ConsumerPods.Len() > 0
+}
+
+func (n *NodeInfo) GetNativeResourceDRAClaimStates() map[types.UID]*fwk.NativeDRAClaimAllocationState {
+	return n.NativeDRAClaimStates
+}
+
 // NodeInfo implements KMetadata, so for example klog.KObjSlice(nodes) works
 // when nodes is a []*NodeInfo.
 var _ klog.KMetadata = &NodeInfo{}
@@ -290,15 +306,16 @@ func (n *NodeInfo) Snapshot() fwk.NodeInfo {
 // SnapshotConcrete returns a copy of this node, Except that ImageStates is copied without the Nodes field.
 func (n *NodeInfo) SnapshotConcrete() *NodeInfo {
 	clone := &NodeInfo{
-		node:             n.node,
-		Requested:        n.Requested.Clone(),
-		NonZeroRequested: n.NonZeroRequested.Clone(),
-		Allocatable:      n.Allocatable.Clone(),
-		UsedPorts:        make(fwk.HostPortInfo),
-		ImageStates:      make(map[string]*fwk.ImageStateSummary),
-		PVCRefCounts:     make(map[string]int),
-		Generation:       n.Generation,
-		DeclaredFeatures: n.DeclaredFeatures.Clone(),
+		node:                 n.node,
+		Requested:            n.Requested.Clone(),
+		NonZeroRequested:     n.NonZeroRequested.Clone(),
+		Allocatable:          n.Allocatable.Clone(),
+		UsedPorts:            make(fwk.HostPortInfo),
+		ImageStates:          make(map[string]*fwk.ImageStateSummary),
+		PVCRefCounts:         make(map[string]int),
+		Generation:           n.Generation,
+		DeclaredFeatures:     n.DeclaredFeatures.Clone(),
+		NativeDRAClaimStates: make(map[types.UID]*fwk.NativeDRAClaimAllocationState),
 	}
 	if len(n.Pods) > 0 {
 		clone.Pods = append([]fwk.PodInfo(nil), n.Pods...)
@@ -328,6 +345,9 @@ func (n *NodeInfo) SnapshotConcrete() *NodeInfo {
 	}
 	for key, value := range n.PVCRefCounts {
 		clone.PVCRefCounts[key] = value
+	}
+	for key, value := range n.NativeDRAClaimStates {
+		clone.NativeDRAClaimStates[key] = value.Snapshot()
 	}
 	return clone
 }
@@ -441,6 +461,38 @@ func (n *NodeInfo) update(podInfo fwk.PodInfo, sign int64) {
 	n.updatePVCRefCounts(podInfo.GetPod(), sign > 0)
 
 	n.Generation = nextGeneration()
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRANativeResources) {
+		n.updateNativeDRAClaimState(podInfo, sign)
+	}
+}
+
+// updateNativeDRAClaimState updates the NodeInfo based on DRA native resource claims in the pod.
+func (n *NodeInfo) updateNativeDRAClaimState(podInfo fwk.PodInfo, sign int64) {
+	pod := podInfo.GetPod()
+
+	if n.NativeDRAClaimStates == nil {
+		n.NativeDRAClaimStates = make(map[types.UID]*fwk.NativeDRAClaimAllocationState)
+	}
+
+	for _, claimStatus := range pod.Status.NativeResourceClaimStatus {
+		claimUID := claimStatus.ClaimInfo.UID
+		if _, exists := n.NativeDRAClaimStates[claimUID]; !exists {
+			n.NativeDRAClaimStates[claimUID] = &fwk.NativeDRAClaimAllocationState{
+				ConsumerPods: sets.Set[types.UID]{},
+			}
+		}
+		state := n.NativeDRAClaimStates[claimUID]
+
+		if sign > 0 { // Pod Added
+			state.ConsumerPods.Insert(pod.UID)
+		} else { // Pod Removed
+			state.ConsumerPods.Delete(pod.UID)
+			if state.ConsumerPods.Len() == 0 {
+				delete(n.NativeDRAClaimStates, claimUID)
+			}
+		}
+	}
 }
 
 // updateUsedPorts updates the UsedPorts of NodeInfo.
