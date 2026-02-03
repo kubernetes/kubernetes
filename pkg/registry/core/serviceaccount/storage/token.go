@@ -84,7 +84,7 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 		return nil, errors.NewInvalid(gvk.GroupKind(), name, errs)
 	}
 	if len(req.Namespace) > 0 && req.Namespace != namespace {
-		errs := field.ErrorList{field.Invalid(field.NewPath("metadata").Child("namespace"), req.Namespace, "must match the service account namespace if specified")}
+		errs := field.ErrorList{field.Invalid(field.NewPath("metadata","namespace"), req.Namespace, "must match the service account namespace if specified")}
 		return nil, errors.NewInvalid(gvk.GroupKind(), name, errs)
 	}
 
