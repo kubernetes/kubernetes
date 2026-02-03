@@ -142,6 +142,14 @@ type WorkloadSpec struct {
 	// +listType=map
 	// +listMapKey=name
 	PodGroups []PodGroup
+
+	// PriorityClassName is an optional reference for an existing PriorityClass of the workload.
+	// If no priority class is specified, but a global default priority class exists, it will default to that class.
+	// Otherwise, the workload's priority will be zero.
+	// This field is immutable.
+	//
+	// +optional
+	PriorityClassName *string
 }
 
 // TypedLocalObjectReference allows to reference typed object inside the same namespace.

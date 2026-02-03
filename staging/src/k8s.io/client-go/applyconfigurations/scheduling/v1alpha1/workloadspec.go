@@ -31,6 +31,11 @@ type WorkloadSpecApplyConfiguration struct {
 	// PodGroups is the list of pod groups that make up the Workload.
 	// The maximum number of pod groups is 8. This field is immutable.
 	PodGroups []PodGroupApplyConfiguration `json:"podGroups,omitempty"`
+	// PriorityClassName is an optional reference for an existing PriorityClass of the workload.
+	// If no priority class is specified, but a global default priority class exists, it will default to that class.
+	// Otherwise, the workload's priority will be zero.
+	// This field is immutable.
+	PriorityClassName *string `json:"priorityClassName,omitempty"`
 }
 
 // WorkloadSpecApplyConfiguration constructs a declarative configuration of the WorkloadSpec type for use with
@@ -57,5 +62,13 @@ func (b *WorkloadSpecApplyConfiguration) WithPodGroups(values ...*PodGroupApplyC
 		}
 		b.PodGroups = append(b.PodGroups, *values[i])
 	}
+	return b
+}
+
+// WithPriorityClassName sets the PriorityClassName field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the PriorityClassName field is set to the value of the last call.
+func (b *WorkloadSpecApplyConfiguration) WithPriorityClassName(value string) *WorkloadSpecApplyConfiguration {
+	b.PriorityClassName = &value
 	return b
 }

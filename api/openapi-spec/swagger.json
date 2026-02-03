@@ -19233,6 +19233,10 @@
             "name"
           ],
           "x-kubernetes-list-type": "map"
+        },
+        "priorityClassName": {
+          "description": "PriorityClassName is an optional reference for an existing PriorityClass of the workload. If no priority class is specified, but a global default priority class exists, it will default to that class. Otherwise, the workload's priority will be zero. This field is immutable.",
+          "type": "string"
         }
       },
       "required": [

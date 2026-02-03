@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	schedulingapiv1 "k8s.io/kubernetes/pkg/apis/scheduling/v1"
+	"k8s.io/utils/ptr"
 )
 
 func TestValidatePriorityClass(t *testing.T) {
@@ -191,6 +192,12 @@ func TestValidateWorkload(t *testing.T) {
 		}),
 		"no controllerRef apiGroup": mkWorkload(func(w *scheduling.Workload) {
 			w.Spec.ControllerRef.APIGroup = ""
+		}),
+		"valid priorityClassName": mkWorkload(func(w *scheduling.Workload) {
+			w.Spec.PriorityClassName = ptr.To("high-priority")
+		}),
+		"empty priorityClassName": mkWorkload(func(w *scheduling.Workload) {
+			w.Spec.PriorityClassName = nil
 		}),
 	}
 	for name, workload := range successCases {
@@ -400,6 +407,14 @@ func TestValidateWorkload(t *testing.T) {
 				field.Invalid(field.NewPath("spec", "podGroups").Index(1).Child("policy", "gang", "minCount"), int64(-1), "must be greater than zero").WithOrigin("minimum").MarkCoveredByDeclarative(),
 			},
 		},
+		"invalid priorityClassName": {
+			workload: mkWorkload(func(w *scheduling.Workload) {
+				w.Spec.PriorityClassName = ptr.To(".invalid")
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "priorityClassName"), ".invalid", "a DNS-1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
+			},
+		},
 	}
 
 	for name, tc := range failureCases {
@@ -507,6 +522,14 @@ func TestValidateWorkloadUpdate(t *testing.T) {
 			old: mkWorkload(),
 			update: mkWorkload(func(w *scheduling.Workload) {
 				w.Spec.ControllerRef = nil
+			}),
+		},
+		"change priorityClassName": {
+			old: mkWorkload(func(w *scheduling.Workload) {
+				w.Spec.PriorityClassName = ptr.To("high-priority")
+			}),
+			update: mkWorkload(func(w *scheduling.Workload) {
+				w.Spec.PriorityClassName = ptr.To("low-priority")
 			}),
 		},
 	}

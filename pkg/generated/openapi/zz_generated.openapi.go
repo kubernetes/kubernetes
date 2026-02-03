@@ -53643,6 +53643,13 @@ func schema_k8sio_api_scheduling_v1alpha1_WorkloadSpec(ref common.ReferenceCallb
 							},
 						},
 					},
+					"priorityClassName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PriorityClassName is an optional reference for an existing PriorityClass of the workload. If no priority class is specified, but a global default priority class exists, it will default to that class. Otherwise, the workload's priority will be zero. This field is immutable.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
 				Required: []string{"podGroups"},
 			},

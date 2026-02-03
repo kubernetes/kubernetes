@@ -135,6 +135,15 @@ type WorkloadSpec struct {
 	// +k8s:maxItems=8
 	// +k8s:immutable
 	PodGroups []PodGroup `json:"podGroups" protobuf:"bytes,2,rep,name=podGroups"`
+
+	// PriorityClassName is an optional reference for an existing PriorityClass of the workload.
+	// If no priority class is specified, but a global default priority class exists, it will default to that class.
+	// Otherwise, the workload's priority will be zero.
+	// This field is immutable.
+	//
+	// +optional
+	// +k8s:optional
+	PriorityClassName *string `json:"priorityClassName,omitempty" protobuf:"bytes,3,opt,name=priorityClassName"`
 }
 
 // TypedLocalObjectReference allows to reference typed object inside the same namespace.
