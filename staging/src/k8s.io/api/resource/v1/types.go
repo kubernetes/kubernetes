@@ -1203,6 +1203,28 @@ type CELDeviceSelector struct {
 	// A robust expression should check for the existence of attributes
 	// before referencing them.
 	//
+	// Examples for handling optional attributes (CEL Optional Types, available since Kubernetes 1.29):
+	//
+	//   - Using optional chaining with orValue() (recommended):
+	//       device.attributes["gpu.example.com"].?model.orValue("") == "A100"
+	//     The ? operator makes field selection optional. If the field doesn't exist,
+	//     it returns optional.none(). orValue() then provides a default value.
+	//
+	//   - Using has() macro to check before accessing:
+	//       has(device.attributes["gpu.example.com"].model) && device.attributes["gpu.example.com"].model == "A100"
+	//     The has() macro checks if a field exists before accessing it.
+	//
+	//   - Checking domain existence first:
+	//       "gpu.example.com" in device.attributes && device.attributes["gpu.example.com"].model == "A100"
+	//
+	// For more details on CEL Optional Types, see:
+	// https://kubernetes.io/docs/reference/using-api/cel/#optional-types
+	// https://pkg.go.dev/github.com/google/cel-go/cel#OptionalTypes
+	//
+	// Note: Accessing a non-existent key without these checks is a runtime error.
+	// This is intentional because silently skipping invalid expressions could lead
+	// to unexpected device selection.
+	//
 	// For ease of use, the cel.bind() function is enabled, and can be used
 	// to simplify expressions that access multiple attributes with the
 	// same domain. For example:
