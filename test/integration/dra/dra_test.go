@@ -171,6 +171,7 @@ func TestDRA(t *testing.T) {
 			},
 			f: func(tCtx ktesting.TContext) {
 				tCtx.Run("AdminAccess", func(tCtx ktesting.TContext) { testAdminAccess(tCtx, false) })
+				tCtx.Run("PartitionableDevices", func(tCtx ktesting.TContext) { testPartitionableDevices(tCtx, false) })
 				tCtx.Run("PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, false) })
 				tCtx.Run("Pod", func(tCtx ktesting.TContext) { testPod(tCtx, true) })
 				tCtx.Run("PublishResourceSlices", func(tCtx ktesting.TContext) {
@@ -246,6 +247,7 @@ func TestDRA(t *testing.T) {
 				tCtx.Run("Convert", testConvert)
 				tCtx.Run("ControllerManagerMetrics", testControllerManagerMetrics)
 				tCtx.Run("DeviceBindingConditions", func(tCtx ktesting.TContext) { testDeviceBindingConditions(tCtx, true) })
+				tCtx.Run("PartitionableDevices", func(tCtx ktesting.TContext) { testPartitionableDevices(tCtx, true) })
 				tCtx.Run("PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, true) })
 				tCtx.Run("PrioritizedListScoring", func(tCtx ktesting.TContext) { testPrioritizedListScoring(tCtx) })
 				tCtx.Run("PublishResourceSlices", func(tCtx ktesting.TContext) { testPublishResourceSlices(tCtx, true) })
@@ -307,10 +309,14 @@ func TestDRA(t *testing.T) {
 
 func createNodes(tCtx ktesting.TContext) {
 	for i := 0; i < numNodes; i++ {
+		nodeName := fmt.Sprintf("worker-%d", i)
 		// Create node.
 		node := &v1.Node{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: fmt.Sprintf("worker-%d", i),
+				Name: nodeName,
+				Labels: map[string]string{
+					"kubernetes.io/hostname": nodeName,
+				},
 			},
 		}
 		node, err := tCtx.Client().CoreV1().Nodes().Create(tCtx, node, metav1.CreateOptions{FieldValidation: "Strict"})
