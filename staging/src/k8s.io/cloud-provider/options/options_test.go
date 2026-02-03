@@ -423,7 +423,11 @@ func TestCreateConfig(t *testing.T) {
 			ServiceController: serviceconfig.ServiceControllerConfiguration{
 				ConcurrentServiceSyncs: 1,
 			},
-			NodeController:            nodeconfig.NodeControllerConfiguration{ConcurrentNodeSyncs: 1},
+			NodeController: nodeconfig.NodeControllerConfiguration{
+				ConcurrentNodeSyncs: 1,
+				// ConcurrentNodeStatusUpdates should default to the value of ConcurrentNodeSyncs only at the stage of config creation
+				ConcurrentNodeStatusUpdates: 1,
+			},
 			NodeStatusUpdateFrequency: metav1.Duration{Duration: 10 * time.Minute},
 			Webhook: cpconfig.WebhookConfiguration{
 				Webhooks: []string{"foo", "bar", "-baz"},
@@ -491,6 +495,7 @@ func TestCreateConfigWithoutWebHooks(t *testing.T) {
 		"--controller-start-interval=2m",
 		"--controllers=foo,bar",
 		"--concurrent-node-syncs=1",
+		"--concurrent-node-status-updates=2",
 		"--http2-max-streams-per-connection=47",
 		"--kube-api-burst=101",
 		"--kube-api-content-type=application/vnd.kubernetes.protobuf",
@@ -564,7 +569,10 @@ func TestCreateConfigWithoutWebHooks(t *testing.T) {
 			ServiceController: serviceconfig.ServiceControllerConfiguration{
 				ConcurrentServiceSyncs: 1,
 			},
-			NodeController:            nodeconfig.NodeControllerConfiguration{ConcurrentNodeSyncs: 1},
+			NodeController: nodeconfig.NodeControllerConfiguration{
+				ConcurrentNodeSyncs:         1,
+				ConcurrentNodeStatusUpdates: 2,
+			},
 			NodeStatusUpdateFrequency: metav1.Duration{Duration: 10 * time.Minute},
 			Webhook:                   cpconfig.WebhookConfiguration{},
 		},

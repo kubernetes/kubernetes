@@ -64235,8 +64235,16 @@ func schema_controllers_node_config_v1alpha1_NodeControllerConfiguration(ref com
 							Format:      "int32",
 						},
 					},
+					"ConcurrentNodeStatusUpdates": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ConcurrentNodeStatusUpdates is the number of workers concurrently updating node statuses. If unspecified or 0, ConcurrentNodeSyncs is used instead",
+							Default:     0,
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
 				},
-				Required: []string{"ConcurrentNodeSyncs"},
+				Required: []string{"ConcurrentNodeSyncs", "ConcurrentNodeStatusUpdates"},
 			},
 		},
 	}
