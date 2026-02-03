@@ -91,6 +91,7 @@
       initNodes: 5000
       initPods: 5000
       measurePods: 50000
+    threshold: 800
   - name: 5000Nodes_50000Pods_AsyncAPICallsEnabled
     featureGates:
       SchedulerQueueingHints: true
@@ -100,14 +101,15 @@
       initNodes: 5000
       initPods: 5000
       measurePods: 50000
+    threshold: 790
 
 # This test case simulates the scheduling of daemonset.
 # https://github.com/kubernetes/kubernetes/issues/124709
 - name: SchedulingDaemonset
   defaultPodTemplatePath: ../templates/daemonset-pod.yaml
   workloadTemplate:
-    # Create one node with a specific name (scheduler-perf-node),
-    # which is supposed to get all Pods created in this test case.
+  # Create one node with a specific name (scheduler-perf-node),
+  # which is supposed to get all Pods created in this test case.
   - opcode: createNodes
     count: 1
     nodeTemplatePath: ../templates/node-with-name.yaml
@@ -412,6 +414,7 @@
       initNodes: 5000
       initPods: 20000
       measurePods: 10000
+    threshold: 790
   - name: 5kNodes/20kInit/10kPods_QueueingHintsEnabled
     featureGates:
       SchedulerQueueingHints: true
@@ -421,6 +424,7 @@
       initNodes: 5000
       initPods: 20000
       measurePods: 10000
+    threshold: 690
   - name: 5kNodes/20kInit/10kPods_AsyncAPICallsEnabled
     featureGates:
       SchedulerQueueingHints: true
@@ -430,6 +434,7 @@
       initNodes: 5000
       initPods: 20000
       measurePods: 10000
+    threshold: 800
 
 - name: SchedulingWithMixedChurn
   workloadTemplate:
@@ -616,6 +621,7 @@
       initNodes: 5000
       deletingPods: 5000
       measurePods: 5000
+    threshold: 980
   - name: 5000Node_5000DeletingPods_QueueingHintsEnabled
     featureGates:
       SchedulerQueueingHints: true
@@ -624,6 +630,7 @@
       initNodes: 5000
       deletingPods: 5000
       measurePods: 5000
+    threshold: 790
 
 ## SchedulingWithExtendedResource uses pods with extended resources requests.
 - name: SchedulingWithExtendedResource
@@ -683,6 +690,7 @@
       nodesWithExtendedResource: 5000
       nodesWithoutExtendedResource: 0
       measurePods: 5000
+    threshold: 200
   - name: 5000pods_5000nodes_DRAExtendedResourceEnabled
     featureGates:
       DRAExtendedResource: true
@@ -691,3 +699,4 @@
       nodesWithExtendedResource: 5000
       nodesWithoutExtendedResource: 0
       measurePods: 5000
+    threshold: 200
