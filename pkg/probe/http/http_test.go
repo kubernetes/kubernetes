@@ -573,3 +573,31 @@ func TestHTTPProbeChecker_PayloadNormal(t *testing.T) {
 		assert.Equal(t, string(normalPayload), body)
 	})
 }
+
+func TestHTTPProbeBlocksSchemeChangingRedirect(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/health" {
+			httpsURL := "https://" + r.Host + "/health"
+			http.Redirect(w, r, httpsURL, http.StatusMovedPermanently)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	target, err := url.Parse(server.URL + "/health")
+	require.NoError(t, err)
+
+	prober := New(false) // followNonLocalRedirects = false
+
+	req, err := NewProbeRequest(target, nil)
+	require.NoError(t, err)
+
+	result, _, err := prober.Probe(req, 1*time.Second)
+	require.NoError(t, err)
+
+	// Blocked redirect → Warning (expected Kubernetes behavior)
+	assert.Equal(t, probe.Warning, result)
+}
