@@ -51,6 +51,11 @@ var (
 	CPUManager = framework.WithFeature(framework.ValidFeatures.Add("CPUManager"))
 
 	// Owner: sig-node
+	// Tests for CPUIdleQoS feature which enables cpu.idle=1 (SCHED_IDLE) for BestEffort QoS pods.
+	// Requires cgroup v2 and kernel version >= 5.4.
+	CPUIdleQoS = framework.WithFeature(framework.ValidFeatures.Add("CPUIdleQoS"))
+
+	// Owner: sig-node
 	// Marks test that exercise checkpointing of containers
 	CheckpointContainer = framework.WithFeature(framework.ValidFeatures.Add("CheckpointContainer"))
 
