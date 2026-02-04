@@ -3643,17 +3643,6 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
-- name: cri_losing_support
-  subsystem: kubelet
-  help: the Kubernetes version that the currently running CRI implementation will
-    lose support on if not upgraded.
-  type: Gauge
-  stabilityLevel: ALPHA
-  labels:
-  - version
-  componentEndpoints:
-  - component: kubelet
-    endpoint: /metrics
 - name: desired_pods
   subsystem: kubelet
   help: The number of pods the kubelet is being instructed to run. static is true
