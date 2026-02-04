@@ -12,6 +12,11 @@ nodes:
 - role: worker
 - role: worker
 kubeadmConfigPatches:
+  - |
+    kind: KubeletConfiguration
+    apiVersion: kubelet.config.k8s.io/v1beta1
+    enableSystemLogHandler: true
+    enableSystemLogQuery: true
   # v1beta4 for the future (v1.35.0+ ?)
   # https://github.com/kubernetes-sigs/kind/issues/3847
   # TODO: drop v1beta3 when kind makes the switch
@@ -78,3 +83,4 @@ kubeadmConfigPatches:
 #    --config <(cat test/e2e/dra/kind.yaml; echo "  <some feature>: true")
 featureGates:
   DynamicResourceAllocation: true
+  NodeLogQuery: true
