@@ -168,6 +168,7 @@ func topologyModeFromHints(svcInfo ServicePort, endpoints []Endpoint, nodeName, 
 		return ""
 	}
 
+	hasReadyEndpoints := false
 	hasEndpointForNode := false
 	allEndpointsHaveNodeHints := true
 	hasEndpointForZone := false
@@ -176,6 +177,7 @@ func topologyModeFromHints(svcInfo ServicePort, endpoints []Endpoint, nodeName, 
 		if !endpoint.IsReady() {
 			continue
 		}
+		hasReadyEndpoints = true
 
 		if endpoint.NodeHints().Len() == 0 {
 			allEndpointsHaveNodeHints = false
@@ -188,6 +190,11 @@ func topologyModeFromHints(svcInfo ServicePort, endpoints []Endpoint, nodeName, 
 		} else if endpoint.ZoneHints().Has(zone) {
 			hasEndpointForZone = true
 		}
+	}
+
+	// If no ready endpoints exist, there are no hints to consider
+	if !hasReadyEndpoints {
+		return ""
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.PreferSameTrafficDistribution) {

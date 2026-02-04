@@ -398,6 +398,15 @@ func TestCategorizeEndpoints(t *testing.T) {
 		clusterEndpoints: nil,
 		localEndpoints:   nil,
 		allEndpoints:     nil,
+	}, {
+		name:       "single endpoint not ready, not serving, not terminating",
+		nodeLabels: map[string]string{v1.LabelTopologyZone: "zone-a"},
+		serviceInfo: &BaseServicePortInfo{},
+		endpoints: []Endpoint{
+			&BaseEndpointInfo{endpoint: "10.0.0.0:80", ready: false, serving: false, terminating: false},
+		},
+		clusterEndpoints: sets.New[string](),
+		localEndpoints:   nil,
 	}}
 
 	for _, tc := range testCases {
