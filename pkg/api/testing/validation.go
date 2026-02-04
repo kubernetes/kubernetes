@@ -336,7 +336,6 @@ func verifyValidationEquivalence(t *testing.T, expectedErrs field.ErrorList, run
 		})
 		declarativeBetaEnabledErrs = runValidations(ctx)
 
-		declarativeErrorMatcher := errOutputMatcher.ByErrorOrigination()
 		if len(expectedErrs) > 0 {
 			errOutputMatcher.Test(t, expectedErrs, declarativeBetaEnabledErrs)
 		} else if len(declarativeBetaEnabledErrs) != 0 {
@@ -401,9 +400,9 @@ func verifyValidationEquivalence(t *testing.T, expectedErrs field.ErrorList, run
 		allDeclarativeErrs := runValidations(testCtx)
 
 		// The matcher here is more specific to ensure that errors from Alpha rules are included and matched correctly.
-		errOutputMatcherByStability := errOutputMatcher.ByValidationStabilityLevel()
+		dvErrorMatcher := errOutputMatcher.ByValidationStabilityLevel().BySource()
 		if len(expectedErrs) > 0 {
-			errOutputMatcherByStability.Test(t, expectedErrs, allDeclarativeErrs)
+			dvErrorMatcher.Test(t, expectedErrs, allDeclarativeErrs)
 		} else if len(allDeclarativeErrs) != 0 {
 			t.Errorf("expected no errors, but got: %v", allDeclarativeErrs)
 		}

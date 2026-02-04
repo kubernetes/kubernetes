@@ -55,7 +55,7 @@ func TestDeclarativeValidate(t *testing.T) {
 				"name: empty": {
 					input: mkDeviceClass(tweakName("")),
 					expectedErrs: field.ErrorList{
-						field.Required(field.NewPath("metadata", "name"), "").MarkOriginatingFromImperative(),
+						field.Required(field.NewPath("metadata", "name"), "").MarkFromImperative(),
 					},
 				},
 				"name: valid": {
@@ -174,7 +174,7 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 					old:    mkDeviceClass(),
 					update: mkDeviceClass(tweakName("test-classx")),
 					expectedErrs: field.ErrorList{
-						field.Invalid(field.NewPath("metadata", "name"), "test-classx", "field is immutable").MarkOriginatingFromImperative(),
+						field.Invalid(field.NewPath("metadata", "name"), "test-classx", "field is immutable").MarkFromImperative(),
 					},
 				},
 				"valid update: at limit selectors": {

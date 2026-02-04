@@ -393,7 +393,7 @@ func ValidateDeclarativelyWithMigrationChecks(ctx context.Context, scheme *runti
 	// allDeclarativeEnforced indicates that we should check all declarative errors for testing purposes.
 	allDeclarativeEnforced := ctx.Value(allDeclarativeEnforcedKey) == true
 	// These errors must be errors returned by the handwritten validation.
-	errs = errs.MarkOriginatingFromImperative()
+	errs = errs.MarkFromImperative()
 	validationIdentifier, err := metricIdentifier(ctx, scheme, obj, opType)
 	if err != nil {
 		// Log the error, but continue with the best-effort identifier.
