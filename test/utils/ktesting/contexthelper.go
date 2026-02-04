@@ -48,14 +48,22 @@ func withTimeout(ctx context.Context, tb TB, timeout time.Duration, timeoutCause
 	cancelCtx, cancel := context.WithCancelCause(ctx)
 	after := time.NewTimer(timeout)
 	stopCtx, stop := context.WithCancel(ctx) // Only used internally, doesn't need a cause.
+	done := make(chan struct{})
 	tb.Cleanup(func() {
 		cancel(cleanupErr(tb.Name()))
 		stop()
+		<-done
 	})
 	go func() {
+		defer close(done)
 		select {
 		case <-stopCtx.Done():
-			after.Stop()
+			if !after.Stop() {
+				select {
+				case <-after.C:
+				default:
+				}
+			}
 			// No need to set a cause here. The cause or error of
 			// the parent context will be used.
 		case <-after.C:
