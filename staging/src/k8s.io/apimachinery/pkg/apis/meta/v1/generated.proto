@@ -384,6 +384,16 @@ message GetOptions {
   // Defaults to unset
   // +optional
   optional string resourceVersion = 1;
+
+  // omitManagedFields indicates that the managed fields for the
+  // requested object should be omitted from the response. This is primarily
+  // useful for reducing the size of the response when the caller does not
+  // need to see the managed fields and wishes to avoid the bandwidth and
+  // client-side cost of them.
+  //
+  // Defaults to false.
+  // +optional
+  optional bool omitManagedFields = 3;
 }
 
 // GroupKind specifies a Group and a Kind, but does not force a version.  This is useful for identifying
@@ -643,6 +653,8 @@ message ListOptions {
   // compatibility reasons) and to false otherwise.
   // +optional
   optional bool sendInitialEvents = 11;
+
+  optional bool omitManagedFields = 12;
 }
 
 // ManagedFieldsEntry is a workflow-id, a FieldSet and the group version of the resource
