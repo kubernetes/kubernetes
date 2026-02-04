@@ -45,7 +45,7 @@ rc=0
 # List of dependencies we need to avoid dragging back into kubernetes/kubernetes
 # Check if unwanted dependencies are removed
 # The array and map in `unwanted-dependencies.json` are in alphabetical order.
-go run k8s.io/kubernetes/cmd/dependencyverifier "${KUBE_ROOT}/hack/unwanted-dependencies.json"
+go run k8s.io/kubernetes/cmd/dependencyverifier --tags=selinux,weak_dependency --cross "$@" "${KUBE_ROOT}/hack/unwanted-dependencies.json"
 
 k8s_module_regex="k8s[.]io/(kubernetes"
 for repo in $(kube::util::list_staging_repos); do
