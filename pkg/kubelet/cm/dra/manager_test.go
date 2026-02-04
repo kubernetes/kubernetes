@@ -56,6 +56,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/resourceupdates"
 	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -548,6 +549,31 @@ func genTestClaimInfo(claimUID types.UID, podUIDs []string, prepared bool) *Clai
 					Devices: []state.Device{{
 						PoolName:     poolName,
 						DeviceName:   deviceName,
+						RequestNames: []string{requestName},
+						CDIDeviceIDs: []string{cdiID},
+					}},
+				},
+			},
+		},
+		prepared: prepared,
+	}
+}
+
+// genTestClaimInfoWithShareID generates claim info object with ShareID set on the device.
+// This is used to test health status reporting for shared/pooled devices.
+func genTestClaimInfoWithShareID(claimUID types.UID, podUIDs []string, prepared bool, shareID *types.UID) *ClaimInfo {
+	return &ClaimInfo{
+		ClaimInfoState: state.ClaimInfoState{
+			ClaimUID:  claimUID,
+			ClaimName: claimName,
+			Namespace: namespace,
+			PodUIDs:   sets.New[string](podUIDs...),
+			DriverState: map[string]state.DriverState{
+				driverName: {
+					Devices: []state.Device{{
+						PoolName:     poolName,
+						DeviceName:   deviceName,
+						ShareID:      shareID,
 						RequestNames: []string{requestName},
 						CDIDeviceIDs: []string{cdiID},
 					}},
@@ -1897,6 +1923,192 @@ func TestHandleWatchResourcesStream(t *testing.T) {
 		require.Error(t, finalErr)
 		assert.True(t, errors.Is(finalErr, context.Canceled) || errors.Is(finalErr, context.DeadlineExceeded))
 	})
+
+	// Test Case 6: Health change for a device allocated with ShareID
+	// This test validates that ShareID does not interfere with health status reporting.
+	t.Run("HealthChangeForDeviceWithShareID", func(t *testing.T) {
+		stCtx, stCancel := context.WithCancel(overallTestCtx)
+		defer stCancel()
+
+		// Setup: Create a manager with a claim that has ShareID set on the device
+		testShareUID := types.UID("test-share-uid-for-health")
+		initialClaim := genTestClaimInfoWithShareID(claimUID, []string{string(podUID)}, true, &testShareUID)
+		manager, runStreamTest := setupNewManagerAndRunStreamTest(t, stCtx, initialClaim)
+
+		t.Log("HealthChangeForDeviceWithShareID: Test Case Started")
+
+		responses := make(chan struct {
+			Resp *drahealthv1alpha1.NodeWatchResourcesResponse
+			Err  error
+		}, 1)
+		updateChan, done, streamErrChan := runStreamTest(stCtx, responses)
+
+		// Send health update for the device (same device that has ShareID in the claim)
+		unhealthyDeviceMsg := &drahealthv1alpha1.DeviceHealth{
+			Device: &drahealthv1alpha1.DeviceIdentifier{
+				PoolName:   poolName,
+				DeviceName: deviceName,
+			},
+			Health:          drahealthv1alpha1.HealthStatus_UNHEALTHY,
+			LastUpdatedTime: time.Now().Unix(),
+		}
+		t.Logf("HealthChangeForDeviceWithShareID: Sending health update: %+v", unhealthyDeviceMsg)
+		responses <- struct {
+			Resp *drahealthv1alpha1.NodeWatchResourcesResponse
+			Err  error
+		}{
+			Resp: &drahealthv1alpha1.NodeWatchResourcesResponse{Devices: []*drahealthv1alpha1.DeviceHealth{unhealthyDeviceMsg}},
+		}
+
+		t.Log("HealthChangeForDeviceWithShareID: Waiting for update on manager channel")
+		select {
+		case upd := <-updateChan:
+			t.Logf("HealthChangeForDeviceWithShareID: Received update: %+v", upd)
+			assert.ElementsMatch(t, []string{string(podUID)}, upd.PodUIDs, "Expected pod UID in update for device with ShareID")
+		case <-time.After(2 * time.Second):
+			t.Fatal("HealthChangeForDeviceWithShareID: Timeout waiting for pod update - ShareID may be interfering with health reporting")
+		}
+
+		// Verify health cache is updated correctly
+		cachedHealth := manager.healthInfoCache.getHealthInfo(driverName, poolName, deviceName)
+		assert.Equal(t, state.DeviceHealthStatus("Unhealthy"), cachedHealth, "Health cache should be updated for device with ShareID")
+
+		// Verify the claim still has the ShareID set (it shouldn't be lost during health updates)
+		claimFromCache, exists := manager.cache.get(claimName, namespace)
+		require.True(t, exists, "Claim should still exist in cache")
+		devices := claimFromCache.DriverState[driverName].Devices
+		require.Len(t, devices, 1, "Claim should have one device")
+		assert.NotNil(t, devices[0].ShareID, "ShareID should still be set on the device")
+		assert.Equal(t, testShareUID, *devices[0].ShareID, "ShareID value should be preserved")
+
+		t.Log("HealthChangeForDeviceWithShareID: Closing responses channel to signal EOF")
+		close(responses)
+
+		t.Log("HealthChangeForDeviceWithShareID: Waiting on done channel")
+		var finalErr error
+		select {
+		case <-done:
+			finalErr = <-streamErrChan
+			t.Log("HealthChangeForDeviceWithShareID: done channel closed, stream goroutine finished.")
+		case <-time.After(1 * time.Second):
+			t.Fatal("HealthChangeForDeviceWithShareID: Timed out waiting for HandleWatchResourcesStream to finish")
+		}
+		assert.True(t, finalErr == nil || errors.Is(finalErr, io.EOF), "Expected nil or io.EOF, got %v", finalErr)
+	})
+
+	// Test Case 7: Health change affects multiple pods sharing the same device via ShareID
+	// When two pods share the same physical device (identified by pool/device, but with different ShareIDs),
+	// a health change should notify both pods since they're using the same underlying hardware.
+	t.Run("HealthChangeForMultiplePodsWithSharedDevice", func(t *testing.T) {
+		stCtx, stCancel := context.WithCancel(overallTestCtx)
+		defer stCancel()
+
+		// Setup: Two claims from different pods, both using the same device with different ShareIDs
+		pod1UID := types.UID("pod-1-sharing-device")
+		pod2UID := types.UID("pod-2-sharing-device")
+		claim1UID := types.UID("claim-1-shared")
+		claim2UID := types.UID("claim-2-shared")
+		shareUID1 := types.UID("share-uid-1")
+		shareUID2 := types.UID("share-uid-2")
+
+		// Both claims reference the same physical device (same pool/device) but with different ShareIDs
+		claim1 := &ClaimInfo{
+			ClaimInfoState: state.ClaimInfoState{
+				ClaimUID:  claim1UID,
+				ClaimName: "shared-claim-1",
+				Namespace: namespace,
+				PodUIDs:   sets.New[string](string(pod1UID)),
+				DriverState: map[string]state.DriverState{
+					driverName: {
+						Devices: []state.Device{{
+							PoolName:     poolName,
+							DeviceName:   deviceName, // Same device as claim2
+							ShareID:      &shareUID1,
+							RequestNames: []string{requestName},
+							CDIDeviceIDs: []string{cdiID},
+						}},
+					},
+				},
+			},
+			prepared: true,
+		}
+		claim2 := &ClaimInfo{
+			ClaimInfoState: state.ClaimInfoState{
+				ClaimUID:  claim2UID,
+				ClaimName: "shared-claim-2",
+				Namespace: namespace,
+				PodUIDs:   sets.New[string](string(pod2UID)),
+				DriverState: map[string]state.DriverState{
+					driverName: {
+						Devices: []state.Device{{
+							PoolName:     poolName,
+							DeviceName:   deviceName, // Same device as claim1
+							ShareID:      &shareUID2,
+							RequestNames: []string{requestName},
+							CDIDeviceIDs: []string{cdiID},
+						}},
+					},
+				},
+			},
+			prepared: true,
+		}
+
+		manager, runStreamTest := setupNewManagerAndRunStreamTest(t, stCtx, claim1, claim2)
+
+		t.Log("HealthChangeForMultiplePodsWithSharedDevice: Test Case Started")
+
+		responses := make(chan struct {
+			Resp *drahealthv1alpha1.NodeWatchResourcesResponse
+			Err  error
+		}, 1)
+		updateChan, done, streamErrChan := runStreamTest(stCtx, responses)
+
+		// Send health update for the shared device
+		unhealthyDeviceMsg := &drahealthv1alpha1.DeviceHealth{
+			Device: &drahealthv1alpha1.DeviceIdentifier{
+				PoolName:   poolName,
+				DeviceName: deviceName,
+			},
+			Health:          drahealthv1alpha1.HealthStatus_UNHEALTHY,
+			LastUpdatedTime: time.Now().Unix(),
+		}
+		t.Logf("HealthChangeForMultiplePodsWithSharedDevice: Sending health update: %+v", unhealthyDeviceMsg)
+		responses <- struct {
+			Resp *drahealthv1alpha1.NodeWatchResourcesResponse
+			Err  error
+		}{
+			Resp: &drahealthv1alpha1.NodeWatchResourcesResponse{Devices: []*drahealthv1alpha1.DeviceHealth{unhealthyDeviceMsg}},
+		}
+
+		t.Log("HealthChangeForMultiplePodsWithSharedDevice: Waiting for update on manager channel")
+		select {
+		case upd := <-updateChan:
+			t.Logf("HealthChangeForMultiplePodsWithSharedDevice: Received update: %+v", upd)
+			// Both pods should be notified since they share the same device
+			assert.Len(t, upd.PodUIDs, 2, "Both pods sharing the device should be notified")
+			assert.Contains(t, upd.PodUIDs, string(pod1UID), "Pod 1 should be notified")
+			assert.Contains(t, upd.PodUIDs, string(pod2UID), "Pod 2 should be notified")
+		case <-time.After(2 * time.Second):
+			t.Fatal("HealthChangeForMultiplePodsWithSharedDevice: Timeout waiting for pod update")
+		}
+
+		// Verify health cache is updated
+		cachedHealth := manager.healthInfoCache.getHealthInfo(driverName, poolName, deviceName)
+		assert.Equal(t, state.DeviceHealthStatus("Unhealthy"), cachedHealth, "Health cache should show Unhealthy for shared device")
+
+		t.Log("HealthChangeForMultiplePodsWithSharedDevice: Closing responses channel to signal EOF")
+		close(responses)
+
+		var finalErr error
+		select {
+		case <-done:
+			finalErr = <-streamErrChan
+			t.Log("HealthChangeForMultiplePodsWithSharedDevice: done channel closed")
+		case <-time.After(1 * time.Second):
+			t.Fatal("HealthChangeForMultiplePodsWithSharedDevice: Timed out waiting for stream to finish")
+		}
+		assert.True(t, finalErr == nil || errors.Is(finalErr, io.EOF), "Expected nil or io.EOF, got %v", finalErr)
+	})
 }
 
 // TestUpdateAllocatedResourcesStatus verifies that the manager can correctly
@@ -2025,6 +2237,51 @@ func TestUpdateAllocatedResourcesStatus(t *testing.T) {
 					Name: "claim:templated-claim",
 					Resources: []v1.ResourceHealth{
 						{ResourceID: "test-driver/pool/dev-c", Health: v1.ResourceHealthStatusHealthy},
+					},
+				},
+			},
+		},
+		// Test case for ShareID: Verifies that health status is correctly reported for devices with ShareID set.
+		// This validates that KEP-4860 (ShareID) does not interfere with KEP-4680 (Resource Health Status).
+		{
+			name: "Claim with ShareID",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod-shareid", UID: "pod-shareid-uid"},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "container1", Resources: v1.ResourceRequirements{Claims: []v1.ResourceClaim{{Name: "shareid-claim"}}}},
+					},
+					ResourceClaims: []v1.PodResourceClaim{
+						{Name: "shareid-claim", ResourceClaimName: ptr.To("shareid-claim-object")},
+					},
+				},
+				Status: v1.PodStatus{
+					ResourceClaimStatuses: []v1.PodResourceClaimStatus{
+						{Name: "shareid-claim", ResourceClaimName: ptr.To("shareid-claim-object")},
+					},
+				},
+			},
+			claimInfos: []*ClaimInfo{
+				{
+					ClaimInfoState: state.ClaimInfoState{
+						ClaimName: "shareid-claim-object",
+						PodUIDs:   sets.New("pod-shareid-uid"),
+						DriverState: map[string]state.DriverState{
+							"test-driver": {Devices: []state.Device{{
+								PoolName:   "pool",
+								DeviceName: "dev-shared",
+								ShareID:    ptr.To(types.UID("test-share-id")), // Device has ShareID
+							}}},
+						},
+					},
+				},
+			},
+			initialStatus: &v1.PodStatus{ContainerStatuses: []v1.ContainerStatus{{Name: "container1"}}},
+			expectedAllocatedResourcesStatus: []v1.ResourceStatus{
+				{
+					Name: "claim:shareid-claim",
+					Resources: []v1.ResourceHealth{
+						{ResourceID: "test-driver/pool/dev-shared", Health: v1.ResourceHealthStatusHealthy},
 					},
 				},
 			},
