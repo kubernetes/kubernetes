@@ -66,25 +66,27 @@ func setupTestRegistry(t *testing.T) (string, func() error) {
 
 	manifestsDir := filepath.Join(tempDir, testImageName, "manifests")
 	blobsDir := filepath.Join(tempDir, testImageName, "blobs")
-	if err := os.MkdirAll(manifestsDir, 0755); err != nil {
+
+	// write the manifest file using nested path
+	manifestPath := digestToPath(manifestsDir, testManifestDigest)
+	if err := os.MkdirAll(filepath.Dir(manifestPath), 0755); err != nil {
 		t.Fatalf("Failed to create manifests dir: %v", err)
 	}
-	if err := os.MkdirAll(blobsDir, 0755); err != nil {
-		t.Fatalf("Failed to create blobs dir: %v", err)
-	}
-
-	// write the manifest file
-	if err := os.WriteFile(filepath.Join(manifestsDir, testManifestDigest), []byte(testManifestContent), 0644); err != nil {
+	if err := os.WriteFile(manifestPath, []byte(testManifestContent), 0644); err != nil {
 		t.Fatalf("Failed to write manifest file: %v", err)
 	}
 
-	// write the tag file
+	// write the tag file (tags are still flat files)
 	if err := os.WriteFile(filepath.Join(manifestsDir, testTag), []byte(testManifestDigest), 0644); err != nil {
 		t.Fatalf("Failed to write tag file: %v", err)
 	}
 
-	// write the blob file
-	if err := os.WriteFile(filepath.Join(blobsDir, testBlobDigest), []byte(testBlobContent), 0644); err != nil {
+	// write the blob file using nested path
+	blobPath := digestToPath(blobsDir, testBlobDigest)
+	if err := os.MkdirAll(filepath.Dir(blobPath), 0755); err != nil {
+		t.Fatalf("Failed to create blobs dir: %v", err)
+	}
+	if err := os.WriteFile(blobPath, []byte(testBlobContent), 0644); err != nil {
 		t.Fatalf("Failed to write blob file: %v", err)
 	}
 
@@ -93,6 +95,28 @@ func setupTestRegistry(t *testing.T) (string, func() error) {
 	}
 
 	return tempDir, cleanup
+}
+
+func TestDigestToPath(t *testing.T) {
+	tests := []struct {
+		name     string
+		baseDir  string
+		digest   string
+		expected string
+	}{
+		{"valid sha256", "/base", "sha256:abc123", "/base/sha256/ab/abc123/data"},
+		{"short hash", "/base", "sha256:a", "/base/sha256:a"}, // fallback
+		{"no colon", "/base", "invalid", "/base/invalid"},
+		{"empty hash", "/base", "sha256:", "/base/sha256:"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := digestToPath(tt.baseDir, tt.digest)
+			if got != tt.expected {
+				t.Errorf("digestToPath() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
 }
 
 func TestRegistryServer(t *testing.T) {
