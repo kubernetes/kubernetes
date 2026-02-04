@@ -492,7 +492,7 @@ func (p *cadvisorStatsProvider) containerInfosToPodStats(logger klog.Logger, con
 			podUID := types.UID(podStats.PodRef.UID)
 			logs, err := p.hostStatsProvider.getPodContainerLogStats(podStats.PodRef.Namespace, podStats.PodRef.Name, podUID, containerName, &rootFsInfo)
 			if err != nil {
-				klog.ErrorS(err, "Unable to fetch container log stats", "containerName", containerName)
+				klog.FromContext(ctx).Error(err, "Unable to fetch container log stats", "containerName", containerName)
 			} else {
 				containerStat.Logs = logs
 			}
