@@ -3695,28 +3695,6 @@ function kube-down() {
       } &
     done
 
-    # Wait for last batch of jobs
-    kube::util::wait-for-jobs || {
-      echo -e "Failed to delete instance group(s)." >&2
-    }
-
-    # Deliberately do not quote, do not change unless a bug is found
-    # shellcheck disable=SC2068
-    for template in ${templates[@]:-}; do
-      {
-        if gcloud compute instance-templates describe --project "${PROJECT}" "${template}" &>/dev/null; then
-          gcloud compute instance-templates delete \
-            --project "${PROJECT}" \
-            --quiet \
-            "${template}"
-        fi
-      } &
-    done
-
-    # Wait for last batch of jobs
-    kube::util::wait-for-jobs || {
-      echo -e "Failed to delete instance template(s)." >&2
-    }
 
     # Delete the special heapster node (if it exists).
     if [[ -n "${HEAPSTER_MACHINE_TYPE:-}" ]]; then
@@ -3729,6 +3707,10 @@ function kube-down() {
           --delete-disks all \
           --zone "${ZONE}" \
           "${heapster_machine_name}"
+        # ^^^ The invocation above continues to be blocking.
+        # It may be worth it for some scalability jobs to
+        # also make it non-blocking, but that is left to
+        # owners of those jobs.
       fi
     fi
   fi
@@ -3760,7 +3742,27 @@ function kube-down() {
       --quiet \
       --delete-disks all \
       --zone "${ZONE}" \
-      "${REPLICA_NAME}"
+      "${REPLICA_NAME}" &
+  fi
+
+  # Wait for last batch of jobs
+  kube::util::wait-for-jobs || {
+    echo -e "Failed to delete instance group(s) and replica(s)." >&2
+  }
+
+  if [[ "${KUBE_DELETE_NODES:-}" != "false" ]]; then
+    # Deliberately do not quote, do not change unless a bug is found
+    # shellcheck disable=SC2068
+    for template in ${templates[@]:-}; do
+      {
+        if gcloud compute instance-templates describe --project "${PROJECT}" "${template}" &>/dev/null; then
+          gcloud compute instance-templates delete \
+            --project "${PROJECT}" \
+            --quiet \
+            "${template}" &
+        fi
+      } &
+    done
   fi
 
   # Delete the master replica pd (possibly leaked by kube-up if master create failed).
@@ -3771,8 +3773,14 @@ function kube-down() {
       --project "${PROJECT}" \
       --quiet \
       --zone "${ZONE}" \
-      "${replica_pd}"
+      "${replica_pd}" &&
+    echo "Deleted ${replica_pd}" & # "gcloud compute disks delete --quiet" does not print anything, in contrast to other sub-commands.
   fi
+
+  # Wait for last batch of jobs
+  kube::util::wait-for-jobs || {
+    echo -e "Failed to delete instance templates and/or replica pd." >&2
+  }
 
   # Check if this are any remaining master replicas.
   local REMAINING_MASTER_COUNT
@@ -3880,7 +3888,7 @@ function kube-down() {
         --project "${PROJECT}" \
         --quiet \
         --zone "${ZONE}" \
-        "${INSTANCE_PREFIX}"-influxdb-pd
+        "${INSTANCE_PREFIX}"-influxdb-pd && echo "Deleted ${INSTANCE_PREFIX}-influxdb-pd."
     fi
 
     # Delete all remaining firewall rules and network.
