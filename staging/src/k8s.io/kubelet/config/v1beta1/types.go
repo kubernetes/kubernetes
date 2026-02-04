@@ -461,6 +461,10 @@ type KubeletConfiguration struct {
 	CgroupsPerQOS *bool `json:"cgroupsPerQOS,omitempty"`
 	// cgroupDriver is the driver kubelet uses to manipulate CGroups on the host (cgroupfs
 	// or systemd).
+	//
+	// Deprecated: The kubelet obtains the cgroup driver from the container runtime.
+	// This field is only used as a fallback when the runtime does not implement
+	// RuntimeConfig and the DisableCgroupDriverFallback feature gate is set to false.
 	// Default: "cgroupfs"
 	// +optional
 	CgroupDriver string `json:"cgroupDriver,omitempty"`

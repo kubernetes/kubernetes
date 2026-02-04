@@ -379,6 +379,16 @@ const (
 	// The Feature Gate will be locked to true and then removed in +2 releases (1.35) if there are no bug reported
 	DisableCPUQuotaWithExclusiveCPUs featuregate.Feature = "DisableCPUQuotaWithExclusiveCPUs"
 
+	// owner: @carlory
+	// kep: https://kep.k8s.io/4033
+	//
+	// Deprecated: v1.38
+	//
+	// Require runtimes to implement RuntimeConfig instead of falling back to the
+	// cgroup driver in the kubelet configuration. Disable temporarily to allow
+	// the runtime to be upgraded after a kubelet upgrade.
+	DisableCgroupDriverFallback featuregate.Feature = "DisableCgroupDriverFallback"
+
 	// owner: @HirazawaUi
 	// kep: http://kep.k8s.io/4004
 	//
@@ -585,16 +595,6 @@ const (
 	//
 	// Enables the kubelet allocated pods endpoint.
 	KubeletAllocatedPodsEndpoint featuregate.Feature = "KubeletAllocatedPodsEndpoint"
-
-	// owner: @marquiz
-	// kep: http://kep.k8s.io/4033
-	//
-	// Enable detection of the kubelet cgroup driver configuration option from
-	// the CRI.  The CRI runtime also needs to support this feature in which
-	// case the kubelet will ignore the cgroupDriver (--cgroup-driver)
-	// configuration option. If runtime doesn't support it, the kubelet will
-	// fallback to using it's cgroupDriver option.
-	KubeletCgroupDriverFromCRI featuregate.Feature = "KubeletCgroupDriverFromCRI"
 
 	// owner: @lauralorenz @hankfreund
 	// kep: https://kep.k8s.io/5593
@@ -1511,6 +1511,11 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Deprecated, LockToDefault: true}, // remove in 1.38
 	},
 
+	DisableCgroupDriverFallback: {
+		{Version: version.MustParse("1.0"), Default: false, PreRelease: featuregate.GA},
+		{Version: version.MustParse("1.38"), Default: true, PreRelease: featuregate.Deprecated},
+	},
+
 	DisableNodeKubeProxyVersion: {
 		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Deprecated},
@@ -1672,12 +1677,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	KubeletAllocatedPodsEndpoint: {
 		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
-	},
-
-	KubeletCgroupDriverFromCRI: {
-		{Version: version.MustParse("1.28"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.37
 	},
 
 	KubeletCrashLoopBackOffMax: {
@@ -2502,6 +2501,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	DisableCPUQuotaWithExclusiveCPUs: {},
 
+	DisableCgroupDriverFallback: {},
+
 	DisableNodeKubeProxyVersion: {},
 
 	EmptyDirVolumeMode: {},
@@ -2569,8 +2570,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	KubeProxyNFTablesLocalhostNodePorts: {},
 
 	KubeletAllocatedPodsEndpoint: {InPlacePodVerticalScaling},
-
-	KubeletCgroupDriverFromCRI: {},
 
 	KubeletCrashLoopBackOffMax: {},
 
