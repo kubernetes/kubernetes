@@ -45,6 +45,7 @@ const (
 
 	// The Content-Type values for the different wire protocols. Do not do direct
 	// comparisons to these constants, instead use the comparison functions.
+	//
 	// Deprecated: Use expfmt.NewFormat(expfmt.TypeUnknown) instead.
 	FmtUnknown Format = `<unknown>`
 	// Deprecated: Use expfmt.NewFormat(expfmt.TypeTextPlain) instead.

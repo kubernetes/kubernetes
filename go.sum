@@ -12,6 +12,12 @@ github.com/Azure/go-ansiterm v0.0.0-20230124172434-306776ec8161/go.mod h1:xomTg6
 github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.30.0/go.mod h1:P4WPRUkOhJC13W//jWpyfJNDAIpvRbAUIYLX/4jtlE0=
 github.com/JeffAshton/win_pdh v0.0.0-20161109143554-76bb4ee9f0ab h1:UKkYhof1njT1/xq4SEg5z+VpTgjmNeHwPGRQl7takDI=
 github.com/JeffAshton/win_pdh v0.0.0-20161109143554-76bb4ee9f0ab/go.mod h1:3VYc5hodBMJ5+l/7J4xAyMeuM2PNuepvHlGs8yilUCA=
+github.com/Jefftree/etcd/api/v3 v3.0.0-20260203154226-a6dc519ade90 h1:fZqo3yNS7EMq8PUhcAw1nTbI5PhR/otATjUNTuGc+QA=
+github.com/Jefftree/etcd/api/v3 v3.0.0-20260203154226-a6dc519ade90/go.mod h1:mA0/AQh9QVQOe0Zv/M3akHobmnSrLK1AEHXeOp+6u1s=
+github.com/Jefftree/etcd/client/pkg/v3 v3.0.0-20260203154226-a6dc519ade90 h1:Xme5N7Y736J1286FKO8sYdMLgGN8xUiKGXfKf30xVJs=
+github.com/Jefftree/etcd/client/pkg/v3 v3.0.0-20260203154226-a6dc519ade90/go.mod h1:gd/H+u3VnIPW8EzFuPt/4XfvAUv56cXImDXisTZIgKg=
+github.com/Jefftree/etcd/client/v3 v3.0.0-20260203154226-a6dc519ade90 h1:9yVfP6sSDaBlOpxmrQpd/jgLK7MsrE6lG85eayFDbzI=
+github.com/Jefftree/etcd/client/v3 v3.0.0-20260203154226-a6dc519ade90/go.mod h1:lXhYnGYlJvPx4XGamH9GFsErgjxBH+Fx6xgjLxOo4Fw=
 github.com/MakeNowJust/heredoc v1.0.0 h1:cXCdzVdstXyiTqTvfqk9SDHpKNjxuom+DOlyEeQ4pzQ=
 github.com/MakeNowJust/heredoc v1.0.0/go.mod h1:mG5amYoWBHf8vpLOuehzbGGw0EHxpZZ6lCpQ4fNJ8LE=
 github.com/Masterminds/semver/v3 v3.4.0 h1:Zog+i5UMtVoCU8oKka5P7i9q9HgrJeGzI9SA1Xbatp0=
@@ -23,7 +29,7 @@ github.com/Microsoft/hnslib v0.1.2/go.mod h1:5vTyBey4N/VI2ZTNh2gdWhkPMefSbCFYjpv
 github.com/NYTimes/gziphandler v1.1.1 h1:ZUDjpQae29j0ryrS0u/B8HZfJBtBQHjqw2rQ2cqUQ3I=
 github.com/NYTimes/gziphandler v1.1.1/go.mod h1:n/CVRwUEOgIxrgPvAQhUUr9oeUtvrhMomdKFjzJNB0c=
 github.com/alecthomas/kingpin/v2 v2.4.0/go.mod h1:0gyi0zQnjuFk8xrkNKamJoyUo382HRL7ATRpFZCw6tE=
-github.com/alecthomas/units v0.0.0-20211218093645-b94a6e3cc137/go.mod h1:OMCwj8VM1Kc9e19TLln2VL61YJF0x1XFtfdL4JdbSyE=
+github.com/alecthomas/units v0.0.0-20240927000941-0f3dac36c52b/go.mod h1:fvzegU4vN3H1qMT+8wDmzjAcDONcgo2/SZ/TyfdUOFs=
 github.com/antihax/optional v1.0.0/go.mod h1:uupD/76wgC+ih3iEmQUL+0Ugr19nfwCT1kdvxnR2qWY=
 github.com/antlr4-go/antlr/v4 v4.13.0 h1:lxCg3LAv+EUK6t1i0y1V6/SLeUi0eKEKdhQAlS8TVTI=
 github.com/antlr4-go/antlr/v4 v4.13.0/go.mod h1:pfChB/xh/Unjila75QW7+VU4TSnWnnk9UTnmpPaOR2g=
@@ -284,8 +290,8 @@ github.com/prometheus/client_golang v1.23.2 h1:Je96obch5RDVy3FDMndoUsjAhG5Edi49h
 github.com/prometheus/client_golang v1.23.2/go.mod h1:Tb1a6LWHB3/SPIzCoaDXI4I8UHKeFTEQ1YCr+0Gyqmg=
 github.com/prometheus/client_model v0.6.2 h1:oBsgwpGs7iVziMvrGhE53c/GrLUsZdHnqNwqPLxwZyk=
 github.com/prometheus/client_model v0.6.2/go.mod h1:y3m2F6Gdpfy6Ut/GBsUqTWZqCUvMVzSfMLjcu6wAwpE=
-github.com/prometheus/common v0.66.1 h1:h5E0h5/Y8niHc5DlaLlWLArTQI7tMrsfQjHV+d9ZoGs=
-github.com/prometheus/common v0.66.1/go.mod h1:gcaUsgf3KfRSwHY4dIMXLPV0K/Wg1oZ8+SbZk/HH/dA=
+github.com/prometheus/common v0.67.5 h1:pIgK94WWlQt1WLwAC5j2ynLaBRDiinoAb86HZHTUGI4=
+github.com/prometheus/common v0.67.5/go.mod h1:SjE/0MzDEEAyrdr5Gqc6G+sXI67maCxzaT3A2+HqjUw=
 github.com/prometheus/procfs v0.16.1 h1:hZ15bTNuirocR6u0JZ6BAHHmwS1p8B4P6MRqxtzMyRg=
 github.com/prometheus/procfs v0.16.1/go.mod h1:teAbpZRB1iIAJYREa1LsoWUXykVXA1KlTmWl8x/U+Is=
 github.com/robfig/cron/v3 v3.0.1 h1:WdRxkvbJztn8LMz/QEvLN5sBU+xKpSqwwUO1Pjr4qDs=
@@ -352,12 +358,6 @@ github.com/yuin/goldmark v1.2.1/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9dec
 github.com/yuin/goldmark v1.4.13/go.mod h1:6yULJ656Px+3vBD8DxQVa3kxgyrAnzto9xy5taEt/CY=
 go.etcd.io/bbolt v1.4.3 h1:dEadXpI6G79deX5prL3QRNP6JB8UxVkqo4UPnHaNXJo=
 go.etcd.io/bbolt v1.4.3/go.mod h1:tKQlpPaYCVFctUIgFKFnAlvbmB3tpy1vkTnDWohtc0E=
-go.etcd.io/etcd/api/v3 v3.6.7 h1:7BNJ2gQmc3DNM+9cRkv7KkGQDayElg8x3X+tFDYS+E0=
-go.etcd.io/etcd/api/v3 v3.6.7/go.mod h1:xJ81TLj9hxrYYEDmXTeKURMeY3qEDN24hqe+q7KhbnI=
-go.etcd.io/etcd/client/pkg/v3 v3.6.7 h1:vvzgyozz46q+TyeGBuFzVuI53/yd133CHceNb/AhBVs=
-go.etcd.io/etcd/client/pkg/v3 v3.6.7/go.mod h1:2IVulJ3FZ/czIGl9T4lMF1uxzrhRahLqe+hSgy+Kh7Q=
-go.etcd.io/etcd/client/v3 v3.6.7 h1:9WqA5RpIBtdMxAy1ukXLAdtg2pAxNqW5NUoO2wQrE6U=
-go.etcd.io/etcd/client/v3 v3.6.7/go.mod h1:2XfROY56AXnUqGsvl+6k29wrwsSbEh1lAouQB1vHpeE=
 go.etcd.io/etcd/pkg/v3 v3.6.7 h1:qIxdSI+LAmKFAjMy42yHQzSNqG/sWES4QjhFSGsMDpY=
 go.etcd.io/etcd/pkg/v3 v3.6.7/go.mod h1:nPbpIExp9Q6tR/EVI2aZe0VBlflLys5VGFWSCmqUOyk=
 go.etcd.io/etcd/server/v3 v3.6.7 h1:8dEGQ877tj0cQJFEfD2bDoZDA76qbS2OkvCNjwAyrSo=

@@ -46,7 +46,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2
 	github.com/prometheus/client_golang v1.23.2
 	github.com/prometheus/client_model v0.6.2
-	github.com/prometheus/common v0.66.1
+	github.com/prometheus/common v0.67.5
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/spf13/cobra v1.10.0
 	github.com/spf13/pflag v1.0.9
@@ -217,6 +217,9 @@ require (
 )
 
 replace (
+	go.etcd.io/etcd/api/v3 => github.com/Jefftree/etcd/api/v3 v3.0.0-20260203154226-a6dc519ade90
+	go.etcd.io/etcd/client/pkg/v3 => github.com/Jefftree/etcd/client/pkg/v3 v3.0.0-20260203154226-a6dc519ade90
+	go.etcd.io/etcd/client/v3 => github.com/Jefftree/etcd/client/v3 v3.0.0-20260203154226-a6dc519ade90
 	k8s.io/api => ./staging/src/k8s.io/api
 	k8s.io/apiextensions-apiserver => ./staging/src/k8s.io/apiextensions-apiserver
 	k8s.io/apimachinery => ./staging/src/k8s.io/apimachinery

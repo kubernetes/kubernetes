@@ -16,6 +16,8 @@ package clientv3
 
 import (
 	"context"
+	"errors"
+	"io"
 
 	"google.golang.org/grpc"
 
@@ -24,11 +26,12 @@ import (
 )
 
 type (
-	CompactResponse pb.CompactionResponse
-	PutResponse     pb.PutResponse
-	GetResponse     pb.RangeResponse
-	DeleteResponse  pb.DeleteRangeResponse
-	TxnResponse     pb.TxnResponse
+	CompactResponse   pb.CompactionResponse
+	PutResponse       pb.PutResponse
+	GetResponse       pb.RangeResponse
+	GetStreamResponse <-chan MaybeRangeStreamResponse
+	DeleteResponse    pb.DeleteRangeResponse
+	TxnResponse       pb.TxnResponse
 )
 
 type KV interface {
@@ -48,6 +51,16 @@ type KV interface {
 	// When passed WithSort(), the keys will be sorted.
 	Get(ctx context.Context, key string, opts ...OpOption) (*GetResponse, error)
 
+	// RangeStream retrieves keys.
+	// By default, will return the value for "key", if any.
+	// When passed WithRange(end), will return the keys in the range [key, end).
+	// When passed WithFromKey(), returns keys greater than or equal to key.
+	// When passed WithRev(rev) with rev > 0, retrieves keys at the given revision;
+	// if the required revision is compacted, the request will fail with ErrCompacted .
+	// When passed WithLimit(limit), the number of returned keys is bounded by limit.
+	// When passed WithSort(), the keys will be sorted.
+	GetStream(ctx context.Context, key string, opts ...OpOption) (GetStreamResponse, error)
+
 	// Delete deletes a key, or optionally using WithRange(end), [key, end).
 	Delete(ctx context.Context, key string, opts ...OpOption) (*DeleteResponse, error)
 
@@ -63,6 +76,78 @@ type KV interface {
 
 	// Txn creates a transaction.
 	Txn(ctx context.Context) Txn
+}
+
+type MaybeRangeStreamResponse struct {
+	*pb.RangeStreamResponse
+	Err error
+}
+
+func GetStreamToGetResponse(stream GetStreamResponse) (*GetResponse, error) {
+	resp := &GetResponse{Header: &pb.ResponseHeader{}}
+	for r := range stream {
+		if r.Err != nil {
+			return nil, r.Err
+		}
+		r := r.RangeStreamResponse.RangeResponse
+		if r.Header != nil {
+			if r.Header.ClusterId != 0 {
+				resp.Header.ClusterId = r.Header.ClusterId
+			}
+			if r.Header.MemberId != 0 {
+				resp.Header.MemberId = r.Header.MemberId
+			}
+			if r.Header.RaftTerm != 0 {
+				resp.Header.RaftTerm = r.Header.RaftTerm
+			}
+			if r.Header.Revision != 0 {
+				resp.Header.Revision = r.Header.Revision
+			}
+		}
+		if r.Count != 0 {
+			resp.Count = r.Count
+		}
+		if r.More {
+			resp.More = true
+		}
+		resp.Kvs = append(resp.Kvs, r.Kvs...)
+	}
+	return resp, nil
+}
+
+func RangeStreamToRangeResponse(c pb.KV_RangeStreamClient) (*pb.RangeResponse, error) {
+	resp := &pb.RangeResponse{Header: &pb.ResponseHeader{}}
+
+	for {
+		r, err := c.Recv()
+		if err != nil {
+			if !errors.Is(err, io.EOF) {
+				return nil, err
+			}
+			return resp, nil
+		}
+		if r.RangeResponse.Header != nil {
+			if r.RangeResponse.Header.ClusterId != 0 {
+				resp.Header.ClusterId = r.RangeResponse.Header.ClusterId
+			}
+			if r.RangeResponse.Header.MemberId != 0 {
+				resp.Header.MemberId = r.RangeResponse.Header.MemberId
+			}
+			if r.RangeResponse.Header.RaftTerm != 0 {
+				resp.Header.RaftTerm = r.RangeResponse.Header.RaftTerm
+			}
+			if r.RangeResponse.Header.Revision != 0 {
+				resp.Header.Revision = r.RangeResponse.Header.Revision
+			}
+		}
+		if r.RangeResponse.Count != 0 {
+			resp.Count = r.RangeResponse.Count
+		}
+		if r.RangeResponse.More {
+			resp.More = true
+		}
+		resp.Kvs = append(resp.Kvs, r.RangeResponse.Kvs...)
+	}
 }
 
 type OpResponse struct {
@@ -124,6 +209,33 @@ func (kv *kv) Get(ctx context.Context, key string, opts ...OpOption) (*GetRespon
 	return r.get, ContextError(ctx, err)
 }
 
+func (kv *kv) GetStream(ctx context.Context, key string, opts ...OpOption) (GetStreamResponse, error) {
+	op := OpGet(key, opts...)
+	c, err := kv.remote.RangeStream(ctx, op.toRangeRequest(), kv.callOpts...)
+	if err != nil {
+		return nil, ContextError(ctx, err)
+	}
+	respCh := make(chan MaybeRangeStreamResponse, 1)
+	go func() {
+		for {
+			resp, err := c.Recv()
+			if err != nil {
+				if !errors.Is(err, io.EOF) {
+					respCh <- MaybeRangeStreamResponse{
+						Err: err,
+					}
+				}
+				close(respCh)
+				return
+			}
+			respCh <- MaybeRangeStreamResponse{
+				RangeStreamResponse: resp,
+			}
+		}
+	}()
+	return respCh, nil
+}
+
 func (kv *kv) Delete(ctx context.Context, key string, opts ...OpOption) (*DeleteResponse, error) {
 	r, err := kv.Do(ctx, OpDelete(key, opts...))
 	return r.del, ContextError(ctx, err)
@@ -134,7 +246,7 @@ func (kv *kv) Compact(ctx context.Context, rev int64, opts ...CompactOption) (*C
 	if err != nil {
 		return nil, ContextError(ctx, err)
 	}
-	return (*CompactResponse)(resp), err
+	return (*CompactResponse)(resp), nil
 }
 
 func (kv *kv) Txn(ctx context.Context) Txn {

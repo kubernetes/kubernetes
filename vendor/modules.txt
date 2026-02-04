@@ -513,8 +513,8 @@ github.com/prometheus/client_golang/prometheus/testutil/promlint/validations
 # github.com/prometheus/client_model v0.6.2
 ## explicit; go 1.22.0
 github.com/prometheus/client_model/go
-# github.com/prometheus/common v0.66.1
-## explicit; go 1.23.0
+# github.com/prometheus/common v0.67.5
+## explicit; go 1.24.0
 github.com/prometheus/common/expfmt
 github.com/prometheus/common/model
 # github.com/prometheus/procfs v0.16.1
@@ -580,8 +580,8 @@ go.etcd.io/bbolt
 go.etcd.io/bbolt/errors
 go.etcd.io/bbolt/internal/common
 go.etcd.io/bbolt/internal/freelist
-# go.etcd.io/etcd/api/v3 v3.6.7
-## explicit; go 1.24.0
+# go.etcd.io/etcd/api/v3 v3.6.7 => github.com/Jefftree/etcd/api/v3 v3.0.0-20260203154226-a6dc519ade90
+## explicit; go 1.25.0
 go.etcd.io/etcd/api/v3/authpb
 go.etcd.io/etcd/api/v3/etcdserverpb
 go.etcd.io/etcd/api/v3/etcdserverpb/gw
@@ -590,8 +590,8 @@ go.etcd.io/etcd/api/v3/mvccpb
 go.etcd.io/etcd/api/v3/v3rpc/rpctypes
 go.etcd.io/etcd/api/v3/version
 go.etcd.io/etcd/api/v3/versionpb
-# go.etcd.io/etcd/client/pkg/v3 v3.6.7
-## explicit; go 1.24.0
+# go.etcd.io/etcd/client/pkg/v3 v3.6.7 => github.com/Jefftree/etcd/client/pkg/v3 v3.0.0-20260203154226-a6dc519ade90
+## explicit; go 1.25.0
 go.etcd.io/etcd/client/pkg/v3/fileutil
 go.etcd.io/etcd/client/pkg/v3/logutil
 go.etcd.io/etcd/client/pkg/v3/pathutil
@@ -601,8 +601,8 @@ go.etcd.io/etcd/client/pkg/v3/tlsutil
 go.etcd.io/etcd/client/pkg/v3/transport
 go.etcd.io/etcd/client/pkg/v3/types
 go.etcd.io/etcd/client/pkg/v3/verify
-# go.etcd.io/etcd/client/v3 v3.6.7
-## explicit; go 1.24.0
+# go.etcd.io/etcd/client/v3 v3.6.7 => github.com/Jefftree/etcd/client/v3 v3.0.0-20260203154226-a6dc519ade90
+## explicit; go 1.25.0
 go.etcd.io/etcd/client/v3
 go.etcd.io/etcd/client/v3/concurrency
 go.etcd.io/etcd/client/v3/credentials
@@ -1304,3 +1304,6 @@ sigs.k8s.io/structured-merge-diff/v6/value
 ## explicit; go 1.22
 sigs.k8s.io/yaml
 sigs.k8s.io/yaml/kyaml
+# go.etcd.io/etcd/api/v3 => github.com/Jefftree/etcd/api/v3 v3.0.0-20260203154226-a6dc519ade90
+# go.etcd.io/etcd/client/pkg/v3 => github.com/Jefftree/etcd/client/pkg/v3 v3.0.0-20260203154226-a6dc519ade90
+# go.etcd.io/etcd/client/v3 => github.com/Jefftree/etcd/client/v3 v3.0.0-20260203154226-a6dc519ade90

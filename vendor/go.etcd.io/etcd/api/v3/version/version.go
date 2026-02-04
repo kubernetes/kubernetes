@@ -26,7 +26,7 @@ import (
 var (
 	// MinClusterVersion is the min cluster version this etcd binary is compatible with.
 	MinClusterVersion = "3.0.0"
-	Version           = "3.6.7"
+	Version           = "3.7.0-alpha.0"
 	APIVersion        = "unknown"
 
 	// Git SHA Value will be set during build
@@ -43,6 +43,7 @@ var (
 	V3_5 = semver.Version{Major: 3, Minor: 5}
 	V3_6 = semver.Version{Major: 3, Minor: 6}
 	V3_7 = semver.Version{Major: 3, Minor: 7}
+	V3_8 = semver.Version{Major: 3, Minor: 8}
 	V4_0 = semver.Version{Major: 4, Minor: 0}
 
 	// AllVersions keeps all the versions in ascending order.

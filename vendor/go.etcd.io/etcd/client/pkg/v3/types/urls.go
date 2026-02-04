@@ -47,7 +47,6 @@ func NewURLs(strs []string) (URLs, error) {
 				return nil, fmt.Errorf("URL must not contain a path: %s", in)
 			}
 		case "unix", "unixs":
-			break
 		default:
 			return nil, fmt.Errorf("URL scheme must be http, https, unix, or unixs: %s", in)
 		}

@@ -43,6 +43,10 @@ service KV {
     };
   }
 
+  // RangeStream gets the keys in the range from the key-value store.
+  rpc RangeStream(RangeRequest) returns (stream RangeStreamResponse) {
+  }
+
   // Put puts the given key into the key-value store.
   // A put request increments the revision of the key-value store
   // and generates one event in the event history.
@@ -345,7 +349,7 @@ service Auth {
     };
   }
 
-  // UserGrant grants a role to a specified user.
+  // UserGrantRole grants a role to a specified user.
   rpc UserGrantRole(AuthUserGrantRoleRequest) returns (AuthUserGrantRoleResponse) {
       option (google.api.http) = {
         post: "/v3/auth/user/grant"
@@ -496,6 +500,18 @@ message RangeRequest {
   // max_create_revision is the upper bound for returned key create revisions; all keys with
   // greater create revisions will be filtered away.
   int64 max_create_revision = 13 [(versionpb.etcd_version_field)="3.1"];
+}
+
+// RangeStreamResponse is the response for the RangeStream RPC.
+// This message is just a wrapper around RangeResponse but there may be a need
+// in the future to add streaming specific fields (for progress status, error
+// propagation, etc.).
+message RangeStreamResponse {
+  option (versionpb.etcd_version_msg) = "3.7";
+  // range_response is a partial response for the KV.RangeStream RPC.
+  // The result of proto.Merge() applied on all responses should result in the
+  // same RangeResponse response as to the Range() method.
+  RangeResponse range_response = 1;
 }
 
 message RangeResponse {

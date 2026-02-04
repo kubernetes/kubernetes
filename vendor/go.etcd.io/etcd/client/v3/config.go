@@ -66,6 +66,9 @@ type Config struct {
 	// Password is a password for authentication.
 	Password string `json:"password"`
 
+	// Token is a JWT used for authentication instead of a password.
+	Token string `json:"token"`
+
 	// RejectOldCluster when set will refuse to create a client against an outdated cluster.
 	RejectOldCluster bool `json:"reject-old-cluster"`
 
@@ -130,6 +133,7 @@ type SecureConfig struct {
 type AuthConfig struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
+	Token    string `json:"token"`
 }
 
 func (cs *ConfigSpec) Clone() *ConfigSpec {
@@ -157,7 +161,7 @@ func (cs *ConfigSpec) Clone() *ConfigSpec {
 }
 
 func (cfg AuthConfig) Empty() bool {
-	return cfg.Username == "" && cfg.Password == ""
+	return cfg.Username == "" && cfg.Password == "" && cfg.Token == ""
 }
 
 // NewClientConfig creates a Config based on the provided ConfigSpec.
@@ -180,6 +184,7 @@ func NewClientConfig(confSpec *ConfigSpec, lg *zap.Logger) (*Config, error) {
 	if confSpec.Auth != nil {
 		cfg.Username = confSpec.Auth.Username
 		cfg.Password = confSpec.Auth.Password
+		cfg.Token = confSpec.Auth.Token
 	}
 
 	return cfg, nil
