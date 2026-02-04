@@ -58,6 +58,10 @@ func (d SharedDeviceID) String() string {
 	return deviceIDStr
 }
 
+func (d SharedDeviceID) GetBaseDeviceID() DeviceID {
+	return MakeDeviceID(d.Driver.String(), d.Pool.String(), d.Device.String())
+}
+
 // MakeSharedDeviceID creates a new SharedDeviceID from a DeviceID and share ID.
 // This function is used in consumable capacity features and the scheduler.
 func MakeSharedDeviceID(deviceID DeviceID, shareID *types.UID) SharedDeviceID {
