@@ -1,3 +1,4 @@
 apiVersion: v1
 kind: GetOptions
+omitManagedFields: true
 resourceVersion: resourceVersionValue

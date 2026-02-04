@@ -156,8 +156,9 @@ func (FieldsV1) SwaggerDoc() map[string]string {
 }
 
 var map_GetOptions = map[string]string{
-	"":                "GetOptions is the standard query options to the standard REST get call.",
-	"resourceVersion": "resourceVersion sets a constraint on what resource versions a request may be served from. See https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions for details.\n\nDefaults to unset",
+	"":                  "GetOptions is the standard query options to the standard REST get call.",
+	"resourceVersion":   "resourceVersion sets a constraint on what resource versions a request may be served from. See https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions for details.\n\nDefaults to unset",
+	"omitManagedFields": "omitManagedFields indicates that the managed fields for the requested object should be omitted from the response. This is primarily useful for reducing the size of the response when the caller does not need to see the managed fields and wishes to avoid the bandwidth and client-side cost of them.\n\nDefaults to false.",
 }
 
 func (GetOptions) SwaggerDoc() map[string]string {

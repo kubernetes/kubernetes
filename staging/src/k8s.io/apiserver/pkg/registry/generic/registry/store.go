@@ -381,6 +381,13 @@ func (e *Store) List(ctx context.Context, options *metainternalversion.ListOptio
 	if e.Decorator != nil {
 		e.Decorator(out)
 	}
+	if options != nil && options.OmitManagedFields {
+		metaObj, err := meta.Accessor(out)
+		if err != nil {
+			return nil, err
+		}
+		metaObj.SetManagedFields(nil)
+	}
 	return out, nil
 }
 
@@ -855,6 +862,13 @@ func (e *Store) Get(ctx context.Context, name string, options *metav1.GetOptions
 	}
 	if e.Decorator != nil {
 		e.Decorator(obj)
+	}
+	if options.OmitManagedFields {
+		metaObj, err := meta.Accessor(obj)
+		if err != nil {
+			return nil, err
+		}
+		metaObj.SetManagedFields(nil)
 	}
 	return obj, nil
 }

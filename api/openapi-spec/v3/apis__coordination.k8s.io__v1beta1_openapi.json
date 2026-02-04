@@ -1447,6 +1447,14 @@
           }
         },
         {
+          "in": "query",
+          "name": "omitManagedFields",
+          "schema": {
+            "type": "boolean",
+            "uniqueItems": true
+          }
+        },
+        {
           "description": "If 'true', then the output is pretty printed. Defaults to 'false' unless the user-agent indicates a browser or command-line HTTP tool (curl and wget).",
           "in": "query",
           "name": "pretty",
@@ -1567,6 +1575,14 @@
             "name": "limit",
             "schema": {
               "type": "integer",
+              "uniqueItems": true
+            }
+          },
+          {
+            "in": "query",
+            "name": "omitManagedFields",
+            "schema": {
+              "type": "boolean",
               "uniqueItems": true
             }
           },
@@ -1720,6 +1736,14 @@
             "name": "limit",
             "schema": {
               "type": "integer",
+              "uniqueItems": true
+            }
+          },
+          {
+            "in": "query",
+            "name": "omitManagedFields",
+            "schema": {
+              "type": "boolean",
               "uniqueItems": true
             }
           },
@@ -2527,6 +2551,14 @@
           }
         },
         {
+          "in": "query",
+          "name": "omitManagedFields",
+          "schema": {
+            "type": "boolean",
+            "uniqueItems": true
+          }
+        },
+        {
           "description": "If 'true', then the output is pretty printed. Defaults to 'false' unless the user-agent indicates a browser or command-line HTTP tool (curl and wget).",
           "in": "query",
           "name": "pretty",
@@ -2694,6 +2726,14 @@
           "required": true,
           "schema": {
             "type": "string",
+            "uniqueItems": true
+          }
+        },
+        {
+          "in": "query",
+          "name": "omitManagedFields",
+          "schema": {
+            "type": "boolean",
             "uniqueItems": true
           }
         },
@@ -2875,6 +2915,14 @@
           "required": true,
           "schema": {
             "type": "string",
+            "uniqueItems": true
+          }
+        },
+        {
+          "in": "query",
+          "name": "omitManagedFields",
+          "schema": {
+            "type": "boolean",
             "uniqueItems": true
           }
         },
