@@ -149,14 +149,14 @@ func TestFlagz(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	wantBodyStr := "kube-apiserver flagz\nWarning: This endpoint is not meant to be machine parseable"
+	wantBodyStr := "apiserver flagz\nWarning: This endpoint is not meant to be machine parseable"
 	wantBodyJSON := &flagzv1alpha1.Flagz{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Flagz",
 			APIVersion: "config.k8s.io/v1alpha1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "kube-apiserver",
+			Name: "apiserver",
 		},
 	}
 
