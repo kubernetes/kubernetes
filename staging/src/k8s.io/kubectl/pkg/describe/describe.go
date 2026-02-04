@@ -49,6 +49,7 @@ import (
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	resourcev1 "k8s.io/api/resource/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -3476,7 +3477,15 @@ func (d *NodeDescriber) Describe(namespace, name string, describerSettings Descr
 		}
 	}
 
-	return describeNode(node, nodeNonTerminatedPodsList, events, canViewPods, &LeaseDescriber{d})
+	// Fetch ResourceSlices exclusive to this node using indexed field selector (O(1) query)
+	var resourceSlices []resourcev1.ResourceSlice
+	if sliceList, err := d.ResourceV1().ResourceSlices().List(context.TODO(), metav1.ListOptions{
+		FieldSelector: fields.Set{resourcev1.ResourceSliceSelectorNodeName: node.Name}.AsSelector().String(),
+	}); err == nil {
+		resourceSlices = sliceList.Items
+	}
+
+	return describeNode(node, nodeNonTerminatedPodsList, events, canViewPods, &LeaseDescriber{d}, resourceSlices)
 }
 
 type LeaseDescriber struct {
@@ -3484,7 +3493,7 @@ type LeaseDescriber struct {
 }
 
 func describeNode(node *corev1.Node, nodeNonTerminatedPodsList *corev1.PodList, events *corev1.EventList,
-	canViewPods bool, ld *LeaseDescriber) (string, error) {
+	canViewPods bool, ld *LeaseDescriber, resourceSlices []resourcev1.ResourceSlice) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", node.Name)
@@ -3546,6 +3555,9 @@ func describeNode(node *corev1.Node, nodeNonTerminatedPodsList *corev1.PodList, 
 			w.Write(LEVEL_0, "Allocatable:\n")
 			printResourceList(node.Status.Allocatable)
 		}
+		if len(resourceSlices) > 0 {
+			describeNodeResourceSlices(w, resourceSlices)
+		}
 
 		w.Write(LEVEL_0, "System Info:\n")
 		w.Write(LEVEL_0, "  Machine ID:\t%s\n", node.Status.NodeInfo.MachineID)
@@ -3580,6 +3592,58 @@ func describeNode(node *corev1.Node, nodeNonTerminatedPodsList *corev1.PodList, 
 		}
 		return nil
 	})
+}
+
+// describeNodeResourceSlices displays ResourceSlices that are exclusive to this node.
+// It aggregates slices by driver/pool and shows device counts, with output capped at 10 pools.
+func describeNodeResourceSlices(w PrefixWriter, resourceSlices []resourcev1.ResourceSlice) {
+	// Aggregate by driver/pool
+	type poolInfo struct {
+		driver      string
+		pool        string
+		sliceCount  int
+		deviceCount int
+	}
+	pools := make(map[string]*poolInfo)
+
+	for _, slice := range resourceSlices {
+		key := slice.Spec.Driver + "/" + slice.Spec.Pool.Name
+		if pools[key] == nil {
+			pools[key] = &poolInfo{
+				driver: slice.Spec.Driver,
+				pool:   slice.Spec.Pool.Name,
+			}
+		}
+		pools[key].sliceCount++
+		pools[key].deviceCount += len(slice.Spec.Devices)
+	}
+
+	if len(pools) == 0 {
+		return
+	}
+
+	// Sort pool keys for consistent output
+	sortedKeys := make([]string, 0, len(pools))
+	for k := range pools {
+		sortedKeys = append(sortedKeys, k)
+	}
+	sort.Strings(sortedKeys)
+
+	w.Write(LEVEL_0, "Node-Local ResourceSlices:\n")
+	w.Write(LEVEL_1, "Driver\tPool\tSlices\tDevices\n")
+	w.Write(LEVEL_1, "------\t----\t------\t-------\n")
+
+	const maxPoolsToShow = 10
+	shown := 0
+	for _, key := range sortedKeys {
+		if shown >= maxPoolsToShow {
+			w.Write(LEVEL_1, "...and %d more pools\n", len(sortedKeys)-maxPoolsToShow)
+			break
+		}
+		p := pools[key]
+		w.Write(LEVEL_1, "%s\t%s\t%d\t%d\n", p.driver, p.pool, p.sliceCount, p.deviceCount)
+		shown++
+	}
 }
 
 func describeNodeLease(lease *coordinationv1.Lease, w PrefixWriter) {
