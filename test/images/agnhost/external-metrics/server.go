@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package externalmetrics
 
 import (
 	"context"
@@ -22,39 +22,50 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
-	"github.com/spf13/pflag"
+	"github.com/spf13/cobra"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/options"
 	"k8s.io/klog/v2"
 	netutils "k8s.io/utils/net"
 )
 
+// CmdExternalMetricsServer is used by agnhost Cobra.
+var CmdExternalMetricsServer = &cobra.Command{
+	Use:   "external-metrics",
+	Short: "Starts an external metrics server for testing",
+	Long:  "Starts an HTTPS server that implements the external metrics API for testing HPA with external metrics",
+	Args:  cobra.MaximumNArgs(0),
+	Run:   main,
+}
+
 var provider *metricProvider
 
-func main() {
-	flags := pflag.NewFlagSet("sample-external-metrics", pflag.ExitOnError)
-	klog.InitFlags(nil)
+var (
+	port        int
+	serviceName string
+	serviceNs   string
+)
+
+func init() {
+	CmdExternalMetricsServer.Flags().IntVar(&port, "port", 6443, "Port number.")
+	CmdExternalMetricsServer.Flags().StringVar(&serviceName, "service-name", "external-metrics-server", "Name of the external metrics service.")
+	CmdExternalMetricsServer.Flags().StringVar(&serviceNs, "service-namespace", "default", "Namespace of the external metrics service.")
+}
+
+func main(cmd *cobra.Command, args []string) {
 
 	// Initialize the metric provider
 	provider = NewConfigurableProvider()
 	// Create some default metrics
 	provider.createMetric("queue_messages_ready", nil, 100, false)
 	provider.createMetric("http_requests_total", nil, 500, false)
-
 	secureServing := options.NewSecureServingOptions()
-	secureServing.BindPort = 6443
+	secureServing.BindPort = port
 	secureServing.ServerCert.CertDirectory = "/tmp/cert"
 	secureServing.ServerCert.PairName = "apiserver"
-	secureServing.AddFlags(flags)
-
-	if err := flags.Parse(os.Args[1:]); err != nil {
-		klog.Fatalf("Error parsing flags: %v", err)
-	}
-
 	// Generate self-signed TLS certificates if none exist. This allows the server to run with HTTPS
 	// without requiring manually provisioned certificates. The certs are valid for "localhost" and
 	// the loopback IP 127.0.0.1. The second parameter (nil) means no additional alternate names.
@@ -96,6 +107,7 @@ func main() {
 
 	<-listenerStoppedCh
 	<-stoppedCh
+
 }
 
 func healthz(w http.ResponseWriter, r *http.Request) {
