@@ -93,6 +93,22 @@ func (c *constrainedImpersonationTest) Authorize(ctx context.Context, a authoriz
 		return authorizer.DecisionAllow, "", nil
 	}
 
+	// many-groups-impersonater: can impersonate users and any groups via wildcard
+	if u.GetName() == "many-groups-impersonater" && a.GetVerb() == "impersonate:user-info" && a.GetResource() == "users" {
+		return authorizer.DecisionAllow, "", nil
+	}
+	if u.GetName() == "many-groups-impersonater" && a.GetVerb() == "impersonate:user-info" && a.GetResource() == "groups" && a.GetName() == "*" {
+		return authorizer.DecisionAllow, "", nil
+	}
+
+	// many-extras-impersonater: can impersonate users and any extras via wildcard
+	if u.GetName() == "many-extras-impersonater" && a.GetVerb() == "impersonate:user-info" && a.GetResource() == "users" {
+		return authorizer.DecisionAllow, "", nil
+	}
+	if u.GetName() == "many-extras-impersonater" && a.GetVerb() == "impersonate:user-info" && a.GetResource() == "userextras" && a.GetSubresource() == "*" && a.GetName() == "*" {
+		return authorizer.DecisionAllow, "", nil
+	}
+
 	return authorizer.DecisionNoOpinion, "deny by default", nil
 }
 
@@ -933,6 +949,170 @@ func TestConstrainedImpersonationFilter(t *testing.T) {
 							"legacy-impersonater": "impersonate",
 						},
 						modes: nil, // legacy impersonation does not cache
+					},
+					expectedCode: http.StatusOK,
+				},
+			},
+		},
+		{
+			name: "system:masters-group-not-allowed",
+			requests: []testRequest{
+				{
+					request:   getPodRequest,
+					requestor: userImpersonator,
+					impersonatedUser: &user.DefaultInfo{
+						Name:   "admin-user",
+						Groups: []string{user.SystemPrivilegedGroup},
+					},
+					expectedAttributes: []authorizer.AttributesRecord{
+						withImpersonateOnAttributes(getPodRequest, "user-info"),
+						withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "users", Name: "admin-user"}, "user-info"),
+						withLegacyImpersonateAttributes(authorizer.AttributesRecord{Resource: "users", Name: "admin-user"}),
+					},
+					expectedCache:   nil,
+					expectedCode:    http.StatusForbidden,
+					expectedMessage: `groups.authentication.k8s.io "system:masters" is forbidden: User "user-impersonater" cannot impersonate:user-info resource "groups" in API group "authentication.k8s.io" at the cluster scope: impersonating the system:masters group is not allowed`,
+				},
+			},
+		},
+		{
+			name: "many-groups-wildcard-allowed",
+			requests: []testRequest{
+				{
+					request: getPodRequest,
+					requestor: &user.DefaultInfo{
+						Name: "many-groups-impersonater",
+					},
+					impersonatedUser: &user.DefaultInfo{
+						Name:   "bob",
+						Groups: []string{"group1", "group2", "group3", "group4"},
+					},
+					expectedImpersonatedUser: &user.DefaultInfo{
+						Name:   "bob",
+						Groups: []string{"group1", "group2", "group3", "group4", "system:authenticated"},
+					},
+					expectedAttributes: []authorizer.AttributesRecord{
+						withImpersonateOnAttributes(getPodRequest, "user-info"),
+						withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "users", Name: "bob"}, "user-info"),
+						withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "groups", Name: "*"}, "user-info"),
+					},
+					expectedCache: &expectedCache{
+						modeIdx: map[string]string{
+							"many-groups-impersonater": "impersonate:user-info",
+						},
+						modes: map[string]expectedModeCache{
+							"impersonate:user-info": {
+								outer: map[impersonationCacheKey]*user.DefaultInfo{
+									outerCacheKey(&user.DefaultInfo{
+										Name:   "bob",
+										Groups: []string{"group1", "group2", "group3", "group4"},
+									}, &user.DefaultInfo{Name: "many-groups-impersonater"}, getPodRequest): {
+										Name:   "bob",
+										Groups: []string{"group1", "group2", "group3", "group4", "system:authenticated"},
+									},
+								},
+								inner: map[innerKey]*user.DefaultInfo{
+									{
+										wantedUser: &user.DefaultInfo{
+											Name:   "bob",
+											Groups: []string{"group1", "group2", "group3", "group4"},
+										},
+										requestor: &user.DefaultInfo{Name: "many-groups-impersonater"},
+									}: {
+										Name:   "bob",
+										Groups: []string{"group1", "group2", "group3", "group4", "system:authenticated"},
+									},
+								},
+							},
+						},
+					},
+					expectedCode: http.StatusOK,
+				},
+			},
+		},
+		{
+			name: "many-extras-wildcard-allowed",
+			requests: []testRequest{
+				{
+					request: getPodRequest,
+					requestor: &user.DefaultInfo{
+						Name: "many-extras-impersonater",
+					},
+					impersonatedUser: &user.DefaultInfo{
+						Name: "alice",
+						Extra: map[string][]string{
+							"scopes.example.com/key1": {"val1"},
+							"scopes.example.com/key2": {"val2"},
+							"scopes.example.com/key3": {"val3"},
+							"scopes.example.com/key4": {"val4"},
+						},
+					},
+					expectedImpersonatedUser: &user.DefaultInfo{
+						Name:   "alice",
+						Groups: []string{"system:authenticated"},
+						Extra: map[string][]string{
+							"scopes.example.com/key1": {"val1"},
+							"scopes.example.com/key2": {"val2"},
+							"scopes.example.com/key3": {"val3"},
+							"scopes.example.com/key4": {"val4"},
+						},
+					},
+					expectedAttributes: []authorizer.AttributesRecord{
+						withImpersonateOnAttributes(getPodRequest, "user-info"),
+						withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "users", Name: "alice"}, "user-info"),
+						withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "userextras", Subresource: "*", Name: "*"}, "user-info"),
+					},
+					expectedCache: &expectedCache{
+						modeIdx: map[string]string{
+							"many-extras-impersonater": "impersonate:user-info",
+						},
+						modes: map[string]expectedModeCache{
+							"impersonate:user-info": {
+								outer: map[impersonationCacheKey]*user.DefaultInfo{
+									outerCacheKey(&user.DefaultInfo{
+										Name: "alice",
+										Extra: map[string][]string{
+											"scopes.example.com/key1": {"val1"},
+											"scopes.example.com/key2": {"val2"},
+											"scopes.example.com/key3": {"val3"},
+											"scopes.example.com/key4": {"val4"},
+										},
+									}, &user.DefaultInfo{Name: "many-extras-impersonater"}, getPodRequest): {
+										Name:   "alice",
+										Groups: []string{"system:authenticated"},
+										Extra: map[string][]string{
+											"scopes.example.com/key1": {"val1"},
+											"scopes.example.com/key2": {"val2"},
+											"scopes.example.com/key3": {"val3"},
+											"scopes.example.com/key4": {"val4"},
+										},
+									},
+								},
+								inner: map[innerKey]*user.DefaultInfo{
+									{
+										wantedUser: &user.DefaultInfo{
+											Name: "alice",
+											Extra: map[string][]string{
+												"scopes.example.com/key1": {"val1"},
+												"scopes.example.com/key2": {"val2"},
+												"scopes.example.com/key3": {"val3"},
+												"scopes.example.com/key4": {"val4"},
+											},
+										},
+										requestor: &user.DefaultInfo{Name: "many-extras-impersonater"},
+									}: {
+										Name:   "alice",
+										Groups: []string{"system:authenticated"},
+										Extra: map[string][]string{
+											"scopes.example.com/key1": {"val1"},
+											"scopes.example.com/key2": {"val2"},
+											"scopes.example.com/key3": {"val3"},
+											"scopes.example.com/key4": {"val4"},
+										},
+									},
+								},
+							},
+						},
 					},
 					expectedCode: http.StatusOK,
 				},
