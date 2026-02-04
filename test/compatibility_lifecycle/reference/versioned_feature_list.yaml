@@ -473,6 +473,10 @@
     lockToDefault: false
     preRelease: Deprecated
     version: "1.33"
+  - default: true
+    lockToDefault: true
+    preRelease: Deprecated
+    version: "1.36"
 - name: DRAAdminAccess
   versionedSpecs:
   - default: false

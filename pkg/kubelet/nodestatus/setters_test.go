@@ -39,7 +39,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/version"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -969,7 +968,6 @@ func TestVersionInfo(t *testing.T) {
 		runtimeVersionError error
 		expectNode          *v1.Node
 		expectError         error
-		kubeProxyVersion    bool
 	}{
 		{
 			desc: "versions set in node info",
@@ -989,11 +987,10 @@ func TestVersionInfo(t *testing.T) {
 						OSImage:                 "ContainerOSVersion",
 						ContainerRuntimeVersion: "RuntimeType://RuntimeVersion",
 						KubeletVersion:          version.Get().String(),
-						KubeProxyVersion:        version.Get().String(),
+						KubeProxyVersion:        "",
 					},
 				},
 			},
-			kubeProxyVersion: true,
 		},
 		{
 			desc:             "error getting version info",
@@ -1001,7 +998,6 @@ func TestVersionInfo(t *testing.T) {
 			versionInfoError: fmt.Errorf("foo"),
 			expectNode:       &v1.Node{},
 			expectError:      fmt.Errorf("error getting version info: foo"),
-			kubeProxyVersion: true,
 		},
 		{
 			desc:                "error getting runtime version results in Unknown runtime",
@@ -1014,11 +1010,10 @@ func TestVersionInfo(t *testing.T) {
 					NodeInfo: v1.NodeSystemInfo{
 						ContainerRuntimeVersion: "RuntimeType://Unknown",
 						KubeletVersion:          version.Get().String(),
-						KubeProxyVersion:        version.Get().String(),
+						KubeProxyVersion:        "",
 					},
 				},
 			},
-			kubeProxyVersion: true,
 		},
 		{
 			desc: "DisableNodeKubeProxyVersion FeatureGate enable, versions set in node info",
@@ -1038,10 +1033,10 @@ func TestVersionInfo(t *testing.T) {
 						OSImage:                 "ContainerOSVersion",
 						ContainerRuntimeVersion: "RuntimeType://RuntimeVersion",
 						KubeletVersion:          version.Get().String(),
+						KubeProxyVersion:        "",
 					},
 				},
 			},
-			kubeProxyVersion: false,
 		},
 		{
 			desc: "DisableNodeKubeProxyVersion FeatureGate enable, KubeProxyVersion will be cleared if it is set.",
@@ -1052,7 +1047,7 @@ func TestVersionInfo(t *testing.T) {
 						OSImage:                 "ContainerOSVersion",
 						ContainerRuntimeVersion: "RuntimeType://RuntimeVersion",
 						KubeletVersion:          version.Get().String(),
-						KubeProxyVersion:        version.Get().String(),
+						KubeProxyVersion:        "",
 					},
 				},
 			},
@@ -1071,17 +1066,15 @@ func TestVersionInfo(t *testing.T) {
 						OSImage:                 "ContainerOSVersion",
 						ContainerRuntimeVersion: "RuntimeType://RuntimeVersion",
 						KubeletVersion:          version.Get().String(),
+						KubeProxyVersion:        "",
 					},
 				},
 			},
-			kubeProxyVersion: false,
 		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DisableNodeKubeProxyVersion, !tc.kubeProxyVersion)
-
 			ctx := ktesting.Init(t)
 			versionInfoFunc := func() (*cadvisorapiv1.VersionInfo, error) {
 				return tc.versionInfo, tc.versionInfoError
