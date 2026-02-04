@@ -359,6 +359,11 @@ func (in *PodCertificateRequestSpec) DeepCopyInto(out *PodCertificateRequestSpec
 		*out = make([]byte, len(*in))
 		copy(*out, *in)
 	}
+	if in.StubPKCS10Request != nil {
+		in, out := &in.StubPKCS10Request, &out.StubPKCS10Request
+		*out = make([]byte, len(*in))
+		copy(*out, *in)
+	}
 	if in.UnverifiedUserAnnotations != nil {
 		in, out := &in.UnverifiedUserAnnotations, &out.UnverifiedUserAnnotations
 		*out = make(map[string]string, len(*in))
