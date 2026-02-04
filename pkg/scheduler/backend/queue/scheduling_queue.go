@@ -102,14 +102,8 @@ type SchedulingQueue interface {
 	Activate(logger klog.Logger, pods map[string]*v1.Pod)
 	// AddUnschedulableIfNotPresent adds an unschedulable pod back to scheduling queue.
 	// The podSchedulingCycle represents the current scheduling cycle number which can be
-	// returned by calling SchedulingCycle(). It requires the pod object to be deepcopied
-	// before calling this function.
+	// returned by calling SchedulingCycle().
 	AddUnschedulableIfNotPresent(logger klog.Logger, pod *framework.QueuedPodInfo, podSchedulingCycle int64) error
-	// AddSchedulableAfterWorkloadCycle inserts a pod, that was deemed schedulable
-	// by the workload scheduling cycle, into the queue, unless it is already in the queue.
-	// Pod is added directly to the activeQ to be popped ASAP to its pod-by-pod scheduling cycle.
-	// It requires the pod object to be deepcopied before calling this function.
-	AddSchedulableAfterWorkloadCycle(logger klog.Logger, pod *framework.QueuedPodInfo) error
 	// SchedulingCycle returns the current number of scheduling cycle which is
 	// cached by scheduling queue. Normally, incrementing this number whenever
 	// a pod is popped (e.g. called Pop()) is enough.
@@ -216,8 +210,6 @@ type PriorityQueue struct {
 	isSchedulingQueueHintEnabled bool
 	// isPopFromBackoffQEnabled indicates whether the feature gate SchedulerPopFromBackoffQ is enabled.
 	isPopFromBackoffQEnabled bool
-	// isPopFromBackoffQEnabled indicates whether the feature gate GenericWorkload is enabled.
-	isGenericWorkloadEnabled bool
 }
 
 // QueueingHintFunction is the wrapper of QueueingHintFn that has PluginName.
@@ -363,7 +355,6 @@ func NewPriorityQueue(
 
 	isSchedulingQueueHintEnabled := utilfeature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints)
 	isPopFromBackoffQEnabled := utilfeature.DefaultFeatureGate.Enabled(features.SchedulerPopFromBackoffQ)
-	isGenericWorkloadEnabled := utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload)
 	lessConverted := convertLessFn(lessFn)
 
 	backoffQ := newBackoffQueue(options.clock, options.podInitialBackoffDuration, options.podMaxBackoffDuration, lessFn, isPopFromBackoffQEnabled)
@@ -382,7 +373,6 @@ func NewPriorityQueue(
 		apiDispatcher:                     options.apiDispatcher,
 		isSchedulingQueueHintEnabled:      isSchedulingQueueHintEnabled,
 		isPopFromBackoffQEnabled:          isPopFromBackoffQEnabled,
-		isGenericWorkloadEnabled:          isGenericWorkloadEnabled,
 	}
 	var backoffQPopper backoffQPopper
 	if isPopFromBackoffQEnabled {
@@ -725,11 +715,6 @@ func (p *PriorityQueue) Add(logger klog.Logger, pod *v1.Pod) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	if p.isGenericWorkloadEnabled {
-		// Scheduling queue can mutate the pod object to set the NominatedNodeName,
-		// so it's deepcopied before adding to the queue.
-		pod = pod.DeepCopy()
-	}
 	pInfo := p.newQueuedPodInfo(pod)
 	if added := p.moveToActiveQ(logger, pInfo, framework.EventUnscheduledPodAdd.Label(), false); added {
 		p.activeQ.broadcast()
@@ -882,8 +867,7 @@ func (p *PriorityQueue) addUnschedulableWithoutQueueingHint(logger klog.Logger, 
 // AddUnschedulableIfNotPresent inserts a pod that cannot be scheduled into
 // the queue, unless it is already in the queue. Normally, PriorityQueue puts
 // unschedulable pods in `unschedulablePods`. But if there has been a recent move
-// request, then the pod is put in `backoffQ`. It requires the pod object to be deepcopied
-// before calling this function.
+// request, then the pod is put in `backoffQ`.
 func (p *PriorityQueue) AddUnschedulableIfNotPresent(logger klog.Logger, pInfo *framework.QueuedPodInfo, podSchedulingCycle int64) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
@@ -920,7 +904,7 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(logger klog.Logger, pInfo *
 	// Clear the flush flag since the pod is returning to the queue after a scheduling attempt.
 	pInfo.WasFlushedFromUnschedulable = false
 	// Pod with Workload reference should always need the cycle after got unschedulable for some reason.
-	pInfo.NeedsWorkloadCycle = pod.Spec.WorkloadRef != nil
+	pInfo.NeedsPodGroupCycle = pod.Spec.WorkloadRef != nil
 
 	if !p.isSchedulingQueueHintEnabled {
 		// fall back to the old behavior which doesn't depend on the queueing hint.
@@ -942,43 +926,6 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(logger klog.Logger, pInfo *
 	logger.V(3).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pod), "event", framework.ScheduleAttemptFailure, "queue", queue, "schedulingCycle", podSchedulingCycle, "hint", schedulingHint, "unschedulable plugins", rejectorPlugins)
 	if queue == activeQ || (p.isPopFromBackoffQEnabled && queue == backoffQ) {
 		// When the Pod is moved to activeQ, need to let p.cond know so that the Pod will be pop()ed out.
-		p.activeQ.broadcast()
-	}
-
-	return nil
-}
-
-// AddSchedulableAfterWorkloadCycle inserts a pod, that was deemed schedulable
-// by the workload scheduling cycle, into the queue, unless it is already in the queue.
-// Pod is added directly to the activeQ to be popped ASAP to its pod-by-pod scheduling cycle.
-// It requires the pod object to be deepcopied before calling this function.
-func (p *PriorityQueue) AddSchedulableAfterWorkloadCycle(logger klog.Logger, pInfo *framework.QueuedPodInfo) error {
-	p.lock.Lock()
-	defer p.lock.Unlock()
-
-	// In any case, this Pod will be moved back to the queue and we should call Done.
-	defer p.Done(pInfo.Pod.UID)
-
-	pod := pInfo.Pod
-	if p.unschedulablePods.get(pod) != nil {
-		return fmt.Errorf("Pod %v is already present in unschedulable queue", klog.KObj(pod))
-	}
-
-	if p.activeQ.has(pInfo) {
-		return fmt.Errorf("Pod %v is already present in the active queue", klog.KObj(pod))
-	}
-	if p.backoffQ.has(pInfo) {
-		return fmt.Errorf("Pod %v is already present in the backoff queue", klog.KObj(pod))
-	}
-
-	// Removing the cached backoff time.
-	pInfo.BackoffExpiration = time.Time{}
-	// Clear the flush flag since the pod is returning to the queue after a scheduling attempt.
-	pInfo.WasFlushedFromUnschedulable = false
-	// Pod passed the workload cycle and should proceed now to pod-by-pod scheduling.
-	pInfo.NeedsWorkloadCycle = false
-
-	if added := p.moveToActiveQ(logger, pInfo, framework.PassedWorkloadCycle, false); added {
 		p.activeQ.broadcast()
 	}
 
@@ -1029,21 +976,7 @@ func (p *PriorityQueue) flushUnschedulablePodsLeftover(logger klog.Logger) {
 // Note: This method should NOT be locked by the p.lock at any moment,
 // as it would lead to scheduling throughput degradation.
 func (p *PriorityQueue) Pop(logger klog.Logger) (*framework.QueuedPodInfo, error) {
-	pInfo, err := p.activeQ.pop(logger)
-	if err != nil {
-		return nil, err
-	}
-	if pInfo == nil {
-		return nil, nil
-	}
-	if p.isGenericWorkloadEnabled {
-		// Pod object can have outdated nomination.
-		// Nominator is a source of truth for nomination in the scheduler,
-		// so the pod's field has to be overwritten.
-		nominatedNodeName := p.nominator.getPodNomination(pInfo.Pod.UID)
-		pInfo.Pod.Status.NominatedNodeName = nominatedNodeName
-	}
-	return pInfo, nil
+	return p.activeQ.pop(logger)
 }
 
 // PopSpecificPod removes the pod from the queue and returns it.
@@ -1085,14 +1018,6 @@ func (p *PriorityQueue) PopSpecificPod(logger klog.Logger, pod *v1.Pod) *framewo
 	if err != nil {
 		utilruntime.HandleErrorWithLogger(logger, err, "Discarding the popped pod")
 		return nil
-	}
-
-	if p.isGenericWorkloadEnabled {
-		// Pod object can have outdated nomination.
-		// Nominator is a source of truth for nomination in the scheduler,
-		// so the pod's field has to be overwritten.
-		nominatedNodeName := p.nominator.getPodNomination(pInfo.Pod.UID)
-		pInfo.Pod.Status.NominatedNodeName = nominatedNodeName
 	}
 
 	return pInfo
@@ -1152,11 +1077,6 @@ func (p *PriorityQueue) Update(logger klog.Logger, oldPod, newPod *v1.Pod) {
 		events = framework.PodSchedulingPropertiesChange(newPod, oldPod)
 	}
 
-	if p.isGenericWorkloadEnabled {
-		// Scheduling queue can mutate the pod object to set the NominatedNodeName,
-		// so it's deepcopied before adding to the queue.
-		newPod = newPod.DeepCopy()
-	}
 	updated := false
 	// Run the following code under the activeQ lock to make sure that in the meantime pod is not popped from either activeQ or backoffQ.
 	// This way, the event will be registered or the pod will be updated consistently.
@@ -1569,7 +1489,7 @@ func (p *PriorityQueue) newQueuedPodInfo(pod *v1.Pod, plugins ...string) *framew
 		Timestamp:               now,
 		InitialAttemptTimestamp: nil,
 		UnschedulablePlugins:    sets.New(plugins...),
-		NeedsWorkloadCycle:      pod.Spec.WorkloadRef != nil,
+		NeedsPodGroupCycle:      pod.Spec.WorkloadRef != nil,
 	}
 }
 

@@ -29,7 +29,6 @@ import (
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/utils/ptr"
 )
 
@@ -50,10 +49,7 @@ func (sched *Scheduler) scheduleOnePodGroup(ctx context.Context, podGroupInfo *f
 	// Synchronously attempt to find a fit for the pod group.
 	start := time.Now()
 
-	workloadCycleCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	sched.workloadCycle(workloadCycleCtx, podGroupInfo, start)
+	sched.podGroupCycle(ctx, podGroupInfo, start)
 }
 
 // podGroupInfoForPod is a temporary function that obtains the QueuedPodGroupInfo based on the pod that got popped from the scheduling queue.
@@ -108,26 +104,43 @@ func (sched *Scheduler) podGroupInfoForPod(ctx context.Context, pInfo *framework
 }
 
 // podSchedulingContext holds the precomputed data needed to handle the pod scheduling.
-// Each scheduling attempt in the same Workload Scheudling Cycle for the same pod
-// should use a cloned version of this context.
+// Each scheduling attempt in the same pod group scheduling cycle for the same pod
+// should call the withNewState method to recreate the podSchedulingContext with a new state.
 type podSchedulingContext struct {
-	logger klog.Logger
-	fwk    framework.Framework
-	state  *framework.CycleState
+	logger         klog.Logger
+	fwk            framework.Framework
+	state          *framework.CycleState
+	podsToActivate *framework.PodsToActivate
 }
 
-// clone returns a cloned podSchedulingContext.
-// This should be used before each new attempt to schedule the same pod in the workload scheduling cycle,
-// to avoid making decision on a cycle state updated by another attempt.
-func (psc *podSchedulingContext) clone() *podSchedulingContext {
+// withNewState returns a new podSchedulingContext instance with a new CycleState.
+// This should be called before each scheduling attempt in the same pod group scheduling cycle
+// for the same pod
+func (psc *podSchedulingContext) withNewState() *podSchedulingContext {
+	// Synchronously attempt to find a fit for the pod.
+	state := framework.NewCycleState()
+	// For the sake of performance, scheduler does not measure and export the scheduler_plugin_execution_duration metric
+	// for every plugin execution in each scheduling cycle. Instead it samples a portion of scheduling cycles - percentage
+	// determined by pluginMetricsSamplePercent. The line below helps to randomly pick appropriate scheduling cycles.
+	state.SetRecordPluginMetrics(rand.Intn(100) < pluginMetricsSamplePercent)
+
+	// Initialize an empty podsToActivate struct, which will be filled up by plugins or stay empty.
+	// During pod group scheduling cycle, no pods will be activated using this,
+	// as they will be eventually activated in the pod-by-pod phase.
+	// We however still need to provide this storage, not to break any existing plugin
+	// that may rely on this and run in the pod group scheduling cycle.
+	podsToActivate := framework.NewPodsToActivate()
+	state.Write(framework.PodsToActivateKey, podsToActivate)
+
 	return &podSchedulingContext{
-		logger: psc.logger,
-		fwk:    psc.fwk,
-		state:  psc.state.Clone().(*framework.CycleState),
+		logger:         psc.logger,
+		fwk:            psc.fwk,
+		state:          state,
+		podsToActivate: podsToActivate,
 	}
 }
 
-// initPodSchedulingContext initializes the scheduling context of a single pod for workload scheduling cycle.
+// initPodSchedulingContext initializes the scheduling context of a single pod for pod group scheduling cycle.
 func (sched *Scheduler) initPodSchedulingContext(ctx context.Context, pod *v1.Pod) (*podSchedulingContext, bool) {
 	logger := klog.FromContext(ctx)
 	// TODO(knelasevero): Remove duplicated keys from log entry calls
@@ -146,26 +159,11 @@ func (sched *Scheduler) initPodSchedulingContext(ctx context.Context, pod *v1.Po
 		return nil, false
 	}
 
-	// Synchronously attempt to find a fit for the pod.
-	state := framework.NewCycleState()
-	// For the sake of performance, scheduler does not measure and export the scheduler_plugin_execution_duration metric
-	// for every plugin execution in each scheduling cycle. Instead it samples a portion of scheduling cycles - percentage
-	// determined by pluginMetricsSamplePercent. The line below helps to randomly pick appropriate scheduling cycles.
-	state.SetRecordPluginMetrics(rand.Intn(100) < pluginMetricsSamplePercent)
-
-	// Initialize an empty podsToActivate struct, which will be filled up by plugins or stay empty.
-	// During Workload Scheduling Cycle, no pods will be activated using this,
-	// as they will be eventually activated in the pod-by-pod phase.
-	// We however still need to provide this storage, not to break any existing plugin
-	// that may rely on this and run in the Workload Scheduling Cycle.
-	podsToActivate := framework.NewPodsToActivate()
-	state.Write(framework.PodsToActivateKey, podsToActivate)
-
-	return &podSchedulingContext{
+	podCtx := &podSchedulingContext{
 		logger: logger,
 		fwk:    podFwk,
-		state:  state,
-	}, true
+	}
+	return podCtx.withNewState(), true
 }
 
 // initPodGroupSchedulingContexts initializes and returns the pod scheduling contexts for the pod group.
@@ -194,76 +192,37 @@ func (sched *Scheduler) initPodGroupSchedulingContexts(ctx context.Context, podG
 	return podCtxs
 }
 
-// workloadCycle runs a workload scheduling cycle for the given pod group in a single cluster snapshot.
-func (sched *Scheduler) workloadCycle(ctx context.Context, podGroupInfo *framework.QueuedPodGroupInfo, start time.Time) {
-	logger := klog.FromContext(ctx)
-	logger = klog.LoggerWithValues(logger, "podGroup", klog.KObj(podGroupInfo))
-	ctx = klog.NewContext(ctx, logger)
+// podGroupCycle runs a pod group scheduling cycle for the given pod group in a single cluster snapshot.
+func (sched *Scheduler) podGroupCycle(ctx context.Context, podGroupInfo *framework.QueuedPodGroupInfo, start time.Time) {
+	podGroupCycleCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	logger := klog.FromContext(podGroupCycleCtx)
 
-	logger.Error(nil, "MS1234: Starting workload cycle")
+	podCtxs := sched.initPodGroupSchedulingContexts(podGroupCycleCtx, podGroupInfo)
 
-	podCtxs := sched.initPodGroupSchedulingContexts(ctx, podGroupInfo)
-
-	if err := sched.Cache.UpdateSnapshot(klog.FromContext(ctx), sched.nodeInfoSnapshot); err != nil {
+	if err := sched.Cache.UpdateSnapshot(logger, sched.nodeInfoSnapshot); err != nil {
 		logger.Error(err, "Error updating snapshot")
 		for i, pInfo := range podGroupInfo.QueuedPodInfos {
 			podCtx := podCtxs[i]
-			sched.FailureHandler(ctx, podCtx.fwk, pInfo, fwk.AsStatus(err), nil, time.Time{})
+			sched.FailureHandler(podGroupCycleCtx, podCtx.fwk, pInfo, fwk.AsStatus(err), nil, time.Time{})
 		}
 		return
 	}
 
-	result := sched.podGroupSchedulingDefaultAlgorithm(ctx, podGroupInfo, podCtxs)
+	result := sched.podGroupSchedulingDefaultAlgorithm(podGroupCycleCtx, podGroupInfo, podCtxs)
 
-	logger.Error(nil, "MS1234: Defautl algorithm result", "status", result.status, "podResults", result.podResults)
+	// applyPodGroupAlgorithmResult can dispatch binding goroutines, so should be called with the noncancelable ctx.
+	sched.applyPodGroupAlgorithmResult(ctx, podGroupInfo, result)
 
-	sched.applyPodGroupAlgorithmResult(ctx, podGroupInfo, result, podCtxs)
-
-	// TBD: Record PodGroup-level metrics, return podGroupInfo to the queue.
-}
-
-// applyPodGroupAlgorithmResult applies the result of the pod group scheduling algorithm.
-// If that algorithm succedeed, the schedulable pods are added as individuals to the scheduling queue.
-// Unschedulable pods are moved back to the scheduling queue and need to wait
-// for the next workload scheduling cycle.
-// If the preemption is required for this pod group, all pods are moved back to the scheduling queue
-// and require the next workload scheduling cycle to verify the preemption outcome.
-func (sched *Scheduler) applyPodGroupAlgorithmResult(ctx context.Context, podGroupInfo *framework.QueuedPodGroupInfo, result podGroupAlgorithmResult, podCtxs []*podSchedulingContext) {
-	for i, podResult := range result.podResults {
-		pInfo := podGroupInfo.QueuedPodInfos[i]
-		podCtx := podCtxs[i]
-		if podResult.status.IsSuccess() {
-			nominatingInfo := &fwk.NominatingInfo{
-				NominatingMode:    fwk.ModeOverride,
-				NominatedNodeName: podResult.scheduleResult.SuggestedHost,
-			}
-			switch result.status {
-			case podGroupFeasible:
-				// Pod is put into the activeQ and will be taken to the pod-by-pod scheduling.
-				sched.handlePodGroupSchedulingSuccess(ctx, podCtx.fwk, pInfo, nominatingInfo, time.Time{})
-			case podGroupUnschedulable:
-				// Pod group is unschedulable, so the pod has to be marked as unschedulable.
-				// Its rejection status is set to its permit status message.
-				status := fwk.NewStatus(fwk.UnschedulableAndUnresolvable, podResult.permitStatus.Message()).WithError(errPodGroupUnschedulable)
-				sched.FailureHandler(ctx, podCtx.fwk, pInfo, status, clearNominatedNode, time.Time{})
-			case podGroupRequiresPreemption:
-				// Pod has to come back to the scheduling queue as unschedulable, waiting for preemption to complete.
-				status := fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "preemption is required for other pods from a pod group").WithError(errPodGroupUnschedulable)
-				sched.FailureHandler(ctx, podCtx.fwk, pInfo, status, nominatingInfo, time.Time{})
-			}
-		} else {
-			// When an error occured or preemption is required for this pod, just call the FailureHandler.
-			// TBD: Add a message to status if the pod used features for which finding a placement cannot be guaranteed,
-			// such as heterogeneous pod group or using inter-pod dependencies.
-			sched.FailureHandler(ctx, podCtx.fwk, pInfo, podResult.status, podResult.scheduleResult.nominatingInfo, time.Time{})
-		}
-	}
+	// TBD: Record PodGroup-level metrics and logs, return podGroupInfo to the queue.
 }
 
 // algorithmResult stores the scheduling result and status for a scheduling attempt of a single pod.
 type algorithmResult struct {
 	// scheduleResult is a scheduling algorithm result.
 	scheduleResult ScheduleResult
+	// podCtx is a specific pod scheduling context used for the scheduling algorithm.
+	podCtx *podSchedulingContext
 	// requiresPreemption determines whether this pod requires a preemption to proceed or not.
 	requiresPreemption bool
 	// status is a scheduling algorithm status.
@@ -274,11 +233,19 @@ type algorithmResult struct {
 	// TBD: Victims for Delayed Preemption
 }
 
+// podGroupAlgorithmStatus is a status of a pod group scheduling algorithm.
 type podGroupAlgorithmStatus string
 
 const (
-	podGroupFeasible           podGroupAlgorithmStatus = "feasible"
-	podGroupUnschedulable      podGroupAlgorithmStatus = "unschedulable"
+	// podGroupFeasible means that the pod group is schedulable, doesn't require any preemption
+	// and its feasible pods should be moved to the binding cycle.
+	podGroupFeasible podGroupAlgorithmStatus = "feasible"
+	// podGroupUnschedulable means that the pod group is unschedulable
+	// and all its pods should be moved back to the scheduling queue as unschedulable.
+	podGroupUnschedulable podGroupAlgorithmStatus = "unschedulable"
+	// podGroupRequiresPreemption means that the pod group requires preemption,
+	// so all its pods should be moved back to the scheduling queue,
+	// waiting for resources to be released.
 	podGroupRequiresPreemption podGroupAlgorithmStatus = "requires_preemption"
 )
 
@@ -301,14 +268,18 @@ func (sched *Scheduler) podGroupSchedulingDefaultAlgorithm(ctx context.Context, 
 		status:     podGroupUnschedulable,
 	}
 
+	logger := klog.FromContext(ctx)
+	logger.V(5).Info("Running a pod group scheduling algorithm", "podGroup", klog.KObj(podGroupInfo), "unscheduledPodsCount", len(podGroupInfo.QueuedPodInfos))
+
 	requiresPreemption := false
 	for i, podInfo := range podGroupInfo.QueuedPodInfos {
-		podCtx := podCtxs[i]
+		podCtx := podCtxs[i].withNewState()
 
 		podResult, revertFn := sched.podGroupPodSchedulingAlgorithm(ctx, podGroupInfo, podInfo, podCtx)
 		result.podResults = append(result.podResults, podResult)
 		if !podResult.status.IsSuccess() && !podResult.requiresPreemption {
-			// When pod is not feasible and doesn't require preemption, it means that it failed the scheduling.
+			// When a pod is not feasible and doesn't require preemption, it means that it failed scheduling.
+			// However, the pod group can still be schedulable as long as the permit check can succeed.
 			continue
 		}
 		// We unreserve the pod at the end of the whole algorithm (via defer) because it should be ultimately returned to the queue,
@@ -354,14 +325,16 @@ func (sched *Scheduler) podGroupPodSchedulingAlgorithm(ctx context.Context, podG
 			// In case of pod being just unschedulable or having an error, just return now.
 			return algorithmResult{
 				scheduleResult: scheduleResult,
+				podCtx:         podCtx,
 				status:         status,
 			}, nil
 		}
 	}
-	scheduleResult, assumedPodInfo, assumeStatus := sched.assumeAndReserve(ctx, podCtx.state, podCtx.fwk, podInfo, scheduleResult)
+	assumedPodInfo, assumeStatus := sched.assumeAndReserve(ctx, podCtx.state, podCtx.fwk, podInfo, scheduleResult)
 	if !assumeStatus.IsSuccess() {
 		return algorithmResult{
-			scheduleResult: scheduleResult,
+			scheduleResult: ScheduleResult{nominatingInfo: clearNominatedNode},
+			podCtx:         podCtx,
 			status:         assumeStatus,
 		}, nil
 	}
@@ -370,9 +343,6 @@ func (sched *Scheduler) podGroupPodSchedulingAlgorithm(ctx context.Context, podG
 		err := sched.unreserveAndForget(ctx, podCtx.state, podCtx.fwk, assumedPodInfo, scheduleResult.SuggestedHost)
 		if err != nil {
 			utilruntime.HandleErrorWithContext(ctx, err, "Unreserve and forget failed")
-		}
-		if assumedPodInfo.Pod.Status.NominatedNodeName != "" {
-			// TBD: Re-add pod to the nominator as `assumeAndReserve` removed it earlier.
 		}
 	}
 
@@ -393,72 +363,64 @@ func (sched *Scheduler) podGroupPodSchedulingAlgorithm(ctx context.Context, podG
 		}
 		return algorithmResult{
 			scheduleResult: ScheduleResult{nominatingInfo: clearNominatedNode},
+			podCtx:         podCtx,
 			status:         permitStatus,
 		}, nil
 	}
 
 	return algorithmResult{
 		scheduleResult:     scheduleResult,
+		podCtx:             podCtx,
 		status:             status,
 		permitStatus:       permitStatus,
 		requiresPreemption: requiresPreemption,
 	}, revertFn
 }
 
-// handlePodGroupSchedulingSuccess returns the pod to the scheduling queue after a successful workload cycle.
-// It follows a similar path to handleSchedulingFailure, but treats the pod as having a successful scheduling attempt.
-func (sched *Scheduler) handlePodGroupSchedulingSuccess(ctx context.Context, podFwk framework.Framework, podInfo *framework.QueuedPodInfo, nominatingInfo *fwk.NominatingInfo, start time.Time) {
-	calledDone := false
-	defer func() {
-		if !calledDone {
-			// Basically, AddSchedulableAfterWorkloadCycle calls DonePod internally.
-			// But, AddSchedulableAfterWorkloadCycle isn't called in some corner cases.
-			// Here, we call DonePod explicitly to avoid leaking the pod.
-			sched.SchedulingQueue.Done(podInfo.Pod.UID)
+// applyPodGroupAlgorithmResult applies the result of the pod group scheduling algorithm.
+// If that algorithm succedeed, the schedulable pods proceed to the binding cycle.
+// Unschedulable pods are moved back to the scheduling queue and need to wait
+// for the next pod group scheduling cycle.
+// If the preemption is required for this pod group, all pods are moved back to the scheduling queue
+// and require the next pod group scheduling cycle to verify the preemption outcome.
+func (sched *Scheduler) applyPodGroupAlgorithmResult(ctx context.Context, podGroupInfo *framework.QueuedPodGroupInfo, result podGroupAlgorithmResult) {
+	for i, podResult := range result.podResults {
+		pInfo := podGroupInfo.QueuedPodInfos[i]
+		podCtx := podResult.podCtx
+		ctx := klog.NewContext(ctx, podCtx.logger)
+
+		if podResult.status.IsSuccess() {
+			nominatingInfo := &fwk.NominatingInfo{
+				NominatingMode:    fwk.ModeOverride,
+				NominatedNodeName: podResult.scheduleResult.SuggestedHost,
+			}
+			switch result.status {
+			case podGroupFeasible:
+				// Pod no longer needs a pod group scheduling cycle. Setting it to false to disable any checks in further functions.
+				pInfo.NeedsPodGroupCycle = false
+				// Schedule result is applied for pod and its binding cycle executes.
+				assumedPodInfo, status := sched.prepareForBindingCycle(ctx, podCtx.state, podCtx.fwk, pInfo, podCtx.podsToActivate, podResult.scheduleResult)
+				if !status.IsSuccess() {
+					// In such unlikely situation just reject this pod.
+					sched.FailureHandler(ctx, podCtx.fwk, pInfo, status, clearNominatedNode, time.Time{})
+					continue
+				}
+				go sched.runBindingCycle(ctx, podCtx.state, podCtx.fwk, podResult.scheduleResult, assumedPodInfo, time.Time{}, podCtx.podsToActivate)
+			case podGroupUnschedulable:
+				// Pod group is unschedulable, so the pod has to be marked as unschedulable.
+				// Its rejection status is set to its permit status message.
+				status := fwk.NewStatus(fwk.UnschedulableAndUnresolvable, podResult.permitStatus.Message()).WithError(errPodGroupUnschedulable)
+				sched.FailureHandler(ctx, podCtx.fwk, pInfo, status, clearNominatedNode, time.Time{})
+			case podGroupRequiresPreemption:
+				// Pod has to come back to the scheduling queue as unschedulable, waiting for preemption to complete.
+				status := fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "preemption is required for other pods from a pod group").WithError(errPodGroupUnschedulable)
+				sched.FailureHandler(ctx, podCtx.fwk, pInfo, status, nominatingInfo, time.Time{})
+			}
+		} else {
+			// When an error occured or preemption is required for this pod, just call the FailureHandler.
+			// TBD: Add a message to status if the pod used features for which finding a placement cannot be guaranteed,
+			// such as heterogeneous pod group or using inter-pod dependencies.
+			sched.FailureHandler(ctx, podCtx.fwk, pInfo, podResult.status, podResult.scheduleResult.nominatingInfo, time.Time{})
 		}
-	}()
-
-	logger := klog.FromContext(ctx)
-
-	// TODO: Record any per-Pod metric?
-
-	pod := podInfo.Pod
-
-	// Count pods scheduled after being flushed from unschedulablePods
-	if podInfo.WasFlushedFromUnschedulable {
-		logger.V(4).Info("Pod scheduled after flush from unschedulablePods", "pod", klog.KObj(podInfo.Pod), "unschedulablePlugins", podInfo.UnschedulablePlugins, "pendingPlugins", podInfo.PendingPlugins)
-		metrics.PodScheduledAfterFlush.Inc()
 	}
-	// Clear plugin-related fields to avoid stale data from previous scheduling attempts.
-	// We clear them here (rather than at Pop) because we sometimes want to use them
-	// for logging when a pod schedules successfully (e.g., after being flushed).
-	podInfo.ClearRejectorPlugins()
-
-	// Check if the Pod exists in informer cache.
-	podLister := podFwk.SharedInformerFactory().Core().V1().Pods().Lister()
-	cachedPod, e := podLister.Pods(pod.Namespace).Get(pod.Name)
-	if e != nil {
-		logger.Info("Pod doesn't exist in informer cache", "pod", klog.KObj(pod), "err", e)
-		// We need to call DonePod here because we don't call AddSchedulableAfterWorkloadCycle in this case.
-	} else {
-		// As <cachedPod> is from SharedInformer, we need to do a DeepCopy() here.
-		// ignore this err since apiserver doesn't properly validate affinity terms
-		// and we can't fix the validation for backwards compatibility.
-		podInfo.PodInfo, _ = framework.NewPodInfo(cachedPod.DeepCopy())
-		if err := sched.SchedulingQueue.AddSchedulableAfterWorkloadCycle(logger, podInfo); err != nil {
-			utilruntime.HandleErrorWithContext(ctx, err, "Error occurred")
-		}
-		calledDone = true
-	}
-
-	// Update the scheduling queue with the nominated pod information. Without
-	// this, there would be a race condition between the next scheduling cycle
-	// and the time the scheduler receives a Pod Update for the nominated pod.
-	// Here we check for nil only for tests.
-	if sched.SchedulingQueue != nil {
-		sched.SchedulingQueue.AddNominatedPod(logger, podInfo.PodInfo, nominatingInfo)
-	}
-
-	// We don't send any API calls to expose the status externally as the pod will be shortly scheduled and receive its condition.
-	// NominatedNodeName doesn't need to be reflected there as its lifecycle should be short.
 }

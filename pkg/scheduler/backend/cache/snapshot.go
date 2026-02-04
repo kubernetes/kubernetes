@@ -42,7 +42,7 @@ type Snapshot struct {
 	// keyed in the format "namespace/name".
 	usedPVCSet sets.Set[string]
 	generation int64
-	// assumedPods maps a pod key to an assumed pod object during a single (workload) scheduling cycle.
+	// assumedPods maps a pod key to an assumed pod object during a single pod group scheduling cycle.
 	// This map should be emptied before the next cycle starts.
 	assumedPods map[string]*v1.Pod
 }

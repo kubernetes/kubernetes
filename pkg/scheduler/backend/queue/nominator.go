@@ -165,13 +165,6 @@ func (npm *nominator) nominatedPodsForNode(nodeName string) []podRef {
 	return slices.Clone(npm.nominatedPods[nodeName])
 }
 
-// getPodNomination returns NominatedNodeName for the given pod. If it's not set, it returns empty string.
-func (npm *nominator) getPodNomination(podUID types.UID) string {
-	npm.nLock.RLock()
-	defer npm.nLock.RUnlock()
-	return npm.nominatedPodToNode[podUID]
-}
-
 // nominatedNodeName returns nominated node name of a Pod.
 func nominatedNodeName(pod *v1.Pod) string {
 	return pod.Status.NominatedNodeName

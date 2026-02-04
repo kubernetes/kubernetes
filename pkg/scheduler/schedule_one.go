@@ -74,7 +74,7 @@ func (sched *Scheduler) ScheduleOne(ctx context.Context) {
 	if podInfo == nil || podInfo.Pod == nil {
 		return
 	}
-	if podInfo.NeedsWorkloadCycle {
+	if podInfo.NeedsPodGroupCycle {
 		podGroupInfo, err := sched.podGroupInfoForPod(ctx, podInfo)
 		if err != nil {
 			podFwk, err := sched.frameworkForPod(podInfo.Pod)
@@ -273,11 +273,6 @@ func (sched *Scheduler) schedulingAlgorithm(
 			return ScheduleResult{nominatingInfo: clearNominatedNode}, fwk.AsStatus(err)
 		}
 
-		if pod.Spec.WorkloadRef != nil && !podInfo.NeedsWorkloadCycle {
-			// TODO: Reject the entire gang if preemption is needed in pod-by-pod.
-			return ScheduleResult{nominatingInfo: clearNominatedNode}, fwk.AsStatus(err)
-		}
-
 		// SchedulePod() may have failed because the pod would not fit on any host, so we try to
 		// preempt, with the expectation that the next time the pod is tried for scheduling it
 		// will fit due to the preemption. It is also possible that a different pod will schedule
@@ -357,7 +352,7 @@ func (sched *Scheduler) assumeAndReserve(
 }
 
 // unreserveAndForget unreserves and forgets the pod from scheduler's memory.
-// This function shouldn't be called during binding cycle with a pod that has the NeedsWorkloadCycle set to true,
+// This function shouldn't be called during binding cycle with a pod that has the NeedsPodGroupCycle set to true,
 // but this shouldn't happen, because such pods cannot reach binding.
 func (sched *Scheduler) unreserveAndForget(
 	ctx context.Context,
@@ -369,8 +364,24 @@ func (sched *Scheduler) unreserveAndForget(
 	logger := klog.FromContext(ctx)
 
 	schedFramework.RunReservePluginsUnreserve(ctx, state, assumedPodInfo.Pod, nodeName)
-	if assumedPodInfo.NeedsWorkloadCycle {
-		return sched.nodeInfoSnapshot.ForgetPod(logger, assumedPodInfo.Pod)
+	if assumedPodInfo.NeedsPodGroupCycle {
+		err := sched.nodeInfoSnapshot.ForgetPod(logger, assumedPodInfo.Pod)
+		if err != nil {
+			return err
+		}
+		if assumedPodInfo.Pod.Status.NominatedNodeName != "" {
+			// Assume method removed the nomination, but since we are reverting that stage for pod groups,
+			// we need to revert that operation as well.
+			if sched.SchedulingQueue != nil {
+				nominatingInfo := &fwk.NominatingInfo{
+					NominatedNodeName: assumedPodInfo.Pod.Status.NominatedNodeName,
+					NominatingMode:    fwk.ModeOverride,
+				}
+				// AssumedPodInfo can be used here, because the whole pod object is not stored in the nominator.
+				sched.SchedulingQueue.AddNominatedPod(logger, assumedPodInfo.PodInfo, nominatingInfo)
+			}
+		}
+		return nil
 	}
 	return sched.Cache.ForgetPod(logger, assumedPodInfo.Pod)
 }
@@ -536,7 +547,7 @@ func (sched *Scheduler) schedulePod(ctx context.Context, fwk framework.Framework
 	pod := podInfo.Pod
 	trace := utiltrace.New("Scheduling", utiltrace.Field{Key: "namespace", Value: pod.Namespace}, utiltrace.Field{Key: "name", Value: pod.Name})
 	defer trace.LogIfLong(100 * time.Millisecond)
-	if !podInfo.NeedsWorkloadCycle {
+	if !podInfo.NeedsPodGroupCycle {
 		if err := sched.Cache.UpdateSnapshot(klog.FromContext(ctx), sched.nodeInfoSnapshot); err != nil {
 			return result, err
 		}
@@ -644,12 +655,6 @@ func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, schedFramework 
 		// Nominated node passes all the filters, scheduler is good to assign this node to the pod.
 		if len(feasibleNodes) != 0 {
 			return feasibleNodes, diagnosis, nodeHint, signature, nil
-		}
-		// Pods that got the NominatedNodeName via workload scheduling cycle cannot change their node in pod-by-pod scheduling.
-		// They should repeat the whole workload cycle.
-		if pod.Spec.WorkloadRef != nil && !podInfo.NeedsWorkloadCycle {
-			logger.V(5).Info("NominatedNodeName set by the workload scheduling cycle is no longer valid", "pod", klog.KObj(pod), "node", pod.Status.NominatedNodeName)
-			return nil, diagnosis, nodeHint, signature, err
 		}
 	}
 
@@ -1076,7 +1081,7 @@ func (h *nodeScoreHeap) Pop() interface{} {
 }
 
 // assume signals to the cache that a pod is already in the cache, so that binding can be asynchronous.
-// When called during workload scheduling cycle, pod is assumed in the snapshot instead.
+// When called during pod group scheduling cycle, pod is assumed in the snapshot instead.
 func (sched *Scheduler) assume(logger klog.Logger, assumedPodInfo *framework.QueuedPodInfo, host string) error {
 	// Optimistically assume that the binding will succeed and send it to apiserver
 	// in the background.
@@ -1084,7 +1089,7 @@ func (sched *Scheduler) assume(logger klog.Logger, assumedPodInfo *framework.Que
 	// immediately.
 	assumedPodInfo.Pod.Spec.NodeName = host
 
-	if assumedPodInfo.NeedsWorkloadCycle {
+	if assumedPodInfo.NeedsPodGroupCycle {
 		err := sched.nodeInfoSnapshot.AssumePod(assumedPodInfo.PodInfo)
 		if err != nil {
 			logger.Error(err, "Scheduler snapshot AssumePod failed")
