@@ -21,8 +21,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/google/btree"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/utils/third_party/forked/golang/btree"
 )
 
 // newThreadedBtreeStoreIndexer returns a storage for cacher by adding locking over the two 2 data structures:
@@ -141,14 +141,14 @@ func (si *threadedStoreIndexer) ByIndex(indexName, indexValue string) ([]interfa
 
 func newBtreeStore(degree int) btreeStore {
 	return btreeStore{
-		tree: btree.NewG(degree, func(a, b *Element) bool {
+		tree: btree.New(degree, func(a, b *Element) bool {
 			return a.Key < b.Key
 		}),
 	}
 }
 
 type btreeStore struct {
-	tree *btree.BTreeG[*Element]
+	tree *btree.BTree[*Element]
 }
 
 func (s *btreeStore) Clone() OrderedLister {
@@ -428,7 +428,7 @@ func (i *indexer) delete(key, value string, index map[string]map[string]*Element
 // TODO: Rewrite to use a cyclic buffer
 func NewSnapshotter() Snapshotter {
 	s := &storeSnapshotter{
-		snapshots: btree.NewG[rvSnapshot](btreeDegree, func(a, b rvSnapshot) bool {
+		snapshots: btree.New(btreeDegree, func(a, b rvSnapshot) bool {
 			return a.resourceVersion < b.resourceVersion
 		}),
 	}
@@ -447,7 +447,7 @@ type Snapshotter interface {
 
 type storeSnapshotter struct {
 	mux       sync.RWMutex
-	snapshots *btree.BTreeG[rvSnapshot]
+	snapshots *btree.BTree[rvSnapshot]
 }
 
 type rvSnapshot struct {
