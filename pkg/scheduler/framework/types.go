@@ -554,10 +554,10 @@ type QueuedPodInfo struct {
 	// GatingPluginEvents records the events registered by the plugin that gated the Pod at PreEnqueue.
 	// We have it as a cache purpose to avoid re-computing which event(s) might ungate the Pod.
 	GatingPluginEvents []fwk.ClusterEvent
-	// NeedsWorkloadCycle says whether the pod needs to pass a workload cycle or not.
-	// If set to false, it means that the pod either passed the workload cycle
+	// NeedsPodGroupCycle says whether the pod needs to pass a pod group scheduling cycle or not.
+	// If set to false, it means that the pod either passed the pod group cycle
 	// or doesn't belong to any pod group.
-	NeedsWorkloadCycle bool
+	NeedsPodGroupCycle bool
 }
 
 func (pqi *QueuedPodInfo) GetPodInfo() fwk.PodInfo {
@@ -623,7 +623,7 @@ func (pqi *QueuedPodInfo) DeepCopy() *QueuedPodInfo {
 		GatingPluginEvents:      slices.Clone(pqi.GatingPluginEvents),
 		PendingPlugins:          pqi.PendingPlugins.Clone(),
 		ConsecutiveErrorsCount:  pqi.ConsecutiveErrorsCount,
-		NeedsWorkloadCycle:      pqi.NeedsWorkloadCycle,
+		NeedsPodGroupCycle:      pqi.NeedsPodGroupCycle,
 	}
 }
 
@@ -646,9 +646,11 @@ type QueuedPodGroupInfo struct {
 }
 
 // PodGroupInfo is a wrapper around the PodGroup API object together with a list of pods that belong to the pod group.
-// Typically used as an input to workload scheduling cycle plugins.
+// Typically used as an input to pod group scheduling cycle plugins.
 type PodGroupInfo struct {
-	Namespace   string
+	// Namespace is a namespace of this pod group.
+	Namespace string
+	// WorkloadRef is a reference to this particular pod group.
 	WorkloadRef *v1.WorkloadReference
 	// UnscheduledPods are pods that are currently being considered for scheduling.
 	// It can be useful to also retrieve the scheduled (assumed or assigned) pods.
@@ -665,7 +667,7 @@ func (pgi *PodGroupInfo) GetName() string {
 	if pgi.WorkloadRef == nil {
 		return ""
 	}
-	return fmt.Sprintf("%s-%s-%s", pgi.WorkloadRef.Name, pgi.WorkloadRef.PodGroup, pgi.WorkloadRef.PodGroupReplicaKey)
+	return fmt.Sprintf("%s/%s/%s", pgi.WorkloadRef.Name, pgi.WorkloadRef.PodGroup, pgi.WorkloadRef.PodGroupReplicaKey)
 }
 
 func (pgi *PodGroupInfo) GetNamespace() string {

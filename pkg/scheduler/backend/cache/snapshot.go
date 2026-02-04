@@ -42,7 +42,7 @@ type Snapshot struct {
 	// keyed in the format "namespace/name".
 	usedPVCSet sets.Set[string]
 	generation int64
-	// assumedPods maps a pod key to an assumed pod object during a single (workload) scheduling cycle.
+	// assumedPods maps a pod key to an assumed pod object during a single pod group scheduling cycle.
 	// This map should be emptied before the next cycle starts.
 	assumedPods map[string]*v1.Pod
 }
@@ -244,7 +244,10 @@ func (s *Snapshot) ForgetPod(logger klog.Logger, pod *v1.Pod) error {
 		// Since this operation only affects the snapshot,
 		// we should keep the old number to remain consistent with the cached value.
 		oldGeneration := nodeInfo.Generation
-		nodeInfo.RemovePod(logger, pod)
+		err := nodeInfo.RemovePod(logger, pod)
+		if err != nil {
+			return err
+		}
 		nodeInfo.Generation = oldGeneration
 	}
 	return nil
@@ -254,6 +257,9 @@ func (s *Snapshot) ForgetPod(logger klog.Logger, pod *v1.Pod) error {
 // This function is not thread safe, so it should be executed when no other routines can write/read from the snapshot.
 func (s *Snapshot) forgetAllAssumedPods(logger klog.Logger) {
 	for _, pod := range s.assumedPods {
-		s.ForgetPod(logger, pod)
+		err := s.ForgetPod(logger, pod)
+		if err != nil {
+			logger.Error(err, "Failed to forget assumed pod")
+		}
 	}
 }

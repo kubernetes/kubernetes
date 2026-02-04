@@ -132,7 +132,7 @@ func (m *NodeToStatus) NodesForStatusCode(nodeLister fwk.NodeInfoLister, code fw
 // PodsToActivateKey is a reserved state key for stashing pods.
 // If the stashed pods are present in unschedulablePods or backoffQ，they will be
 // activated (i.e., moved to activeQ) in two phases:
-// - end of a pod-by-pod scheduling cycle if it succeeds (will be cleared from `PodsToActivate` if activated)
+// - end of a scheduling cycle if it succeeds (will be cleared from `PodsToActivate` if activated)
 // - end of a binding cycle if it succeeds
 var PodsToActivateKey fwk.StateKey = "kubernetes.io/pods-to-activate"
 
