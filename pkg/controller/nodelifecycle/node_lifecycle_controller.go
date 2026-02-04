@@ -964,7 +964,7 @@ func (nc *Controller) tryUpdateNodeHealth(ctx context.Context, node *v1.Node) (t
 			} else {
 				logger.V(2).Info("Node hasn't been updated",
 					"node", klog.KObj(node), "duration", nc.now().Time.Sub(nodeHealth.probeTimestamp.Time), "nodeConditionType", nodeConditionType, "currentCondition", currentCondition)
-				if currentCondition.Status != v1.ConditionUnknown {
+				if currentCondition.Status != v1.ConditionUnknown && currentCondition.Message != "node is shutting down" {
 					currentCondition.Status = v1.ConditionUnknown
 					currentCondition.Reason = "NodeStatusUnknown"
 					currentCondition.Message = "Kubelet stopped posting node status."
