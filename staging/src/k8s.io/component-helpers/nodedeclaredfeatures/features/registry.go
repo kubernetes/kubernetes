@@ -27,6 +27,5 @@ import (
 // discovery and inference logic.
 var AllFeatures = []nodedeclaredfeatures.Feature{
 	restartallcontainers.Feature,
-	inplacepodresize.GuaranteedQoSPodCPUResizeFeature,
 	inplacepodresize.PodLevelResourcesResizeFeature,
 }
