@@ -366,73 +366,73 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 			gomega.Consistently(ctx, getNodeSummary, 30*time.Second, 15*time.Second).Should(matchExpectations)
 		})
 		ginkgo.It("should include terminated container storage stats in pod summary", func(ctx context.Context) {
-    		const podName = "terminated-container-pod"
+			const podName = "terminated-container-pod"
 
-    		pod := &v1.Pod{
-        		ObjectMeta: metav1.ObjectMeta{
-            		Name: podName,
-        		},
-        		Spec: v1.PodSpec{
-            		RestartPolicy: v1.RestartPolicyNever,
-            		Containers: []v1.Container{
-                		{
-                    		Name:    "writer",
-                    		Image:   busyboxImage,
-                    		Command: []string{"sh", "-c", "echo hello > /tmp/logfile"},
-                		},
-            		},
-        		},
-    		}
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: podName,
+				},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyNever,
+					Containers: []v1.Container{
+						{
+							Name:    "writer",
+							Image:   busyboxImage,
+							Command: []string{"sh", "-c", "echo hello > /tmp/logfile"},
+						},
+					},
+				},
+			}
 
-    		ginkgo.By("Creating a pod with a short-lived container")
-    		e2epod.NewPodClient(f).Create(ctx, pod)
+			ginkgo.By("Creating a pod with a short-lived container")
+			e2epod.NewPodClient(f).Create(ctx, pod)
 
-    		ginkgo.By("Waiting for the pod to complete")
-    		framework.ExpectNoError(
-        		e2epod.WaitForPodCondition(
-        			ctx,
-        			f.ClientSet,
-        			f.Namespace.Name,
-        			pod.Name,
-        			"pod reached Succeeded phase",
-        			framework.PodStartTimeout,
-        			func(p *v1.Pod) (bool, error) {
-            			return p.Status.Phase == v1.PodSucceeded, nil
-        			},
-    			),
-    		)
+			ginkgo.By("Waiting for the pod to complete")
+			framework.ExpectNoError(
+				e2epod.WaitForPodCondition(
+					ctx,
+					f.ClientSet,
+					f.Namespace.Name,
+					pod.Name,
+					"pod reached Succeeded phase",
+					framework.PodStartTimeout,
+					func(p *v1.Pod) (bool, error) {
+						return p.Status.Phase == v1.PodSucceeded, nil
+					},
+				),
+			)
 
-    		ginkgo.By("Validating terminated container storage stats appear in summary")
-    		gomega.Eventually(ctx, func() *kubeletstatsv1alpha1.PodStats {
-        		summary, err := getNodeSummary(ctx)
-        		framework.ExpectNoError(err)
+			ginkgo.By("Validating terminated container storage stats appear in summary")
+			gomega.Eventually(ctx, func() *kubeletstatsv1alpha1.PodStats {
+				summary, err := getNodeSummary(ctx)
+				framework.ExpectNoError(err)
 
-        		for _, ps := range summary.Pods {
-            		if ps.PodRef.Name == podName && ps.PodRef.Namespace == f.Namespace.Name {
-                		return &ps
-            		}
-        		}
-        		return nil
-    		}, 2*time.Minute, 10*time.Second).ShouldNot(gomega.BeNil())
+				for _, ps := range summary.Pods {
+					if ps.PodRef.Name == podName && ps.PodRef.Namespace == f.Namespace.Name {
+						return &ps
+					}
+				}
+				return nil
+			}, 2*time.Minute, 10*time.Second).ShouldNot(gomega.BeNil())
 
-    		summary, err := getNodeSummary(ctx)
-    		framework.ExpectNoError(err)
+			summary, err := getNodeSummary(ctx)
+			framework.ExpectNoError(err)
 
-    		var podStats *kubeletstatsv1alpha1.PodStats
-    		for _, ps := range summary.Pods {
-        		if ps.PodRef.Name == podName && ps.PodRef.Namespace == f.Namespace.Name {
-            		podStats = &ps
-            		break
-        		}
-    		}
+			var podStats *kubeletstatsv1alpha1.PodStats
+			for _, ps := range summary.Pods {
+				if ps.PodRef.Name == podName && ps.PodRef.Namespace == f.Namespace.Name {
+					podStats = &ps
+					break
+				}
+			}
 
-    		gomega.Expect(podStats).NotTo(gomega.BeNil())
-    		gomega.Expect(podStats.Containers).NotTo(gomega.BeEmpty())
+			gomega.Expect(podStats).NotTo(gomega.BeNil())
+			gomega.Expect(podStats.Containers).NotTo(gomega.BeEmpty())
 
-    		container := podStats.Containers[0]
+			container := podStats.Containers[0]
 
-    		gomega.Expect(container.Logs).NotTo(gomega.BeNil())
-    		gomega.Expect(container.Logs.UsedBytes).NotTo(gomega.BeZero())
+			gomega.Expect(container.Logs).NotTo(gomega.BeNil())
+			gomega.Expect(container.Logs.UsedBytes).NotTo(gomega.BeZero())
 		})
 	})
 
