@@ -11,5 +11,6 @@
   "limit": 7,
   "continue": "continueValue",
   "sendInitialEvents": true,
-  "shardSelector": "shardSelectorValue"
+  "shardSelector": "shardSelectorValue",
+  "omitManagedFields": true
 }

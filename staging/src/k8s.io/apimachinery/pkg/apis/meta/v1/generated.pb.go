@@ -716,6 +716,14 @@ func (m *GetOptions) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	i--
+	if m.OmitManagedFields {
+		dAtA[i] = 1
+	} else {
+		dAtA[i] = 0
+	}
+	i--
+	dAtA[i] = 0x18
 	i -= len(m.ResourceVersion)
 	copy(dAtA[i:], m.ResourceVersion)
 	i = encodeVarintGenerated(dAtA, i, uint64(len(m.ResourceVersion)))
@@ -1162,6 +1170,14 @@ func (m *ListOptions) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i = encodeVarintGenerated(dAtA, i, uint64(len(m.ShardSelector)))
 	i--
 	dAtA[i] = 0x7a
+	i--
+	if m.OmitManagedFields {
+		dAtA[i] = 1
+	} else {
+		dAtA[i] = 0
+	}
+	i--
+	dAtA[i] = 0x60
 	if m.SendInitialEvents != nil {
 		i--
 		if *m.SendInitialEvents {
@@ -2430,6 +2446,7 @@ func (m *GetOptions) Size() (n int) {
 	_ = l
 	l = len(m.ResourceVersion)
 	n += 1 + l + sovGenerated(uint64(l))
+	n += 2
 	return n
 }
 
@@ -2621,6 +2638,7 @@ func (m *ListOptions) Size() (n int) {
 	if m.SendInitialEvents != nil {
 		n += 2
 	}
+	n += 2
 	l = len(m.ShardSelector)
 	n += 1 + l + sovGenerated(uint64(l))
 	return n
@@ -3160,6 +3178,7 @@ func (this *GetOptions) String() string {
 	}
 	s := strings.Join([]string{`&GetOptions{`,
 		`ResourceVersion:` + fmt.Sprintf("%v", this.ResourceVersion) + `,`,
+		`OmitManagedFields:` + fmt.Sprintf("%v", this.OmitManagedFields) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -3258,6 +3277,7 @@ func (this *ListOptions) String() string {
 		`AllowWatchBookmarks:` + fmt.Sprintf("%v", this.AllowWatchBookmarks) + `,`,
 		`ResourceVersionMatch:` + fmt.Sprintf("%v", this.ResourceVersionMatch) + `,`,
 		`SendInitialEvents:` + valueToStringGenerated(this.SendInitialEvents) + `,`,
+		`OmitManagedFields:` + fmt.Sprintf("%v", this.OmitManagedFields) + `,`,
 		`ShardSelector:` + fmt.Sprintf("%v", this.ShardSelector) + `,`,
 		`}`,
 	}, "")
@@ -5408,6 +5428,26 @@ func (m *GetOptions) Unmarshal(dAtA []byte) error {
 			}
 			m.ResourceVersion = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field OmitManagedFields", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.OmitManagedFields = bool(v != 0)
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
@@ -7142,6 +7182,26 @@ func (m *ListOptions) Unmarshal(dAtA []byte) error {
 			}
 			b := bool(v != 0)
 			m.SendInitialEvents = &b
+		case 12:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field OmitManagedFields", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.OmitManagedFields = bool(v != 0)
 		case 15:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field ShardSelector", wireType)

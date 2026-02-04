@@ -359,6 +359,13 @@ func autoConvert_url_Values_To_v1_GetOptions(in *url.Values, out *GetOptions, s 
 	} else {
 		out.ResourceVersion = ""
 	}
+	if values, ok := map[string][]string(*in)["omitManagedFields"]; ok && len(values) > 0 {
+		if err := runtime.Convert_Slice_string_To_bool(&values, &out.OmitManagedFields, s); err != nil {
+			return err
+		}
+	} else {
+		out.OmitManagedFields = false
+	}
 	return nil
 }
 
@@ -446,6 +453,13 @@ func autoConvert_url_Values_To_v1_ListOptions(in *url.Values, out *ListOptions, 
 		}
 	} else {
 		out.ShardSelector = ""
+	}
+	if values, ok := map[string][]string(*in)["omitManagedFields"]; ok && len(values) > 0 {
+		if err := runtime.Convert_Slice_string_To_bool(&values, &out.OmitManagedFields, s); err != nil {
+			return err
+		}
+	} else {
+		out.OmitManagedFields = false
 	}
 	return nil
 }

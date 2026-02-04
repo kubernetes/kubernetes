@@ -482,6 +482,8 @@ type ListOptions struct {
 	// +featureGate=ShardedListAndWatch
 	// +optional
 	ShardSelector string `json:"shardSelector,omitempty" protobuf:"bytes,15,opt,name=shardSelector"`
+
+	OmitManagedFields bool `json:"omitManagedFields,omitempty" protobuf:"varint,12,opt,name=omitManagedFields"`
 }
 
 const (
@@ -525,7 +527,18 @@ type GetOptions struct {
 	// Defaults to unset
 	// +optional
 	ResourceVersion string `json:"resourceVersion,omitempty" protobuf:"bytes,1,opt,name=resourceVersion"`
+
 	// +k8s:deprecated=includeUninitialized,protobuf=2
+
+	// omitManagedFields indicates that the managed fields for the
+	// requested object should be omitted from the response. This is primarily
+	// useful for reducing the size of the response when the caller does not
+	// need to see the managed fields and wishes to avoid the bandwidth and
+	// client-side cost of them.
+	//
+	// Defaults to false.
+	// +optional
+	OmitManagedFields bool `json:"omitManagedFields,omitempty" protobuf:"varint,3,opt,name=omitManagedFields"`
 }
 
 // DeletionPropagation decides if a deletion will propagate to the dependents of

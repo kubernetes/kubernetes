@@ -94,6 +94,8 @@ type ListOptions struct {
 	// Parsing is deferred to the apiserver storage layer where the CEL
 	// parser dependency is available.
 	ShardSelector string
+
+	OmitManagedFields bool
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
