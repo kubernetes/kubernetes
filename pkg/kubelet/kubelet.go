@@ -2781,12 +2781,11 @@ func (kl *Kubelet) HandlePodAdditions(ctx context.Context, pods []*v1.Pod) {
 			}
 		}
 
-		// Skip previously rejected pods on kubelet restart.
-		// When kubelet restarts, all pods arrive as ADD operations. Pods that were
-		// previously rejected have Failed phase and skip the admission check above
-		// (due to IsPodPhaseTerminal check). Without this filter, they would enter
-		// pod_workers.
-		if kl.isLocallyRejected(pod) {
+		// Skip pods rejected during this kubelet session.
+		// After restart, previously rejected pods may enter pod_workers, but they
+		// will be immediately marked as terminated because their pod cache is empty
+		// (no containers were ever created), so they won't affect resource accounting.
+		if kl.statusManager.IsPodRejected(pod.UID) {
 			continue
 		}
 

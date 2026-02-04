@@ -4906,13 +4906,12 @@ func TestSyncPodNodeDeclaredFeaturesUpdate(t *testing.T) {
 	}
 }
 
-func TestIsLocallyRejected(t *testing.T) {
+func TestIsPodRejected(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 
-	// Helper to create a unique pod for each test case. Each of the TCs needs a
-	// different pod UID.
+	// Helper to create a unique pod for each test case.
 	podCounter := 0
 	newUniquePod := func() *v1.Pod {
 		podCounter++
@@ -4939,7 +4938,7 @@ func TestIsLocallyRejected(t *testing.T) {
 			description:      "pod with no local status should not be considered rejected",
 		},
 		{
-			name: "local status without rejection message",
+			name: "local status set via SetPodStatus",
 			setupPod: func() *v1.Pod {
 				return newUniquePod()
 			},
@@ -4951,10 +4950,10 @@ func TestIsLocallyRejected(t *testing.T) {
 				})
 			},
 			expectedRejected: false,
-			description:      "pod with Failed status but no rejection message should not be considered rejected",
+			description:      "pod with status set via SetPodStatus should not be considered rejected",
 		},
 		{
-			name: "rejected pod without deletion timestamp",
+			name: "rejected pod via SetPodRejected",
 			setupPod: func() *v1.Pod {
 				return newUniquePod()
 			},
@@ -4966,55 +4965,7 @@ func TestIsLocallyRejected(t *testing.T) {
 				})
 			},
 			expectedRejected: true,
-			description:      "rejected pod without deletion timestamp should be considered rejected",
-		},
-		{
-			name: "pod with deletion timestamp and rejection message",
-			setupPod: func() *v1.Pod {
-				pod := newUniquePod()
-				now := metav1.NewTime(time.Now())
-				pod.DeletionTimestamp = &now
-				return pod
-			},
-			setupLocalStatus: func(pod *v1.Pod) {
-				kubelet.statusManager.SetPodRejected(klog.TODO(), pod, v1.PodStatus{
-					Phase:   v1.PodFailed,
-					Reason:  "OutOfcpu",
-					Message: PodRejectionMessagePrefix + "insufficient CPU",
-				})
-			},
-			expectedRejected: true,
-			description:      "pod with rejection message is considered rejected regardless of deletion timestamp",
-		},
-		{
-			name: "pod with partial rejection message prefix",
-			setupPod: func() *v1.Pod {
-				return newUniquePod()
-			},
-			setupLocalStatus: func(pod *v1.Pod) {
-				kubelet.statusManager.SetPodStatus(klog.TODO(), pod, v1.PodStatus{
-					Phase:   v1.PodFailed,
-					Reason:  "OutOfMemory",
-					Message: "Pod was reject",
-				})
-			},
-			expectedRejected: false,
-			description:      "pod with partial rejection message prefix should not be considered rejected",
-		},
-		{
-			name: "pod with rejection message in the middle",
-			setupPod: func() *v1.Pod {
-				return newUniquePod()
-			},
-			setupLocalStatus: func(pod *v1.Pod) {
-				kubelet.statusManager.SetPodStatus(klog.TODO(), pod, v1.PodStatus{
-					Phase:   v1.PodFailed,
-					Reason:  "OutOfMemory",
-					Message: "Container failed because " + PodRejectionMessagePrefix + "insufficient resources",
-				})
-			},
-			expectedRejected: false,
-			description:      "pod with rejection message not at start should not be considered rejected",
+			description:      "pod rejected via SetPodRejected should be considered rejected",
 		},
 	}
 
@@ -5023,7 +4974,7 @@ func TestIsLocallyRejected(t *testing.T) {
 			pod := tc.setupPod()
 			tc.setupLocalStatus(pod)
 
-			result := kubelet.isLocallyRejected(pod)
+			result := kubelet.statusManager.IsPodRejected(pod.UID)
 			assert.Equal(t, tc.expectedRejected, result, tc.description)
 		})
 	}

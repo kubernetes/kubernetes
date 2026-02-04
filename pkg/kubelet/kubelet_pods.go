@@ -1164,34 +1164,6 @@ func (kl *Kubelet) isAdmittedPodTerminal(pod *v1.Pod) bool {
 	return false
 }
 
-// isLocallyRejected checks if a pod was rejected by this kubelet instance.
-// Rejected pods are pods that failed admission (e.g., insufficient resources,
-// node affinity mismatch). These pods:
-// - Never had containers created
-// - Were marked as Failed with PodRejectionMessagePrefix in the status message
-// - Should never enter the pod_workers pipeline
-//
-// This function checks both the local statusManager cache (for current session
-// rejections) and the pod.Status from API server (for rejections that survived
-// kubelet restart).
-func (kl *Kubelet) isLocallyRejected(pod *v1.Pod) bool {
-	// Check local statusManager cache first (current session rejections).
-	// This catches pods rejected since the kubelet started.
-	localStatus, found := kl.statusManager.GetPodStatus(pod.UID)
-	if found && strings.HasPrefix(localStatus.Message, PodRejectionMessagePrefix) {
-		return true
-	}
-
-	// Check API server status (rejections from before kubelet restart).
-	// When kubelet restarts, the local statusManager is empty, but the rejection
-	// status was synced to the API server and is available in pod.Status.
-	if strings.HasPrefix(pod.Status.Message, PodRejectionMessagePrefix) {
-		return true
-	}
-
-	return false
-}
-
 // removeOrphanedPodStatuses removes obsolete entries in podStatus where
 // the pod is no longer considered bound to this node.
 func (kl *Kubelet) removeOrphanedPodStatuses(logger klog.Logger, pods []*v1.Pod, mirrorPods []*v1.Pod) {
