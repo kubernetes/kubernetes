@@ -3843,3 +3843,53 @@ func BuildNodeInfos(nodes []*v1.Node) []fwk.NodeInfo {
 	}
 	return res
 }
+
+// TestPluginEvaluationTotalIncrementsOnFilterExecution tests that the PluginEvaluationTotal metric increments on filter execution.
+func TestPluginEvaluationTotalIncrementsOnFilterExecution(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+
+	registry := Registry{}
+	cfgPls := &config.Plugins{}
+	pluginName := "plugin-eval-filter"
+
+	pl := &TestPlugin{name: pluginName, inj: injectedResult{FilterStatus: int(fwk.Success)}}
+	if err := registry.Register(pluginName, func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+		return pl, nil
+	}); err != nil {
+		t.Fatalf("failed to register filter plugin %q: %v", pluginName, err)
+	}
+	cfgPls.Filter.Enabled = append(cfgPls.Filter.Enabled, config.Plugin{Name: pluginName})
+
+	profile := config.KubeSchedulerProfile{
+		SchedulerName: testProfileName,
+		Plugins:       cfgPls,
+	}
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	f, err := newFrameworkWithQueueSortAndBind(ctx, registry, profile)
+	if err != nil {
+		t.Fatalf("failed to create framework: %v", err)
+	}
+	defer func() { _ = f.Close() }()
+
+	m := metrics.PluginEvaluationTotal.WithLabelValues(pluginName, metrics.Filter, testProfileName)
+	before, err := testutil.GetCounterMetricValue(m)
+	if err != nil {
+		t.Fatalf("failed to get %s before: %v", metrics.PluginEvaluationTotal.Name, err)
+	}
+
+	state := framework.NewCycleState()
+	if st := f.RunFilterPlugins(ctx, state, pod, nil); st != nil && !st.IsSuccess() {
+		t.Fatalf("RunFilterPlugins returned unexpected status: %v", st)
+	}
+
+	after, err := testutil.GetCounterMetricValue(m)
+	if err != nil {
+		t.Fatalf("failed to get %s after: %v", metrics.PluginEvaluationTotal.Name, err)
+	}
+	if gotDelta := after - before; gotDelta != 1 {
+		t.Fatalf("unexpected %s delta: got %v, want 1 (before=%v after=%v)", metrics.PluginEvaluationTotal.Name, gotDelta, before, after)
+	}
+}
