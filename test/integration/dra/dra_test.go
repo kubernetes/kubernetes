@@ -77,35 +77,22 @@ import (
 var (
 	// For more test data see pkg/scheduler/framework/plugin/dynamicresources/dynamicresources_test.go.
 
-	podName                     = "my-pod"
-	podWithExtendedResourceName = "my-pod-with-extended-resource"
-	namespace                   = "default"
-	resourceName                = "my-resource"
-	extendedResourceName        = "my-example.com/my-extended-resource"
-	claimName                   = podName + "-" + resourceName
-	className                   = "my-resource-class"
-	extendedClassName           = "my-extended-resource-class"
-	device1                     = "device-1"
-	device2                     = "device-2"
-	podWithClaimName            = st.MakePod().Name(podName).Namespace(namespace).
-					Container("my-container").
-					PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimName: &claimName}).
-					Obj()
-	podWithExtendedResource = st.MakePod().Name(podWithExtendedResourceName).Namespace(namespace).
+	podName              = "my-pod"
+	namespace            = "default"
+	resourceName         = "my-resource"
+	extendedResourceName = "my-example.com/my-extended-resource"
+	claimName            = podName + "-" + resourceName
+	className            = "my-resource-class"
+	device1              = "device-1"
+	device2              = "device-2"
+
+	podWithClaimName = st.MakePod().Name(podName).Namespace(namespace).
 				Container("my-container").
-				Res(map[v1.ResourceName]string{v1.ResourceName(extendedResourceName): "1"}).
+				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimName: &claimName}).
 				Obj()
 	class = &resourceapi.DeviceClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: className,
-		},
-	}
-	classWithExtendedResource = &resourceapi.DeviceClass{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: extendedClassName,
-		},
-		Spec: resourceapi.DeviceClassSpec{
-			ExtendedResourceName: &extendedResourceName,
 		},
 	}
 	claim = st.MakeResourceClaim().
@@ -798,44 +785,36 @@ func testExtendedResource(tCtx ktesting.TContext, enabled bool) {
 	tCtx.Parallel()
 
 	namespace := createTestNamespace(tCtx, nil)
-	driverName := namespace + driverNameSuffix
-	class := classWithExtendedResource.DeepCopy()
-	class.Spec.Selectors = []resourceapi.DeviceSelector{{
-		CEL: &resourceapi.CELDeviceSelector{
-			Expression: fmt.Sprintf("device.driver == %q", driverName),
-		},
-	}}
-	c, err := tCtx.Client().ResourceV1().DeviceClasses().Create(tCtx, class, metav1.CreateOptions{FieldValidation: "Strict"})
-	tCtx.ExpectNoError(err, "create class")
+	spec := &resourceapi.DeviceClassSpec{
+		ExtendedResourceName: &extendedResourceName,
+	}
+	_, driverName := createTestClassWithSpec(tCtx, namespace, spec)
 
 	slice := st.MakeResourceSlice("worker-0", driverName).Devices(device1)
 	createSlice(tCtx, slice.Obj())
 
-	if enabled {
-		require.NotEmpty(tCtx, c.Spec.ExtendedResourceName, "should store ExtendedResourceName")
-	}
-
 	tCtx.Run("scheduler", func(tCtx ktesting.TContext) {
 		startScheduler(tCtx)
 
-		pod := podWithExtendedResource.DeepCopy()
-		pod.Namespace = namespace
-		_, err := tCtx.Client().CoreV1().Pods(namespace).Create(tCtx, pod, metav1.CreateOptions{FieldValidation: "Strict"})
-		tCtx.ExpectNoError(err, "create pod")
-		schedulingAttempted := gomega.HaveField("Status.Conditions", gomega.ContainElement(
-			gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
-				"Type":    gomega.Equal(v1.PodScheduled),
-				"Status":  gomega.Equal(v1.ConditionFalse),
-				"Reason":  gomega.Equal("Unschedulable"),
-				"Message": gomega.Equal("0/8 nodes are available: 8 Insufficient my-example.com/my-extended-resource. no new claims to deallocate, preemption: 0/8 nodes are available: 8 Preemption is not helpful for scheduling."),
-			}),
-		))
+		podWithOneContainer := st.MakePod().Name("test-pod").Namespace(namespace).Container("test-container").Obj()
+		pod := createPodWithExtendedResource(tCtx, namespace, extendedResourceName, "1", podWithOneContainer)
+
+		var schedulingAttempted gtypes.GomegaMatcher
 		if enabled {
 			// pod can be scheduled as the drivers in testPublishResourceSlices provide the devices.
 			schedulingAttempted = gomega.HaveField("Status.Conditions", gomega.ContainElement(
 				gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
 					"Type":   gomega.Equal(v1.PodScheduled),
 					"Status": gomega.Equal(v1.ConditionTrue),
+				}),
+			))
+		} else {
+			schedulingAttempted = gomega.HaveField("Status.Conditions", gomega.ContainElement(
+				gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+					"Type":    gomega.Equal(v1.PodScheduled),
+					"Status":  gomega.Equal(v1.ConditionFalse),
+					"Reason":  gomega.Equal("Unschedulable"),
+					"Message": gomega.Equal(fmt.Sprintf("0/8 nodes are available: 8 Insufficient %s. no new claims to deallocate, preemption: 0/8 nodes are available: 8 Preemption is not helpful for scheduling.", extendedResourceName)),
 				}),
 			))
 		}
