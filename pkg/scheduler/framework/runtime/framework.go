@@ -1628,6 +1628,11 @@ func (f *frameworkImpl) RunBindPlugins(ctx context.Context, state fwk.CycleState
 	return status
 }
 
+func (f *frameworkImpl) RunPlacementGeneratorPlugins(ctx context.Context, state fwk.CycleState, podGroup *fwk.PodGroupInfo, parentPlacements []*fwk.ParentPlacement) ([]*fwk.ParentPlacement, *fwk.Status) {
+	// https://github.com/kubernetes/kubernetes/pull/136686
+	return nil, fwk.NewStatus(fwk.Error, "Not yet implemented")
+}
+
 func (f *frameworkImpl) runBindPlugin(ctx context.Context, bp fwk.BindPlugin, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
 	if !state.ShouldRecordPluginMetrics() {
 		return bp.Bind(ctx, state, pod, nodeName)

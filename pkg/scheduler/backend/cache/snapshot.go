@@ -45,6 +45,9 @@ type Snapshot struct {
 	// assumedPods maps a pod key to an assumed pod object during a single pod group scheduling cycle.
 	// This map should be emptied before the next cycle starts.
 	assumedPods map[string]*v1.Pod
+
+	placementNodeInfoList []fwk.NodeInfo
+	placementNodeInfoSet  sets.Set[string]
 }
 
 var _ fwk.SharedLister = &Snapshot{}
@@ -170,8 +173,8 @@ func (s *Snapshot) StorageInfos() fwk.StorageInfoLister {
 	return s
 }
 
-// NumNodes returns the number of nodes in the snapshot.
-func (s *Snapshot) NumNodes() int {
+// NumNodes returns the number of nodes in the snapshot for the current placement.
+func (s *Snapshot) NumNodesInPlacement() int {
 	return len(s.nodeInfoList)
 }
 
@@ -256,4 +259,19 @@ func (s *Snapshot) forgetAllAssumedPods(logger klog.Logger) {
 	for _, pod := range s.assumedPods {
 		s.ForgetPod(logger, pod)
 	}
+}
+
+func (s *Snapshot) SetPlacement(placement *fwk.ParentPlacement) {
+}
+
+func (s *Snapshot) UnsetPlacement() {
+	s.placementNodeInfoList = nil
+}
+
+func (s *Snapshot) GetInPlacement(nodeName string) (fwk.NodeInfo, error) {
+
+}
+
+func (s *Snapshot) ListInPlacement() ([]fwk.NodeInfo, error) {
+
 }

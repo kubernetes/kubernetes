@@ -554,7 +554,7 @@ func (sched *Scheduler) schedulePod(ctx context.Context, fwk framework.Framework
 		trace.Step("Snapshotting scheduler cache and node infos done")
 	}
 
-	if sched.nodeInfoSnapshot.NumNodes() == 0 {
+	if sched.nodeInfoSnapshot.NumNodesInPlacement() == 0 {
 		return result, ErrNoNodesAvailable
 	}
 
@@ -567,7 +567,7 @@ func (sched *Scheduler) schedulePod(ctx context.Context, fwk framework.Framework
 	if len(feasibleNodes) == 0 {
 		return result, &framework.FitError{
 			Pod:         pod,
-			NumAllNodes: sched.nodeInfoSnapshot.NumNodes(),
+			NumAllNodes: sched.nodeInfoSnapshot.NumNodesInPlacement(),
 			Diagnosis:   diagnosis,
 		}
 	}
@@ -614,7 +614,7 @@ func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, schedFramework 
 	}
 	pod := podInfo.Pod
 
-	allNodes, err := sched.nodeInfoSnapshot.NodeInfos().List()
+	allNodes, err := sched.nodeInfoSnapshot.ListInPlacement()
 	if err != nil {
 		return nil, diagnosis, "", nil, err
 	}
@@ -664,7 +664,7 @@ func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, schedFramework 
 		for nodeName := range preRes.NodeNames {
 			// PreRes may return nodeName(s) which do not exist; we verify
 			// node exists in the Snapshot.
-			if nodeInfo, err := sched.nodeInfoSnapshot.Get(nodeName); err == nil {
+			if nodeInfo, err := sched.nodeInfoSnapshot.GetInPlacement(nodeName); err == nil {
 				nodes = append(nodes, nodeInfo)
 			}
 		}
@@ -709,7 +709,7 @@ func (sched *Scheduler) evaluateNominatedNode(ctx context.Context, pod *v1.Pod, 
 		nnn = nodeHint
 	}
 
-	nodeInfo, err := sched.nodeInfoSnapshot.Get(nnn)
+	nodeInfo, err := sched.nodeInfoSnapshot.GetInPlacement(nnn)
 	if err != nil {
 		return nil, err
 	}
