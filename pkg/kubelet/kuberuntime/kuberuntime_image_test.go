@@ -136,6 +136,37 @@ func TestGetImageRef(t *testing.T) {
 	assert.Equal(t, image, imageRef)
 }
 
+// TestGetImageRefReturnsImageIdNotRepoDigest verifies that GetImageRef returns
+// Image.Id instead of RepoDigests to ensure content-based deduplication.
+// This prevents the same image pulled from different registries from being
+// treated as different images in pull record lookups.
+func TestGetImageRefReturnsImageIdNotRepoDigest(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	_, fakeImageService, fakeManager, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	// Simulate an image with both Id and RepoDigests set
+	// In a real scenario, the same image content pulled from different registries
+	// would have the same Id but different RepoDigests
+	imageID := "sha256:abcd1234"
+	repoDigest1 := "registry1.io/myimage@sha256:abcd1234"
+	repoDigest2 := "registry2.io/myimage@sha256:abcd1234"
+
+	fakeImageService.Lock()
+	fakeImageService.Images["myimage"] = &runtimeapi.Image{
+		Id:          imageID,
+		RepoDigests: []string{repoDigest1, repoDigest2},
+		RepoTags:    []string{"myimage:latest"},
+		Size:        1000,
+	}
+	fakeImageService.Unlock()
+
+	// GetImageRef should return the content-based Image.Id, not the location-based RepoDigest
+	imageRef, err := fakeManager.GetImageRef(tCtx, kubecontainer.ImageSpec{Image: "myimage"})
+	require.NoError(t, err)
+	assert.Equal(t, imageID, imageRef, "GetImageRef should return Image.Id for content-based deduplication")
+}
+
 func TestImageSize(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	_, fakeImageService, fakeManager, err := createTestRuntimeManager(tCtx)
@@ -246,7 +277,7 @@ func TestImageStatsWithError(t *testing.T) {
 }
 
 func TestPullWithSecrets(t *testing.T) {
-	tCtx := ktesting.Init(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 	// auth value is equivalent to: "username":"passed-user","password":"passed-password"
 	dockerCfg := map[string]map[string]string{"index.docker.io/v1/": {"email": "passed-email", "auth": "cGFzc2VkLXVzZXI6cGFzc2VkLXBhc3N3b3Jk"}}
 	dockercfgContent, err := json.Marshal(dockerCfg)
@@ -320,13 +351,14 @@ func TestPullWithSecrets(t *testing.T) {
 		_, fakeImageService, fakeManager, err := createTestRuntimeManager(tCtx)
 		require.NoError(t, err)
 
-		fsRecordAccessor, err := imagepullmanager.NewFSPullRecordsAccessor(t.TempDir())
+		fsRecordAccessor, err := imagepullmanager.NewFSPullRecordsAccessor(logger, t.TempDir())
 		if err != nil {
 			t.Fatal("failed to setup an file pull records accessor")
 		}
 
 		const intentsRecordsCacheSize, pulledRecordsCacheSize, stripedLocksSetSize = 50, 100, 10
 		memCacheRecordsAccessor := imagepullmanager.NewCachedPullRecordsAccessor(
+			logger,
 			fsRecordAccessor,
 			intentsRecordsCacheSize,
 			pulledRecordsCacheSize,
@@ -358,7 +390,7 @@ func TestPullWithSecrets(t *testing.T) {
 }
 
 func TestPullWithSecretsWithError(t *testing.T) {
-	tCtx := ktesting.Init(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 
 	dockerCfg := map[string]map[string]map[string]string{
 		"auths": {
@@ -410,13 +442,14 @@ func TestPullWithSecretsWithError(t *testing.T) {
 				fakeImageService.InjectError("PullImage", fmt.Errorf("test-error"))
 			}
 
-			fsRecordAccessor, err := imagepullmanager.NewFSPullRecordsAccessor(t.TempDir())
+			fsRecordAccessor, err := imagepullmanager.NewFSPullRecordsAccessor(logger, t.TempDir())
 			if err != nil {
 				t.Fatal("failed to setup an file pull records accessor")
 			}
 
 			const intentsRecordsCacheSize, pulledRecordsCacheSize, stripedLocksSetSize = 50, 100, 10
 			memCacheRecordsAccessor := imagepullmanager.NewCachedPullRecordsAccessor(
+				logger,
 				fsRecordAccessor,
 				intentsRecordsCacheSize,
 				pulledRecordsCacheSize,

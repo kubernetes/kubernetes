@@ -60,6 +60,32 @@ func TestClientGOMetrics(t *testing.T) {
 			            rest_client_request_retries_total{code="500",host="www.bar.com",verb="GET"} 1
 				`,
 		},
+		{
+			description: "Number of calls to an exec plugin",
+			name:        "rest_client_exec_plugin_call_total",
+			metric:      execPluginCalls,
+			update: func() {
+				metrics.ExecPluginCalls.Increment(0, "no_error")
+			},
+			want: `
+						# HELP rest_client_exec_plugin_call_total [ALPHA] Number of calls to an exec plugin, partitioned by the type of event encountered (no_error, plugin_execution_error, plugin_not_found_error, client_internal_error) and an optional exit code. The exit code will be set to 0 if and only if the plugin call was successful.
+        				# TYPE rest_client_exec_plugin_call_total counter
+        				rest_client_exec_plugin_call_total{call_status="no_error",code="0"} 1
+				`,
+		},
+		{
+			description: "Number of calls to get a new transport",
+			name:        "rest_client_transport_create_calls_total",
+			metric:      transportCacheCalls,
+			update: func() {
+				metrics.TransportCreateCalls.Increment("hit")
+			},
+			want: `
+			            # HELP rest_client_transport_create_calls_total [ALPHA] Number of calls to get a new transport, partitioned by the result of the operation hit: obtained from the cache, miss: created and added to the cache, uncacheable: created and not cached
+			            # TYPE rest_client_transport_create_calls_total counter
+			            rest_client_transport_create_calls_total{result="hit"} 1
+				`,
+		},
 	}
 
 	// no need to register the metrics here, since the init function of

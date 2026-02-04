@@ -22,7 +22,7 @@ import (
 	"sync/atomic"
 
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/api/validation/path"
+	"k8s.io/apimachinery/pkg/api/validate/content"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -46,7 +46,7 @@ func NamespaceKeyFunc(prefix string, obj runtime.Object) (string, error) {
 		return "", err
 	}
 	name := meta.GetName()
-	if msgs := path.IsValidPathSegmentName(name); len(msgs) != 0 {
+	if msgs := content.IsPathSegmentName(name); len(msgs) != 0 {
 		return "", fmt.Errorf("invalid name: %v", msgs)
 	}
 	return prefix + meta.GetNamespace() + "/" + name, nil
@@ -61,7 +61,7 @@ func NoNamespaceKeyFunc(prefix string, obj runtime.Object) (string, error) {
 		return "", err
 	}
 	name := meta.GetName()
-	if msgs := path.IsValidPathSegmentName(name); len(msgs) != 0 {
+	if msgs := content.IsPathSegmentName(name); len(msgs) != 0 {
 		return "", fmt.Errorf("invalid name: %v", msgs)
 	}
 	return prefix + name, nil

@@ -235,9 +235,11 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 	for _, pi := range nodeInfo.GetPods() {
 		if pl.isPreemptionAllowed(nodeInfo, pi, pod) {
 			potentialVictims = append(potentialVictims, pi)
-			if err := removePod(pi); err != nil {
-				return nil, 0, fwk.AsStatus(err)
-			}
+		}
+	}
+	for _, pi := range potentialVictims {
+		if err := removePod(pi); err != nil {
+			return nil, 0, fwk.AsStatus(err)
 		}
 	}
 

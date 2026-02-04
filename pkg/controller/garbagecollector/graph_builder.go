@@ -94,8 +94,9 @@ type GraphBuilder struct {
 	// This channel is also protected by monitorLock.
 	stopCh <-chan struct{}
 
-	// running tracks whether Run() has been called.
-	// it is protected by monitorLock.
+	// running is set to true when the Run() function has been called.
+	// It will revert to false when the Run() function receives a cancellation.
+	// It is protected by monitorLock.
 	running bool
 
 	eventRecorder    record.EventRecorder
@@ -222,7 +223,7 @@ func (gb *GraphBuilder) controllerFor(logger klog.Logger, resource schema.GroupV
 
 	shared, err := gb.sharedInformers.ForResource(resource)
 	if err != nil {
-		logger.V(4).Error(err, "unable to use a shared informer", "resource", resource, "kind", kind)
+		logger.V(4).Info("unable to use a shared informer", "resource", resource, "kind", kind, "err", err)
 		return nil, nil, err
 	}
 	logger.V(4).Info("using a shared informer", "resource", resource, "kind", kind)

@@ -542,7 +542,6 @@ func execPluginClientTests(t *testing.T, unauthorizedCert, unauthorizedKey []byt
 func v1beta1TestsFromV1Tests(v1Tests []execPluginClientTestData) []execPluginClientTestData {
 	v1beta1Tests := make([]execPluginClientTestData, 0, len(v1Tests))
 	for _, v1Test := range v1Tests {
-		v1Test := v1Test
 
 		v1beta1Test := v1Test
 		v1beta1Test.name = fmt.Sprintf("%s v1beta1", v1Test.name)
@@ -573,7 +572,6 @@ func TestExecPluginViaClient(t *testing.T) {
 	tests := execPluginClientTests(t, unauthorizedCert, unauthorizedKey, clientAuthorizedToken, clientCertFileName, clientKeyFileName)
 
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			actualMetrics := captureMetrics(t)
 
@@ -1143,7 +1141,6 @@ func TestExecPluginGlobalCache(t *testing.T) {
 	getTestExecClientAddresses := func(t *testing.T, tests []execPluginClientTestData, suffix string) []string {
 		var addresses []string
 		for i, test := range tests {
-			test := test
 			t.Run(test.name+" "+suffix, func(t *testing.T) {
 				clientConfig := rest.AnonymousClientConfig(result.ClientConfig)
 				clientConfig.ExecProvider = &clientcmdapi.ExecConfig{

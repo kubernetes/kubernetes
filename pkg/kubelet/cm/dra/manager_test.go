@@ -24,6 +24,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -44,8 +45,10 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	metricstestutil "k8s.io/component-base/metrics/testutil"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/klog/v2"
+	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 
 	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1"
@@ -62,8 +65,9 @@ const (
 )
 
 var (
-	shareID  = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-	shareUID = types.UID(shareID)
+	shareID        = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+	shareUID       = types.UID(shareID)
+	testPodCounter atomic.Uint32
 )
 
 type fakeDRADriverGRPCServer struct {
@@ -79,6 +83,22 @@ type fakeDRADriverGRPCServer struct {
 	watchResourcesResponses    chan *drahealthv1alpha1.NodeWatchResourcesResponse
 	watchResourcesError        error
 }
+
+var gatherWithoutDurations = metricstestutil.GathererFunc(func() ([]*metricstestutil.MetricFamily, error) {
+	got, err := kubeletmetrics.GetGather().Gather()
+	for _, mf := range got {
+
+		for _, m := range mf.Metric {
+			if m.Histogram == nil {
+				continue
+			}
+			// Remove everything from a histogram that depends on timing.
+			m.Histogram.SampleSum = nil
+			m.Histogram.Bucket = nil
+		}
+	}
+	return got, err
+})
 
 func (s *fakeDRADriverGRPCServer) NodePrepareResources(ctx context.Context, req *drapb.NodePrepareResourcesRequest) (*drapb.NodePrepareResourcesResponse, error) {
 	s.prepareResourceCalls.Add(1)
@@ -281,6 +301,23 @@ func setupFakeDRADriverGRPCServer(ctx context.Context, shouldTimeout bool, plugi
 	}, nil
 }
 
+func genPrepareResourcesResponse(claimUID types.UID) *drapb.NodePrepareResourcesResponse {
+	return &drapb.NodePrepareResourcesResponse{
+		Claims: map[string]*drapb.NodePrepareResourceResponse{
+			string(claimUID): {
+				Devices: []*drapb.Device{
+					{
+						PoolName:     poolName,
+						DeviceName:   deviceName,
+						RequestNames: []string{requestName},
+						CdiDeviceIds: []string{cdiID},
+					},
+				},
+			},
+		},
+	}
+}
+
 func TestNewManagerImpl(t *testing.T) {
 	kubeClient := fake.NewSimpleClientset()
 	for _, test := range []struct {
@@ -337,6 +374,45 @@ func genTestPod() *v1.Pod {
 								Name: claimName,
 							},
 						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func genTestPodWithClaims(claimNames ...string) *v1.Pod {
+	podCounter := testPodCounter.Add(1)
+
+	podName := fmt.Sprintf("test-pod-%d", podCounter)
+	podUID := types.UID(fmt.Sprintf("test-pod-uid-%d", podCounter))
+
+	resourceClaims := make([]v1.PodResourceClaim, 0, len(claimNames))
+	containerClaims := make([]v1.ResourceClaim, 0, len(claimNames))
+
+	for _, claimName := range claimNames {
+		cn := claimName
+		resourceClaims = append(resourceClaims, v1.PodResourceClaim{
+			Name:              cn,
+			ResourceClaimName: &cn,
+		})
+		containerClaims = append(containerClaims, v1.ResourceClaim{
+			Name: cn,
+		})
+	}
+
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      podName,
+			Namespace: namespace,
+			UID:       podUID,
+		},
+		Spec: v1.PodSpec{
+			ResourceClaims: resourceClaims,
+			Containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Claims: containerClaims,
 					},
 				},
 			},
@@ -631,7 +707,7 @@ func TestGetResources(t *testing.T) {
 	}
 }
 
-func getFakeNode() (*v1.Node, error) {
+func getFakeNode(context.Context) (*v1.Node, error) {
 	return &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "worker"}}, nil
 }
 
@@ -654,18 +730,31 @@ func TestPrepareResources(t *testing.T) {
 		expectedErrMsg         string
 		expectedClaimInfoState state.ClaimInfoState
 		expectedPrepareCalls   uint32
+		expectedMetric         string
 	}{
 		{
 			description:    "claim doesn't exist",
 			driverName:     driverName,
 			pod:            genTestPod(),
 			expectedErrMsg: "fetch ResourceClaim ",
+			expectedMetric: `# HELP dra_operations_duration_seconds [ALPHA] Latency histogram in seconds for the duration of handling all ResourceClaims referenced by a pod when the pod starts or stops. Identified by the name of the operation (PrepareResources or UnprepareResources) and separated by the success of the operation. The number of failed operations is provided through the histogram's overall count.
+# TYPE dra_operations_duration_seconds histogram
+dra_operations_duration_seconds_bucket{is_error="true",operation_name="PrepareResources",le="+Inf"} 1
+dra_operations_duration_seconds_sum{is_error="true",operation_name="PrepareResources"} 0
+dra_operations_duration_seconds_count{is_error="true",operation_name="PrepareResources"} 1
+`,
 		},
 		{
 			description:    "unknown driver",
 			pod:            genTestPod(),
 			claim:          genTestClaim(claimName, "unknown driver", deviceName, podUID),
 			expectedErrMsg: "prepare dynamic resources: DRA driver unknown driver is not registered",
+			expectedMetric: `# HELP dra_operations_duration_seconds [ALPHA] Latency histogram in seconds for the duration of handling all ResourceClaims referenced by a pod when the pod starts or stops. Identified by the name of the operation (PrepareResources or UnprepareResources) and separated by the success of the operation. The number of failed operations is provided through the histogram's overall count.
+# TYPE dra_operations_duration_seconds histogram
+dra_operations_duration_seconds_bucket{is_error="true",operation_name="PrepareResources",le="+Inf"} 1
+dra_operations_duration_seconds_sum{is_error="true",operation_name="PrepareResources"} 0
+dra_operations_duration_seconds_count{is_error="true",operation_name="PrepareResources"} 1
+`,
 		},
 		{
 			description:            "should prepare resources, driver returns nil value",
@@ -675,6 +764,17 @@ func TestPrepareResources(t *testing.T) {
 			resp:                   &drapb.NodePrepareResourcesResponse{Claims: map[string]*drapb.NodePrepareResourceResponse{string(claimUID): nil}},
 			expectedClaimInfoState: genClaimInfoState(""),
 			expectedPrepareCalls:   1,
+			expectedMetric: `# HELP dra_grpc_operations_duration_seconds [ALPHA] Duration in seconds of the DRA gRPC operations
+# TYPE dra_grpc_operations_duration_seconds histogram
+dra_grpc_operations_duration_seconds_bucket{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodePrepareResources",le="+Inf"} 1
+dra_grpc_operations_duration_seconds_sum{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodePrepareResources"} 0
+dra_grpc_operations_duration_seconds_count{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodePrepareResources"} 1
+# HELP dra_operations_duration_seconds [ALPHA] Latency histogram in seconds for the duration of handling all ResourceClaims referenced by a pod when the pod starts or stops. Identified by the name of the operation (PrepareResources or UnprepareResources) and separated by the success of the operation. The number of failed operations is provided through the histogram's overall count.
+# TYPE dra_operations_duration_seconds histogram
+dra_operations_duration_seconds_bucket{is_error="false",operation_name="PrepareResources",le="+Inf"} 1
+dra_operations_duration_seconds_sum{is_error="false",operation_name="PrepareResources"} 0
+dra_operations_duration_seconds_count{is_error="false",operation_name="PrepareResources"} 1
+`,
 		},
 		{
 			description:          "driver returns empty result",
@@ -684,6 +784,17 @@ func TestPrepareResources(t *testing.T) {
 			resp:                 &drapb.NodePrepareResourcesResponse{Claims: map[string]*drapb.NodePrepareResourceResponse{}},
 			expectedPrepareCalls: 1,
 			expectedErrMsg:       "NodePrepareResources skipped 1 ResourceClaims",
+			expectedMetric: `# HELP dra_grpc_operations_duration_seconds [ALPHA] Duration in seconds of the DRA gRPC operations
+# TYPE dra_grpc_operations_duration_seconds histogram
+dra_grpc_operations_duration_seconds_bucket{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodePrepareResources",le="+Inf"} 1
+dra_grpc_operations_duration_seconds_sum{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodePrepareResources"} 0
+dra_grpc_operations_duration_seconds_count{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodePrepareResources"} 1
+# HELP dra_operations_duration_seconds [ALPHA] Latency histogram in seconds for the duration of handling all ResourceClaims referenced by a pod when the pod starts or stops. Identified by the name of the operation (PrepareResources or UnprepareResources) and separated by the success of the operation. The number of failed operations is provided through the histogram's overall count.
+# TYPE dra_operations_duration_seconds histogram
+dra_operations_duration_seconds_bucket{is_error="true",operation_name="PrepareResources",le="+Inf"} 1
+dra_operations_duration_seconds_sum{is_error="true",operation_name="PrepareResources"} 0
+dra_operations_duration_seconds_count{is_error="true",operation_name="PrepareResources"} 1
+`,
 		},
 		{
 			description:    "pod is not allowed to use resource claim",
@@ -691,6 +802,12 @@ func TestPrepareResources(t *testing.T) {
 			pod:            genTestPod(),
 			claim:          genTestClaim(claimName, driverName, deviceName, ""),
 			expectedErrMsg: "is not allowed to use ResourceClaim ",
+			expectedMetric: `# HELP dra_operations_duration_seconds [ALPHA] Latency histogram in seconds for the duration of handling all ResourceClaims referenced by a pod when the pod starts or stops. Identified by the name of the operation (PrepareResources or UnprepareResources) and separated by the success of the operation. The number of failed operations is provided through the histogram's overall count.
+# TYPE dra_operations_duration_seconds histogram
+dra_operations_duration_seconds_bucket{is_error="true",operation_name="PrepareResources",le="+Inf"} 1
+dra_operations_duration_seconds_sum{is_error="true",operation_name="PrepareResources"} 0
+dra_operations_duration_seconds_count{is_error="true",operation_name="PrepareResources"} 1
+`,
 		},
 		{
 			description: "no container uses the claim",
@@ -713,21 +830,21 @@ func TestPrepareResources(t *testing.T) {
 					},
 				},
 			},
-			claim:                  genTestClaim(claimName, driverName, deviceName, podUID),
-			expectedPrepareCalls:   1,
+			claim:                genTestClaim(claimName, driverName, deviceName, podUID),
+			expectedPrepareCalls: 1,
+			expectedMetric: `# HELP dra_grpc_operations_duration_seconds [ALPHA] Duration in seconds of the DRA gRPC operations
+# TYPE dra_grpc_operations_duration_seconds histogram
+dra_grpc_operations_duration_seconds_bucket{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodePrepareResources",le="+Inf"} 1
+dra_grpc_operations_duration_seconds_sum{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodePrepareResources"} 0
+dra_grpc_operations_duration_seconds_count{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodePrepareResources"} 1
+# HELP dra_operations_duration_seconds [ALPHA] Latency histogram in seconds for the duration of handling all ResourceClaims referenced by a pod when the pod starts or stops. Identified by the name of the operation (PrepareResources or UnprepareResources) and separated by the success of the operation. The number of failed operations is provided through the histogram's overall count.
+# TYPE dra_operations_duration_seconds histogram
+dra_operations_duration_seconds_bucket{is_error="false",operation_name="PrepareResources",le="+Inf"} 1
+dra_operations_duration_seconds_sum{is_error="false",operation_name="PrepareResources"} 0
+dra_operations_duration_seconds_count{is_error="false",operation_name="PrepareResources"} 1
+`,
 			expectedClaimInfoState: genClaimInfoState(cdiID),
-			resp: &drapb.NodePrepareResourcesResponse{Claims: map[string]*drapb.NodePrepareResourceResponse{
-				string(claimUID): {
-					Devices: []*drapb.Device{
-						{
-							PoolName:     poolName,
-							DeviceName:   deviceName,
-							RequestNames: []string{requestName},
-							CdiDeviceIds: []string{cdiID},
-						},
-					},
-				},
-			}},
+			resp:                   genPrepareResourcesResponse(claimUID),
 		},
 		{
 			description:            "resource already prepared",
@@ -736,18 +853,13 @@ func TestPrepareResources(t *testing.T) {
 			claim:                  genTestClaim(claimName, driverName, deviceName, podUID),
 			claimInfo:              genTestClaimInfo(claimUID, []string{podUID}, true),
 			expectedClaimInfoState: genClaimInfoState(cdiID),
-			resp: &drapb.NodePrepareResourcesResponse{Claims: map[string]*drapb.NodePrepareResourceResponse{
-				string(claimUID): {
-					Devices: []*drapb.Device{
-						{
-							PoolName:     poolName,
-							DeviceName:   deviceName,
-							RequestNames: []string{requestName},
-							CdiDeviceIds: []string{cdiID},
-						},
-					},
-				},
-			}},
+			resp:                   genPrepareResourcesResponse(claimUID),
+			expectedMetric: `# HELP dra_operations_duration_seconds [ALPHA] Latency histogram in seconds for the duration of handling all ResourceClaims referenced by a pod when the pod starts or stops. Identified by the name of the operation (PrepareResources or UnprepareResources) and separated by the success of the operation. The number of failed operations is provided through the histogram's overall count.
+# TYPE dra_operations_duration_seconds histogram
+dra_operations_duration_seconds_bucket{is_error="false",operation_name="PrepareResources",le="+Inf"} 1
+dra_operations_duration_seconds_sum{is_error="false",operation_name="PrepareResources"} 0
+dra_operations_duration_seconds_count{is_error="false",operation_name="PrepareResources"} 1
+`,
 		},
 		{
 			description:          "should timeout",
@@ -757,6 +869,17 @@ func TestPrepareResources(t *testing.T) {
 			wantTimeout:          true,
 			expectedPrepareCalls: 1,
 			expectedErrMsg:       "NodePrepareResources: rpc error: code = DeadlineExceeded",
+			expectedMetric: `# HELP dra_grpc_operations_duration_seconds [ALPHA] Duration in seconds of the DRA gRPC operations
+# TYPE dra_grpc_operations_duration_seconds histogram
+dra_grpc_operations_duration_seconds_bucket{driver_name="test-driver",grpc_status_code="DeadlineExceeded",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodePrepareResources",le="+Inf"} 1
+dra_grpc_operations_duration_seconds_sum{driver_name="test-driver",grpc_status_code="DeadlineExceeded",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodePrepareResources"} 0
+dra_grpc_operations_duration_seconds_count{driver_name="test-driver",grpc_status_code="DeadlineExceeded",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodePrepareResources"} 1
+# HELP dra_operations_duration_seconds [ALPHA] Latency histogram in seconds for the duration of handling all ResourceClaims referenced by a pod when the pod starts or stops. Identified by the name of the operation (PrepareResources or UnprepareResources) and separated by the success of the operation. The number of failed operations is provided through the histogram's overall count.
+# TYPE dra_operations_duration_seconds histogram
+dra_operations_duration_seconds_bucket{is_error="true",operation_name="PrepareResources",le="+Inf"} 1
+dra_operations_duration_seconds_sum{is_error="true",operation_name="PrepareResources"} 0
+dra_operations_duration_seconds_count{is_error="true",operation_name="PrepareResources"} 1
+`,
 		},
 		{
 			description:            "should prepare resource, claim not in cache",
@@ -764,19 +887,19 @@ func TestPrepareResources(t *testing.T) {
 			pod:                    genTestPod(),
 			claim:                  genTestClaim(claimName, driverName, deviceName, podUID),
 			expectedClaimInfoState: genClaimInfoState(cdiID),
-			resp: &drapb.NodePrepareResourcesResponse{Claims: map[string]*drapb.NodePrepareResourceResponse{
-				string(claimUID): {
-					Devices: []*drapb.Device{
-						{
-							PoolName:     poolName,
-							DeviceName:   deviceName,
-							RequestNames: []string{requestName},
-							CdiDeviceIds: []string{cdiID},
-						},
-					},
-				},
-			}},
-			expectedPrepareCalls: 1,
+			resp:                   genPrepareResourcesResponse(claimUID),
+			expectedPrepareCalls:   1,
+			expectedMetric: `# HELP dra_grpc_operations_duration_seconds [ALPHA] Duration in seconds of the DRA gRPC operations
+# TYPE dra_grpc_operations_duration_seconds histogram
+dra_grpc_operations_duration_seconds_bucket{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodePrepareResources",le="+Inf"} 1
+dra_grpc_operations_duration_seconds_sum{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodePrepareResources"} 0
+dra_grpc_operations_duration_seconds_count{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodePrepareResources"} 1
+# HELP dra_operations_duration_seconds [ALPHA] Latency histogram in seconds for the duration of handling all ResourceClaims referenced by a pod when the pod starts or stops. Identified by the name of the operation (PrepareResources or UnprepareResources) and separated by the success of the operation. The number of failed operations is provided through the histogram's overall count.
+# TYPE dra_operations_duration_seconds histogram
+dra_operations_duration_seconds_bucket{is_error="false",operation_name="PrepareResources",le="+Inf"} 1
+dra_operations_duration_seconds_sum{is_error="false",operation_name="PrepareResources"} 0
+dra_operations_duration_seconds_count{is_error="false",operation_name="PrepareResources"} 1
+`,
 		},
 		{
 			description:            "should prepare extended resource claim backed by DRA",
@@ -797,6 +920,17 @@ func TestPrepareResources(t *testing.T) {
 				},
 			}},
 			expectedPrepareCalls: 1,
+			expectedMetric: `# HELP dra_grpc_operations_duration_seconds [ALPHA] Duration in seconds of the DRA gRPC operations
+# TYPE dra_grpc_operations_duration_seconds histogram
+dra_grpc_operations_duration_seconds_bucket{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodePrepareResources",le="+Inf"} 1
+dra_grpc_operations_duration_seconds_sum{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodePrepareResources"} 0
+dra_grpc_operations_duration_seconds_count{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodePrepareResources"} 1
+# HELP dra_operations_duration_seconds [ALPHA] Latency histogram in seconds for the duration of handling all ResourceClaims referenced by a pod when the pod starts or stops. Identified by the name of the operation (PrepareResources or UnprepareResources) and separated by the success of the operation. The number of failed operations is provided through the histogram's overall count.
+# TYPE dra_operations_duration_seconds histogram
+dra_operations_duration_seconds_bucket{is_error="false",operation_name="PrepareResources",le="+Inf"} 1
+dra_operations_duration_seconds_sum{is_error="false",operation_name="PrepareResources"} 0
+dra_operations_duration_seconds_count{is_error="false",operation_name="PrepareResources"} 1
+`,
 		},
 		{
 			description:    "claim UIDs mismatch",
@@ -805,6 +939,12 @@ func TestPrepareResources(t *testing.T) {
 			claim:          genTestClaim(claimName, driverName, deviceName, podUID),
 			claimInfo:      genTestClaimInfo(anotherClaimUID, []string{podUID}, false),
 			expectedErrMsg: fmt.Sprintf("old ResourceClaim with same name %s and different UID %s still exists", claimName, anotherClaimUID),
+			expectedMetric: `# HELP dra_operations_duration_seconds [ALPHA] Latency histogram in seconds for the duration of handling all ResourceClaims referenced by a pod when the pod starts or stops. Identified by the name of the operation (PrepareResources or UnprepareResources) and separated by the success of the operation. The number of failed operations is provided through the histogram's overall count.
+# TYPE dra_operations_duration_seconds histogram
+dra_operations_duration_seconds_bucket{is_error="true",operation_name="PrepareResources",le="+Inf"} 1
+dra_operations_duration_seconds_sum{is_error="true",operation_name="PrepareResources"} 0
+dra_operations_duration_seconds_count{is_error="true",operation_name="PrepareResources"} 1
+`,
 		},
 		{
 			description: "should prepare resources with share id",
@@ -830,13 +970,37 @@ func TestPrepareResources(t *testing.T) {
 				},
 			}},
 			expectedPrepareCalls: 1,
+			expectedMetric: `# HELP dra_grpc_operations_duration_seconds [ALPHA] Duration in seconds of the DRA gRPC operations
+# TYPE dra_grpc_operations_duration_seconds histogram
+dra_grpc_operations_duration_seconds_bucket{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodePrepareResources",le="+Inf"} 1
+dra_grpc_operations_duration_seconds_sum{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodePrepareResources"} 0
+dra_grpc_operations_duration_seconds_count{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodePrepareResources"} 1
+# HELP dra_operations_duration_seconds [ALPHA] Latency histogram in seconds for the duration of handling all ResourceClaims referenced by a pod when the pod starts or stops. Identified by the name of the operation (PrepareResources or UnprepareResources) and separated by the success of the operation. The number of failed operations is provided through the histogram's overall count.
+# TYPE dra_operations_duration_seconds histogram
+dra_operations_duration_seconds_bucket{is_error="false",operation_name="PrepareResources",le="+Inf"} 1
+dra_operations_duration_seconds_sum{is_error="false",operation_name="PrepareResources"} 0
+dra_operations_duration_seconds_count{is_error="false",operation_name="PrepareResources"} 1
+`,
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
-			backgroundCtx, cancel := context.WithCancel(context.Background())
+			tCtx := ktesting.Init(t)
+			backgroundCtx, cancel := context.WithCancel(tCtx)
 			defer cancel()
 
-			tCtx := ktesting.Init(t)
+			kubeletmetrics.Register()
+			kubeletmetrics.DRAOperationsDuration.Reset()
+			kubeletmetrics.DRAGRPCOperationsDuration.Reset()
+			defer func() {
+				require.NoError(t,
+					metricstestutil.GatherAndCompare(gatherWithoutDurations,
+						strings.NewReader(test.expectedMetric),
+						kubeletmetrics.DRAOperationsDuration.FQName(),
+						kubeletmetrics.DRAGRPCOperationsDuration.FQName(),
+					),
+				)
+			}()
+
 			backgroundCtx = klog.NewContext(backgroundCtx, tCtx.Logger())
 
 			manager, err := NewManager(tCtx.Logger(), fakeKubeClient, t.TempDir())
@@ -913,6 +1077,74 @@ func TestPrepareResources(t *testing.T) {
 	}
 }
 
+// TestPrepareResourcesWithPreparedAndNewClaim verifies that PrepareResources
+// correctly handles a pod that references a mix of ResourceClaims:
+// - first claim already prepared by a previous pod
+// - second claim is new and needs to be prepared
+func TestPrepareResourcesWithPreparedAndNewClaim(t *testing.T) {
+	logger, tCtx := ktesting.NewTestContext(t)
+	fakeKubeClient := fake.NewClientset()
+
+	manager, err := NewManager(logger, fakeKubeClient, t.TempDir())
+	require.NoError(t, err)
+	manager.initDRAPluginManager(tCtx, getFakeNode, time.Second)
+
+	secondClaimName := fmt.Sprintf("%s-second", claimName)
+
+	// Generate two pods where the second pod reuses an existing claim and adds a new one
+	firstPod := genTestPodWithClaims(claimName)
+	secondPod := genTestPodWithClaims(claimName, secondClaimName)
+
+	firstClaim := genTestClaim(claimName, driverName, deviceName, string(firstPod.ObjectMeta.UID))
+	secondClaim := genTestClaim(secondClaimName, driverName, deviceName, string(secondPod.ObjectMeta.UID))
+
+	// Make firstClaim reserved for first and second pod
+	firstClaim.Status.ReservedFor = append(
+		firstClaim.Status.ReservedFor,
+		resourceapi.ResourceClaimConsumerReference{UID: secondPod.ObjectMeta.UID},
+	)
+
+	_, err = fakeKubeClient.ResourceV1().ResourceClaims(namespace).Create(tCtx, firstClaim, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	_, err = fakeKubeClient.ResourceV1().ResourceClaims(namespace).Create(tCtx, secondClaim, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	respFirst := genPrepareResourcesResponse(firstClaim.UID)
+	draServerInfo, err := setupFakeDRADriverGRPCServer(tCtx, false, nil, respFirst, nil, nil)
+	require.NoError(t, err)
+	defer draServerInfo.teardownFn()
+
+	plg := manager.GetWatcherHandler()
+	require.NoError(t, plg.RegisterPlugin(driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, nil))
+
+	err = manager.PrepareResources(tCtx, firstPod)
+	require.NoError(t, err)
+
+	assert.Equal(t, uint32(1),
+		draServerInfo.server.prepareResourceCalls.Load(),
+		"first pod should trigger one prepare call",
+	)
+
+	respSecond := genPrepareResourcesResponse(secondClaim.UID)
+	draServerInfo.server.prepareResourcesResponse = respSecond
+
+	err = manager.PrepareResources(tCtx, secondPod)
+	require.NoError(t, err)
+
+	// second pod triggered exactly one prepare call (new claim only) + previous one call
+	assert.Equal(t, uint32(2),
+		draServerInfo.server.prepareResourceCalls.Load(),
+		"second pod should trigger one prepare call for the new claim",
+	)
+
+	for _, claimName := range []string{firstClaim.Name, secondClaim.Name} {
+		claimInfo, exists := manager.cache.get(claimName, namespace)
+		require.True(t, exists, "claim %s should exist in cache", claimName)
+		assert.True(t, claimInfo.prepared, "claim %s should be marked as prepared", claimName)
+	}
+}
+
 func TestUnprepareResources(t *testing.T) {
 	fakeKubeClient := fake.NewSimpleClientset()
 	for _, test := range []struct {
@@ -927,6 +1159,7 @@ func TestUnprepareResources(t *testing.T) {
 
 		expectedUnprepareCalls uint32
 		expectedErrMsg         string
+		expectedMetric         string
 	}{
 		{
 			description: "unknown driver",
@@ -953,6 +1186,12 @@ func TestUnprepareResources(t *testing.T) {
 			},
 			expectedErrMsg:         "unprepare dynamic resources: DRA driver unknown-driver is not registered",
 			expectedUnprepareCalls: 0,
+			expectedMetric: `# HELP dra_operations_duration_seconds [ALPHA] Latency histogram in seconds for the duration of handling all ResourceClaims referenced by a pod when the pod starts or stops. Identified by the name of the operation (PrepareResources or UnprepareResources) and separated by the success of the operation. The number of failed operations is provided through the histogram's overall count.
+# TYPE dra_operations_duration_seconds histogram
+dra_operations_duration_seconds_bucket{is_error="true",operation_name="UnprepareResources",le="+Inf"} 1
+dra_operations_duration_seconds_sum{is_error="true",operation_name="UnprepareResources"} 0
+dra_operations_duration_seconds_count{is_error="true",operation_name="UnprepareResources"} 1
+`,
 		},
 		{
 			description:         "resource claim referenced by other pod(s)",
@@ -960,6 +1199,12 @@ func TestUnprepareResources(t *testing.T) {
 			pod:                 genTestPod(),
 			claimInfo:           genTestClaimInfo(claimUID, []string{podUID, "another-pod-uid"}, true),
 			wantResourceSkipped: true,
+			expectedMetric: `# HELP dra_operations_duration_seconds [ALPHA] Latency histogram in seconds for the duration of handling all ResourceClaims referenced by a pod when the pod starts or stops. Identified by the name of the operation (PrepareResources or UnprepareResources) and separated by the success of the operation. The number of failed operations is provided through the histogram's overall count.
+# TYPE dra_operations_duration_seconds histogram
+dra_operations_duration_seconds_bucket{is_error="false",operation_name="UnprepareResources",le="+Inf"} 1
+dra_operations_duration_seconds_sum{is_error="false",operation_name="UnprepareResources"} 0
+dra_operations_duration_seconds_count{is_error="false",operation_name="UnprepareResources"} 1
+`,
 		},
 		{
 			description:            "should timeout",
@@ -969,6 +1214,17 @@ func TestUnprepareResources(t *testing.T) {
 			wantTimeout:            true,
 			expectedUnprepareCalls: 1,
 			expectedErrMsg:         "NodeUnprepareResources: rpc error: code = DeadlineExceeded",
+			expectedMetric: `# HELP dra_grpc_operations_duration_seconds [ALPHA] Duration in seconds of the DRA gRPC operations
+# TYPE dra_grpc_operations_duration_seconds histogram
+dra_grpc_operations_duration_seconds_bucket{driver_name="test-driver",grpc_status_code="DeadlineExceeded",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodeUnprepareResources",le="+Inf"} 1
+dra_grpc_operations_duration_seconds_sum{driver_name="test-driver",grpc_status_code="DeadlineExceeded",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodeUnprepareResources"} 0
+dra_grpc_operations_duration_seconds_count{driver_name="test-driver",grpc_status_code="DeadlineExceeded",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodeUnprepareResources"} 1
+# HELP dra_operations_duration_seconds [ALPHA] Latency histogram in seconds for the duration of handling all ResourceClaims referenced by a pod when the pod starts or stops. Identified by the name of the operation (PrepareResources or UnprepareResources) and separated by the success of the operation. The number of failed operations is provided through the histogram's overall count.
+# TYPE dra_operations_duration_seconds histogram
+dra_operations_duration_seconds_bucket{is_error="true",operation_name="UnprepareResources",le="+Inf"} 1
+dra_operations_duration_seconds_sum{is_error="true",operation_name="UnprepareResources"} 0
+dra_operations_duration_seconds_count{is_error="true",operation_name="UnprepareResources"} 1
+`,
 		},
 		{
 			description:            "should fail when driver returns empty response",
@@ -978,6 +1234,17 @@ func TestUnprepareResources(t *testing.T) {
 			resp:                   &drapb.NodeUnprepareResourcesResponse{Claims: map[string]*drapb.NodeUnprepareResourceResponse{}},
 			expectedUnprepareCalls: 1,
 			expectedErrMsg:         "NodeUnprepareResources skipped 1 ResourceClaims",
+			expectedMetric: `# HELP dra_grpc_operations_duration_seconds [ALPHA] Duration in seconds of the DRA gRPC operations
+# TYPE dra_grpc_operations_duration_seconds histogram
+dra_grpc_operations_duration_seconds_bucket{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodeUnprepareResources",le="+Inf"} 1
+dra_grpc_operations_duration_seconds_sum{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodeUnprepareResources"} 0
+dra_grpc_operations_duration_seconds_count{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodeUnprepareResources"} 1
+# HELP dra_operations_duration_seconds [ALPHA] Latency histogram in seconds for the duration of handling all ResourceClaims referenced by a pod when the pod starts or stops. Identified by the name of the operation (PrepareResources or UnprepareResources) and separated by the success of the operation. The number of failed operations is provided through the histogram's overall count.
+# TYPE dra_operations_duration_seconds histogram
+dra_operations_duration_seconds_bucket{is_error="true",operation_name="UnprepareResources",le="+Inf"} 1
+dra_operations_duration_seconds_sum{is_error="true",operation_name="UnprepareResources"} 0
+dra_operations_duration_seconds_count{is_error="true",operation_name="UnprepareResources"} 1
+`,
 		},
 		{
 			description:            "should unprepare already prepared extended resource backed by DRA",
@@ -986,6 +1253,17 @@ func TestUnprepareResources(t *testing.T) {
 			claim:                  genTestClaimWithExtendedResource(claimName, driverName, deviceName, podUID),
 			claimInfo:              genTestClaimInfoWithExtendedResource([]string{podUID}, true),
 			expectedUnprepareCalls: 1,
+			expectedMetric: `# HELP dra_grpc_operations_duration_seconds [ALPHA] Duration in seconds of the DRA gRPC operations
+# TYPE dra_grpc_operations_duration_seconds histogram
+dra_grpc_operations_duration_seconds_bucket{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodeUnprepareResources",le="+Inf"} 1
+dra_grpc_operations_duration_seconds_sum{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodeUnprepareResources"} 0
+dra_grpc_operations_duration_seconds_count{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodeUnprepareResources"} 1
+# HELP dra_operations_duration_seconds [ALPHA] Latency histogram in seconds for the duration of handling all ResourceClaims referenced by a pod when the pod starts or stops. Identified by the name of the operation (PrepareResources or UnprepareResources) and separated by the success of the operation. The number of failed operations is provided through the histogram's overall count.
+# TYPE dra_operations_duration_seconds histogram
+dra_operations_duration_seconds_bucket{is_error="false",operation_name="UnprepareResources",le="+Inf"} 1
+dra_operations_duration_seconds_sum{is_error="false",operation_name="UnprepareResources"} 0
+dra_operations_duration_seconds_count{is_error="false",operation_name="UnprepareResources"} 1
+`,
 		},
 		{
 			description:            "should unprepare already prepared resource",
@@ -994,6 +1272,17 @@ func TestUnprepareResources(t *testing.T) {
 			claim:                  genTestClaim(claimName, driverName, deviceName, podUID),
 			claimInfo:              genTestClaimInfo(claimUID, []string{podUID}, true),
 			expectedUnprepareCalls: 1,
+			expectedMetric: `# HELP dra_grpc_operations_duration_seconds [ALPHA] Duration in seconds of the DRA gRPC operations
+# TYPE dra_grpc_operations_duration_seconds histogram
+dra_grpc_operations_duration_seconds_bucket{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodeUnprepareResources",le="+Inf"} 1
+dra_grpc_operations_duration_seconds_sum{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodeUnprepareResources"} 0
+dra_grpc_operations_duration_seconds_count{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodeUnprepareResources"} 1
+# HELP dra_operations_duration_seconds [ALPHA] Latency histogram in seconds for the duration of handling all ResourceClaims referenced by a pod when the pod starts or stops. Identified by the name of the operation (PrepareResources or UnprepareResources) and separated by the success of the operation. The number of failed operations is provided through the histogram's overall count.
+# TYPE dra_operations_duration_seconds histogram
+dra_operations_duration_seconds_bucket{is_error="false",operation_name="UnprepareResources",le="+Inf"} 1
+dra_operations_duration_seconds_sum{is_error="false",operation_name="UnprepareResources"} 0
+dra_operations_duration_seconds_count{is_error="false",operation_name="UnprepareResources"} 1
+`,
 		},
 		{
 			description:            "should unprepare resource when driver returns nil value",
@@ -1002,14 +1291,34 @@ func TestUnprepareResources(t *testing.T) {
 			claimInfo:              genTestClaimInfo(claimUID, []string{podUID}, true),
 			resp:                   &drapb.NodeUnprepareResourcesResponse{Claims: map[string]*drapb.NodeUnprepareResourceResponse{string(claimUID): nil}},
 			expectedUnprepareCalls: 1,
+			expectedMetric: `# HELP dra_grpc_operations_duration_seconds [ALPHA] Duration in seconds of the DRA gRPC operations
+# TYPE dra_grpc_operations_duration_seconds histogram
+dra_grpc_operations_duration_seconds_bucket{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodeUnprepareResources",le="+Inf"} 1
+dra_grpc_operations_duration_seconds_sum{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodeUnprepareResources"} 0
+dra_grpc_operations_duration_seconds_count{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodeUnprepareResources"} 1
+# HELP dra_operations_duration_seconds [ALPHA] Latency histogram in seconds for the duration of handling all ResourceClaims referenced by a pod when the pod starts or stops. Identified by the name of the operation (PrepareResources or UnprepareResources) and separated by the success of the operation. The number of failed operations is provided through the histogram's overall count.
+# TYPE dra_operations_duration_seconds histogram
+dra_operations_duration_seconds_bucket{is_error="false",operation_name="UnprepareResources",le="+Inf"} 1
+dra_operations_duration_seconds_sum{is_error="false",operation_name="UnprepareResources"} 0
+dra_operations_duration_seconds_count{is_error="false",operation_name="UnprepareResources"} 1
+`,
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
-			backgroundCtx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
 			tCtx := ktesting.Init(t)
-			backgroundCtx = klog.NewContext(backgroundCtx, tCtx.Logger())
+
+			kubeletmetrics.Register()
+			kubeletmetrics.DRAOperationsDuration.Reset()
+			kubeletmetrics.DRAGRPCOperationsDuration.Reset()
+			defer func() {
+				require.NoError(t,
+					metricstestutil.GatherAndCompare(gatherWithoutDurations,
+						strings.NewReader(test.expectedMetric),
+						kubeletmetrics.DRAOperationsDuration.FQName(),
+						kubeletmetrics.DRAGRPCOperationsDuration.FQName(),
+					),
+				)
+			}()
 
 			var pluginClientTimeout *time.Duration
 			if test.wantTimeout {
@@ -1017,7 +1326,7 @@ func TestUnprepareResources(t *testing.T) {
 				pluginClientTimeout = &timeout
 			}
 
-			draServerInfo, err := setupFakeDRADriverGRPCServer(backgroundCtx, test.wantTimeout, pluginClientTimeout, nil, test.resp, nil)
+			draServerInfo, err := setupFakeDRADriverGRPCServer(tCtx, test.wantTimeout, pluginClientTimeout, nil, test.resp, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1025,7 +1334,7 @@ func TestUnprepareResources(t *testing.T) {
 
 			manager, err := NewManager(tCtx.Logger(), fakeKubeClient, t.TempDir())
 			require.NoError(t, err, "create DRA manager")
-			manager.initDRAPluginManager(backgroundCtx, getFakeNode, time.Second /* very short wiping delay for testing */)
+			manager.initDRAPluginManager(tCtx, getFakeNode, time.Second /* very short wiping delay for testing */)
 
 			plg := manager.GetWatcherHandler()
 			if err := plg.RegisterPlugin(test.driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, pluginClientTimeout); err != nil {
@@ -1037,7 +1346,7 @@ func TestUnprepareResources(t *testing.T) {
 			}
 
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, true)
-			err = manager.UnprepareResources(backgroundCtx, test.pod)
+			err = manager.UnprepareResources(tCtx, test.pod)
 
 			assert.Equal(t, test.expectedUnprepareCalls, draServerInfo.server.unprepareResourceCalls.Load())
 
@@ -1282,7 +1591,9 @@ func TestParallelPrepareUnprepareResources(t *testing.T) {
 // is updated correctly, if affected pods are identified, and if update notifications are sent
 // through the manager's update channel. It covers various scenarios including health changes, stream errors, and context cancellation.
 func TestHandleWatchResourcesStream(t *testing.T) {
-	overallTestCtx, overallTestCancel := context.WithCancel(ktesting.Init(t))
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+	overallTestCtx, overallTestCancel := context.WithCancel(tCtx)
 	defer overallTestCancel()
 
 	// Helper to create and setup a new manager for each sub-test
@@ -1475,7 +1786,7 @@ func TestHandleWatchResourcesStream(t *testing.T) {
 
 		// Pre-populate health cache
 		initialHealth := state.DeviceHealth{PoolName: poolName, DeviceName: deviceName, Health: "Unhealthy", LastUpdated: time.Now().Add(-5 * time.Millisecond), HealthCheckTimeout: DefaultHealthTimeout} // Ensure LastUpdated is slightly in past
-		_, err := manager.healthInfoCache.updateHealthInfo(driverName, []state.DeviceHealth{initialHealth})
+		_, err := manager.healthInfoCache.updateHealthInfo(logger, driverName, []state.DeviceHealth{initialHealth})
 		require.NoError(t, err, "Failed to pre-populate health cache")
 
 		t.Log("NoActualStateChange: Test Case Started")
@@ -1723,7 +2034,8 @@ func TestUpdateAllocatedResourcesStatus(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
-			manager, err := NewManager(tCtx.Logger(), nil, t.TempDir())
+			logger := tCtx.Logger()
+			manager, err := NewManager(logger, nil, t.TempDir())
 			require.NoError(t, err)
 
 			for _, ci := range tc.claimInfos {
@@ -1737,7 +2049,7 @@ func TestUpdateAllocatedResourcesStatus(t *testing.T) {
 					for _, dev := range ds.Devices {
 						devices = append(devices, state.DeviceHealth{PoolName: dev.PoolName, DeviceName: dev.DeviceName, Health: state.DeviceHealthStatusHealthy})
 					}
-					_, err := manager.healthInfoCache.updateHealthInfo(driverName, devices)
+					_, err := manager.healthInfoCache.updateHealthInfo(logger, driverName, devices)
 					require.NoError(t, err)
 				}
 			}

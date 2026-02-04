@@ -18,7 +18,7 @@ dependencies:
 
   # CNI plugins
   - name: "cni"
-    version: 1.8.0
+    version: 1.9.0
     refPaths:
     - path: cluster/gce/config-common.sh
       match: WINDOWS_CNI_VERSION=
@@ -31,7 +31,7 @@ dependencies:
 
   # CoreDNS
   - name: "coredns-kube-up"
-    version: 1.13.1
+    version: 1.14.1
     refPaths:
     - path: cluster/addons/dns/coredns/coredns.yaml.base
       match: registry.k8s.io/coredns
@@ -41,14 +41,14 @@ dependencies:
       match: registry.k8s.io/coredns
 
   - name: "coredns-kubeadm"
-    version: 1.13.1
+    version: 1.14.1
     refPaths:
     - path: cmd/kubeadm/app/constants/constants.go
       match: CoreDNSVersion =
 
   # CRI Tools
   - name: "crictl"
-    version: 1.34.0
+    version: 1.35.0
     refPaths:
     - path: cluster/gce/windows/k8s-node-setup.psm1
       match: CRICTL_VERSION =
@@ -78,6 +78,53 @@ dependencies:
       match: registry.k8s.io/etcd
     - path: test/utils/image/manifest.go
       match: configs\[Etcd\] = Config{list\.GcEtcdRegistry, "etcd", "\d+\.\d+.\d+(-(alpha|beta|rc).\d+)?(-\d+)?"}
+    - path: test/e2e/testing-manifests/statefulset/etcd/statefulset.yaml
+      match: registry.k8s.io/etcd:\d+\.\d+\.\d+(-\d+)?
+
+  # agnhost - E2E test image
+  - name: "agnhost"
+    version: 2.61
+    refPaths:
+    - path: test/utils/image/manifest.go
+      match: configs\[Agnhost\] = Config{list\.PromoterE2eRegistry, "agnhost", "\d+\.\d+"}
+    - path: test/images/kitten/BASEIMAGE
+      match: agnhost:\d+\.\d+-
+    - path: test/images/nautilus/BASEIMAGE
+      match: agnhost:\d+\.\d+-
+    - path: test/e2e/testing-manifests/kubectl/agnhost-primary-pod.yaml
+      match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+
+    - path: test/e2e/testing-manifests/serviceloadbalancer/netexecrc.yaml
+      match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+
+    - path: test/e2e/testing-manifests/ingress/multiple-certs/rc.yaml
+      match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+
+    - path: test/e2e/testing-manifests/ingress/http/rc.yaml
+      match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+
+    - path: test/e2e/testing-manifests/ingress/http2/rc.yaml
+      match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+
+    - path: test/e2e/testing-manifests/ingress/pre-shared-cert/rc.yaml
+      match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+
+    - path: test/e2e/testing-manifests/ingress/gce/static-ip-2/rc.yaml
+      match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+
+    - path: test/e2e/testing-manifests/ingress/neg/rc.yaml
+      match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+
+    - path: test/e2e/testing-manifests/ingress/static-ip/rc.yaml
+      match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+
+    - path: test/e2e/testing-manifests/ingress/neg-exposed/rc.yaml
+      match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+
+    - path: test/e2e/testing-manifests/ingress/neg-clusterip/rc.yaml
+      match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+
+    - path: test/e2e/dra/test-driver/deploy/example/pod-inline.yaml
+      match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+
+    - path: test/e2e/dra/test-driver/deploy/example/pod-external.yaml
+      match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+
+    - path: test/e2e/dra/test-driver/deploy/example/pod-external-toleration.yaml
+      match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+
+    - path: test/fixtures/pkg/kubectl/cmd/auth/rbac-resource-plus.yaml
+      match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+
+    - path: test/fixtures/doc-yaml/user-guide/multi-pod.yaml
+      match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+
+    - path: hack/testdata/pod-with-large-name.yaml
+      match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+
 
   - name: "node-problem-detector"
     version: 1.34.0
@@ -103,7 +150,7 @@ dependencies:
   # Golang
   # TODO: this should really be eliminated and controlled by .go-version
   - name: "golang: upstream version"
-    version: 1.25.5
+    version: 1.25.6
     refPaths:
     - path: .go-version
     - path: staging/publishing/rules.yaml
@@ -117,7 +164,7 @@ dependencies:
   # should also be updated, but go-runner is much harder to exploit and has
   # far less relevancy to go updates for Kubernetes more generally.
   - name: "registry.k8s.io/kube-cross: dependents"
-    version: v1.35.0-go1.25.5-bullseye.0
+    version: v1.36.0-go1.25.6-bullseye.0
     refPaths:
     - path: build/build-image/cross/VERSION
 
@@ -155,7 +202,7 @@ dependencies:
       match: registry\.k8s\.io\/build-image\/debian-base:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
 
   - name: "registry.k8s.io/distroless-iptables: dependents"
-    version: v0.8.6
+    version: v0.8.7
     refPaths:
     - path: build/common.sh
       match: __default_distroless_iptables_version=
@@ -163,7 +210,7 @@ dependencies:
       match: configs\[DistrolessIptables\] = Config{list\.BuildImageRegistry, "distroless-iptables", "v([0-9]+)\.([0-9]+)\.([0-9]+)"}
 
   - name: "registry.k8s.io/go-runner: dependents"
-    version: v2.4.0-go1.25.5-bookworm.0
+    version: v2.4.0-go1.25.6-bookworm.0
     refPaths:
     - path: build/common.sh
       match: __default_go_runner_version=

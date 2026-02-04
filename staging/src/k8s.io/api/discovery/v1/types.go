@@ -48,10 +48,14 @@ type EndpointSlice struct {
 	// The EndpointSlice controller only generates, and kube-proxy only processes,
 	// slices of addressType "IPv4" and "IPv6". No semantics are defined for
 	// the "FQDN" type.
+	// +required
+	// +k8s:required
+	// +k8s:immutable
 	AddressType AddressType `json:"addressType" protobuf:"bytes,4,rep,name=addressType"`
 
 	// endpoints is a list of unique endpoints in this slice. Each slice may
 	// include a maximum of 1000 endpoints.
+	// +optional
 	// +listType=atomic
 	Endpoints []Endpoint `json:"endpoints" protobuf:"bytes,2,rep,name=endpoints"`
 
@@ -68,6 +72,7 @@ type EndpointSlice struct {
 
 // AddressType represents the type of address referred to by an endpoint.
 // +enum
+// +k8s:enum
 type AddressType string
 
 const (
@@ -90,6 +95,9 @@ type Endpoint struct {
 	// controller will always have exactly 1 address. No semantics are defined for
 	// additional addresses beyond the first, and kube-proxy does not look at them.
 	// +listType=set
+	// +required
+	// +k8s:required
+	// +k8s:maxItems=100
 	Addresses []string `json:"addresses" protobuf:"bytes,1,rep,name=addresses"`
 
 	// conditions contains information about the current status of the endpoint.

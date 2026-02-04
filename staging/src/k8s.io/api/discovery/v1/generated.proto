@@ -38,6 +38,9 @@ message Endpoint {
   // controller will always have exactly 1 address. No semantics are defined for
   // additional addresses beyond the first, and kube-proxy does not look at them.
   // +listType=set
+  // +required
+  // +k8s:required
+  // +k8s:maxItems=100
   repeated string addresses = 1;
 
   // conditions contains information about the current status of the endpoint.
@@ -181,10 +184,14 @@ message EndpointSlice {
   // The EndpointSlice controller only generates, and kube-proxy only processes,
   // slices of addressType "IPv4" and "IPv6". No semantics are defined for
   // the "FQDN" type.
+  // +required
+  // +k8s:required
+  // +k8s:immutable
   optional string addressType = 4;
 
   // endpoints is a list of unique endpoints in this slice. Each slice may
   // include a maximum of 1000 endpoints.
+  // +optional
   // +listType=atomic
   repeated Endpoint endpoints = 2;
 

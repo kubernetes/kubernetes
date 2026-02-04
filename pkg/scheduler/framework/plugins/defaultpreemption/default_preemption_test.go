@@ -455,7 +455,7 @@ func TestPostFilter(t *testing.T) {
 					t.Fatal(err)
 				}
 				if asyncAPICallsEnabled {
-					cache := internalcache.New(ctx, 100*time.Millisecond, apiDispatcher)
+					cache := internalcache.New(ctx, apiDispatcher)
 					f.SetAPICacher(apicache.New(nil, cache))
 				}
 
@@ -2169,7 +2169,7 @@ func TestPreempt(t *testing.T) {
 						defer apiDispatcher.Close()
 					}
 
-					cache := internalcache.New(ctx, time.Duration(0), apiDispatcher)
+					cache := internalcache.New(ctx, apiDispatcher)
 					for _, pod := range testPods {
 						if err := cache.AddPod(logger, pod.DeepCopy()); err != nil {
 							t.Fatalf("Failed to add pod %s: %v", pod.Name, err)

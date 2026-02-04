@@ -50,7 +50,6 @@ type DeviceClassLister = internal.DeviceClassLister
 type Features = internal.Features
 type DeviceID = internal.DeviceID
 
-// types_experimental
 type SharedDeviceID = internal.SharedDeviceID
 type ConsumedCapacityCollection = internal.ConsumedCapacityCollection
 type ConsumedCapacity = internal.ConsumedCapacity
@@ -84,6 +83,7 @@ const (
 	req1SubReq0 = "req-1/subReq-0"
 	req1SubReq1 = "req-1/subReq-1"
 	req2SubReq0 = "req-2/subReq-0"
+	req2SubReq1 = "req-2/subReq-1"
 	claim0      = "claim-0"
 	claim1      = "claim-1"
 	slice1      = "slice-1"
@@ -963,6 +963,15 @@ func TestAllocator(t *testing.T,
 		// Test case setting expectNumAllocateOneInvocations do not run against the "stable" variant of the allocator,
 		// which doesn't provide the stats and also falls over with excessive runtime for them.
 		expectNumAllocateOneInvocations int64
+
+		// expectNumAllocateOneInvocationsByChannel overrides expectNumAllocateOneInvocations with
+		// different values for specific implementations (e.g. "experimental").
+		//
+		// Ignored unless expectNumAllocateOneInvocations is also set.
+		// expectNumAllocateOneInvocations should contain the "best" result, so
+		// expectNumAllocateOneInvocationsByChannel is only needed as long as we have "worse"
+		// implementations.
+		expectNumAllocateOneInvocationsByChannel map[internal.AllocatorChannel]int64
 	}{
 
 		"empty": {},
@@ -6014,6 +6023,252 @@ func TestAllocator(t *testing.T,
 			),
 			node: node(node1, region1),
 		},
+		"check-combinations-within-single-request-single-pool-single-slice": {
+			claimsToAllocate: objects(claimWithRequests(claim0, nil,
+				request(req0, classA, 5),
+			)),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1, nil, nil),
+				device(device2, nil, nil),
+				device(device3, nil, nil),
+				device(device4, nil, nil),
+			)),
+			node:                            node(node1, region1),
+			expectResults:                   nil,
+			expectNumAllocateOneInvocations: 16,
+			expectNumAllocateOneInvocationsByChannel: map[internal.AllocatorChannel]int64{
+				internal.Incubating: 65,
+			},
+		},
+		"check-combinations-within-single-request-single-pool-multiple-slices": {
+			claimsToAllocate: objects(claimWithRequests(claim0, nil,
+				request(req0, classA, 5),
+			)),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1, nil, nil),
+					device(device2, nil, nil),
+				),
+				sliceWithDevices(slice2, node1, resourcePool(pool1, 2), driverA,
+					device(device3, nil, nil),
+					device(device4, nil, nil),
+				),
+			),
+			node:                            node(node1, region1),
+			expectResults:                   nil,
+			expectNumAllocateOneInvocations: 16,
+			expectNumAllocateOneInvocationsByChannel: map[internal.AllocatorChannel]int64{
+				internal.Incubating: 65,
+			},
+		},
+		"check-combinations-within-single-request-multiple-pools-multiple-slices": {
+			claimsToAllocate: objects(claimWithRequests(claim0, nil,
+				request(req0, classA, 5),
+			)),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1, nil, nil),
+				),
+				sliceWithDevices(slice2, node1, resourcePool(pool1, 2), driverA,
+					device(device2, nil, nil),
+				),
+				sliceWithDevices(slice3, node1, pool2, driverA,
+					device(device3, nil, nil),
+					device(device4, nil, nil),
+				),
+			),
+			node:                            node(node1, region1),
+			expectResults:                   nil,
+			expectNumAllocateOneInvocations: 16,
+			expectNumAllocateOneInvocationsByChannel: map[internal.AllocatorChannel]int64{
+				internal.Incubating: 65,
+			},
+		},
+		"check-combinations-within-single-request-many-pools": {
+			claimsToAllocate: objects(claimWithRequests(claim0, nil,
+				request(req0, classA, 5),
+			)),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device1, nil, nil),
+				),
+				sliceWithDevices(slice2, node1, pool2, driverA,
+					device(device2, nil, nil),
+				),
+				sliceWithDevices(slice3, node1, pool3, driverA,
+					device(device3, nil, nil),
+				),
+				sliceWithDevices(slice4, node1, pool4, driverA,
+					device(device4, nil, nil),
+				),
+			),
+			node:                            node(node1, region1),
+			expectResults:                   nil,
+			expectNumAllocateOneInvocations: 16,
+			expectNumAllocateOneInvocationsByChannel: map[internal.AllocatorChannel]int64{
+				internal.Incubating: 65,
+			},
+		},
+		"check-combinations-with-backtracking": {
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				nil,
+				// req-1 needs two generic devices.
+				request(req1, classA, 2),
+				// req-2 needs a specific device.
+				request(req2, classA, 1, resourceapi.DeviceSelector{
+					CEL: &resourceapi.CELDeviceSelector{
+						Expression: fmt.Sprintf(`device.attributes["%s"].type == "X"`, driverA),
+					},
+				}),
+			)),
+			classes: objects(class(classA, driverA)),
+			// The order of devices is chosen such that the allocator
+			// will initially pick {device1, device2} for req1. This will fail
+			// because req-2 needs device1. The allocator has to
+			// backtrack. The correct solution is {device2, device3} for req-1
+			// and {device1} for req-2. The optimized allocator avoids
+			// testing {device2, device1} for req-1 and thus finds the solution
+			// faster.
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"type": {StringValue: ptr.To("X")},
+				}),
+				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"type": {StringValue: ptr.To("Y")},
+				}),
+				device(device3, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"type": {StringValue: ptr.To("Y")},
+				}),
+			)),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req1, driverA, pool1, device2, false),
+				deviceAllocationResult(req1, driverA, pool1, device3, false),
+				deviceAllocationResult(req2, driverA, pool1, device1, false),
+			)},
+			expectNumAllocateOneInvocations: 12,
+			expectNumAllocateOneInvocationsByChannel: map[internal.AllocatorChannel]int64{
+				internal.Incubating: 14,
+			},
+		},
+		"check-combinations-with-backtracking-across-slices-and-pools": {
+			features: Features{
+				DeviceBindingAndStatus: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				nil,
+				// req-1 needs two generic devices.
+				request(req1, classA, 2),
+				// req-2 needs a specific device.
+				request(req2, classA, 1, resourceapi.DeviceSelector{
+					CEL: &resourceapi.CELDeviceSelector{
+						Expression: fmt.Sprintf(`device.attributes["%s"].type == "X"`, driverA),
+					},
+				}),
+			)),
+			classes: objects(class(classA, driverA)),
+			// The order of devices is chosen such that the allocator
+			// will initially pick {device1, device2} for req1. This will fail
+			// because req-2 needs device1. The allocator has to
+			// backtrack. The correct solution is {device2, device3} for req-1
+			// and {device1} for req-2. The optimized allocator avoids
+			// testing {device2, device1} for req-1 and thus finds the solution
+			// faster.
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"type": {StringValue: ptr.To("X")},
+					}),
+				),
+				sliceWithDevices(slice2, node1, resourcePool(pool1, 2), driverA,
+					device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"type": {StringValue: ptr.To("Y")},
+					}),
+				),
+				// Use a binding condition here to make sure pool2 is searched after pool1 when
+				// trying to allocate devices. This makes sure we see the same results every time.
+				sliceWithDevices(slice3, node1, pool2, driverA,
+					device(device3, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"type": {StringValue: ptr.To("Y")},
+					}).withBindingConditions([]string{"IsPrepare"}, []string{}),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req1, driverA, pool1, device2, false),
+				deviceRequestAllocationResultWithBindingConditions(req1, driverA, pool2, device3, []string{"IsPrepare"}, []string{}),
+				deviceAllocationResult(req2, driverA, pool1, device1, false),
+			)},
+			expectNumAllocateOneInvocations: 12,
+			expectNumAllocateOneInvocationsByChannel: map[internal.AllocatorChannel]int64{
+				internal.Incubating: 14,
+			},
+		},
+		"check-combinations-with-prioritized-list": {
+			features: Features{
+				PrioritizedList: true,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(
+				// The first alternative can't be satisfied since there aren't enough devices
+				// of type Y, but the allocator will try all devices before finding out.
+				requestWithPrioritizedList(req1,
+					subRequest(subReq0, classA, 3, resourceapi.DeviceSelector{
+						CEL: &resourceapi.CELDeviceSelector{
+							Expression: fmt.Sprintf(`device.attributes["%s"].type == "Y"`, driverA),
+						},
+					}),
+					subRequest(subReq1, classA, 2),
+				),
+				// The first subrequest asks for too many devices, so the second
+				// have to be chosen.
+				requestWithPrioritizedList(req2,
+					subRequest(subReq0, classA, 2),
+					subRequest(subReq1, classA, 1, resourceapi.DeviceSelector{
+						CEL: &resourceapi.CELDeviceSelector{
+							Expression: fmt.Sprintf(`device.attributes["%s"].type == "X"`, driverA),
+						},
+					}),
+				),
+			)),
+			classes: objects(class(classA, driverA)),
+			// The order of devices is chosen such that the allocator
+			// will initially pick {device1, device2} for req1. This will fail
+			// because req-2 needs device1. The allocator has to
+			// backtrack. The correct solution is {device2, device3} for req-1
+			// and {device1} for req-2. The optimized allocator avoids
+			// testing {device2, device1} for req-1 and thus finds the solution
+			// faster.
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"type": {StringValue: ptr.To("X")},
+				}),
+				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"type": {StringValue: ptr.To("Y")},
+				}),
+				device(device3, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"type": {StringValue: ptr.To("Y")},
+				}),
+			)),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req1SubReq1, driverA, pool1, device2, false),
+				deviceAllocationResult(req1SubReq1, driverA, pool1, device3, false),
+				deviceAllocationResult(req2SubReq1, driverA, pool1, device1, false),
+			)},
+			expectNumAllocateOneInvocations: 26,
+			expectNumAllocateOneInvocationsByChannel: map[internal.AllocatorChannel]int64{
+				internal.Incubating: 32,
+			},
+		},
 	}
 
 	for name, tc := range testcases {
@@ -6078,9 +6333,12 @@ func TestAllocator(t *testing.T,
 			g.Expect(slices).To(gomega.ConsistOf(tc.slices))
 			g.Expect(classLister.objs).To(gomega.ConsistOf(tc.classes))
 
-			if tc.expectNumAllocateOneInvocations > 0 {
+			if expectNumAllocateOneInvocations := tc.expectNumAllocateOneInvocations; expectNumAllocateOneInvocations > 0 {
 				stats := allocator.(internal.AllocatorExtended).GetStats()
-				g.Expect(stats.NumAllocateOneInvocations).To(gomega.Equal(tc.expectNumAllocateOneInvocations))
+				if override, ok := tc.expectNumAllocateOneInvocationsByChannel[allocator.Channel()]; ok {
+					expectNumAllocateOneInvocations = override
+				}
+				g.Expect(stats.NumAllocateOneInvocations).To(gomega.Equal(expectNumAllocateOneInvocations))
 			}
 		})
 	}

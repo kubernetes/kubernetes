@@ -1,3 +1,8 @@
+## 2.27.4
+
+### Fixes
+- CurrentTreeConstructionNodeReport: fix for nested container nodes [59bc751]
+
 ## 2.27.3
 
 ### Fixes

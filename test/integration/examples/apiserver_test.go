@@ -871,7 +871,6 @@ func waitForWardleAPIServiceReady(ctx context.Context, t *testing.T, kubeConfig 
 		}
 		resources := make([]string, 0, 2)
 		for _, resource := range apiResources.APIResources {
-			resource := resource
 			resources = append(resources, resource.Name)
 		}
 		sort.Strings(resources)

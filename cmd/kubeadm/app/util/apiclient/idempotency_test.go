@@ -110,7 +110,7 @@ func testCreateOrUpdate[T kubernetesObject](t *testing.T, resource, resources st
 
 	for _, tc := range tests {
 		t.Run(fmt.Sprintf(tc.nameFormat, resource), func(t *testing.T) {
-			client := clientsetfake.NewSimpleClientset()
+			client := clientsetfake.NewClientset()
 			tc.setupClient(client, resources)
 			err := CreateOrUpdate(clientBuilder(client, empty), empty)
 			if (err != nil) != tc.expectedError {
@@ -203,7 +203,7 @@ func testCreateOrMutate[T kubernetesObject](t *testing.T, resource, resources st
 
 	for _, tc := range tests {
 		t.Run(fmt.Sprintf(tc.nameFormat, resource), func(t *testing.T) {
-			client := clientsetfake.NewSimpleClientset()
+			client := clientsetfake.NewClientset()
 			tc.setupClient(client)
 			err := CreateOrMutate[T](clientBuilder(client, empty), empty, tc.mutator)
 			if (err != nil) != tc.expectedError {
@@ -272,7 +272,7 @@ func testCreateOrRetain[T kubernetesObject](t *testing.T, resource, resources st
 
 	for _, tc := range tests {
 		t.Run(fmt.Sprintf(tc.nameFormat, resource), func(t *testing.T) {
-			client := clientsetfake.NewSimpleClientset()
+			client := clientsetfake.NewClientset()
 			tc.setupClient(client)
 			err := CreateOrRetain[T](clientBuilder(client, empty), empty, resource)
 			if (err != nil) != tc.expectedError {
@@ -402,7 +402,7 @@ func TestPatchNodeOnce(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			client := clientsetfake.NewSimpleClientset()
+			client := clientsetfake.NewClientset()
 			_, err := client.CoreV1().Nodes().Create(context.Background(), &tc.node, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("failed to create node to fake client: %v", err)
@@ -465,7 +465,7 @@ func TestPatchNode(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			client := clientsetfake.NewSimpleClientset()
+			client := clientsetfake.NewClientset()
 			tc.setupClient(client)
 			patchFn := func(*v1.Node) {}
 			err := PatchNode(client, "some-node", patchFn)
@@ -512,7 +512,7 @@ func TestGetConfigMapWithShortRetry(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			client := clientsetfake.NewSimpleClientset()
+			client := clientsetfake.NewClientset()
 			tc.setupClient(client)
 			actual, err := GetConfigMapWithShortRetry(client, "ns", "some-cm")
 			if (err != nil) != tc.expectedError {

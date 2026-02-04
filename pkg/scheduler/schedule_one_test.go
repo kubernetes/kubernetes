@@ -993,7 +993,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 							defer apiDispatcher.Close()
 						}
 
-						internalCache := internalcache.New(ctx, 30*time.Second, apiDispatcher)
+						internalCache := internalcache.New(ctx, apiDispatcher)
 						cache := &fakecache.Cache{
 							Cache: internalCache,
 							ForgetFunc: func(pod *v1.Pod) {
@@ -1588,7 +1588,7 @@ func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {
 						defer apiDispatcher.Close()
 					}
 
-					internalCache := internalcache.New(ctx, 30*time.Second, apiDispatcher)
+					internalCache := internalcache.New(ctx, apiDispatcher)
 					cache := &fakecache.Cache{
 						Cache: internalCache,
 						ForgetFunc: func(pod *v1.Pod) {
@@ -1759,88 +1759,6 @@ func podListContainsPod(list []*v1.Pod, pod *v1.Pod) bool {
 	return false
 }
 
-func TestSchedulerNoPhantomPodAfterExpire(t *testing.T) {
-	for _, asyncAPICallsEnabled := range []bool{true, false} {
-		t.Run(fmt.Sprintf("Async API calls enabled: %v", asyncAPICallsEnabled), func(t *testing.T) {
-			logger, ctx := ktesting.NewTestContext(t)
-			ctx, cancel := context.WithCancel(ctx)
-			defer cancel()
-			queuedPodStore := clientcache.NewFIFO(clientcache.MetaNamespaceKeyFunc)
-			client := clientsetfake.NewClientset()
-			bindingChan := interruptOnBind(client)
-
-			var apiDispatcher *apidispatcher.APIDispatcher
-			if asyncAPICallsEnabled {
-				apiDispatcher = apidispatcher.New(client, 16, apicalls.Relevances)
-				apiDispatcher.Run(logger)
-				defer apiDispatcher.Close()
-			}
-
-			scache := internalcache.New(ctx, 100*time.Millisecond, apiDispatcher)
-			pod := podWithPort("pod.Name", "", 8080)
-			node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1", UID: types.UID("node1")}}
-			scache.AddNode(logger, &node)
-
-			fns := []tf.RegisterPluginFunc{
-				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-				tf.RegisterPluginAsExtensions(nodeports.Name, frameworkruntime.FactoryAdapter(feature.Features{}, nodeports.New), "Filter", "PreFilter"),
-			}
-			scheduler, errChan := setupTestSchedulerWithOnePodOnNode(ctx, t, client, queuedPodStore, scache, apiDispatcher, pod, &node, bindingChan, fns...)
-
-			waitPodExpireChan := make(chan struct{})
-			timeout := make(chan struct{})
-			go func() {
-				for {
-					select {
-					case <-timeout:
-						return
-					default:
-					}
-					pods, err := scache.PodCount()
-					if err != nil {
-						errChan <- fmt.Errorf("cache.List failed: %w", err)
-						return
-					}
-					if pods == 0 {
-						close(waitPodExpireChan)
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-			// waiting for the assumed pod to expire
-			select {
-			case err := <-errChan:
-				t.Fatal(err)
-			case <-waitPodExpireChan:
-			case <-time.After(wait.ForeverTestTimeout):
-				close(timeout)
-				t.Fatalf("timeout timeout in waiting pod expire after %v", wait.ForeverTestTimeout)
-			}
-
-			// We use conflicted pod ports to incur fit predicate failure if first pod not removed.
-			secondPod := podWithPort("bar", "", 8080)
-			if err := queuedPodStore.Add(secondPod); err != nil {
-				t.Fatal(err)
-			}
-			scheduler.ScheduleOne(ctx)
-			select {
-			case b := <-bindingChan:
-				expectBinding := &v1.Binding{
-					ObjectMeta: metav1.ObjectMeta{Name: "bar", UID: types.UID("bar")},
-					Target:     v1.ObjectReference{Kind: "Node", Name: node.Name},
-				}
-				if diff := cmp.Diff(expectBinding, b); diff != "" {
-					t.Errorf("Unexpected binding (-want,+got):\n%s", diff)
-				}
-			case <-time.After(wait.ForeverTestTimeout):
-				t.Fatalf("timeout in binding after %v", wait.ForeverTestTimeout)
-			}
-		})
-	}
-}
-
 func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 	for _, asyncAPICallsEnabled := range []bool{true, false} {
 		t.Run(fmt.Sprintf("Async API calls enabled: %v", asyncAPICallsEnabled), func(t *testing.T) {
@@ -1858,7 +1776,7 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 				defer apiDispatcher.Close()
 			}
 
-			scache := internalcache.New(ctx, 10*time.Minute, apiDispatcher)
+			scache := internalcache.New(ctx, apiDispatcher)
 			firstPod := podWithPort("pod.Name", "", 8080)
 			node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1", UID: types.UID("node1")}}
 			scache.AddNode(logger, &node)
@@ -1947,7 +1865,7 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 				defer apiDispatcher.Close()
 			}
 
-			scache := internalcache.New(ctx, 10*time.Minute, apiDispatcher)
+			scache := internalcache.New(ctx, apiDispatcher)
 
 			// Design the baseline for the pods, and we will make nodes that don't fit it later.
 			var cpu = int64(4)
@@ -2255,7 +2173,7 @@ func TestSchedulerBinding(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				cache := internalcache.New(ctx, 100*time.Millisecond, apiDispatcher)
+				cache := internalcache.New(ctx, apiDispatcher)
 				if asyncAPICallsEnabled {
 					informerFactory := informers.NewSharedInformerFactory(client, 0)
 					ar := metrics.NewMetricsAsyncRecorder(10, 1*time.Second, ctx.Done())
@@ -3578,7 +3496,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
-			cache := internalcache.New(ctx, time.Duration(0), nil)
+			cache := internalcache.New(ctx, nil)
 			for _, pod := range test.pods {
 				cache.AddPod(logger, pod)
 			}
@@ -3824,156 +3742,6 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 			}
 			if test.expectedCount != plugin.NumFilterCalled {
 				t.Errorf("predicate was called %d times, expected is %d", plugin.NumFilterCalled, test.expectedCount)
-			}
-		})
-	}
-}
-
-// The point of this test is to show that you:
-//   - get the same priority for a zero-request pod as for a pod with the defaults requests,
-//     both when the zero-request pod is already on the node and when the zero-request pod
-//     is the one being scheduled.
-//   - don't get the same score no matter what we schedule.
-func TestZeroRequest(t *testing.T) {
-	// A pod with no resources. We expect spreading to count it as having the default resources.
-	noResources := v1.PodSpec{
-		Containers: []v1.Container{
-			{},
-		},
-	}
-	noResources1 := noResources
-	noResources1.NodeName = "node1"
-	// A pod with the same resources as a 0-request pod gets by default as its resources (for spreading).
-	small := v1.PodSpec{
-		Containers: []v1.Container{
-			{
-				Resources: v1.ResourceRequirements{
-					Requests: v1.ResourceList{
-						v1.ResourceCPU: resource.MustParse(
-							strconv.FormatInt(schedutil.DefaultMilliCPURequest, 10) + "m"),
-						v1.ResourceMemory: resource.MustParse(
-							strconv.FormatInt(schedutil.DefaultMemoryRequest, 10)),
-					},
-				},
-			},
-		},
-	}
-	small2 := small
-	small2.NodeName = "node2"
-	// A larger pod.
-	large := v1.PodSpec{
-		Containers: []v1.Container{
-			{
-				Resources: v1.ResourceRequirements{
-					Requests: v1.ResourceList{
-						v1.ResourceCPU: resource.MustParse(
-							strconv.FormatInt(schedutil.DefaultMilliCPURequest*3, 10) + "m"),
-						v1.ResourceMemory: resource.MustParse(
-							strconv.FormatInt(schedutil.DefaultMemoryRequest*3, 10)),
-					},
-				},
-			},
-		},
-	}
-	large1 := large
-	large1.NodeName = "node1"
-	large2 := large
-	large2.NodeName = "node2"
-	tests := []struct {
-		pod           *v1.Pod
-		pods          []*v1.Pod
-		nodes         []*v1.Node
-		name          string
-		expectedScore int64
-	}{
-		// The point of these next two tests is to show you get the same priority for a zero-request pod
-		// as for a pod with the defaults requests, both when the zero-request pod is already on the node
-		// and when the zero-request pod is the one being scheduled.
-		{
-			pod:   &v1.Pod{Spec: noResources},
-			nodes: []*v1.Node{makeNode("node1", 1000, schedutil.DefaultMemoryRequest*10), makeNode("node2", 1000, schedutil.DefaultMemoryRequest*10)},
-			name:  "test priority of zero-request pod with node with zero-request pod",
-			pods: []*v1.Pod{
-				{Spec: large1}, {Spec: noResources1},
-				{Spec: large2}, {Spec: small2},
-			},
-			expectedScore: 50,
-		},
-		{
-			pod:   &v1.Pod{Spec: small},
-			nodes: []*v1.Node{makeNode("node1", 1000, schedutil.DefaultMemoryRequest*10), makeNode("node2", 1000, schedutil.DefaultMemoryRequest*10)},
-			name:  "test priority of nonzero-request pod with node with zero-request pod",
-			pods: []*v1.Pod{
-				{Spec: large1}, {Spec: noResources1},
-				{Spec: large2}, {Spec: small2},
-			},
-			expectedScore: 150,
-		},
-		// The point of this test is to verify that we're not just getting the same score no matter what we schedule.
-		{
-			pod:   &v1.Pod{Spec: large},
-			nodes: []*v1.Node{makeNode("node1", 1000, schedutil.DefaultMemoryRequest*10), makeNode("node2", 1000, schedutil.DefaultMemoryRequest*10)},
-			name:  "test priority of larger pod with node with zero-request pod",
-			pods: []*v1.Pod{
-				{Spec: large1}, {Spec: noResources1},
-				{Spec: large2}, {Spec: small2},
-			},
-			expectedScore: 130,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			client := clientsetfake.NewClientset()
-			informerFactory := informers.NewSharedInformerFactory(client, 0)
-
-			snapshot := internalcache.NewSnapshot(test.pods, test.nodes)
-			fts := feature.Features{}
-			pluginRegistrations := []tf.RegisterPluginFunc{
-				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				tf.RegisterScorePlugin(noderesources.Name, frameworkruntime.FactoryAdapter(fts, noderesources.NewFit), 1),
-				tf.RegisterScorePlugin(noderesources.BalancedAllocationName, frameworkruntime.FactoryAdapter(fts, noderesources.NewBalancedAllocation), 1),
-				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-			}
-			_, ctx := ktesting.NewTestContext(t)
-			ctx, cancel := context.WithCancel(ctx)
-			defer cancel()
-			fwk, err := tf.NewFramework(
-				ctx,
-				pluginRegistrations, "",
-				frameworkruntime.WithInformerFactory(informerFactory),
-				frameworkruntime.WithSnapshotSharedLister(snapshot),
-				frameworkruntime.WithClientSet(client),
-				frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
-			)
-			if err != nil {
-				t.Fatalf("error creating framework: %+v", err)
-			}
-
-			sched := &Scheduler{
-				nodeInfoSnapshot:         snapshot,
-				percentageOfNodesToScore: schedulerapi.DefaultPercentageOfNodesToScore,
-			}
-			sched.applyDefaultHandlers()
-
-			state := framework.NewCycleState()
-			_, _, _, _, err = sched.findNodesThatFitPod(ctx, fwk, state, test.pod)
-			if err != nil {
-				t.Fatalf("error filtering nodes: %+v", err)
-			}
-			nodeInfos, err := snapshot.NodeInfos().List()
-			if err != nil {
-				t.Fatalf("failed to list node from snapshot: %v", err)
-			}
-			fwk.RunPreScorePlugins(ctx, state, test.pod, nodeInfos)
-			list, err := prioritizeNodes(ctx, nil, fwk, state, test.pod, nodeInfos)
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-			for _, hp := range list {
-				if hp.TotalScore != test.expectedScore {
-					t.Errorf("expected %d for all priorities, got list %#v", test.expectedScore, list)
-				}
 			}
 		})
 	}
@@ -4338,7 +4106,7 @@ func Test_prioritizeNodes(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
-			cache := internalcache.New(ctx, time.Duration(0), nil)
+			cache := internalcache.New(ctx, nil)
 			for _, node := range test.nodes {
 				cache.AddNode(klog.FromContext(ctx), node)
 			}
@@ -4539,7 +4307,7 @@ func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
 			nodes := makeNodeList([]string{"node1", "node2", "node3"})
 			client := clientsetfake.NewClientset(test.pod)
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
-			cache := internalcache.New(ctx, time.Duration(0), nil)
+			cache := internalcache.New(ctx, nil)
 			for _, n := range nodes {
 				cache.AddNode(logger, n)
 			}
@@ -4621,7 +4389,7 @@ func makeNodeList(nodeNames []string) []*v1.Node {
 // makeScheduler makes a simple Scheduler for testing.
 func makeScheduler(ctx context.Context, nodes []*v1.Node) *Scheduler {
 	logger := klog.FromContext(ctx)
-	cache := internalcache.New(ctx, time.Duration(0), nil)
+	cache := internalcache.New(ctx, nil)
 	for _, n := range nodes {
 		cache.AddNode(logger, n)
 	}
@@ -4742,7 +4510,7 @@ func setupTestScheduler(ctx context.Context, t *testing.T, client clientset.Inte
 		nodeInfoSnapshot:         snapshot,
 		percentageOfNodesToScore: schedulerapi.DefaultPercentageOfNodesToScore,
 		NextPod: func(logger klog.Logger) (*framework.QueuedPodInfo, error) {
-			return &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(t, clientcache.Pop(queuedPodStore).(*v1.Pod))}, nil
+			return &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(t, pop(queuedPodStore).(*v1.Pod))}, nil
 		},
 		SchedulingQueue: schedulingQueue,
 		APIDispatcher:   apiDispatcher,
@@ -4784,7 +4552,7 @@ func setupTestSchedulerWithVolumeBinding(ctx context.Context, t *testing.T, clie
 		t.Cleanup(apiDispatcher.Close)
 	}
 
-	scache := internalcache.New(ctx, 10*time.Minute, apiDispatcher)
+	scache := internalcache.New(ctx, apiDispatcher)
 	scache.AddNode(logger, &testNode)
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	pvcInformer := informerFactory.Core().V1().PersistentVolumeClaims()
@@ -4824,4 +4592,14 @@ func mustNewPodInfo(t *testing.T, pod *v1.Pod) *framework.PodInfo {
 		t.Fatal(err)
 	}
 	return podInfo
+}
+
+func pop(queue clientcache.Queue) interface{} {
+	obj, err := queue.Pop(func(obj interface{}, isInInitialList bool) error {
+		return nil
+	})
+	if err != nil {
+		return nil
+	}
+	return obj
 }

@@ -1097,12 +1097,12 @@ func TestEnsureAdminClusterRoleBindingImpl(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			adminClient := clientsetfake.NewSimpleClientset()
+			adminClient := clientsetfake.NewClientset()
 			tc.setupAdminClient(adminClient)
 
 			var superAdminClient clientset.Interface // ensure superAdminClient is nil by default
 			if tc.setupSuperAdminClient != nil {
-				fakeSuperAdminClient := clientsetfake.NewSimpleClientset()
+				fakeSuperAdminClient := clientsetfake.NewClientset()
 				tc.setupSuperAdminClient(fakeSuperAdminClient)
 				superAdminClient = fakeSuperAdminClient
 			}

@@ -411,7 +411,6 @@ jwt:
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, singleTestRunner(useAuthenticationConfig, rsaGenerateKey, tt))
 	}
 
@@ -554,7 +553,6 @@ func TestUpdatingRefreshTokenInCaseOfExpiredIDToken(t *testing.T) {
 	require.NoError(t, err)
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			expiredIDToken, stubRefreshToken := fetchExpiredToken(t, oidcServer, caCert, signingPrivateKey)
 			clientConfig := configureClientConfigForOIDC(t, apiServer.ClientConfig, defaultOIDCClientID, certPath, expiredIDToken, stubRefreshToken, oidcServer.URL())
@@ -1051,7 +1049,6 @@ jwt:
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			oidcServer, apiServer, signingPrivateKey, caCert, certPath := tt.configureInfrastructure(t, tt.authConfigFn, rsaGenerateKey)
@@ -1511,7 +1508,6 @@ jwt:
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			authenticationconfigmetrics.ResetMetricsForTest()
 			defer authenticationconfigmetrics.ResetMetricsForTest()
@@ -1675,7 +1671,6 @@ func TestStructuredAuthenticationDiscoveryURL(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			caCertContent, _, caFilePath, caKeyFilePath := generateCert(t)

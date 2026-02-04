@@ -60,12 +60,6 @@ import (
 	"k8s.io/utils/clock"
 )
 
-const (
-	// Duration the scheduler will wait before expiring an assumed pod.
-	// See issue #106361 for more details about this parameter and its value.
-	durationToExpireAssumedPod time.Duration = 0
-)
-
 // ErrNoNodesAvailable is used to describe the error that no nodes available to schedule pods.
 var ErrNoNodesAvailable = fmt.Errorf("no nodes available to schedule pods")
 
@@ -356,7 +350,7 @@ func New(ctx context.Context,
 	}
 	var workloadManager internalworkloadmanager.WorkloadManager
 	if feature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
-		workloadManager = internalworkloadmanager.New()
+		workloadManager = internalworkloadmanager.New(logger)
 	}
 
 	profiles, err := profile.NewMap(ctx, options.profiles, registry, recorderFactory,
@@ -418,7 +412,7 @@ func New(ctx context.Context,
 		internalqueue.WithAPIDispatcher(apiDispatcher),
 	)
 
-	schedulerCache := internalcache.New(ctx, durationToExpireAssumedPod, apiDispatcher)
+	schedulerCache := internalcache.New(ctx, apiDispatcher)
 
 	var apiCache fwk.APICacher
 	if apiDispatcher != nil {

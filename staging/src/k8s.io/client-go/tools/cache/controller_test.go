@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"math/rand"
 	"sort"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -29,8 +30,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -40,8 +43,6 @@ import (
 	"k8s.io/klog/v2/ktesting"
 
 	"sigs.k8s.io/randfill"
-
-	"k8s.io/apimachinery/pkg/api/meta"
 )
 
 func Example() {
@@ -853,7 +854,8 @@ func TestProcessDeltasInBatch(t *testing.T) {
 				dummyListener,
 				mockStore,
 				tc.deltaList,
-				true)
+				true,
+				DeletionHandlingMetaNamespaceKeyFunc)
 			if tc.assertErr != nil {
 				assert.True(t, tc.assertErr(err))
 			}
@@ -902,45 +904,49 @@ func TestReplaceEvents(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	// Test that both atomic and non-atomic replace have the same behavior
+	// in regards to events and store state.
+	for _, atomic := range []bool{false, true} {
+		source := fcache.NewFakeControllerSource()
+		t.Cleanup(func() {
+			source.Shutdown()
+		})
+		store := NewStore(DeletionHandlingMetaNamespaceKeyFunc)
+		fifoOptions := RealFIFOOptions{
+			AtomicEvents: atomic,
+		}
+		if !atomic {
+			fifoOptions.KnownObjects = store
+		}
+		fifo := NewRealFIFOWithOptions(fifoOptions)
+		recorder := newEventRecorder(store)
 
-	source := fcache.NewFakeControllerSource()
-	store := NewStore(DeletionHandlingMetaNamespaceKeyFunc)
-	t.Cleanup(func() {
-		source.Shutdown()
-	})
+		cfg := &Config{
+			Queue:            fifo,
+			ListerWatcher:    source,
+			ObjectType:       &v1.Pod{},
+			FullResyncPeriod: 0,
 
-	recorder := newEventRecorder(store)
-
-	fifo := NewRealFIFOWithOptions(RealFIFOOptions{
-		KnownObjects: store,
-	})
-
-	cfg := &Config{
-		Queue:            fifo,
-		ListerWatcher:    source,
-		ObjectType:       &v1.Pod{},
-		FullResyncPeriod: 0,
-
-		Process: func(obj interface{}, isInInitialList bool) error {
-			if deltas, ok := obj.(Deltas); ok {
-				return processDeltas(recorder, store, deltas, isInInitialList)
-			}
-			return errors.New("object given as Process argument is not Deltas")
-		},
-		ProcessBatch: func(deltaList []Delta, isInInitialList bool) error {
-			return processDeltasInBatch(recorder, store, deltaList, isInInitialList)
-		},
+			Process: func(obj interface{}, isInInitialList bool) error {
+				if deltas, ok := obj.(Deltas); ok {
+					return processDeltas(recorder, store, deltas, isInInitialList, DeletionHandlingMetaNamespaceKeyFunc)
+				}
+				return errors.New("object given as Process argument is not Deltas")
+			},
+			ProcessBatch: func(deltaList []Delta, isInInitialList bool) error {
+				return processDeltasInBatch(recorder, store, deltaList, isInInitialList, DeletionHandlingMetaNamespaceKeyFunc)
+			},
+		}
+		c := New(cfg)
+		go c.RunWithContext(ctx)
+		if !WaitForCacheSync(ctx.Done(), c.HasSynced) {
+			t.Fatal("Timed out waiting for cache sync")
+		}
+		testReplaceEvents(t, ctx, fifo, recorder, store, atomic)
 	}
-
-	c := New(cfg)
-	go c.RunWithContext(ctx)
-	if !WaitForCacheSync(ctx.Done(), c.HasSynced) {
-		t.Fatal("Timed out waiting for cache sync")
-	}
-	testReplaceEvents(t, ctx, fifo, recorder, store)
 }
 
-func testReplaceEvents(t *testing.T, ctx context.Context, fifo Queue, m *eventRecorder, store Store) {
+func testReplaceEvents(t *testing.T, ctx context.Context, fifo Queue, m *eventRecorder, store Store, atomic bool) {
 	tcs := []struct {
 		name            string
 		initialObjs     []metav1.Object
@@ -994,8 +1000,9 @@ func testReplaceEvents(t *testing.T, ctx context.Context, fifo Queue, m *eventRe
 	}
 
 	for _, tc := range tcs {
-		t.Run(tc.name, func(t *testing.T) {
-			// Clear history so we don't get noise from previous tests.
+		testName := tc.name + " atomic: " + strconv.FormatBool(atomic)
+		t.Run(testName, func(t *testing.T) {
+			// Clear history to ensure we don't count events from previous tests
 			m.clearHistory()
 
 			for _, obj := range tc.initialObjs {
@@ -1023,11 +1030,114 @@ func testReplaceEvents(t *testing.T, ctx context.Context, fifo Queue, m *eventRe
 	}
 }
 
+func TestResetWatch(t *testing.T) {
+	for _, atomic := range []bool{false, true} {
+		t.Run("atomic "+strconv.FormatBool(atomic), func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			source := fcache.NewFakeControllerSource()
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod-1",
+					Namespace: "default",
+				},
+			}
+			source.Add(pod)
+			t.Cleanup(func() {
+				source.Shutdown()
+			})
+
+			store := NewStore(DeletionHandlingMetaNamespaceKeyFunc)
+			fifoOptions := RealFIFOOptions{
+				AtomicEvents: atomic,
+			}
+			if !atomic {
+				fifoOptions.KnownObjects = store
+			}
+			fifo := NewRealFIFOWithOptions(fifoOptions)
+			recorder := newEventRecorder(store)
+
+			cfg := &Config{
+				Queue:            fifo,
+				ListerWatcher:    source,
+				ObjectType:       &v1.Pod{},
+				FullResyncPeriod: 0,
+
+				Process: func(obj interface{}, isInInitialList bool) error {
+					if deltas, ok := obj.(Deltas); ok {
+						return processDeltas(recorder, store, deltas, isInInitialList, DeletionHandlingMetaNamespaceKeyFunc)
+					}
+					return errors.New("object given as Process argument is not Deltas")
+				},
+				ProcessBatch: func(deltaList []Delta, isInInitialList bool) error {
+					return processDeltasInBatch(recorder, store, deltaList, isInInitialList, DeletionHandlingMetaNamespaceKeyFunc)
+				},
+			}
+			c := New(cfg)
+			go c.RunWithContext(ctx)
+			if !WaitForCacheSync(ctx.Done(), c.HasSynced) {
+				t.Fatal("Timed out waiting for cache sync")
+			}
+			testResetWatch(t, ctx, source, recorder)
+		})
+	}
+}
+
+func testResetWatch(t *testing.T, ctx context.Context, source *fcache.FakeControllerSource, recorder *eventRecorder) {
+	// The first event should be the initial add.
+	require.NoError(t, recorder.waitForEventCount(ctx, 1, 5*time.Second), "Controller failed to receive initial setup all events, got: %v", recorder.getHistory())
+	history := recorder.getHistory()
+	assert.Len(t, history, 1)
+	assert.Equal(t, "add", history[0].Action)
+	assert.Equal(t, "default/pod-1", history[0].Key)
+	assert.True(t, history[0].IsInInitialList)
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pod-1",
+			Namespace: "default",
+		},
+	}
+	pod2 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pod-2",
+			Namespace: "default",
+		},
+	}
+
+	recorder.clearHistory()
+	source.ModifyDropWatch(pod)
+	source.AddDropWatch(pod2)
+	source.ResetWatch()
+
+	// We should get an add for the second pod and update for the initial pod on reset.
+	require.NoError(t, recorder.waitForEventCount(ctx, 2, 5*time.Second), "Controller failed to receive initial setup all events, got: %v", recorder.getHistory())
+	history = recorder.getHistory()
+	assert.Len(t, history, 2)
+
+	var addEvent eventRecord
+	var updateEvent eventRecord
+	for _, event := range history {
+		switch event.Action {
+		case "update":
+			updateEvent = event
+		case "add":
+			addEvent = event
+		}
+	}
+	assert.Equal(t, "default/pod-1", updateEvent.Key)
+	assert.False(t, updateEvent.IsInInitialList)
+	assert.Equal(t, "default/pod-2", addEvent.Key)
+	assert.False(t, addEvent.IsInInitialList)
+}
+
 type eventRecord struct {
-	Action  string
-	Key     string
-	EventRV string
-	StoreRV string
+	Action          string
+	Key             string
+	EventRV         string
+	StoreRV         string
+	IsInInitialList bool
 }
 
 type eventRecorder struct {
@@ -1045,17 +1155,17 @@ func newEventRecorder(store Store) *eventRecorder {
 	}
 }
 
-func (m *eventRecorder) OnAdd(obj interface{}, _ bool) {
-	m.record("add", obj)
+func (m *eventRecorder) OnAdd(obj interface{}, isInInitialList bool) {
+	m.record("add", obj, isInInitialList)
 }
 func (m *eventRecorder) OnUpdate(_, obj interface{}) {
-	m.record("update", obj)
+	m.record("update", obj, false)
 }
 func (m *eventRecorder) OnDelete(obj interface{}) {
-	m.record("delete", obj)
+	m.record("delete", obj, false)
 }
 
-func (m *eventRecorder) record(action string, obj interface{}) {
+func (m *eventRecorder) record(action string, obj interface{}, isInInitialList bool) {
 	m.historyLock.Lock()
 	defer m.historyLock.Unlock()
 	key, _ := DeletionHandlingMetaNamespaceKeyFunc(obj)
@@ -1077,10 +1187,11 @@ func (m *eventRecorder) record(action string, obj interface{}) {
 	}
 
 	m.history = append(m.history, eventRecord{
-		Action:  action,
-		Key:     key,
-		EventRV: eventRV,
-		StoreRV: storeRV,
+		Action:          action,
+		Key:             key,
+		EventRV:         eventRV,
+		StoreRV:         storeRV,
+		IsInInitialList: isInInitialList,
 	})
 	select {
 	case m.updateCh <- true:

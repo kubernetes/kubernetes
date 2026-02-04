@@ -569,7 +569,7 @@ func TestVolumeAttachmentValidationV1(t *testing.T) {
 	}}
 
 	for _, volumeAttachment := range successCases {
-		if errs := ValidateVolumeAttachmentV1(&volumeAttachment); len(errs) != 0 {
+		if errs := ValidateVolumeAttachment(&volumeAttachment); len(errs) != 0 {
 			t.Errorf("expected success: %+v", errs)
 		}
 	}
@@ -597,7 +597,7 @@ func TestVolumeAttachmentValidationV1(t *testing.T) {
 	}}
 
 	for _, volumeAttachment := range errorCases {
-		if errs := ValidateVolumeAttachmentV1(&volumeAttachment); len(errs) == 0 {
+		if errs := ValidateVolumeAttachment(&volumeAttachment); len(errs) == 0 {
 			t.Errorf("Expected failure for test: %+v", volumeAttachment)
 		}
 	}
@@ -1506,7 +1506,6 @@ func TestCSIDriverValidation(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)
 	// assume this feature is on for this test, detailed enabled/disabled tests in TestMutableCSINodeAllocatableCountEnabledDisabled
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MutableCSINodeAllocatableCount, true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIServiceAccountTokenSecrets, true)
 
 	driverName := "test-driver"
 	longName := "my-a-b-c-d-c-f-g-h-i-j-k-l-m-n-o-p-q-r-s-t-u-v-w-x-y-z-ABCDEFGHIJKLMNOPQRSTUVWXYZ-driver"
@@ -1845,7 +1844,6 @@ func TestCSIDriverValidationUpdate(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)
 	// assume this feature is on for this test, detailed enabled/disabled tests in TestMutableCSINodeAllocatableCountEnabledDisabled
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MutableCSINodeAllocatableCount, true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIServiceAccountTokenSecrets, true)
 
 	driverName := "test-driver"
 	longName := "my-a-b-c-d-c-f-g-h-i-j-k-l-m-n-o-p-q-r-s-t-u-v-w-x-y-z-ABCDEFGHIJKLMNOPQRSTUVWXYZ-driver"

@@ -335,6 +335,8 @@ type KubeletConfiguration struct {
 	NodeLeaseDurationSeconds int32 `json:"nodeLeaseDurationSeconds,omitempty"`
 	// imageMinimumGCAge is the minimum age for an unused image before it is
 	// garbage collected.
+	// The field value must be greater than 0.
+	// If unset or 0, defaults to 2m.
 	// Default: "2m"
 	// +optional
 	ImageMinimumGCAge metav1.Duration `json:"imageMinimumGCAge,omitempty"`
@@ -731,10 +733,11 @@ type KubeletConfiguration struct {
 	KubeReservedCgroup string `json:"kubeReservedCgroup,omitempty"`
 	// This flag specifies the various Node Allocatable enforcements that Kubelet needs to perform.
 	// This flag accepts a list of options. Acceptable options are `none`, `pods`,
-	// `system-reserved` and `kube-reserved`.
+	// `system-reserved`, `system-reserved-compressible`, `kube-reserved`, and `kube-reserved-compressible`.
 	// If `none` is specified, no other options may be specified.
-	// When `system-reserved` is in the list, systemReservedCgroup must be specified.
-	// When `kube-reserved` is in the list, kubeReservedCgroup must be specified.
+	// When a `system-reserved` option is in the list, systemReservedCgroup must be specified.
+	// When a `kube-reserved` option is in the list, kubeReservedCgroup must be specified.
+	// If a `compressible` option is specified, the corresponding non-compressible option may not be specified.
 	// This field is supported only when `cgroupsPerQOS` is set to true.
 	// Refer to [Node Allocatable](https://kubernetes.io/docs/tasks/administer-cluster/reserve-compute-resources/#node-allocatable)
 	// for more information.

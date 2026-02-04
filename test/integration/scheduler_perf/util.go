@@ -115,7 +115,7 @@ func mustSetupCluster(tCtx ktesting.TContext, config *config.KubeSchedulerConfig
 	// Cleanup will be in reverse order: first the clients by canceling the
 	// child context (happens automatically), then the server.
 	tCtx.Cleanup(server.TearDownFn)
-	tCtx = ktesting.WithCancel(tCtx)
+	tCtx = tCtx.WithCancel()
 
 	// TODO: client connection configuration, such as QPS or Burst is configurable in theory, this could be derived from the `config`, need to
 	// support this when there is any testcase that depends on such configuration.
@@ -132,7 +132,7 @@ func mustSetupCluster(tCtx ktesting.TContext, config *config.KubeSchedulerConfig
 		}
 	}
 
-	tCtx = ktesting.WithRESTConfig(tCtx, cfg)
+	tCtx = tCtx.WithRESTConfig(cfg)
 
 	// Not all config options will be effective but only those mostly related with scheduler performance will
 	// be applied to start a scheduler, most of them are defined in `scheduler.schedulerOptions`.
@@ -778,4 +778,39 @@ func (mc *memoryCollector) collect() []DataItem {
 		mc.createMetricDataItem(heapValues, "MB", "heap_memory_usage"),
 		growthItem,
 	}
+}
+
+// schedulingDurationCollector calculates the total duration of the scheduling phase, including pod creation.
+type schedulingDurationCollector struct {
+	resultLabels map[string]string
+	duration     time.Duration
+}
+
+func newSchedulingDurationCollector(resultLabels map[string]string) *schedulingDurationCollector {
+	return &schedulingDurationCollector{
+		resultLabels: resultLabels,
+	}
+}
+
+func (sdc *schedulingDurationCollector) init() error {
+	return nil
+}
+
+func (sdc *schedulingDurationCollector) run(tCtx ktesting.TContext) {
+	start := time.Now()
+	// Wait for the scheduling to finish
+	<-tCtx.Done()
+	sdc.duration = time.Since(start)
+}
+
+func (sdc *schedulingDurationCollector) collect() []DataItem {
+	labels := maps.Clone(sdc.resultLabels)
+	labels["Metric"] = "SchedulingDuration"
+	return []DataItem{{
+		Labels: labels,
+		Data: map[string]float64{
+			"Duration": sdc.duration.Seconds(),
+		},
+		Unit: "s",
+	}}
 }

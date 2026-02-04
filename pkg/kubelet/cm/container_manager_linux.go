@@ -652,9 +652,11 @@ func (cm *containerManagerImpl) Start(ctx context.Context, node *v1.Node,
 		if err != nil {
 			return fmt.Errorf("failed to get rootfs info: %v", err)
 		}
+		cm.Lock()
 		for rName, rCap := range cadvisor.EphemeralStorageCapacityFromFsInfo(rootfs) {
 			cm.capacity[rName] = rCap
 		}
+		cm.Unlock()
 	}
 
 	// Ensure that node allocatable configuration is valid.
@@ -945,6 +947,8 @@ func isKernelPid(pid int) bool {
 // GetCapacity returns node capacity data for "cpu", "memory", "ephemeral-storage", and "huge-pages*"
 // At present this method is only invoked when introspecting ephemeral storage
 func (cm *containerManagerImpl) GetCapacity(localStorageCapacityIsolation bool) v1.ResourceList {
+	cm.RLock()
+	defer cm.RUnlock()
 	// Use klog.TODO() because we currently do not have a proper logger to pass in.
 	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
 	logger := klog.TODO()

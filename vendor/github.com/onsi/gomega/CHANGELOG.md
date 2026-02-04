@@ -1,3 +1,9 @@
+## 1.39.0
+
+### Features
+
+Add `MatchErrorStrictly` which only passes if `errors.Is(actual, expected)` returns true.  `MatchError`, by contrast, will fallback to string comparison.
+
 ## 1.38.3
 
 ### Fixes

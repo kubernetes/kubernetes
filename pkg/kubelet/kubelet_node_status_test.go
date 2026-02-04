@@ -64,6 +64,7 @@ import (
 	kubeletvolume "k8s.io/kubernetes/pkg/kubelet/volumemanager"
 	taintutil "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	netutils "k8s.io/utils/net"
 )
 
@@ -318,7 +319,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 				},
 			}
 
-			kubelet.updateRuntimeUp()
+			kubelet.updateRuntimeUp(ctx)
 			assert.NoError(t, kubelet.updateNodeStatus(ctx))
 			actions := kubeClient.Actions()
 			require.Len(t, actions, 2)
@@ -508,7 +509,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 		},
 	}
 
-	kubelet.updateRuntimeUp()
+	kubelet.updateRuntimeUp(ctx)
 	assert.NoError(t, kubelet.updateNodeStatus(ctx))
 
 	actions := kubeClient.Actions()
@@ -604,7 +605,7 @@ func TestUpdateExistingNodeStatusTimeout(t *testing.T) {
 }
 
 func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
-	ctx := context.Background()
+	tCtx := ktesting.Init(t)
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -715,13 +716,13 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 
 	checkNodeStatus := func(status v1.ConditionStatus, reason string) {
 		kubeClient.ClearActions()
-		assert.NoError(t, kubelet.updateNodeStatus(ctx))
+		require.NoError(t, kubelet.updateNodeStatus(tCtx))
 		actions := kubeClient.Actions()
 		require.Len(t, actions, 2)
 		require.True(t, actions[1].Matches("patch", "nodes"))
 		require.Equal(t, "status", actions[1].GetSubresource())
 
-		updatedNode, err := kubeClient.CoreV1().Nodes().Get(ctx, testKubeletHostname, metav1.GetOptions{})
+		updatedNode, err := kubeClient.CoreV1().Nodes().Get(tCtx, testKubeletHostname, metav1.GetOptions{})
 		require.NoError(t, err, "can't apply node status patch")
 
 		for i, cond := range updatedNode.Status.Conditions {
@@ -750,17 +751,17 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 	// TODO(random-liu): Refactor the unit test to be table driven test.
 	// Should report kubelet not ready if the runtime check is out of date
 	clock.SetTime(time.Now().Add(-maxWaitForContainerRuntime))
-	kubelet.updateRuntimeUp()
+	kubelet.updateRuntimeUp(tCtx)
 	checkNodeStatus(v1.ConditionFalse, "KubeletNotReady")
 
 	// Should report kubelet ready if the runtime check is updated
 	clock.SetTime(time.Now())
-	kubelet.updateRuntimeUp()
+	kubelet.updateRuntimeUp(tCtx)
 	checkNodeStatus(v1.ConditionTrue, "KubeletReady")
 
 	// Should report kubelet not ready if the runtime check is out of date
 	clock.SetTime(time.Now().Add(-maxWaitForContainerRuntime))
-	kubelet.updateRuntimeUp()
+	kubelet.updateRuntimeUp(tCtx)
 	checkNodeStatus(v1.ConditionFalse, "KubeletNotReady")
 
 	// Should report kubelet not ready if the runtime check failed
@@ -768,19 +769,19 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 	// Inject error into fake runtime status check, node should be NotReady
 	fakeRuntime.StatusErr = fmt.Errorf("injected runtime status error")
 	clock.SetTime(time.Now())
-	kubelet.updateRuntimeUp()
+	kubelet.updateRuntimeUp(tCtx)
 	checkNodeStatus(v1.ConditionFalse, "KubeletNotReady")
 
 	fakeRuntime.StatusErr = nil
 
 	// Should report node not ready if runtime status is nil.
 	fakeRuntime.RuntimeStatus = nil
-	kubelet.updateRuntimeUp()
+	kubelet.updateRuntimeUp(tCtx)
 	checkNodeStatus(v1.ConditionFalse, "KubeletNotReady")
 
 	// Should report node not ready if runtime status is empty.
 	fakeRuntime.RuntimeStatus = &kubecontainer.RuntimeStatus{}
-	kubelet.updateRuntimeUp()
+	kubelet.updateRuntimeUp(tCtx)
 	checkNodeStatus(v1.ConditionFalse, "KubeletNotReady")
 
 	// Should report node not ready if RuntimeReady is false.
@@ -790,7 +791,7 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 			{Type: kubecontainer.NetworkReady, Status: true},
 		},
 	}
-	kubelet.updateRuntimeUp()
+	kubelet.updateRuntimeUp(tCtx)
 	checkNodeStatus(v1.ConditionFalse, "KubeletNotReady")
 
 	// Should report node ready if RuntimeReady is true.
@@ -800,7 +801,7 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 			{Type: kubecontainer.NetworkReady, Status: true},
 		},
 	}
-	kubelet.updateRuntimeUp()
+	kubelet.updateRuntimeUp(tCtx)
 	checkNodeStatus(v1.ConditionTrue, "KubeletReady")
 
 	// Should report node not ready if NetworkReady is false.
@@ -810,24 +811,24 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 			{Type: kubecontainer.NetworkReady, Status: false},
 		},
 	}
-	kubelet.updateRuntimeUp()
+	kubelet.updateRuntimeUp(tCtx)
 	checkNodeStatus(v1.ConditionFalse, "KubeletNotReady")
 }
 
 func TestUpdateNodeStatusError(t *testing.T) {
-	ctx := context.Background()
+	tCtx := ktesting.Init(t)
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	kubelet.kubeClient = nil // ensure only the heartbeat client is used
 	// No matching node for the kubelet
 	testKubelet.fakeKubeClient.ReactionChain = fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{}}).ReactionChain
-	assert.Error(t, kubelet.updateNodeStatus(ctx))
+	require.Error(t, kubelet.updateNodeStatus(tCtx))
 	assert.Len(t, testKubelet.fakeKubeClient.Actions(), nodeStatusUpdateRetry)
 }
 
 func TestUpdateNodeStatusWithLease(t *testing.T) {
-	ctx := context.Background()
+	tCtx := ktesting.Init(t)
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	clock := testKubelet.fakeClock
@@ -950,8 +951,8 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 
 	// Update node status when node status is created.
 	// Report node status.
-	kubelet.updateRuntimeUp()
-	assert.NoError(t, kubelet.updateNodeStatus(ctx))
+	kubelet.updateRuntimeUp(tCtx)
+	require.NoError(t, kubelet.updateNodeStatus(tCtx))
 
 	actions := kubeClient.Actions()
 	assert.Len(t, actions, 2)
@@ -974,7 +975,7 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 	// Update node status again when nothing is changed (except heartbeat time).
 	// Report node status if it has exceeded the duration of nodeStatusReportFrequency.
 	clock.Step(time.Minute)
-	assert.NoError(t, kubelet.updateNodeStatus(ctx))
+	require.NoError(t, kubelet.updateNodeStatus(tCtx))
 
 	// 2 more action (There were 2 actions before).
 	actions = kubeClient.Actions()
@@ -999,7 +1000,7 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 	// Update node status again when nothing is changed (except heartbeat time).
 	// Do not report node status if it is within the duration of nodeStatusReportFrequency.
 	clock.Step(10 * time.Second)
-	assert.NoError(t, kubelet.updateNodeStatus(ctx))
+	require.NoError(t, kubelet.updateNodeStatus(tCtx))
 
 	// Only 1 more action (There were 4 actions before).
 	actions = kubeClient.Actions()
@@ -1017,7 +1018,7 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 	newMachineInfo := oldMachineInfo.Clone()
 	newMachineInfo.MemoryCapacity = uint64(newMemoryCapacity)
 	kubelet.setCachedMachineInfo(newMachineInfo)
-	assert.NoError(t, kubelet.updateNodeStatus(ctx))
+	require.NoError(t, kubelet.updateNodeStatus(tCtx))
 
 	// 2 more action (There were 5 actions before).
 	actions = kubeClient.Actions()
@@ -1049,7 +1050,7 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 	updatedNode.Spec.PodCIDR = podCIDRs[0]
 	updatedNode.Spec.PodCIDRs = podCIDRs
 	kubeClient.ReactionChain = fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{*updatedNode}}).ReactionChain
-	assert.NoError(t, kubelet.updateNodeStatus(ctx))
+	require.NoError(t, kubelet.updateNodeStatus(tCtx))
 	assert.Equal(t, strings.Join(podCIDRs, ","), kubelet.runtimeState.podCIDR(), "Pod CIDR should be updated now")
 	// 2 more action (There were 7 actions before).
 	actions = kubeClient.Actions()
@@ -1062,7 +1063,7 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 	clock.Step(10 * time.Second)
 	assert.Equal(t, strings.Join(podCIDRs, ","), kubelet.runtimeState.podCIDR(), "Pod CIDR should already be updated")
 
-	assert.NoError(t, kubelet.updateNodeStatus(ctx))
+	require.NoError(t, kubelet.updateNodeStatus(tCtx))
 	// Only 1 more action (There were 9 actions before).
 	actions = kubeClient.Actions()
 	assert.Len(t, actions, 10)
@@ -1582,7 +1583,7 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 }
 
 func TestUpdateNewNodeStatusTooLargeReservation(t *testing.T) {
-	ctx := context.Background()
+	tCtx := ktesting.Init(t)
 	const nodeStatusMaxImages = 5
 
 	// generate one more in inputImageList than we configure the Kubelet to report
@@ -1640,8 +1641,8 @@ func TestUpdateNewNodeStatusTooLargeReservation(t *testing.T) {
 		},
 	}
 
-	kubelet.updateRuntimeUp()
-	assert.NoError(t, kubelet.updateNodeStatus(ctx))
+	kubelet.updateRuntimeUp(tCtx)
+	require.NoError(t, kubelet.updateNodeStatus(tCtx))
 	actions := kubeClient.Actions()
 	require.Len(t, actions, 1)
 	require.True(t, actions[0].Matches("patch", "nodes"))

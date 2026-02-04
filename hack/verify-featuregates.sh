@@ -32,7 +32,7 @@ kube::golang::setup_env
 cd "${KUBE_ROOT}"
 
 if ! go run test/compatibility_lifecycle/main.go feature-gates verify; then
-  echo "Please run 'hack/update-featuregates.sh' to update the feature list."
+  echo >&2 "Please run 'hack/update-featuregates.sh' to update the feature list."
   exit 1
 fi
 
@@ -44,7 +44,7 @@ trap 'rm -f "${TMPFILE}"' EXIT
 go run cmd/genfeaturegates/genfeaturegates.go -output="${TMPFILE}"
 
 if ! diff -q "${FEATURE_LIST_MD}" "${TMPFILE}" > /dev/null 2>&1; then
-  echo "${FEATURE_LIST_MD} is out of date."
-  echo "Please run 'hack/update-featuregates.sh' to update the feature list."
+  echo >&2 "${FEATURE_LIST_MD} is out of date."
+  echo >&2 "Please run 'hack/update-featuregates.sh' to update the feature list."
   exit 1
 fi

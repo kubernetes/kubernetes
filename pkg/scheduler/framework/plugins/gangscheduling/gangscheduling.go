@@ -30,6 +30,7 @@ import (
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
@@ -76,18 +77,13 @@ func (pl *GangScheduling) EventsToRegister(_ context.Context) ([]fwk.ClusterEven
 	}, nil
 }
 
-// matchingWorkloadReference returns true if two pods belong to the same workload, including their pod group and replica key.
-func matchingWorkloadReference(pod1, pod2 *v1.Pod) bool {
-	return pod1.Spec.WorkloadRef != nil && pod2.Spec.WorkloadRef != nil && pod1.Namespace == pod2.Namespace && *pod1.Spec.WorkloadRef == *pod2.Spec.WorkloadRef
-}
-
 func (pl *GangScheduling) isSchedulableAfterPodAdded(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
 	_, addedPod, err := util.As[*v1.Pod](oldObj, newObj)
 	if err != nil {
 		return fwk.Queue, err
 	}
 
-	if !matchingWorkloadReference(pod, addedPod) {
+	if !helper.MatchingWorkloadReference(pod, addedPod) {
 		logger.V(5).Info("another pod was added but it doesn't match the target pod's workload",
 			"pod", klog.KObj(pod), "workloadRef", pod.Spec.WorkloadRef, "addedPod", klog.KObj(addedPod), "addedWorkloadRef", pod.Spec.WorkloadRef)
 		return fwk.QueueSkip, nil
@@ -135,7 +131,7 @@ func (pl *GangScheduling) PreEnqueue(ctx context.Context, pod *v1.Pod) *fwk.Stat
 		return fwk.AsStatus(fmt.Errorf("failed to get workload %s/%s", namespace, workloadRef.Name))
 	}
 
-	policy, ok := podGroupPolicy(workload, workloadRef.PodGroup)
+	policy, ok := helper.PodGroupPolicy(workload, workloadRef.PodGroup)
 	if !ok {
 		return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("pod group %q doesn't exist for a workload %q", workloadRef.PodGroup, workload.Name))
 	}
@@ -144,11 +140,11 @@ func (pl *GangScheduling) PreEnqueue(ctx context.Context, pod *v1.Pod) *fwk.Stat
 		return nil
 	}
 
-	podGroupInfo, err := pl.handle.WorkloadManager().PodGroupInfo(namespace, workloadRef)
+	podGroupState, err := pl.handle.WorkloadManager().PodGroupState(namespace, workloadRef)
 	if err != nil {
 		return fwk.AsStatus(err)
 	}
-	allPods := podGroupInfo.AllPods()
+	allPods := podGroupState.AllPods()
 	if len(allPods) < int(policy.Gang.MinCount) {
 		return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "waiting for minCount pods from a gang to appear in scheduling queue")
 	}
@@ -164,11 +160,11 @@ func (pl *GangScheduling) Reserve(ctx context.Context, cs fwk.CycleState, pod *v
 	if pod.Spec.WorkloadRef == nil {
 		return nil
 	}
-	podGroupInfo, err := pl.handle.WorkloadManager().PodGroupInfo(pod.Namespace, pod.Spec.WorkloadRef)
+	podGroupState, err := pl.handle.WorkloadManager().PodGroupState(pod.Namespace, pod.Spec.WorkloadRef)
 	if err != nil {
 		return fwk.AsStatus(err)
 	}
-	podGroupInfo.AssumePod(pod.UID)
+	podGroupState.AssumePod(pod.UID)
 	return nil
 }
 
@@ -178,22 +174,12 @@ func (pl *GangScheduling) Unreserve(ctx context.Context, cs fwk.CycleState, pod 
 	if pod.Spec.WorkloadRef == nil {
 		return
 	}
-	podGroupInfo, err := pl.handle.WorkloadManager().PodGroupInfo(pod.Namespace, pod.Spec.WorkloadRef)
+	podGroupState, err := pl.handle.WorkloadManager().PodGroupState(pod.Namespace, pod.Spec.WorkloadRef)
 	if err != nil {
-		utilruntime.HandleErrorWithContext(ctx, err, "Failed to get pod group info", "pod", klog.KObj(pod), "workloadRef", pod.Spec.WorkloadRef)
+		utilruntime.HandleErrorWithContext(ctx, err, "Failed to get pod group state", "pod", klog.KObj(pod), "workloadRef", pod.Spec.WorkloadRef)
 		return
 	}
-	podGroupInfo.ForgetPod(pod.UID)
-}
-
-// podGroupPolicy is a helper to find the policy for a specific pod group name in a workload.
-func podGroupPolicy(workload *schedulingapi.Workload, podGroupName string) (schedulingapi.PodGroupPolicy, bool) {
-	for _, podGroup := range workload.Spec.PodGroups {
-		if podGroup.Name == podGroupName {
-			return podGroup.Policy, true
-		}
-	}
-	return schedulingapi.PodGroupPolicy{}, false
+	podGroupState.ForgetPod(pod.UID)
 }
 
 // Permit forces all pods in a gang to wait at this stage. Once the number of waiting (assumed) pods
@@ -214,7 +200,7 @@ func (pl *GangScheduling) Permit(ctx context.Context, state fwk.CycleState, pod 
 		return fwk.AsStatus(fmt.Errorf("failed to get workload %s/%s: %w", namespace, workloadRef.Name, err)), 0
 	}
 
-	policy, ok := podGroupPolicy(workload, workloadRef.PodGroup)
+	policy, ok := helper.PodGroupPolicy(workload, workloadRef.PodGroup)
 	if !ok {
 		return fwk.AsStatus(fmt.Errorf("pod group %q doesn't exist for a workload %q", workloadRef.PodGroup, workload.Name)), 0
 	}
@@ -223,18 +209,18 @@ func (pl *GangScheduling) Permit(ctx context.Context, state fwk.CycleState, pod 
 		return nil, 0
 	}
 
-	podGroupInfo, err := pl.handle.WorkloadManager().PodGroupInfo(namespace, workloadRef)
+	podGroupState, err := pl.handle.WorkloadManager().PodGroupState(namespace, workloadRef)
 	if err != nil {
 		return fwk.AsStatus(err), 0
 	}
-	assumedPods := podGroupInfo.AssumedPods()
-	assumedOrAssignedPods := assumedPods.Union(podGroupInfo.AssignedPods())
+	assumedPods := podGroupState.AssumedPods()
+	assumedOrAssignedPods := assumedPods.Union(podGroupState.AssignedPods())
 	if len(assumedOrAssignedPods) < int(policy.Gang.MinCount) {
 		// Activate unscheduled pods from this pod group in case they were waiting for this pod to be scheduled.
-		unscheduledPods := podGroupInfo.UnscheduledPods()
+		unscheduledPods := podGroupState.UnscheduledPods()
 		pl.handle.Activate(klog.FromContext(ctx), unscheduledPods)
 		logger.V(4).Info("Quorum is not met for a gang. Waiting for another pod to allow", "pod", klog.KObj(pod), "workloadRef", pod.Spec.WorkloadRef, "activatedPods", len(unscheduledPods))
-		return fwk.NewStatus(fwk.Wait, "waiting for minCount pods from a gang to be waiting on permit"), podGroupInfo.SchedulingTimeout()
+		return fwk.NewStatus(fwk.Wait, "waiting for minCount pods from a gang to be waiting on permit"), podGroupState.SchedulingTimeout()
 	}
 
 	logger.V(4).Info("Quorum is met for a gang. Allowing other pods from a gang waiting on permit", "pod", klog.KObj(pod), "workloadRef", pod.Spec.WorkloadRef, "allowedPods", len(assumedPods))

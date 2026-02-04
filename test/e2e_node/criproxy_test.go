@@ -216,7 +216,7 @@ var _ = SIGDescribe(feature.CriProxy, framework.WithSerial(), func() {
 
 			ginkgo.By("Expecting an error when imageSpec.Image is empty")
 			gomega.Eventually(func() error {
-				return verifyErrorInKubeletLogs("image was not found")
+				return verifyErrorInKubeletLogs("Failed to inspect image")
 			}).WithPolling(5*time.Second).WithTimeout(20*time.Second).ToNot(gomega.HaveOccurred(), "Could not verify error in kubelet logs")
 		})
 	})

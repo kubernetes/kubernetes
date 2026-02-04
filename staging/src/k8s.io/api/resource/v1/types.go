@@ -70,9 +70,6 @@ const (
 //
 // For resources that are not local to a node, the node name is not set. Instead,
 // the driver may use a node selector to specify where the devices are available.
-//
-// This is an alpha type and requires enabling the DynamicResourceAllocation
-// feature gate.
 type ResourceSlice struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object metadata
@@ -215,6 +212,8 @@ type CounterSet struct {
 	// The maximum number of counters is 32.
 	//
 	// +required
+	// +k8s:required
+	// +k8s:eachKey=+k8s:format=k8s-short-name
 	Counters map[string]Counter `json:"counters,omitempty" protobuf:"bytes,2,name=counters"`
 }
 
@@ -448,6 +447,8 @@ type DeviceCounterConsumption struct {
 	// The maximum number of counters is 32.
 	//
 	// +required
+	// +k8s:required
+	// +k8s:eachKey=+k8s:format=k8s-short-name
 	Counters map[string]Counter `json:"counters,omitempty" protobuf:"bytes,2,opt,name=counters"`
 }
 
@@ -736,9 +737,6 @@ type ResourceSliceList struct {
 // with specific properties, this is how that request is expressed. The status
 // stanza tracks whether this claim has been satisfied and what specific
 // resources have been allocated.
-//
-// This is an alpha type and requires enabling the DynamicResourceAllocation
-// feature gate.
 type ResourceClaim struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object metadata
@@ -942,7 +940,7 @@ type ExactDeviceRequest struct {
 	// all ordinary claims to the device with respect to access modes and
 	// any resource allocations.
 	//
-	// This is an alpha field and requires enabling the DRAAdminAccess
+	// This is an beta field and requires enabling the DRAAdminAccess
 	// feature gate. Admin access is disabled if this field is unset or
 	// set to false, otherwise it is enabled.
 	//
@@ -1627,7 +1625,7 @@ type DeviceRequestAllocationResult struct {
 	// administrative access. See the corresponding request field
 	// for a definition of mode.
 	//
-	// This is an alpha field and requires enabling the DRAAdminAccess
+	// This is an beta field and requires enabling the DRAAdminAccess
 	// feature gate. Admin access is disabled if this field is unset or
 	// set to false, otherwise it is enabled.
 	//
@@ -1760,9 +1758,6 @@ type ResourceClaimList struct {
 // device configuration and selectors. It can be referenced in
 // the device requests of a claim to apply these presets.
 // Cluster scoped.
-//
-// This is an alpha type and requires enabling the DynamicResourceAllocation
-// feature gate.
 type DeviceClass struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object metadata
@@ -1851,9 +1846,6 @@ type DeviceClassList struct {
 // +k8s:prerelease-lifecycle-gen:introduced=1.34
 
 // ResourceClaimTemplate is used to produce ResourceClaim objects.
-//
-// This is an alpha type and requires enabling the DynamicResourceAllocation
-// feature gate.
 type ResourceClaimTemplate struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object metadata

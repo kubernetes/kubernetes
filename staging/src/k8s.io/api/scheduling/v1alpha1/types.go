@@ -37,6 +37,7 @@ type PriorityClass struct {
 
 	// value represents the integer value of this priority class. This is the actual priority that pods
 	// receive when they have the name of this class in their pod spec.
+	// +optional
 	Value int32 `json:"value" protobuf:"bytes,2,opt,name=value"`
 
 	// globalDefault specifies whether this PriorityClass should be considered as
@@ -118,6 +119,8 @@ type WorkloadSpec struct {
 	// When set, it cannot be changed.
 	//
 	// +optional
+	// +k8s:optional
+	// +k8s:update=NoModify
 	ControllerRef *TypedLocalObjectReference `json:"controllerRef,omitempty" protobuf:"bytes,1,opt,name=controllerRef"`
 
 	// PodGroups is the list of pod groups that make up the Workload.
@@ -126,6 +129,11 @@ type WorkloadSpec struct {
 	// +required
 	// +listType=map
 	// +listMapKey=name
+	// +k8s:required
+	// +k8s:listType=map
+	// +k8s:listMapKey=name
+	// +k8s:maxItems=8
+	// +k8s:immutable
 	PodGroups []PodGroup `json:"podGroups" protobuf:"bytes,2,rep,name=podGroups"`
 }
 
@@ -137,16 +145,22 @@ type TypedLocalObjectReference struct {
 	// It must be a DNS subdomain.
 	//
 	// +optional
+	// +k8s:optional
+	// +k8s:format=k8s-long-name
 	APIGroup string `json:"apiGroup,omitempty" protobuf:"bytes,1,opt,name=apiGroup"`
 	// Kind is the type of resource being referenced.
 	// It must be a path segment name.
 	//
 	// +required
+	// +k8s:required
+	// +k8s:format=k8s-path-segment-name
 	Kind string `json:"kind" protobuf:"bytes,2,opt,name=kind"`
 	// Name is the name of resource being referenced.
 	// It must be a path segment name.
 	//
 	// +required
+	// +k8s:required
+	// +k8s:format=k8s-path-segment-name
 	Name string `json:"name" protobuf:"bytes,3,opt,name=name"`
 }
 
@@ -156,6 +170,8 @@ type PodGroup struct {
 	// It must be a DNS label. This field is immutable.
 	//
 	// +required
+	// +k8s:required
+	// +k8s:format=k8s-short-name
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 
 	// Policy defines the scheduling policy for this PodGroup.
@@ -165,19 +181,24 @@ type PodGroup struct {
 }
 
 // PodGroupPolicy defines the scheduling configuration for a PodGroup.
+// +union
 type PodGroupPolicy struct {
 	// Basic specifies that the pods in this group should be scheduled using
 	// standard Kubernetes scheduling behavior.
 	//
 	// +optional
+	// +k8s:optional
 	// +oneOf=PolicySelection
+	// +k8s:unionMember
 	Basic *BasicSchedulingPolicy `json:"basic,omitempty" protobuf:"bytes,2,opt,name=basic"`
 
 	// Gang specifies that the pods in this group should be scheduled using
 	// all-or-nothing semantics.
 	//
 	// +optional
+	// +k8s:optional
 	// +oneOf=PolicySelection
+	// +k8s:unionMember
 	Gang *GangSchedulingPolicy `json:"gang,omitempty" protobuf:"bytes,3,opt,name=gang"`
 }
 
@@ -197,5 +218,7 @@ type GangSchedulingPolicy struct {
 	// It must be a positive integer.
 	//
 	// +required
+	// +k8s:required
+	// +k8s:minimum=0
 	MinCount int32 `json:"minCount" protobuf:"varint,1,opt,name=minCount"`
 }

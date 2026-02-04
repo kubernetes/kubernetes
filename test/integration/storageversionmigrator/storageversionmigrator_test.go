@@ -328,7 +328,6 @@ func TestStorageVersionMigrationDuringChaos(t *testing.T) {
 	const migrations = 10 // more than the total workers of SVM
 	wg.Add(migrations)
 	for i := range migrations {
-		i := i
 		go func() {
 			defer wg.Done()
 

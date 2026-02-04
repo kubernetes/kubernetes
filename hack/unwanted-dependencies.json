@@ -1,10 +1,6 @@
 {
   "spec": {
     "pinnedModules": {
-      "github.com/godbus/dbus/v5": {
-        "Version": "v5.2.0",
-        "Reason": "v5.2.1 has unused import on windows causing typecheck failures - https://github.com/kubernetes/kubernetes/issues/135864"
-      },
       "github.com/libopenstorage/openstorage": {
         "Version": "v1.0.0",
         "Reason": "portworx csi driver has been deprecated and will be removed - https://github.com/kubernetes/enhancements/issues/2589"
@@ -42,6 +38,7 @@
       "github.com/golang/mock": "unmaintained, archive mode",
       "github.com/golang/protobuf": "replace with google.golang.org/protobuf",
       "github.com/golang/groupcache": "unmaintained",
+      "github.com/google/btree": "unmaintained, archive mode",
       "github.com/google/gofuzz": "unmaintained, use sigs.k8s.io/randfill",
       "github.com/google/s2a-go": "cloud dependency, unstable",
       "github.com/google/shlex": "unmaintained, archive mode",
@@ -172,12 +169,15 @@
         "google.golang.org/protobuf",
         "sigs.k8s.io/apiserver-network-proxy/konnectivity-client"
       ],
+      "github.com/google/btree": [
+        "go.etcd.io/etcd/server/v3",
+        "k8s.io/apiserver"
+      ],
       "github.com/google/gofuzz": [
         "github.com/json-iterator/go"
       ],
       "github.com/json-iterator/go": [
         "github.com/prometheus/client_golang",
-        "go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful",
         "k8s.io/kube-openapi",
         "sigs.k8s.io/structured-merge-diff/v6"
       ],
@@ -197,19 +197,16 @@
       "github.com/modern-go/concurrent": [
         "github.com/json-iterator/go",
         "github.com/prometheus/client_golang",
-        "go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful",
         "k8s.io/kube-openapi",
         "sigs.k8s.io/structured-merge-diff/v6"
       ],
       "github.com/modern-go/reflect2": [
         "github.com/json-iterator/go",
         "github.com/prometheus/client_golang",
-        "go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful",
         "k8s.io/kube-openapi",
         "sigs.k8s.io/structured-merge-diff/v6"
       ],
       "github.com/pkg/errors": [
-        "github.com/google/cadvisor",
         "sigs.k8s.io/kustomize/api",
         "sigs.k8s.io/kustomize/kustomize/v5"
       ],
@@ -233,7 +230,6 @@
         "github.com/google/cel-go",
         "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus",
         "github.com/grpc-ecosystem/go-grpc-middleware/v2",
-        "github.com/grpc-ecosystem/grpc-gateway/v2",
         "github.com/prometheus/common",
         "github.com/spf13/cobra",
         "github.com/stretchr/objx",
@@ -268,6 +264,7 @@
       "github.com/davecgh/go-spew",
       "github.com/gogo/protobuf",
       "github.com/golang/protobuf",
+      "github.com/google/btree",
       "github.com/json-iterator/go",
       "github.com/mailru/easyjson",
       "github.com/modern-go/concurrent",

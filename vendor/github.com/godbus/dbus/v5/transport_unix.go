@@ -1,5 +1,4 @@
 //go:build !windows && !solaris
-// +build !windows,!solaris
 
 package dbus
 
@@ -142,16 +141,16 @@ func (t *unixTransport) ReadMessage() (*Message, error) {
 	}
 
 	msg := &Message{
-		Type:   t.rdr.msghead.Type,
-		Flags:  t.rdr.msghead.Flags,
-		serial: t.rdr.msghead.Serial,
+		Type:   t.rdr.Type,
+		Flags:  t.rdr.Flags,
+		serial: t.rdr.Serial,
 	}
 	// Length of header fields (without alignment).
-	hlen := t.rdr.msghead.HeaderLen
+	hlen := t.rdr.HeaderLen
 	if hlen%8 != 0 {
 		hlen += 8 - (hlen % 8)
 	}
-	if hlen+t.rdr.msghead.BodyLen+16 > 1<<27 {
+	if hlen+t.rdr.BodyLen+16 > 1<<27 {
 		return nil, InvalidMessageError("message is too long")
 	}
 
@@ -175,7 +174,7 @@ func (t *unixTransport) ReadMessage() (*Message, error) {
 	var unixfds uint32
 	for _, v := range t.rdr.headers {
 		if v.Field == byte(FieldUnixFDs) {
-			unixfds, _ = v.Variant.value.(uint32)
+			unixfds, _ = v.value.(uint32)
 		}
 	}
 
@@ -272,7 +271,7 @@ func (t *unixTransport) SendMessage(msg *Message) error {
 			return err
 		}
 		oob := syscall.UnixRights(fds...)
-		n, oobn, err := t.UnixConn.WriteMsgUnix(buf.Bytes(), oob, nil)
+		n, oobn, err := t.WriteMsgUnix(buf.Bytes(), oob, nil)
 		if err != nil {
 			return err
 		}

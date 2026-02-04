@@ -79,8 +79,9 @@ type QuotaMonitor struct {
 	// This channel is also protected by monitorLock.
 	stopCh <-chan struct{}
 
-	// running tracks whether Run() has been called.
-	// it is protected by monitorLock.
+	// running is set to true when the Run() function has been called.
+	// It will revert to false when the Run() function receives a cancellation.
+	// It is protected by monitorLock.
 	running bool
 
 	// monitors are the producer of the resourceChanges queue
@@ -175,7 +176,7 @@ func (qm *QuotaMonitor) controllerFor(ctx context.Context, resource schema.Group
 		shared.Informer().AddEventHandlerWithResyncPeriod(handlers, qm.resyncPeriod())
 		return shared.Informer().GetController(), nil
 	}
-	logger.V(4).Error(err, "QuotaMonitor unable to use a shared informer", "resource", resource.String())
+	logger.V(4).Info("QuotaMonitor unable to use a shared informer", "resource", resource.String(), "err", err)
 
 	// TODO: if we can share storage with garbage collector, it may make sense to support other resources
 	// until that time, aggregated api servers will have to run their own controller to reconcile their own quota.
@@ -333,6 +334,10 @@ func (qm *QuotaMonitor) Run(ctx context.Context) {
 	// Stop any running monitors.
 	qm.monitorLock.Lock()
 	defer qm.monitorLock.Unlock()
+	// Mark as not running so that no new monitors can be started.
+	// Not doing this here could cause goroutine leaks and deadlocks since it would make it possible for startMonitors
+	// to proceed and start new monitors after stopMonitors has been called.
+	qm.running = false
 	monitors := qm.monitors
 	stopped := 0
 	for _, monitor := range monitors {
@@ -341,6 +346,7 @@ func (qm *QuotaMonitor) Run(ctx context.Context) {
 			close(monitor.stopCh)
 		}
 	}
+	qm.monitors = nil
 	qm.monitorWG.Wait()
 	logger.Info("QuotaMonitor stopped monitors", "stopped", stopped, "total", len(monitors))
 }

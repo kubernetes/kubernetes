@@ -75,10 +75,6 @@ func (c *Controller) GetMounter() mount.Interface {
 	return nil
 }
 
-func (c *Controller) GetHostName() string {
-	return ""
-}
-
 func (c *Controller) GetNodeAllocatable() (v1.ResourceList, error) {
 	return v1.ResourceList{}, nil
 }

@@ -133,7 +133,7 @@ func TestGeneratePodSandboxLinuxConfigSeccomp(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		config, _ := m.generatePodSandboxLinuxConfig(test.pod)
+		config, _ := m.generatePodSandboxLinuxConfig(tCtx, test.pod)
 		actualProfile := config.SecurityContext.Seccomp.ProfileType.String()
 		assert.EqualValues(t, test.expectedProfile, actualProfile, "TestCase[%d]: %s", i, test.description)
 	}

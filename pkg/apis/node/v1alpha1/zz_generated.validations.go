@@ -47,14 +47,6 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 		}
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
-	// type RuntimeClassList
-	scheme.AddValidationFunc((*nodev1alpha1.RuntimeClassList)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_RuntimeClassList(ctx, op, nil /* fldPath */, obj.(*nodev1alpha1.RuntimeClassList), safe.Cast[*nodev1alpha1.RuntimeClassList](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
 	return nil
 }
 
@@ -75,27 +67,6 @@ func Validate_RuntimeClass(ctx context.Context, op operation.Operation, fldPath 
 			errs = append(errs, Validate_RuntimeClassSpec(ctx, op, fldPath, obj, oldObj)...)
 			return
 		}(fldPath.Child("spec"), &obj.Spec, safe.Field(oldObj, func(oldObj *nodev1alpha1.RuntimeClass) *nodev1alpha1.RuntimeClassSpec { return &oldObj.Spec }), oldObj != nil)...)
-
-	return errs
-}
-
-// Validate_RuntimeClassList validates an instance of RuntimeClassList according
-// to declarative validation rules in the API schema.
-func Validate_RuntimeClassList(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *nodev1alpha1.RuntimeClassList) (errs field.ErrorList) {
-	// field nodev1alpha1.RuntimeClassList.TypeMeta has no validation
-	// field nodev1alpha1.RuntimeClassList.ListMeta has no validation
-
-	// field nodev1alpha1.RuntimeClassList.Items
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []nodev1alpha1.RuntimeClass, oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
-			}
-			// iterate the list and call the type's validation function
-			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_RuntimeClass)...)
-			return
-		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *nodev1alpha1.RuntimeClassList) []nodev1alpha1.RuntimeClass { return oldObj.Items }), oldObj != nil)...)
 
 	return errs
 }

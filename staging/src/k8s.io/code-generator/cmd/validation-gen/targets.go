@@ -48,8 +48,10 @@ const (
 )
 
 var (
-	runtimePkg = "k8s.io/apimachinery/pkg/runtime"
-	schemeType = types.Name{Package: runtimePkg, Name: "Scheme"}
+	runtimePkg   = "k8s.io/apimachinery/pkg/runtime"
+	schemeType   = types.Name{Package: runtimePkg, Name: "Scheme"}
+	metav1Pkg    = "k8s.io/apimachinery/pkg/apis/meta/v1"
+	listMetaType = types.Name{Package: metav1Pkg, Name: "ListMeta"}
 )
 
 func extractTag(comments []string) ([]string, bool) {
@@ -319,6 +321,16 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 			if checkTag(t.SecondClosestCommentLines, "true") {
 				return true
 			}
+
+			// skip types that embed metav1.ListMeta
+			if t.Kind == types.Struct {
+				for _, member := range t.Members {
+					if member.Embedded && member.Type.Name == listMetaType {
+						return false
+					}
+				}
+			}
+
 			// all types
 			for _, v := range typesWith {
 				if v == "*" && !namer.IsPrivateGoName(t.Name.Name) {

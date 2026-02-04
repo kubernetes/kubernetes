@@ -28,7 +28,6 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/api/validation/path"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
@@ -449,7 +448,8 @@ func (t *Tester) testCreateIgnoresMismatchedNamespace(valid runtime.Object, opts
 }
 
 func (t *Tester) testCreateValidatesNames(valid runtime.Object, opts metav1.CreateOptions) {
-	for _, invalidName := range path.NameMayNotBe {
+	invalidPathElements := []string{".", ".."}
+	for _, invalidName := range invalidPathElements {
 		objCopy := valid.DeepCopyObject()
 		objCopyMeta := t.getObjectMetaOrFail(objCopy)
 		objCopyMeta.SetName(invalidName)
@@ -461,7 +461,8 @@ func (t *Tester) testCreateValidatesNames(valid runtime.Object, opts metav1.Crea
 		}
 	}
 
-	for _, invalidSuffix := range path.NameMayNotContain {
+	invalidInPath := []string{"/", "%"}
+	for _, invalidSuffix := range invalidInPath {
 		objCopy := valid.DeepCopyObject()
 		objCopyMeta := t.getObjectMetaOrFail(objCopy)
 		objCopyMeta.SetName(objCopyMeta.GetName() + invalidSuffix)

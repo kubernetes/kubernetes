@@ -39,6 +39,7 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher/delegator"
 	"k8s.io/apiserver/pkg/storage/cacher/metrics"
+	"k8s.io/apiserver/pkg/storage/cacher/store"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/tracing"
 	"k8s.io/klog/v2"
@@ -111,7 +112,7 @@ func (c *CacheDelegator) Delete(ctx context.Context, key string, out runtime.Obj
 	} else if exists {
 		// DeepCopy the object since we modify resource version when serializing the
 		// current object.
-		currObj := elem.(*storeElement).Object.DeepCopyObject()
+		currObj := elem.(*store.Element).Object.DeepCopyObject()
 		return c.storage.Delete(ctx, key, out, preconditions, validateDeletion, currObj, opts)
 	}
 	// If we couldn't get the object, fallback to no-suggestion.
@@ -128,10 +129,6 @@ func (c *CacheDelegator) Watch(ctx context.Context, key string, opts storage.Lis
 	// and disable sendingInitialEvents when the feature wasn't enabled
 	if !utilfeature.DefaultFeatureGate.Enabled(features.WatchList) && opts.SendInitialEvents != nil {
 		opts.SendInitialEvents = nil
-	}
-	// TODO: we should eventually get rid of this legacy case
-	if utilfeature.DefaultFeatureGate.Enabled(features.WatchFromStorageWithoutResourceVersion) && opts.SendInitialEvents == nil && opts.ResourceVersion == "" {
-		return c.storage.Watch(ctx, key, opts)
 	}
 	return c.cacher.Watch(ctx, key, opts)
 }
@@ -254,7 +251,7 @@ func (c *CacheDelegator) GuaranteedUpdate(ctx context.Context, key string, desti
 	} else if exists {
 		// DeepCopy the object since we modify resource version when serializing the
 		// current object.
-		currObj := elem.(*storeElement).Object.DeepCopyObject()
+		currObj := elem.(*store.Element).Object.DeepCopyObject()
 		return c.storage.GuaranteedUpdate(ctx, key, destination, ignoreNotFound, preconditions, tryUpdate, currObj)
 	}
 	// If we couldn't get the object, fallback to no-suggestion.
@@ -344,10 +341,10 @@ func (c *consistencyChecker) check(ctx context.Context) {
 		c.cacher.MarkConsistent(true)
 		return
 	}
-	klog.ErrorS(nil, "Cache consistency check failed", "group", c.groupResource.Group, "resource", c.groupResource.Resource, "resourceVersion", digests.ResourceVersion, "etcdDigest", digests.EtcdDigest, "cacheDigest", digests.CacheDigest)
+	klog.ErrorS(nil, "Cache consistency check failed", "group", c.groupResource.Group, "resource", c.groupResource.Resource, "resourceVersion", digests.ResourceVersion, "etcdDigest", digests.EtcdDigest, "cacheDigest", digests.CacheDigest, "diffDetail", digests.DiffDetail)
 	metrics.StorageConsistencyCheckTotal.WithLabelValues(c.groupResource.Group, c.groupResource.Resource, "failure").Inc()
 	if panicOnCacheInconsistency {
-		panic(fmt.Sprintf("Cache consistency check failed, group: %q, resource: %q, resourceVersion: %q, etcdDigest: %q, cacheDigest: %q", c.groupResource.Group, c.groupResource.Resource, digests.ResourceVersion, digests.EtcdDigest, digests.CacheDigest))
+		panic(fmt.Sprintf("Cache consistency check failed, group: %q, resource: %q, resourceVersion: %q, etcdDigest: %q, cacheDigest: %q, diffDetail: %v", c.groupResource.Group, c.groupResource.Resource, digests.ResourceVersion, digests.EtcdDigest, digests.CacheDigest, digests.DiffDetail))
 	}
 	c.cacher.MarkConsistent(false)
 }
@@ -356,13 +353,42 @@ func (c *consistencyChecker) calculateDigests(ctx context.Context) (*storageDige
 	if !c.cacher.Ready() {
 		return nil, fmt.Errorf("cache is not ready")
 	}
-	cacheDigest, cacheResourceVersion, err := c.calculateStoreDigest(ctx, c.cacher, "0", 0)
+	// variables for tracking the diff in consistency checker
+	cacheItems := []namespaceNameRV{}
+	var foundDiff *diffDetail
+	var etcdIndex int
+
+	cacheDigest, cacheResourceVersion, err := c.calculateStoreDigest(ctx, c.cacher, "0", 0, func(obj metav1.Object) {
+		// collect items from cacher's list
+		cacheItems = append(cacheItems, namespaceNameRV{Namespace: obj.GetNamespace(), Name: obj.GetName(), RV: obj.GetResourceVersion()})
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed calculating cache digest: %w", err)
 	}
-	etcdDigest, etcdResourceVersion, err := c.calculateStoreDigest(ctx, c.etcd, cacheResourceVersion, storageWatchListPageSize)
+	etcdDigest, etcdResourceVersion, err := c.calculateStoreDigest(ctx, c.etcd, cacheResourceVersion, storageWatchListPageSize, func(obj metav1.Object) {
+		// compare the item in etcd's list against cacheItems which is cacher's list
+		if foundDiff != nil {
+			return
+		}
+		etcdItem := namespaceNameRV{Namespace: obj.GetNamespace(), Name: obj.GetName(), RV: obj.GetResourceVersion()}
+		if len(cacheItems) <= etcdIndex {
+			foundDiff = &diffDetail{Index: etcdIndex, EtcdItem: &etcdItem}
+			cacheItems = nil // don't need it any more and nil it to allow GC to collect it
+			return
+		}
+		if cacheItem := cacheItems[etcdIndex]; cacheItem != etcdItem {
+			foundDiff = &diffDetail{Index: etcdIndex, EtcdItem: &etcdItem, CacheItem: &cacheItem}
+			cacheItems = nil // don't need it any more and nil it to allow GC to collect it
+			return
+		}
+		etcdIndex += 1
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed calculating etcd digest: %w", err)
+	}
+	if len(cacheItems) > etcdIndex {
+		cacheItem := cacheItems[etcdIndex]
+		foundDiff = &diffDetail{Index: etcdIndex, CacheItem: &cacheItem}
 	}
 	if cacheResourceVersion != etcdResourceVersion {
 		return nil, fmt.Errorf("etcd returned different resource version then expected, cache: %q, etcd: %q", cacheResourceVersion, etcdResourceVersion)
@@ -371,16 +397,30 @@ func (c *consistencyChecker) calculateDigests(ctx context.Context) (*storageDige
 		ResourceVersion: cacheResourceVersion,
 		CacheDigest:     cacheDigest,
 		EtcdDigest:      etcdDigest,
+		DiffDetail:      foundDiff,
 	}, nil
+}
+
+type namespaceNameRV struct {
+	Namespace string
+	Name      string
+	RV        string
+}
+
+type diffDetail struct {
+	Index     int
+	CacheItem *namespaceNameRV
+	EtcdItem  *namespaceNameRV
 }
 
 type storageDigest struct {
 	ResourceVersion string
 	CacheDigest     string
 	EtcdDigest      string
+	DiffDetail      *diffDetail
 }
 
-func (c *consistencyChecker) calculateStoreDigest(ctx context.Context, store getLister, resourceVersion string, limit int64) (digest, rv string, err error) {
+func (c *consistencyChecker) calculateStoreDigest(ctx context.Context, store getLister, resourceVersion string, limit int64, metaVisitor func(objectMeta metav1.Object)) (digest, rv string, err error) {
 	opts := storage.ListOptions{
 		Recursive:       true,
 		Predicate:       storage.Everything,
@@ -399,7 +439,7 @@ func (c *consistencyChecker) calculateStoreDigest(ctx context.Context, store get
 		if err != nil {
 			return "", "", err
 		}
-		err = addListToDigest(h, resp)
+		err = addListToDigest(h, resp, metaVisitor)
 		if err != nil {
 			return "", "", err
 		}
@@ -420,7 +460,7 @@ func (c *consistencyChecker) calculateStoreDigest(ctx context.Context, store get
 	}
 }
 
-func addListToDigest(h hash.Hash64, list runtime.Object) error {
+func addListToDigest(h hash.Hash64, list runtime.Object, metaVisitor func(objectMeta metav1.Object)) error {
 	return meta.EachListItem(list, func(obj runtime.Object) error {
 		objectMeta, err := meta.Accessor(obj)
 		if err != nil {
@@ -430,6 +470,7 @@ func addListToDigest(h hash.Hash64, list runtime.Object) error {
 		if err != nil {
 			return err
 		}
+		metaVisitor(objectMeta)
 		return nil
 	})
 }

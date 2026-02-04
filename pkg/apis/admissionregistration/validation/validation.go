@@ -24,8 +24,8 @@ import (
 	"sync"
 
 	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/validate/content"
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
-	"k8s.io/apimachinery/pkg/api/validation/path"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -939,7 +939,7 @@ func validateValidationActions(va []admissionregistration.ValidationAction, fldP
 		allErrors = append(allErrors, field.Invalid(fldPath, va, "must not contain both Deny and Warn (repeating the same validation failure information in the API response and headers serves no purpose)"))
 	}
 	if len(actions) == 0 {
-		allErrors = append(allErrors, field.Required(fldPath, "at least one validation action is required"))
+		allErrors = append(allErrors, field.Required(fldPath, "at least one validation action is required")).MarkCoveredByDeclarative()
 	}
 	return allErrors
 }
@@ -948,7 +948,7 @@ func validateNamedRuleWithOperations(n *admissionregistration.NamedRuleWithOpera
 	var allErrors field.ErrorList
 	resourceNames := sets.NewString()
 	for i, rName := range n.ResourceNames {
-		for _, msg := range path.ValidatePathSegmentName(rName, false) {
+		for _, msg := range content.IsPathSegmentName(rName) {
 			allErrors = append(allErrors, field.Invalid(fldPath.Child("resourceNames").Index(i), rName, msg))
 		}
 		if resourceNames.Has(rName) {
@@ -1182,7 +1182,7 @@ func validateValidatingAdmissionPolicyBindingSpec(spec *admissionregistration.Va
 	var allErrors field.ErrorList
 
 	if len(spec.PolicyName) == 0 {
-		allErrors = append(allErrors, field.Required(fldPath.Child("policyName"), ""))
+		allErrors = append(allErrors, field.Required(fldPath.Child("policyName"), "").MarkCoveredByDeclarative())
 	} else {
 		for _, msg := range genericvalidation.NameIsDNSSubdomain(spec.PolicyName, false) {
 			allErrors = append(allErrors, field.Invalid(fldPath.Child("policyName"), spec.PolicyName, msg))
@@ -1202,7 +1202,7 @@ func validateParamRef(pr *admissionregistration.ParamRef, fldPath *field.Path) f
 	}
 
 	if len(pr.Name) > 0 {
-		for _, msg := range path.ValidatePathSegmentName(pr.Name, false) {
+		for _, msg := range content.IsPathSegmentName(pr.Name) {
 			allErrors = append(allErrors, field.Invalid(fldPath.Child("name"), pr.Name, msg))
 		}
 

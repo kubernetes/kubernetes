@@ -17,8 +17,6 @@ limitations under the License.
 package noderesources
 
 import (
-	"context"
-	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -37,8 +35,6 @@ import (
 	"k8s.io/dynamic-resource-allocation/deviceclass/extendedresourcecache"
 	"k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/dynamic-resource-allocation/structured"
-	"k8s.io/klog/v2"
-	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -47,6 +43,7 @@ import (
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -265,6 +262,9 @@ func TestResourceAllocationScorerCalculateRequests(t *testing.T) {
 }
 
 func TestCalculateResourceAllocatableRequest(t *testing.T) {
+	testCalculateResourceAllocatableRequest(ktesting.Init(t))
+}
+func testCalculateResourceAllocatableRequest(tCtx ktesting.TContext) {
 	// Initialize test variables
 	nodeName := "resource-node"
 	driverName := "test-driver"
@@ -286,44 +286,40 @@ func TestCalculateResourceAllocatableRequest(t *testing.T) {
 		enableDRAExtendedResource bool
 		node                      *v1.Node
 		extendedResource          v1.ResourceName
-		objects                   []apiruntime.Object
-		podRequest                int64
+		draObjects                []apiruntime.Object
 		expectedAllocatable       int64
-		expectedRequested         int64
+		expectedAllocated         int64
 	}{
 		"device-plugin-resource-feature-disabled": {
 			enableDRAExtendedResource: false,
 			node:                      st.MakeNode().Name(nodeName).Capacity(map[v1.ResourceName]string{explicitExtendedResource: "4"}).Obj(),
 			extendedResource:          explicitExtendedResource,
-			podRequest:                1,
 			expectedAllocatable:       4,
-			expectedRequested:         1,
+			expectedAllocated:         0,
 		},
 		"device-plugin-resource-feature-enabled": {
 			enableDRAExtendedResource: true,
 			node:                      st.MakeNode().Name(nodeName).Capacity(map[v1.ResourceName]string{explicitExtendedResource: "4"}).Obj(),
 			extendedResource:          explicitExtendedResource,
-			podRequest:                1,
 			expectedAllocatable:       4,
-			expectedRequested:         1,
+			expectedAllocated:         0,
 		},
 		"DRA-backed-resource-explicit": {
 			enableDRAExtendedResource: true,
 			node:                      st.MakeNode().Name(nodeName).Obj(),
 			extendedResource:          explicitExtendedResource,
-			objects: []apiruntime.Object{
+			draObjects: []apiruntime.Object{
 				deviceClassWithExtendResourceName,
 				st.MakeResourceSlice(nodeName, driverName).Device("device-1").Obj(),
 			},
-			podRequest:          1,
-			expectedAllocatable: 1,
-			expectedRequested:   1,
+			expectedAllocatable: 1, // 1 device `device-1`
+			expectedAllocated:   0,
 		},
 		"DRA-backed-resource-implicit": {
 			enableDRAExtendedResource: true,
 			node:                      st.MakeNode().Name(nodeName).Obj(),
 			extendedResource:          implicitExtendedResource,
-			objects: []apiruntime.Object{
+			draObjects: []apiruntime.Object{
 				&resourceapi.DeviceClass{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: deviceClassName,
@@ -331,24 +327,24 @@ func TestCalculateResourceAllocatableRequest(t *testing.T) {
 				},
 				st.MakeResourceSlice(nodeName, driverName).Device("device-1").Obj(),
 			},
-			podRequest:          1,
-			expectedAllocatable: 1,
-			expectedRequested:   1,
+			expectedAllocatable: 1, // 1 device `device-1`
+			expectedAllocated:   0,
 		},
 		"DRA-backed-resource-no-slices": {
 			enableDRAExtendedResource: true,
 			node:                      st.MakeNode().Name(nodeName).Obj(),
 			extendedResource:          explicitExtendedResource,
-			objects:                   []apiruntime.Object{deviceClassWithExtendResourceName},
-			podRequest:                1,
-			expectedAllocatable:       0,
-			expectedRequested:         0,
+			draObjects: []apiruntime.Object{
+				deviceClassWithExtendResourceName,
+			},
+			expectedAllocatable: 0,
+			expectedAllocated:   0,
 		},
 		"DRA-backed-resource-with-allocated-device": {
 			enableDRAExtendedResource: true,
 			node:                      st.MakeNode().Name(nodeName).Obj(),
 			extendedResource:          explicitExtendedResource,
-			objects: []apiruntime.Object{
+			draObjects: []apiruntime.Object{
 				deviceClassWithExtendResourceName,
 				st.MakeResourceSlice(nodeName, driverName).Devices("device-1", "device-2").Obj(),
 				// Create a resource claim that fully allocates device-1
@@ -369,15 +365,14 @@ func TestCalculateResourceAllocatableRequest(t *testing.T) {
 					}).
 					Obj(),
 			},
-			podRequest:          1,
-			expectedAllocatable: 2,
-			expectedRequested:   2, // 1 allocated + 1 requested
+			expectedAllocatable: 2, // 2 allocatable devices `device-1`, `device-2`
+			expectedAllocated:   1, // 1 allocated by `testClaim`
 		},
 		"DRA-backed-resource-with-shared-device-allocation": {
 			enableDRAExtendedResource: true,
 			node:                      st.MakeNode().Name(nodeName).Obj(),
 			extendedResource:          explicitExtendedResource,
-			objects: []apiruntime.Object{
+			draObjects: []apiruntime.Object{
 				deviceClassWithExtendResourceName,
 				st.MakeResourceSlice(nodeName, driverName).Devices("device-1", "device-2").Obj(),
 				// Create a resource claim with shared device allocation (consumable capacity)
@@ -399,15 +394,14 @@ func TestCalculateResourceAllocatableRequest(t *testing.T) {
 					}).
 					Obj(),
 			},
-			podRequest:          1,
-			expectedAllocatable: 2,
-			expectedRequested:   2, // 1 allocated (shared) + 1 requested
+			expectedAllocatable: 2, // 2 allocatable devices `device-1`, `device-2`
+			expectedAllocated:   1, // 1 allocated (shared) by `testClaim`
 		},
 		"DRA-backed-resource-multiple-devices-mixed-allocation": {
 			enableDRAExtendedResource: true,
 			node:                      st.MakeNode().Name(nodeName).Obj(),
 			extendedResource:          explicitExtendedResource,
-			objects: []apiruntime.Object{
+			draObjects: []apiruntime.Object{
 				deviceClassWithExtendResourceName,
 				st.MakeResourceSlice(nodeName, driverName).Devices("device-1", "device-2", "device-3").Obj(),
 				// Mix of fully allocated and shared device allocations
@@ -447,15 +441,14 @@ func TestCalculateResourceAllocatableRequest(t *testing.T) {
 					Obj(),
 				// device-3 remains unallocated
 			},
-			podRequest:          1,
-			expectedAllocatable: 3,
-			expectedRequested:   3, // 2 allocated (1 full + 1 shared) + 1 requested
+			expectedAllocatable: 3, // 3 allocatable devices `device-1`, `device-2`, `device-3`
+			expectedAllocated:   2, // 2 allocated (1 full `test-claim-1` + 1 shared `test-claim-2`)
 		},
 		"DRA-backed-resource-with-per-device-node-selection": {
 			enableDRAExtendedResource: true,
 			node:                      st.MakeNode().Name(nodeName).Label("zone", "us-east-1a").Obj(),
 			extendedResource:          explicitExtendedResource,
-			objects: []apiruntime.Object{
+			draObjects: []apiruntime.Object{
 				&resourceapi.DeviceClass{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: deviceClassName,
@@ -545,25 +538,17 @@ func TestCalculateResourceAllocatableRequest(t *testing.T) {
 					}).
 					Obj(),
 			},
-			podRequest:          1,
 			expectedAllocatable: 2, // device-1 matches the test node and device-3 matches via its selector
-			expectedRequested:   2, // 1 allocated (device-1) + 1 requested
+			expectedAllocated:   1, // 1 allocated (device-1)
 		},
 	}
 
 	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
+		tCtx.SyncTest(name, func(tCtx ktesting.TContext) {
 			// Setup environment, create required objects
-			logger, tCtx := ktesting.NewTestContext(t)
-			tCtx, cancel := context.WithCancel(tCtx)
-			defer cancel()
+			featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, tc.enableDRAExtendedResource)
 
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, tc.enableDRAExtendedResource)
-
-			draManager, err := newTestDRAManager(t, tCtx, logger, tc.objects...)
-			if err != nil {
-				t.Fatalf("failed to create fake DRA manager: %v", err)
-			}
+			draManager := newTestDRAManager(tCtx, tc.draObjects...)
 
 			nodeInfo := framework.NewNodeInfo()
 			nodeInfo.SetNode(tc.node)
@@ -582,24 +567,26 @@ func TestCalculateResourceAllocatableRequest(t *testing.T) {
 				var status *fwk.Status
 				draPreScoreState, status = getDRAPreScoredParams(draManager, []config.ResourceSpec{{Name: string(tc.extendedResource)}})
 				if status != nil {
-					t.Fatalf("getting DRA pre-scored params failed: %v", status)
+					tCtx.Fatalf("getting DRA pre-scored params failed: %v", status)
 				}
 			}
 
 			// Test calculateResourceAllocatableRequest API
-			allocatable, requested := scorer.calculateResourceAllocatableRequest(tCtx, nodeInfo, tc.extendedResource, tc.podRequest, draPreScoreState)
+			allocatable, allocated := scorer.calculateResourceAllocatableRequest(tCtx, nodeInfo, tc.extendedResource, draPreScoreState)
 			if !cmp.Equal(allocatable, tc.expectedAllocatable) {
-				t.Errorf("Expected allocatable=%v, but got allocatable=%v", tc.expectedAllocatable, allocatable)
+				tCtx.Errorf("Expected allocatable=%v, but got %v", tc.expectedAllocatable, allocatable)
 			}
-			if !cmp.Equal(requested, tc.expectedRequested) {
-				t.Errorf("Expected requested=%v, but got requested=%v", tc.expectedRequested, requested)
+			if !cmp.Equal(allocated, tc.expectedAllocated) {
+				tCtx.Errorf("Expected allocated=%v, but got %v", tc.expectedAllocated, allocated)
 			}
 		})
 	}
 }
 
-// newTestDRAManager creates a DefaultDRAManager for testing purposes
-func newTestDRAManager(t *testing.T, ctx context.Context, logger klog.Logger, objects ...apiruntime.Object) (*dynamicresources.DefaultDRAManager, error) {
+// newTestDRAManager creates a DefaultDRAManager for testing purposes.
+// Only usable in a syntest bubble.
+func newTestDRAManager(tCtx ktesting.TContext, objects ...apiruntime.Object) *dynamicresources.DefaultDRAManager {
+	tCtx = tCtx.WithCancel()
 	client := fake.NewClientset(objects...)
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	resourceSliceTrackerOpts := tracker.Options{
@@ -608,14 +595,12 @@ func newTestDRAManager(t *testing.T, ctx context.Context, logger klog.Logger, ob
 		ClassInformer: informerFactory.Resource().V1().DeviceClasses(),
 		KubeClient:    client,
 	}
-	resourceSliceTracker, err := tracker.StartTracker(ctx, resourceSliceTrackerOpts)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't start resource slice tracker: %w", err)
-	}
+	resourceSliceTracker, err := tracker.StartTracker(tCtx, resourceSliceTrackerOpts)
+	tCtx.ExpectNoError(err, "couldn't start resource slice tracker")
 	draManager := dynamicresources.NewDRAManager(
-		ctx,
+		tCtx,
 		assumecache.NewAssumeCache(
-			logger,
+			tCtx.Logger(),
 			informerFactory.Resource().V1().ResourceClaims().Informer(),
 			"resource claim",
 			"",
@@ -624,18 +609,25 @@ func newTestDRAManager(t *testing.T, ctx context.Context, logger klog.Logger, ob
 		informerFactory)
 
 	cache := draManager.DeviceClassResolver().(*extendedresourcecache.ExtendedResourceCache)
-	if _, err := informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandler(cache); err != nil {
-		return nil, fmt.Errorf("failed to add device class informer event handler: %w", err)
-	}
+	handle, err := informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandler(cache)
+	tCtx.ExpectNoError(err, "add device class informer event handler")
+	tCtx.Cleanup(func() {
+		_ = informerFactory.Resource().V1().DeviceClasses().Informer().RemoveEventHandler(handle)
+	})
 
-	informerFactory.Start(ctx.Done())
-	t.Cleanup(func() {
+	informerFactory.Start(tCtx.Done())
+	tCtx.Cleanup(func() {
+		tCtx.Cancel("test has completed")
 		// Now we can wait for all goroutines to stop.
 		informerFactory.Shutdown()
 	})
-	informerFactory.WaitForCacheSync(ctx.Done())
+	informerFactory.WaitForCacheSync(tCtx.Done())
 
-	return draManager, nil
+	// Wait for full initialization of manager, including
+	// processing of all informer events.
+	tCtx.Wait()
+
+	return draManager
 }
 
 // getCachedDeviceMatch checks the cache for a DeviceMatches result

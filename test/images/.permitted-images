@@ -14,14 +14,14 @@ registry.k8s.io/cloud-provider-gcp/gcp-compute-persistent-disk-csi-driver
 registry.k8s.io/e2e-test-images/agnhost
 registry.k8s.io/e2e-test-images/apparmor-loader
 registry.k8s.io/e2e-test-images/busybox
+registry.k8s.io/e2e-test-images/glibc-dns-testing
 registry.k8s.io/e2e-test-images/ipc-utils
-registry.k8s.io/e2e-test-images/jessie-dnsutils
 registry.k8s.io/e2e-test-images/kitten
 registry.k8s.io/e2e-test-images/nautilus
 registry.k8s.io/e2e-test-images/nginx
 registry.k8s.io/e2e-test-images/node-perf/npb-ep
 registry.k8s.io/e2e-test-images/node-perf/npb-is
-registry.k8s.io/e2e-test-images/node-perf/tf-wide-deep
+registry.k8s.io/e2e-test-images/node-perf/pytorch-wide-deep
 registry.k8s.io/e2e-test-images/nonewprivs
 registry.k8s.io/e2e-test-images/nonroot
 registry.k8s.io/e2e-test-images/perl

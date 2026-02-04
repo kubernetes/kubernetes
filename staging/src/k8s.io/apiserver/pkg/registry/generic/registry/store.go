@@ -27,8 +27,8 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/validate/content"
 	"k8s.io/apimachinery/pkg/api/validation"
-	"k8s.io/apimachinery/pkg/api/validation/path"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -286,7 +286,7 @@ func NamespaceKeyFunc(ctx context.Context, prefix string, name string) (string, 
 	if len(name) == 0 {
 		return "", apierrors.NewBadRequest("Name parameter required.")
 	}
-	if msgs := path.IsValidPathSegmentName(name); len(msgs) != 0 {
+	if msgs := content.IsPathSegmentName(name); len(msgs) != 0 {
 		return "", apierrors.NewBadRequest(fmt.Sprintf("Name parameter invalid: %q: %s", name, strings.Join(msgs, ";")))
 	}
 	key = key + "/" + name
@@ -299,7 +299,7 @@ func NoNamespaceKeyFunc(ctx context.Context, prefix string, name string) (string
 	if len(name) == 0 {
 		return "", apierrors.NewBadRequest("Name parameter required.")
 	}
-	if msgs := path.IsValidPathSegmentName(name); len(msgs) != 0 {
+	if msgs := content.IsPathSegmentName(name); len(msgs) != 0 {
 		return "", apierrors.NewBadRequest(fmt.Sprintf("Name parameter invalid: %q: %s", name, strings.Join(msgs, ";")))
 	}
 	key := prefix + "/" + name
@@ -1263,7 +1263,7 @@ func (e *Store) DeleteCollection(ctx context.Context, deleteValidation rest.Vali
 	for i := 0; i < workersNumber; i++ {
 		go func() {
 			// panics don't cross goroutine boundaries
-			defer utilruntime.HandleCrash(func(panicReason interface{}) {
+			defer utilruntime.HandleCrashWithContext(ctx, func(_ context.Context, panicReason interface{}) {
 				errs <- fmt.Errorf("DeleteCollection goroutine panicked: %v", panicReason)
 			})
 			defer wg.Done()
@@ -1288,7 +1288,7 @@ func (e *Store) DeleteCollection(ctx context.Context, deleteValidation rest.Vali
 	}
 	// In case of all workers exit, notify distributor.
 	go func() {
-		defer utilruntime.HandleCrash(func(panicReason interface{}) {
+		defer utilruntime.HandleCrashWithContext(ctx, func(_ context.Context, panicReason interface{}) {
 			errs <- fmt.Errorf("DeleteCollection workers closer panicked: %v", panicReason)
 		})
 		wg.Wait()

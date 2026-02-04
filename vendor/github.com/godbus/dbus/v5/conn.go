@@ -445,7 +445,8 @@ func (conn *Conn) handleSignal(sequence Sequence, msg *Message) {
 	// sender is optional for signals.
 	sender, _ := msg.Headers[FieldSender].value.(string)
 	if iface == "org.freedesktop.DBus" && sender == "org.freedesktop.DBus" {
-		if member == "NameLost" {
+		switch member {
+		case "NameLost":
 			// If we lost the name on the bus, remove it from our
 			// tracking list.
 			name, ok := msg.Body[0].(string)
@@ -453,7 +454,7 @@ func (conn *Conn) handleSignal(sequence Sequence, msg *Message) {
 				panic("Unable to read the lost name")
 			}
 			conn.names.loseName(name)
-		} else if member == "NameAcquired" {
+		case "NameAcquired":
 			// If we acquired the name on the bus, add it to our
 			// tracking list.
 			name, ok := msg.Body[0].(string)
@@ -512,9 +513,10 @@ func isEncodingError(err error) bool {
 }
 
 func (conn *Conn) handleSendError(msg *Message, err error) {
-	if msg.Type == TypeMethodCall {
+	switch msg.Type {
+	case TypeMethodCall:
 		conn.calls.handleSendError(msg, err)
-	} else if msg.Type == TypeMethodReply {
+	case TypeMethodReply:
 		if isEncodingError(err) {
 			// Make sure that the caller gets some kind of error response if
 			// the application code tried to respond, but the resulting message

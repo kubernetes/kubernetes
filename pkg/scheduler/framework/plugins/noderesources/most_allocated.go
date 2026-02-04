@@ -27,8 +27,8 @@ import (
 //
 // Details:
 // (cpu(MaxNodeScore * requested * cpuWeight / capacity) + memory(MaxNodeScore * requested * memoryWeight / capacity) + ...) / weightSum
-func mostResourceScorer(resources []config.ResourceSpec) func(requested, allocable []int64) int64 {
-	return func(requested, allocable []int64) int64 {
+func mostResourceScorer(resources []config.ResourceSpec) func(requested, _, allocable []int64) int64 {
+	return func(requested, _, allocable []int64) int64 {
 		var nodeScore, weightSum int64
 		for i := range requested {
 			if allocable[i] == 0 {

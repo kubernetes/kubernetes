@@ -197,6 +197,9 @@ linters:
         - float-compare
         - go-require
         - require-error
+    usetesting:
+      context-background: true
+      context-todo: true
   exclusions:
     generated: lax
     presets:

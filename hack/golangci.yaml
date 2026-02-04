@@ -118,7 +118,7 @@ linters:
 
       - linters:
           - govet
-        text: "lostcancel|printf"
+        text: "lostcancel"
 
       - linters:
           - ginkgolinter
@@ -158,7 +158,7 @@ linters:
       # Commentstart - Ignore commentstart issues for existing API group
       # TODO: For each existing API group, we aim to remove it over time.
       - text: "godoc for field .* should start with '.* ...'"
-        path: "staging/src/k8s.io/api/(admissionregistration|apiserverinternal|apps|authentication|authorization|autoscaling|batch|certificates|coordination|core|discovery|events|extensions|flowcontrol|imagepolicy|networking|node|policy|rbac|resource|scheduling|storage|storagemigration)"
+        path: "staging/src/k8s.io/api/(apiserverinternal|apps|authorization|autoscaling|batch|certificates|coordination|core|discovery|events|extensions|flowcontrol|imagepolicy|networking|node|policy|rbac|resource|scheduling|storage|storagemigration)"
       - text: "field .* is missing godoc comment"
         path: "staging/src/k8s.io/api/autoscaling/"
       
@@ -184,6 +184,60 @@ linters:
         path: "staging/src/k8s.io/api/networking/v1/types.go"
       - text: "field IngressPortStatus.Error has conflicting markers: optional_vs_required: {\\[optional\\], \\[kubebuilder:validation:Required\\]}. fields cannot be both optional and required"
         path: "staging/src/k8s.io/api/networking/v1beta1/types.go"
+      
+      # The following exceptions are for fields in stable or deprecated APIs that cannot be
+      # changed due to backward compatibility constraints. Each rule is scoped to the
+      # specific field to avoid hiding new violations.
+      
+      ## For the "Extra" field, which is common across several auth-related APIs.
+      - text: "field UserInfo.Extra should not use a map type, use a list type with a unique name/identifier instead"
+        path: "staging/src/k8s.io/api/authentication/(v1|v1beta1)/types.go"
+      - text: "field SubjectAccessReviewSpec.Extra should not use a map type, use a list type with a unique name/identifier instead"
+        path: "staging/src/k8s.io/api/authorization/(v1|v1beta1)/types.go"
+      - text: "field CertificateSigningRequestSpec.Extra should not use a map type, use a list type with a unique name/identifier instead"
+        path: "staging/src/k8s.io/api/certificates/(v1|v1beta1)/types.go"
+      
+      ## For ResourceList fields in the core API.
+      - text: "field (PersistentVolumeSpec.Capacity|ContainerStatus.AllocatedResources|PodSpec.Overhead|ResourceQuotaSpec.Hard) type ResourceList should not use a map type, use a list type with a unique name/identifier instead"
+        path: "staging/src/k8s.io/api/core/v1/types.go"
+      - text: "field (ResourceRequirements|VolumeResourceRequirements).(Limits|Requests) type ResourceList should not use a map type, use a list type with a unique name/identifier instead"
+        path: "staging/src/k8s.io/api/core/v1/types.go"
+      - text: "field LimitRangeItem.(Max|Min|Default|DefaultRequest|MaxLimitRequestRatio) type ResourceList should not use a map type, use a list type with a unique name/identifier instead"
+        path: "staging/src/k8s.io/api/core/v1/types.go"
+      - text: "field ResourceQuotaStatus.(Hard|Used) type ResourceList should not use a map type, use a list type with a unique name/identifier instead"
+        path: "staging/src/k8s.io/api/core/v1/types.go"
+      - text: "type ResourceList should not use a map type, use a list type with a unique name/identifier instead"
+        path: "staging/src/k8s.io/api/core/v1/types.go"
+      
+      ## For the Secret.Data and ConfigMap.BinaryData fields in the core API.
+      - text: "field (Secret.Data|ConfigMap.BinaryData) should not use a map type, use a list type with a unique name/identifier instead"
+        path: "staging/src/k8s.io/api/core/v1/types.go"
+      
+      ## For map fields in the resource API (across all versions).
+      - text: "field (CounterSet|DeviceCounterConsumption).Counters should not use a map type, use a list type with a unique name/identifier instead"
+        path: "staging/src/k8s.io/api/resource/(v1|v1beta1|v1beta2)/types.go"
+      - text: "field BasicDevice.(Attributes|Capacity) should not use a map type, use a list type with a unique name/identifier instead"
+        path: "staging/src/k8s.io/api/resource/v1beta1/types.go"
+      - text: "field Device.(Attributes|Capacity) should not use a map type, use a list type with a unique name/identifier instead"
+        path: "staging/src/k8s.io/api/resource/(v1|v1beta2)/types.go"
+      - text: "field (CapacityRequirements.Requests|DeviceRequestAllocationResult.ConsumedCapacity) should not use a map type, use a list type with a unique name/identifier instead"
+        path: "staging/src/k8s.io/api/resource/(v1|v1beta1|v1beta2)/types.go"
+      
+      # OptionalOrRequired is being enabled over time. For now, each API group should be added to this list until we comb through each group and fix the missing tags.
+      - text: "must be marked as optional or required"
+        path: "staging/src/k8s.io/api/(admission|apidiscovery|apiserverinternal|apps|authentication|authorization|autoscaling|batch|certificates|coordination|core|discovery|events|extensions|flowcontrol|networking|policy|rbac|resource|storage|storagemigration)"
+      
+      # OptionalOrRequired - Existing fields that are marked as both optional and required (based on standard optional vs kubebuilder:validation:Required) and should not be fixed.
+      - text: "field (PortStatus|IngressPortStatus)\\.Error must not be marked as both optional and required"
+        path: "staging/src/k8s.io/api/(core/v1|extensions/v1beta1|networking/(v1|v1beta1))"
+      
+      # jsontags: 'Port' must be capitalized for backward compatibility
+      - text: 'jsontags: field DaemonEndpoint.Port json tag does not match'
+        path: "staging/src/k8s.io/api/core/v1/types.go"
+
+      - linters:
+        - forbidigo
+        path: test/e2e/e2e_test\.go|test/e2e/framework/internal/.*|test/e2e/framework/[^/]*\.go|test/e2e/invariants/.*
 
   default: none
   enable: # please keep this alphabetized
@@ -195,6 +249,7 @@ linters:
     - ineffassign
     - kubeapilinter
     - logcheck
+    - modernize
     - revive
     - sorted
     - staticcheck
@@ -243,6 +298,7 @@ linters:
             contextual k8s.io/client-go/tools/cache/.*
             contextual k8s.io/client-go/tools/events/.*
             contextual k8s.io/client-go/tools/record/.*
+            contextual k8s.io/component-base/featuregate/*
             contextual k8s.io/component-helpers/.*
             contextual k8s.io/cri-api/.*
             contextual k8s.io/cri-client/.*
@@ -274,33 +330,51 @@ linters:
             contextual k8s.io/kubernetes/pkg/security/.*
             contextual k8s.io/kubernetes/pkg/securitycontext/.*
             contextual k8s.io/kubernetes/test/e2e/dra/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/certificate/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/cm/dra/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/lifecycle/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/pleg/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/clustertrustbundle/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/token/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/cadvisor/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/config/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/oom/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/server/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/status/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/sysctl/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/winstats/.*
+            contextual k8s.io/kubernetes/test/images/sample-device-plugin/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/allocation/.*
             contextual k8s.io/kubernetes/pkg/kubelet/apis/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/cadvisor/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/certificate/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/checkpointmanager/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/client/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/clustertrustbundle/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/cm/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/config/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/configmap/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/container/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/envvars/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/events/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/eviction/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/images/.*
             contextual k8s.io/kubernetes/pkg/kubelet/kubeletconfig/.*
             contextual k8s.io/kubernetes/pkg/kubelet/kuberuntime/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/nodeshutdown/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/pod/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/preemption/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/volumemanager/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/util/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/lifecycle/.*
             contextual k8s.io/kubernetes/pkg/kubelet/logs/.*
-            contextual k8s.io/kubernetes/test/images/sample-device-plugin/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/metrics/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/network/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/nodeshutdown/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/nodestatus/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/oom/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/pleg/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/pluginmanager/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/pod/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/podcertificate/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/preemption/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/prober/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/qos/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/runtimeclass/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/secret/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/server/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/stats/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/status/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/sysctl/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/token/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/types/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/userns/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/util/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/volumemanager/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/watchdog/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/winstats/.*
             
             # As long as contextual logging is alpha or beta, all WithName, WithValues,
             # NewContext calls have to go through klog. Once it is GA, we can lift
@@ -334,20 +408,23 @@ linters:
               - "commentstart" # Ensure comments start with the serialized version of the field name.
               - "conditions" # Ensure conditions have the correct json tags and markers.
               - "conflictingmarkers" # Detect mutually exclusive markers on the same field.
-              # - "integers" # Ensure only int32 and int64 are used for integers.
-              # - "jsontags" # Ensure every field has a json tag.
+              - "integers" # Ensure only int32 and int64 are used for integers.
+              - "jsontags" # Ensure every field has a json tag.
               # - "maxlength" # Ensure all strings and arrays have maximum lengths/maximum items. ONLY for CRDs until declarative markers exist in core types.
               # - "nobools" # Bools do not evolve over time, should use enums instead.
               # - "nofloats" # Ensure floats are not used.
-              # - "nomaps" # Ensure maps are not used, unless they are `map[string]string` (for labels/annotations/etc).
+              - "nomaps" # Ensure maps are not used, unless they are `map[string]string` (for labels/annotations/etc).
+              - "nonullable" # Ensure fields are not marked as nullable.
               # - "nophase" # Ensure field names do not have the word "phase" in them.
               - "notimestamp" # Ensure fields are not named "timestamp", prefer "time".
               # - "optionalfields" # Ensure fields marked optional have omitempty and pointers.
-              # - "optionalorrequired" # Every field should be marked as `+optional` xor `+required`.
+              - "optionalorrequired" # Every field should be marked as `+optional` xor `+required`.
               # - "requiredfields" # Required fields should only be pointers when required based on the validity of the zero value, they should always have `omitempty`.
               - "ssatags" # Ensure lists have a listType tag.
               # - "uniquemarkers" # Ensure markers are not duplicated across field and type definitions.
               - "duplicatemarkers" #Prevent identical markers from being present on types and fields
+              - "dependenttags" # Ensure markers dependent on other markers are present.
+              - "nodurations" # Ensure duration types are not used.
           lintersConfig:
             conditions:
               isFirstField: Ignore
@@ -365,6 +442,12 @@ linters:
                 - ["k8s:required", "required", "kubebuilder:validation:Required"]
                 - ["default"]
                 description: "fields with default values are always optional"
+            dependenttags:
+              rules:
+                - identifier: "k8s:unionMember"
+                  type: "All"
+                  dependsOn:
+                    - "k8s:optional"
             # jsonTags:
             #   jsonTagRegex: "^[a-z][a-z0-9]*(?:[A-Z][a-z0-9]*)*$" # The default regex is appropriate for our use case.
             # nomaps:
@@ -431,6 +514,10 @@ linters:
         - pattern: \.Add$
           pkg: ^k8s\.io/component-base/featuregate$         
           msg: should not use Add, use AddVersioned instead
+        - pattern: \.(ReportBeforeSuite|ReportAfterSuite)
+          pkg: ^github\.com/onsi/ginkgo/v2$
+          msg: usage is restricted to code under control of SIG Testing
+          # Exceptions are listed above under rules.
     gocritic:
       enabled-checks: # These are in addition to the default checks - see https://golangci-lint.run/docs/linters/configuration/#gocritic
         - boolExprSimplify
@@ -449,6 +536,102 @@ linters:
         - typeSwitchVar
         - underef
         - unslice
+    modernize:
+      # List of analyzers to disable.
+      # By default, all analyzers are enabled but in
+      # Kubernetes we want to be more selective and
+      # disable those which are not useful for it.
+      #
+      # Analyzers which are kept enabled are not
+      # called out here, see https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/modernize#section-documentation
+      # for the full list.
+      disable:
+        # Replace interface{} with any.
+        #
+        # Disabled because developers may
+        # prefer to use `interface{}` for
+        # consistency with existing code
+        # and it's just syntactic sugar.
+        - any
+        # Replace for-range over b.N with b.Loop.
+        #
+        # Only a hint for new tests because there's
+        # too much existing code that isn't worth
+        # updating.
+        - bloop
+        # Replace []byte(fmt.Sprintf) with fmt.Appendf.
+        #
+        # A useful hint for new code, but
+        # should only be updated in old code
+        # where it really matters.
+        - fmtappendf
+        # Remove redundant re-declaration of loop variables.
+        #
+        # A useful hint that this is no longer necessary with
+        # the Go version that Kubernetes depends on.
+        - forvar
+        # Replace explicit loops over maps with calls to maps package.
+        #
+        # Completely disabled because the benefit
+        # isn't immediately obvious.
+        - mapsloop
+        # Replace if/else statements with calls to min or max.
+        #
+        # A useful hint for new code.
+        - minmax
+        # Suggest replacing omitempty with omitzero for struct fields.
+        #
+        # Disabled because might interfere
+        # with encoding of API structs.
+        - omitzero
+        # Replace 3-clause for loops with for-range over integers.
+        #
+        # A useful hint for new code (makes it shorter).
+        - rangeint
+        # Replace reflect.TypeOf(x) with TypeFor[T]().
+        #
+        # A useful hint for new code, it could be more efficient.
+        - reflecttypefor
+        # Replace loops with slices.Contains or slices.ContainsFunc.
+        #
+        # A useful hint because it can make  code more obvious
+        # and/or avoid helper functions.
+        - slicescontains
+        # Replace sort.Slice with slices.Sort for basic types.
+        #
+        # A useful hint because the code becomes shorter.
+        - slicessort
+        # Use iterators instead of Len/At-style APIs.
+        #
+        # A useful hint because the code becomes shorter.
+        - stditerators
+        # Replace HasPrefix/TrimPrefix with CutPrefix.
+        #
+        # A useful hint because the code becomes shorter.
+        - stringscutprefix
+        # Replace ranging over Split/Fields with SplitSeq/FieldsSeq.
+        #
+        # A useful hint because it's more efficient.
+        - stringsseq
+        # Replace += with strings.Builder.
+        #
+        # Disabled because in code which
+        # isn't performance-sensitive +=
+        # can be a bit more readable.
+        - stringsbuilder
+        # Replace context.WithCancel with t.Context in tests.
+        #
+        # Disabled because in Kubernetes,
+        # test/utils/ktesting handles
+        # context cancellation and also
+        # addresses other pain points.
+        - testingcontext
+        # Replace wg.Add(1)/go/wg.Done() with wg.Go.
+        #
+        # A useful hint leading to shorter code.
+        # Makes wait.Group obsolete.
+        - waitgroup
+
     revive:
       # Only these rules are enabled.
       rules:

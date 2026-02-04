@@ -215,6 +215,8 @@ type CounterSet struct {
 	// The maximum number of counters is 32.
 	//
 	// +required
+	// +k8s:required
+	// +k8s:eachKey=+k8s:format=k8s-short-name
 	Counters map[string]Counter `json:"counters,omitempty" protobuf:"bytes,2,name=counters"`
 }
 
@@ -465,6 +467,8 @@ type DeviceCounterConsumption struct {
 	// The maximum number of counters is 32.
 	//
 	// +required
+	// +k8s:required
+	// +k8s:eachKey=+k8s:format=k8s-short-name
 	Counters map[string]Counter `json:"counters,omitempty" protobuf:"bytes,2,opt,name=counters"`
 }
 

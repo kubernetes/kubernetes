@@ -23,7 +23,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -208,7 +207,7 @@ func NewVolumeManager(
 	}
 
 	intreeToCSITranslator := csitrans.New()
-	csiMigratedPluginManager := csimigration.NewPluginManager(intreeToCSITranslator, utilfeature.DefaultFeatureGate)
+	csiMigratedPluginManager := csimigration.NewPluginManager(intreeToCSITranslator)
 
 	vm.intreeToCSITranslator = intreeToCSITranslator
 	vm.csiMigratedPluginManager = csiMigratedPluginManager
@@ -298,7 +297,7 @@ func (e *VolumeAttachLimitExceededError) Error() string {
 
 func (vm *volumeManager) Run(ctx context.Context, sourcesReady config.SourcesReady) {
 	logger := klog.FromContext(ctx)
-	defer runtime.HandleCrash()
+	defer runtime.HandleCrashWithContext(ctx)
 
 	if vm.kubeClient != nil {
 		// start informer for CSIDriver
@@ -511,21 +510,18 @@ func (vm *volumeManager) WaitForUnmount(ctx context.Context, pod *v1.Pod) error 
 }
 
 func (vm *volumeManager) WaitForAllPodsUnmount(ctx context.Context, pods []*v1.Pod) error {
-	var (
-		errors []error
-		wg     sync.WaitGroup
-	)
-	wg.Add(len(pods))
-	for _, pod := range pods {
-		go func(pod *v1.Pod) {
-			defer wg.Done()
-			if err := vm.WaitForUnmount(ctx, pod); err != nil {
-				errors = append(errors, err)
-			}
-		}(pod)
+	if len(pods) == 0 {
+		return nil
 	}
-	wg.Wait()
-	return utilerrors.NewAggregate(errors)
+
+	funcs := make([]func() error, 0, len(pods))
+	for _, pod := range pods {
+		funcs = append(funcs, func() error {
+			return vm.WaitForUnmount(ctx, pod)
+		})
+	}
+
+	return utilerrors.AggregateGoroutines(funcs...)
 }
 
 func (vm *volumeManager) getVolumesNotInDSW(uniquePodName types.UniquePodName, expectedVolumes []string) []string {

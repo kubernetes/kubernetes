@@ -41,6 +41,8 @@ message GangSchedulingPolicy {
   // It must be a positive integer.
   //
   // +required
+  // +k8s:required
+  // +k8s:minimum=0
   optional int32 minCount = 1;
 }
 
@@ -50,6 +52,8 @@ message PodGroup {
   // It must be a DNS label. This field is immutable.
   //
   // +required
+  // +k8s:required
+  // +k8s:format=k8s-short-name
   optional string name = 1;
 
   // Policy defines the scheduling policy for this PodGroup.
@@ -59,19 +63,24 @@ message PodGroup {
 }
 
 // PodGroupPolicy defines the scheduling configuration for a PodGroup.
+// +union
 message PodGroupPolicy {
   // Basic specifies that the pods in this group should be scheduled using
   // standard Kubernetes scheduling behavior.
   //
   // +optional
+  // +k8s:optional
   // +oneOf=PolicySelection
+  // +k8s:unionMember
   optional BasicSchedulingPolicy basic = 2;
 
   // Gang specifies that the pods in this group should be scheduled using
   // all-or-nothing semantics.
   //
   // +optional
+  // +k8s:optional
   // +oneOf=PolicySelection
+  // +k8s:unionMember
   optional GangSchedulingPolicy gang = 3;
 }
 
@@ -86,6 +95,7 @@ message PriorityClass {
 
   // value represents the integer value of this priority class. This is the actual priority that pods
   // receive when they have the name of this class in their pod spec.
+  // +optional
   optional int32 value = 2;
 
   // globalDefault specifies whether this PriorityClass should be considered as
@@ -127,18 +137,24 @@ message TypedLocalObjectReference {
   // It must be a DNS subdomain.
   //
   // +optional
+  // +k8s:optional
+  // +k8s:format=k8s-long-name
   optional string apiGroup = 1;
 
   // Kind is the type of resource being referenced.
   // It must be a path segment name.
   //
   // +required
+  // +k8s:required
+  // +k8s:format=k8s-path-segment-name
   optional string kind = 2;
 
   // Name is the name of resource being referenced.
   // It must be a path segment name.
   //
   // +required
+  // +k8s:required
+  // +k8s:format=k8s-path-segment-name
   optional string name = 3;
 }
 
@@ -177,6 +193,8 @@ message WorkloadSpec {
   // When set, it cannot be changed.
   //
   // +optional
+  // +k8s:optional
+  // +k8s:update=NoModify
   optional TypedLocalObjectReference controllerRef = 1;
 
   // PodGroups is the list of pod groups that make up the Workload.
@@ -185,6 +203,11 @@ message WorkloadSpec {
   // +required
   // +listType=map
   // +listMapKey=name
+  // +k8s:required
+  // +k8s:listType=map
+  // +k8s:listMapKey=name
+  // +k8s:maxItems=8
+  // +k8s:immutable
   repeated PodGroup podGroups = 2;
 }
 

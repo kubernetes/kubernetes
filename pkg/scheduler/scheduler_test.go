@@ -309,7 +309,7 @@ func TestFailureHandler(t *testing.T) {
 
 				recorder := metrics.NewMetricsAsyncRecorder(3, 20*time.Microsecond, ctx.Done())
 				queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(testingclock.NewFakeClock(time.Now())), internalqueue.WithMetricsRecorder(recorder), internalqueue.WithAPIDispatcher(apiDispatcher))
-				schedulerCache := internalcache.New(ctx, 30*time.Second, apiDispatcher)
+				schedulerCache := internalcache.New(ctx, apiDispatcher)
 
 				queue.Add(logger, testPod)
 
@@ -383,7 +383,7 @@ func TestFailureHandler_PodAlreadyBound(t *testing.T) {
 			}
 
 			queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(testingclock.NewFakeClock(time.Now())), internalqueue.WithAPIDispatcher(apiDispatcher))
-			schedulerCache := internalcache.New(ctx, 30*time.Second, apiDispatcher)
+			schedulerCache := internalcache.New(ctx, apiDispatcher)
 
 			// Add node to schedulerCache no matter it's deleted in API server or not.
 			schedulerCache.AddNode(logger, &nodeFoo)
@@ -1301,7 +1301,7 @@ func TestFrameworkHandler_IterateOverWaitingPods(t *testing.T) {
 			// Wait all pods in waitSchedulingPods to be scheduled.
 			wg.Wait()
 
-			utiltesting.Eventually(tCtx, func(utiltesting.TContext) sets.Set[string] {
+			tCtx.Eventually(func(utiltesting.TContext) sets.Set[string] {
 				// Ensure that all waitingPods in scheduler can be obtained from any profiles.
 				actualPodNamesInWaitingPods := sets.New[string]()
 				for _, schedFramework := range scheduler.Profiles {

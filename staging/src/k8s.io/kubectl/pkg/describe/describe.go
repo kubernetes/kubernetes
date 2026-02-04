@@ -41,12 +41,10 @@ import (
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	batchv1 "k8s.io/api/batch/v1"
-	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	certificatesv1 "k8s.io/api/certificates/v1"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
-	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -210,7 +208,6 @@ func describerMap(clientConfig *rest.Config) (map[schema.GroupKind]ResourceDescr
 		{Group: corev1.GroupName, Kind: "PriorityClass"}:                     &PriorityClassDescriber{c},
 		{Group: discoveryv1.GroupName, Kind: "EndpointSlice"}:                &EndpointSliceDescriber{c},
 		{Group: autoscalingv2.GroupName, Kind: "HorizontalPodAutoscaler"}:    &HorizontalPodAutoscalerDescriber{c},
-		{Group: extensionsv1beta1.GroupName, Kind: "Ingress"}:                &IngressDescriber{c},
 		{Group: networkingv1.GroupName, Kind: "Ingress"}:                     &IngressDescriber{c},
 		{Group: networkingv1.GroupName, Kind: "IngressClass"}:                &IngressClassDescriber{c},
 		{Group: networkingv1beta1.GroupName, Kind: "ServiceCIDR"}:            &ServiceCIDRDescriber{c},
@@ -219,7 +216,6 @@ func describerMap(clientConfig *rest.Config) (map[schema.GroupKind]ResourceDescr
 		{Group: networkingv1.GroupName, Kind: "IPAddress"}:                   &IPAddressDescriber{c},
 		{Group: batchv1.GroupName, Kind: "Job"}:                              &JobDescriber{c},
 		{Group: batchv1.GroupName, Kind: "CronJob"}:                          &CronJobDescriber{c},
-		{Group: batchv1beta1.GroupName, Kind: "CronJob"}:                     &CronJobDescriber{c},
 		{Group: appsv1.GroupName, Kind: "StatefulSet"}:                       &StatefulSetDescriber{c},
 		{Group: appsv1.GroupName, Kind: "Deployment"}:                        &DeploymentDescriber{c},
 		{Group: appsv1.GroupName, Kind: "DaemonSet"}:                         &DaemonSetDescriber{c},
@@ -454,7 +450,7 @@ func (d *NamespaceDescriber) Describe(namespace, name string, describerSettings 
 	resourceQuotaList := &corev1.ResourceQuotaList{}
 	err = runtimeresource.FollowContinue(&metav1.ListOptions{Limit: describerSettings.ChunkSize},
 		func(options metav1.ListOptions) (runtime.Object, error) {
-			newList, err := d.CoreV1().ResourceQuotas(name).List(context.TODO(), options)
+			newList, err := d.CoreV1().ResourceQuotas(ns.Name).List(context.TODO(), options)
 			if err != nil {
 				return nil, runtimeresource.EnhanceListError(err, options, corev1.ResourceQuotas.String())
 			}
@@ -474,7 +470,7 @@ func (d *NamespaceDescriber) Describe(namespace, name string, describerSettings 
 	limitRangeList := &corev1.LimitRangeList{}
 	err = runtimeresource.FollowContinue(&metav1.ListOptions{Limit: describerSettings.ChunkSize},
 		func(options metav1.ListOptions) (runtime.Object, error) {
-			newList, err := d.CoreV1().LimitRanges(name).List(context.TODO(), options)
+			newList, err := d.CoreV1().LimitRanges(ns.Name).List(context.TODO(), options)
 			if err != nil {
 				return nil, runtimeresource.EnhanceListError(err, options, "limitranges")
 			}
@@ -656,9 +652,7 @@ type LimitRangeDescriber struct {
 }
 
 func (d *LimitRangeDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	lr := d.CoreV1().LimitRanges(namespace)
-
-	limitRange, err := lr.Get(context.TODO(), name, metav1.GetOptions{})
+	limitRange, err := d.CoreV1().LimitRanges(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -683,9 +677,7 @@ type ResourceQuotaDescriber struct {
 }
 
 func (d *ResourceQuotaDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	rq := d.CoreV1().ResourceQuotas(namespace)
-
-	resourceQuota, err := rq.Get(context.TODO(), name, metav1.GetOptions{})
+	resourceQuota, err := d.CoreV1().ResourceQuotas(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -1508,9 +1500,7 @@ type PersistentVolumeDescriber struct {
 }
 
 func (d *PersistentVolumeDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	c := d.CoreV1().PersistentVolumes()
-
-	pv, err := c.Get(context.TODO(), name, metav1.GetOptions{})
+	pv, err := d.CoreV1().PersistentVolumes().Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -1656,14 +1646,12 @@ type PersistentVolumeClaimDescriber struct {
 }
 
 func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	c := d.CoreV1().PersistentVolumeClaims(namespace)
-
-	pvc, err := c.Get(context.TODO(), name, metav1.GetOptions{})
+	pvc, err := d.CoreV1().PersistentVolumeClaims(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
 
-	pc := d.CoreV1().Pods(namespace)
+	pc := d.CoreV1().Pods(pvc.Namespace)
 
 	pods, err := getPodsForPVC(pc, pvc, describerSettings)
 	if err != nil {
@@ -2178,14 +2166,12 @@ type ReplicationControllerDescriber struct {
 }
 
 func (d *ReplicationControllerDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	rc := d.CoreV1().ReplicationControllers(namespace)
-	pc := d.CoreV1().Pods(namespace)
-
-	controller, err := rc.Get(context.TODO(), name, metav1.GetOptions{})
+	controller, err := d.CoreV1().ReplicationControllers(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
 
+	pc := d.CoreV1().Pods(controller.Namespace)
 	selector := labels.SelectorFromSet(controller.Spec.Selector)
 	running, waiting, succeeded, failed, err := getPodStatusForController(pc, selector, controller.UID, describerSettings)
 	if err != nil {
@@ -2260,10 +2246,7 @@ type ReplicaSetDescriber struct {
 }
 
 func (d *ReplicaSetDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	rsc := d.AppsV1().ReplicaSets(namespace)
-	pc := d.CoreV1().Pods(namespace)
-
-	rs, err := rsc.Get(context.TODO(), name, metav1.GetOptions{})
+	rs, err := d.AppsV1().ReplicaSets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -2273,6 +2256,7 @@ func (d *ReplicaSetDescriber) Describe(namespace, name string, describerSettings
 		return "", err
 	}
 
+	pc := d.CoreV1().Pods(rs.Namespace)
 	running, waiting, succeeded, failed, getPodErr := getPodStatusForController(pc, selector, rs.UID, describerSettings)
 
 	var events *corev1.EventList
@@ -2520,14 +2504,12 @@ type DaemonSetDescriber struct {
 }
 
 func (d *DaemonSetDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	dc := d.AppsV1().DaemonSets(namespace)
-	pc := d.CoreV1().Pods(namespace)
-
-	daemon, err := dc.Get(context.TODO(), name, metav1.GetOptions{})
+	daemon, err := d.AppsV1().DaemonSets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
 
+	pc := d.CoreV1().Pods(daemon.Namespace)
 	selector, err := metav1.LabelSelectorAsSelector(daemon.Spec.Selector)
 	if err != nil {
 		return "", err
@@ -2574,9 +2556,7 @@ type SecretDescriber struct {
 }
 
 func (d *SecretDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	c := d.CoreV1().Secrets(namespace)
-
-	secret, err := c.Get(context.TODO(), name, metav1.GetOptions{})
+	secret, err := d.CoreV1().Secrets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -2928,15 +2908,13 @@ type ServiceDescriber struct {
 }
 
 func (d *ServiceDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	c := d.CoreV1().Services(namespace)
-
-	service, err := c.Get(context.TODO(), name, metav1.GetOptions{})
+	service, err := d.CoreV1().Services(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
 
-	endpointSliceList, _ := d.DiscoveryV1().EndpointSlices(namespace).List(context.TODO(), metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("%s=%s", discoveryv1.LabelServiceName, name),
+	endpointSliceList, _ := d.DiscoveryV1().EndpointSlices(service.Namespace).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("%s=%s", discoveryv1.LabelServiceName, service.Name),
 	})
 	var events *corev1.EventList
 	if describerSettings.ShowEvents {
@@ -3022,6 +3000,9 @@ func describeService(service *corev1.Service, endpointSlices []discoveryv1.Endpo
 			} else {
 				w.Write(LEVEL_0, "TargetPort:\t%s/%s\n", sp.TargetPort.StrVal, sp.Protocol)
 			}
+			if sp.AppProtocol != nil {
+				w.Write(LEVEL_0, "AppProtocol:\t%s\n", *sp.AppProtocol)
+			}
 			if sp.NodePort != 0 {
 				w.Write(LEVEL_0, "NodePort:\t%s\t%d/%s\n", name, sp.NodePort, sp.Protocol)
 			}
@@ -3056,9 +3037,7 @@ type EndpointsDescriber struct {
 }
 
 func (d *EndpointsDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	c := d.CoreV1().Endpoints(namespace)
-
-	ep, err := c.Get(context.TODO(), name, metav1.GetOptions{})
+	ep, err := d.CoreV1().Endpoints(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -3231,9 +3210,7 @@ type ServiceAccountDescriber struct {
 }
 
 func (d *ServiceAccountDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	c := d.CoreV1().ServiceAccounts(namespace)
-
-	serviceAccount, err := c.Get(context.TODO(), name, metav1.GetOptions{})
+	serviceAccount, err := d.CoreV1().ServiceAccounts(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -3454,14 +3431,13 @@ type NodeDescriber struct {
 }
 
 func (d *NodeDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	mc := d.CoreV1().Nodes()
-	node, err := mc.Get(context.TODO(), name, metav1.GetOptions{})
+	node, err := d.CoreV1().Nodes().Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
 
 	fieldSelector := fields.AndSelectors(
-		fields.OneTermEqualSelector("spec.nodeName", name),
+		fields.OneTermEqualSelector("spec.nodeName", node.Name),
 		fields.OneTermNotEqualSelector("status.phase", string(corev1.PodSucceeded)),
 		fields.OneTermNotEqualSelector("status.phase", string(corev1.PodFailed)),
 	)
@@ -3472,7 +3448,7 @@ func (d *NodeDescriber) Describe(namespace, name string, describerSettings Descr
 		FieldSelector: fieldSelector.String(),
 		Limit:         describerSettings.ChunkSize,
 	}
-	nodeNonTerminatedPodsList, err := getPodsInChunks(d.CoreV1().Pods(namespace), initialOpts)
+	nodeNonTerminatedPodsList, err := getPodsInChunks(d.CoreV1().Pods(node.Namespace), initialOpts)
 	if err != nil {
 		if !apierrors.IsForbidden(err) {
 			return "", err
@@ -3634,7 +3610,7 @@ func (p *StatefulSetDescriber) Describe(namespace, name string, describerSetting
 	if err != nil {
 		return "", err
 	}
-	pc := p.client.CoreV1().Pods(namespace)
+	pc := p.client.CoreV1().Pods(ps.Namespace)
 
 	selector, err := metav1.LabelSelectorAsSelector(ps.Spec.Selector)
 	if err != nil {
@@ -4280,9 +4256,7 @@ type ConfigMapDescriber struct {
 }
 
 func (d *ConfigMapDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	c := d.CoreV1().ConfigMaps(namespace)
-
-	configMap, err := c.Get(context.TODO(), name, metav1.GetOptions{})
+	configMap, err := d.CoreV1().ConfigMaps(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -4327,9 +4301,7 @@ type NetworkPolicyDescriber struct {
 }
 
 func (d *NetworkPolicyDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	c := d.NetworkingV1().NetworkPolicies(namespace)
-
-	networkPolicy, err := c.Get(context.TODO(), name, metav1.GetOptions{})
+	networkPolicy, err := d.NetworkingV1().NetworkPolicies(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}

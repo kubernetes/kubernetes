@@ -803,7 +803,7 @@ func TestCondition(t *testing.T) {
 			attributes: newValidAttribute(nil, false),
 			results: []EvaluationResult{
 				{
-					Error: errors.New(fmt.Sprintf("operation cancelled: actual cost limit exceeded")),
+					Error: fmt.Errorf("operation cancelled: actual cost limit exceeded"),
 				},
 			},
 			hasParamKind:     true,
@@ -1573,6 +1573,8 @@ func (f fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) 
 			panic(fmt.Sprintf("unsupported type: %T", a))
 		}
 
+		// Compare AttributesRecord structs - contains error fields but we're comparing the struct, not handling errors
+		//nolint:all
 		if reflect.DeepEqual(f.match.match, *other) {
 			return f.match.decision, f.match.reason, f.match.err
 		}

@@ -19,9 +19,8 @@ package ktesting
 import (
 	"context"
 	"errors"
-	"os"
-	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/stretchr/testify/assert"
@@ -38,9 +37,12 @@ func TestCause(t *testing.T) {
 	timeoutCause := canceledError("I timed out")
 	parentCause := errors.New("parent canceled")
 
-	t.Parallel()
+	contextBackground := func(t *testing.T) context.Context {
+		return context.Background()
+	}
+
 	for name, tt := range map[string]struct {
-		parentCtx              context.Context
+		parentCtx              func(t *testing.T) context.Context
 		timeout                time.Duration
 		sleep                  time.Duration
 		cancelCause            string
@@ -48,96 +50,81 @@ func TestCause(t *testing.T) {
 		expectDeadline         time.Duration
 	}{
 		"nothing": {
-			parentCtx: context.Background(),
+			parentCtx: contextBackground,
 			timeout:   5 * time.Millisecond,
 			sleep:     time.Millisecond,
 		},
 		"timeout": {
-			parentCtx:   context.Background(),
+			parentCtx:   contextBackground,
 			timeout:     time.Millisecond,
 			sleep:       5 * time.Millisecond,
 			expectErr:   context.Canceled,
 			expectCause: canceledError(timeoutCause),
 		},
 		"parent-canceled": {
-			parentCtx: func() context.Context {
+			parentCtx: func(t *testing.T) context.Context {
 				ctx, cancel := context.WithCancel(context.Background())
 				cancel()
 				return ctx
-			}(),
+			},
 			timeout:     time.Millisecond,
 			sleep:       5 * time.Millisecond,
 			expectErr:   context.Canceled,
 			expectCause: context.Canceled,
 		},
 		"parent-cause": {
-			parentCtx: func() context.Context {
+			parentCtx: func(t *testing.T) context.Context {
 				ctx, cancel := context.WithCancelCause(context.Background())
 				cancel(parentCause)
 				return ctx
-			}(),
+			},
 			timeout:     time.Millisecond,
 			sleep:       5 * time.Millisecond,
 			expectErr:   context.Canceled,
 			expectCause: parentCause,
 		},
 		"deadline-no-parent": {
-			parentCtx:      context.Background(),
+			parentCtx:      contextBackground,
 			timeout:        time.Minute,
 			expectDeadline: time.Minute,
 		},
 		"deadline-parent": {
-			parentCtx: func() context.Context {
+			parentCtx: func(t *testing.T) context.Context {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 				t.Cleanup(cancel)
 				return ctx
-			}(),
+			},
 			timeout:        2 * time.Minute,
 			expectDeadline: time.Minute,
 		},
 		"deadline-child": {
-			parentCtx: func() context.Context {
+			parentCtx: func(t *testing.T) context.Context {
 				ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 				t.Cleanup(cancel)
 				return ctx
-			}(),
+			},
 			timeout:        time.Minute,
 			expectDeadline: time.Minute,
 		},
 	} {
-		tt := tt
 		t.Run(name, func(t *testing.T) {
-			ctx, cancel := withTimeout(tt.parentCtx, t, tt.timeout, timeoutCause.Error())
-			if tt.cancelCause != "" {
-				cancel(tt.cancelCause)
-			}
-			if tt.expectDeadline != 0 {
-				actualDeadline, ok := ctx.Deadline()
-				if assert.True(t, ok, "should have had a deadline") {
-					// Testing timing behavior is unreliable in Prow because
-					// the test runs in parallel with several others.
-					// Therefore this check is skipped if a CI environment is
-					// detected.
-					ci, _ := os.LookupEnv("CI")
-					switch strings.ToLower(ci) {
-					case "yes", "true", "1":
-						// Skip.
-					default:
-						assert.InDelta(t, time.Until(actualDeadline), tt.expectDeadline, float64(time.Second), "remaining time till Deadline()")
+			synctest.Test(t, func(t *testing.T) {
+				ctx, cancel := withTimeout(tt.parentCtx(t), t, tt.timeout, timeoutCause.Error())
+				if tt.cancelCause != "" {
+					cancel(tt.cancelCause)
+				}
+				if tt.expectDeadline != 0 {
+					actualDeadline, ok := ctx.Deadline()
+					if assert.True(t, ok, "should have had a deadline") {
+						assert.Equal(t, tt.expectDeadline, time.Until(actualDeadline), "remaining time till Deadline()")
 					}
 				}
-			}
-			time.Sleep(tt.sleep)
-			actualErr := ctx.Err()
-			actualCause := context.Cause(ctx)
-			ci, _ := os.LookupEnv("CI")
-			switch strings.ToLower(ci) {
-			case "yes", "true", "1":
-				// Skip.
-			default:
+				time.Sleep(tt.sleep)
+				actualErr := ctx.Err()
+				actualCause := context.Cause(ctx)
 				assert.Equal(t, tt.expectErr, actualErr, "ctx.Err()")
 				assert.Equal(t, tt.expectCause, actualCause, "context.Cause()")
-			}
+			})
 		})
 	}
 }

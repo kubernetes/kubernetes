@@ -29,6 +29,7 @@ import (
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	ctesting "k8s.io/kubernetes/pkg/kubelet/container/testing"
@@ -818,12 +819,13 @@ type testWriteCountingFSPullRecordsAccessor struct {
 	fsPullRecordsAccessor
 }
 
-func (a *testWriteCountingFSPullRecordsAccessor) WriteImagePulledRecord(pulledRecord *kubeletconfiginternal.ImagePulledRecord) error {
+func (a *testWriteCountingFSPullRecordsAccessor) WriteImagePulledRecord(logger klog.Logger, pulledRecord *kubeletconfiginternal.ImagePulledRecord) error {
 	a.imagePulledRecordsWrites += 1
-	return a.fsPullRecordsAccessor.WriteImagePulledRecord(pulledRecord)
+	return a.fsPullRecordsAccessor.WriteImagePulledRecord(logger, pulledRecord)
 }
 
 func TestFileBasedImagePullManager_RecordPullIntent(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	tests := []struct {
 		name         string
 		inputImage   string
@@ -869,7 +871,7 @@ func TestFileBasedImagePullManager_RecordPullIntent(t *testing.T) {
 				f.intentCounters.Store(tt.inputImage, tt.startCounter)
 			}
 
-			_ = f.RecordPullIntent(tt.inputImage)
+			_ = f.RecordPullIntent(logger, tt.inputImage)
 
 			expectFilename := filepath.Join(pullingDir, tt.wantFile)
 			require.FileExists(t, expectFilename)

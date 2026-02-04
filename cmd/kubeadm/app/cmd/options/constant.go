@@ -143,6 +143,9 @@ const (
 	// CleanupTmpDir flag indicates whether reset will cleanup the tmp dir
 	CleanupTmpDir = "cleanup-tmp-dir"
 
+	// AllowDeprecatedAPI flag can be used to allow deprecated APIs
+	AllowDeprecatedAPI = "allow-deprecated-api"
+
 	// AllowExperimentalAPI flag can be used to allow experimental / work in progress APIs
 	AllowExperimentalAPI = "allow-experimental-api"
 

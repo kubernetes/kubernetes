@@ -77,5 +77,5 @@ func compilePolicy(policy *Policy) PolicyEvaluator {
 		}
 	}
 
-	return PolicyEvaluator{Matcher: matcher, Mutators: patchers, CompositionEnv: compiler.CompositionEnv}
+	return PolicyEvaluator{Matcher: matcher, Mutators: patchers, CompositedCompiler: compiler}
 }

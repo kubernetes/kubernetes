@@ -518,25 +518,45 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 		// Claims (and thus their devices) are treated as "allocated" if they are in the assume cache
 		// or currently their allocation is in-flight. This does not change
 		// during filtering, so we can determine that once.
+		//
+		// This might have to be retried in the unlikely case that some concurrent modification made
+		// the result invalid.
 		var allocatedState *structured.AllocatedState
-		if pl.fts.EnableDRAConsumableCapacity {
-			allocatedState, err = pl.draManager.ResourceClaims().GatherAllocatedState()
-			if err != nil {
-				return nil, statusError(logger, err)
+		err = wait.PollUntilContextTimeout(ctx, time.Microsecond, 5*time.Second, true /* immediate */, func(context.Context) (bool, error) {
+			if pl.fts.EnableDRAConsumableCapacity {
+				allocatedState, err = pl.draManager.ResourceClaims().GatherAllocatedState()
+				if err != nil {
+					if errors.Is(err, errClaimTrackerConcurrentModification) {
+						logger.V(6).Info("Conflicting modification during GatherAllocatedState, trying again")
+						return false, nil
+					}
+					return false, err
+				}
+				if allocatedState == nil {
+					return false, errors.New("nil allocated state")
+				}
+				// Done.
+				return true, nil
+			} else {
+				allocatedDevices, err := pl.draManager.ResourceClaims().ListAllAllocatedDevices()
+				if err != nil {
+					if errors.Is(err, errClaimTrackerConcurrentModification) {
+						logger.V(6).Info("Conflicting modification during ListAllAllocatedDevices, trying again")
+						return false, nil
+					}
+					return false, err
+				}
+				allocatedState = &structured.AllocatedState{
+					AllocatedDevices:         allocatedDevices,
+					AllocatedSharedDeviceIDs: sets.New[structured.SharedDeviceID](),
+					AggregatedCapacity:       structured.NewConsumedCapacityCollection(),
+				}
+				// Done.
+				return true, nil
 			}
-			if allocatedState == nil {
-				return nil, statusError(logger, errors.New("nil allocated state"))
-			}
-		} else {
-			allocatedDevices, err := pl.draManager.ResourceClaims().ListAllAllocatedDevices()
-			if err != nil {
-				return nil, statusError(logger, err)
-			}
-			allocatedState = &structured.AllocatedState{
-				AllocatedDevices:         allocatedDevices,
-				AllocatedSharedDeviceIDs: sets.New[structured.SharedDeviceID](),
-				AggregatedCapacity:       structured.NewConsumedCapacityCollection(),
-			}
+		})
+		if err != nil {
+			return nil, statusError(logger, fmt.Errorf("gather allocation state: %w", err))
 		}
 		slices, err := pl.draManager.ResourceSlices().ListWithDeviceTaintRules()
 		if err != nil {
@@ -655,7 +675,11 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 			// If the claim is not ready yet (ready false, no error) and binding has timed out
 			// or binding has failed (err non-nil), then the scheduler should consider deallocating this
 			// claim in PostFilter to unblock trying other devices.
-			if err != nil || !ready && pl.isClaimTimeout(claim) {
+			if err != nil {
+				logger.V(5).Info("Claim failed binding conditions check", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaim", klog.KObj(claim), "err", err)
+				unavailableClaims = append(unavailableClaims, index)
+			} else if !ready && pl.isClaimTimeout(claim) {
+				logger.V(5).Info("Claim timed out waiting for binding conditions", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaim", klog.KObj(claim))
 				unavailableClaims = append(unavailableClaims, index)
 			}
 		}
@@ -1092,18 +1116,19 @@ func (pl *DynamicResources) PreBind(ctx context.Context, cs fwk.CycleState, pod 
 
 // PreBindPreFlight is called before PreBind, and determines whether PreBind is going to do something for this pod, or not.
 // It just checks state.claims to determine whether there are any claims and hence the plugin has to handle them at PreBind.
-func (pl *DynamicResources) PreBindPreFlight(ctx context.Context, cs fwk.CycleState, p *v1.Pod, nodeName string) *fwk.Status {
+func (pl *DynamicResources) PreBindPreFlight(ctx context.Context, cs fwk.CycleState, p *v1.Pod, nodeName string) (*fwk.PreBindPreFlightResult, *fwk.Status) {
+	result := &fwk.PreBindPreFlightResult{AllowParallel: true}
 	if !pl.enabled {
-		return fwk.NewStatus(fwk.Skip)
+		return result, fwk.NewStatus(fwk.Skip)
 	}
 	state, err := getStateData(cs)
 	if err != nil {
-		return statusError(klog.FromContext(ctx), err)
+		return result, statusError(klog.FromContext(ctx), err)
 	}
 	if state.claims.empty() {
-		return fwk.NewStatus(fwk.Skip)
+		return result, fwk.NewStatus(fwk.Skip)
 	}
-	return nil
+	return result, nil
 }
 
 // bindClaim gets called by PreBind for claim which is not reserved for the pod yet.

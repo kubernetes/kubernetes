@@ -21,18 +21,19 @@ package fake
 import (
 	gentype "k8s.io/client-go/gentype"
 	v1alpha1 "k8s.io/sample-controller/pkg/apis/samplecontroller/v1alpha1"
-	samplecontrollerv1alpha1 "k8s.io/sample-controller/pkg/generated/clientset/versioned/typed/samplecontroller/v1alpha1"
+	samplecontrollerv1alpha1 "k8s.io/sample-controller/pkg/generated/applyconfiguration/samplecontroller/v1alpha1"
+	typedsamplecontrollerv1alpha1 "k8s.io/sample-controller/pkg/generated/clientset/versioned/typed/samplecontroller/v1alpha1"
 )
 
 // fakeFoos implements FooInterface
 type fakeFoos struct {
-	*gentype.FakeClientWithList[*v1alpha1.Foo, *v1alpha1.FooList]
+	*gentype.FakeClientWithListAndApply[*v1alpha1.Foo, *v1alpha1.FooList, *samplecontrollerv1alpha1.FooApplyConfiguration]
 	Fake *FakeSamplecontrollerV1alpha1
 }
 
-func newFakeFoos(fake *FakeSamplecontrollerV1alpha1, namespace string) samplecontrollerv1alpha1.FooInterface {
+func newFakeFoos(fake *FakeSamplecontrollerV1alpha1, namespace string) typedsamplecontrollerv1alpha1.FooInterface {
 	return &fakeFoos{
-		gentype.NewFakeClientWithList[*v1alpha1.Foo, *v1alpha1.FooList](
+		gentype.NewFakeClientWithListAndApply[*v1alpha1.Foo, *v1alpha1.FooList, *samplecontrollerv1alpha1.FooApplyConfiguration](
 			fake.Fake,
 			namespace,
 			v1alpha1.SchemeGroupVersion.WithResource("foos"),

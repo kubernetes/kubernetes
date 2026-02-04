@@ -162,11 +162,14 @@ func createPod(tCtx ktesting.TContext, namespace string, suffix string, pod *v1.
 	return pod
 }
 
-func waitForPodScheduled(tCtx ktesting.TContext, namespace, podName string) {
+func waitForPodScheduled(tCtx ktesting.TContext, namespace, podName string) *v1.Pod {
 	tCtx.Helper()
 
-	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) *v1.Pod {
-		return must(tCtx, tCtx.Client().CoreV1().Pods(namespace).Get, podName, metav1.GetOptions{})
+	var pod *v1.Pod
+	tCtx.Eventually(func(tCtx ktesting.TContext) (*v1.Pod, error) {
+		p, err := tCtx.Client().CoreV1().Pods(namespace).Get(tCtx, podName, metav1.GetOptions{})
+		pod = p
+		return p, err
 	}).WithTimeout(60*time.Second).Should(
 		gomega.HaveField("Status.Conditions", gomega.ContainElement(
 			gomega.And(
@@ -176,6 +179,7 @@ func waitForPodScheduled(tCtx ktesting.TContext, namespace, podName string) {
 		)),
 		"Pod %s should have been scheduled.", podName,
 	)
+	return pod
 }
 
 func deleteAndWait[T any](tCtx ktesting.TContext, del func(context.Context, string, metav1.DeleteOptions) error, get func(context.Context, string, metav1.GetOptions) (T, error), name string) {
@@ -198,7 +202,7 @@ func waitForNotFound[T any](tCtx ktesting.TContext, get func(context.Context, st
 	tCtx.Helper()
 
 	var t T
-	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) error {
+	tCtx.Eventually(func(tCtx ktesting.TContext) error {
 		_, err := get(tCtx, name, metav1.GetOptions{})
 		return err
 	}).WithTimeout(60*time.Second).Should(gomega.MatchError(apierrors.IsNotFound, "IsNotFound"), "Object %T %s should have been removed.", t, name)
@@ -207,11 +211,10 @@ func waitForNotFound[T any](tCtx ktesting.TContext, get func(context.Context, st
 func waitForClaim(tCtx ktesting.TContext, namespace, claimName string, timeout time.Duration, match gtypes.GomegaMatcher, description ...any) *resourceapi.ResourceClaim {
 	tCtx.Helper()
 	var latestClaim *resourceapi.ResourceClaim
-	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) *resourceapi.ResourceClaim {
+	tCtx.Eventually(func(tCtx ktesting.TContext) (*resourceapi.ResourceClaim, error) {
 		c, err := tCtx.Client().ResourceV1().ResourceClaims(namespace).Get(tCtx, claimName, metav1.GetOptions{})
-		tCtx.ExpectNoError(err, "get claim")
 		latestClaim = c
-		return latestClaim
+		return c, err
 	}).WithTimeout(timeout).WithPolling(time.Second).Should(match, description...)
 	return latestClaim
 }

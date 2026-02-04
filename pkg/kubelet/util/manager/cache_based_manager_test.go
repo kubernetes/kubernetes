@@ -319,7 +319,7 @@ func TestParseNodeAnnotation(t *testing.T) {
 		},
 	}
 	for i, testCase := range testCases {
-		getNode := func() (*v1.Node, error) { return testCase.node, testCase.err }
+		getNode := func(context.Context) (*v1.Node, error) { return testCase.node, testCase.err }
 		ttl, exists := GetObjectTTLFromNodeFunc(getNode)()
 		if exists != testCase.exists {
 			t.Errorf("%d: incorrect parsing: %t", i, exists)

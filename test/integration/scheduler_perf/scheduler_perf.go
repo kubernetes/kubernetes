@@ -293,7 +293,7 @@ type testCase struct {
 	Labels []string
 	// DefaultThresholdMetricSelector defines default metric used for threshold comparison.
 	// It is only populated to workloads without their ThresholdMetricSelector set.
-	// If nil, the default metric is set to "SchedulingThroughput".
+	// If nil, the default metric is set to "SchedulingThroughput" with "Average" data bucket.
 	// Optional
 	DefaultThresholdMetricSelector *thresholdMetricSelector
 }
@@ -372,9 +372,10 @@ func (w *workload) setDefaults(testCaseThresholdMetricSelector *thresholdMetricS
 		w.ThresholdMetricSelector = testCaseThresholdMetricSelector
 		return
 	}
-	// By default, SchedulingThroughput should be compared with the threshold.
+	// By default, SchedulingThroughput Average should be compared with the threshold.
 	w.ThresholdMetricSelector = &thresholdMetricSelector{
-		Name: "SchedulingThroughput",
+		Name:       "SchedulingThroughput",
+		DataBucket: "Average",
 	}
 }
 
@@ -406,6 +407,8 @@ type thresholdMetricSelector struct {
 	Name string
 	// Labels of the metric. All of them needs to match the metric's labels to assume equality.
 	Labels map[string]string
+	// DataBucket specifies which data bucket should be compared against the threshold.
+	DataBucket string
 	// ExpectLower defines whether the threshold should denote the maximum allowable value of the metric.
 	// If false, the threshold defines minimum allowable value.
 	// Optional
@@ -413,6 +416,9 @@ type thresholdMetricSelector struct {
 }
 
 func (ms thresholdMetricSelector) isValid(mcc *metricsCollectorConfig) error {
+	if ms.DataBucket == "" {
+		return fmt.Errorf("dataBucket should be set for metric %v", ms.Name)
+	}
 	if ms.Name == "SchedulingThroughput" {
 		return nil
 	}
@@ -1158,7 +1164,7 @@ func setupTestCase(t testing.TB, tc *testCase, featureGates map[featuregate.Feat
 
 	// 30 minutes should be plenty enough even for the 5000-node tests.
 	timeout := 30 * time.Minute
-	tCtx = ktesting.WithTimeout(tCtx, timeout, fmt.Sprintf("timed out after the %s per-test timeout", timeout))
+	tCtx = tCtx.WithTimeout(timeout, fmt.Sprintf("timed out after the %s per-test timeout", timeout))
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints) {
 		registerQHintMetrics()
@@ -1466,19 +1472,34 @@ func valueWithinThreshold(value, threshold float64, expectLower bool) bool {
 	return value > threshold
 }
 
-func compareMetricWithThreshold(items []DataItem, threshold float64, metricSelector thresholdMetricSelector) error {
+// applyThreshold adds the threshold to data item with metric specified via metricSelector and verifies that
+// this metrics value is within threshold.
+func applyThreshold(items []DataItem, threshold float64, metricSelector thresholdMetricSelector) error {
 	if threshold == 0 {
 		return nil
 	}
+	dataBucket := metricSelector.DataBucket
+	var errs []error
 	for _, item := range items {
-		if item.Labels["Metric"] == metricSelector.Name && labelsMatch(item.Labels, metricSelector.Labels) && !valueWithinThreshold(item.Data["Average"], threshold, metricSelector.ExpectLower) {
+		if item.Labels["Metric"] != metricSelector.Name || !labelsMatch(item.Labels, metricSelector.Labels) {
+			continue
+		}
+		thresholdItemName := dataBucket + "Threshold"
+		item.Data[thresholdItemName] = threshold
+		dataItem, ok := item.Data[dataBucket]
+		if !ok {
+			errs = append(errs, fmt.Errorf("%s: no data present for %q metric %q bucket", item.Labels["Name"], metricSelector.Name, dataBucket))
+			continue
+		}
+		if !valueWithinThreshold(dataItem, threshold, metricSelector.ExpectLower) {
 			if metricSelector.ExpectLower {
-				return fmt.Errorf("%s: expected %s Average to be lower: got %f, want %f", item.Labels["Name"], metricSelector.Name, item.Data["Average"], threshold)
+				errs = append(errs, fmt.Errorf("%s: expected %q %q to be lower: got %f, want %f", item.Labels["Name"], metricSelector.Name, dataBucket, dataItem, threshold))
+			} else {
+				errs = append(errs, fmt.Errorf("%s: expected %q %q to be higher: got %f, want %f", item.Labels["Name"], metricSelector.Name, dataBucket, dataItem, threshold))
 			}
-			return fmt.Errorf("%s: expected %s Average to be higher: got %f, want %f", item.Labels["Name"], metricSelector.Name, item.Data["Average"], threshold)
 		}
 	}
-	return nil
+	return errors.Join(errs...)
 }
 
 func checkEmptyInFlightEvents() error {
@@ -1496,7 +1517,7 @@ func checkEmptyInFlightEvents() error {
 }
 
 func startCollectingMetrics(tCtx ktesting.TContext, collectorWG *sync.WaitGroup, podInformer coreinformers.PodInformer, mcc *metricsCollectorConfig, throughputErrorMargin float64, opIndex int, name string, namespaces []string, labelSelector map[string]string) (ktesting.TContext, []testDataCollector, error) {
-	collectorCtx := ktesting.WithCancel(tCtx)
+	collectorCtx := tCtx.WithCancel()
 	workloadName := tCtx.Name()
 
 	// Clean up memory usage from the initial setup phase.
@@ -1507,7 +1528,6 @@ func startCollectingMetrics(tCtx ktesting.TContext, collectorWG *sync.WaitGroup,
 	collectors := getTestDataCollectors(podInformer, fmt.Sprintf("%s/%s", workloadName, name), namespaces, labelSelector, mcc, throughputErrorMargin)
 	for _, collector := range collectors {
 		// Need loop-local variable for function below.
-		collector := collector
 		err := collector.init()
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to initialize data collector: %w", err)
@@ -1541,7 +1561,7 @@ func stopCollectingMetrics(tCtx ktesting.TContext, collectorCtx ktesting.TContex
 	for _, collector := range collectors {
 		items := collector.collect()
 		dataItems = append(dataItems, items...)
-		err := compareMetricWithThreshold(items, threshold, tms)
+		err := applyThreshold(items, threshold, tms)
 		if err != nil {
 			tCtx.Errorf("op %d: %s", opIndex, err)
 		}
@@ -1597,7 +1617,7 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, topicName st
 	podInformer := informerFactory.Core().V1().Pods()
 
 	// Everything else started by this function gets stopped before it returns.
-	tCtx = ktesting.WithCancel(tCtx)
+	tCtx = tCtx.WithCancel()
 
 	executor := WorkloadExecutor{
 		tCtx:                         tCtx,
@@ -2013,7 +2033,8 @@ type testDataCollector interface {
 	collect() []DataItem
 }
 
-func getTestDataCollectors(podInformer coreinformers.PodInformer, name string, namespaces []string, labelSelector map[string]string, mcc *metricsCollectorConfig, throughputErrorMargin float64) []testDataCollector {
+// var for mocking in tests.
+var getTestDataCollectors = func(podInformer coreinformers.PodInformer, name string, namespaces []string, labelSelector map[string]string, mcc *metricsCollectorConfig, throughputErrorMargin float64) []testDataCollector {
 	if mcc == nil {
 		mcc = &defaultMetricsCollectorConfig
 	}
@@ -2021,6 +2042,7 @@ func getTestDataCollectors(podInformer coreinformers.PodInformer, name string, n
 		newThroughputCollector(podInformer, map[string]string{"Name": name}, labelSelector, namespaces, throughputErrorMargin),
 		newMetricsCollector(mcc, map[string]string{"Name": name}),
 		newMemoryCollector(map[string]string{"Name": name}, 500*time.Millisecond),
+		newSchedulingDurationCollector(map[string]string{"Name": name}),
 	}
 }
 
@@ -2074,7 +2096,7 @@ func createPodsSteadily(tCtx ktesting.TContext, namespace string, podInformer co
 		return err
 	}
 	tCtx.Logf("creating pods in namespace %q for %s", namespace, cpo.Duration)
-	tCtx = ktesting.WithTimeout(tCtx, cpo.Duration.Duration, fmt.Sprintf("the operation ran for the configured %s", cpo.Duration.Duration))
+	tCtx = tCtx.WithTimeout(cpo.Duration.Duration, fmt.Sprintf("the operation ran for the configured %s", cpo.Duration.Duration))
 
 	// Start watching pods in the namespace. Any pod which is seen as being scheduled
 	// gets deleted.

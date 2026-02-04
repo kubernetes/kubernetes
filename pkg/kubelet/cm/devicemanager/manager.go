@@ -250,7 +250,7 @@ func (m *ManagerImpl) PluginDisconnected(logger klog.Logger, resourceName string
 
 	if ep, exists := m.endpoints[resourceName]; exists {
 		m.markResourceUnhealthy(logger, resourceName)
-		logger.V(2).Info("Endpoint became unhealthy", "resourceName", resourceName, "endpoint", ep)
+		logger.V(2).Info("Endpoint became unhealthy", "resourceName", resourceName)
 
 		ep.e.setStopTime(time.Now())
 	}
@@ -1203,21 +1203,36 @@ func (m *ManagerImpl) ShouldResetExtendedResourceCapacity() bool {
 }
 
 func (m *ManagerImpl) isContainerAlreadyRunning(logger klog.Logger, podUID, cntName string) bool {
-	cntID, err := m.containerMap.GetContainerID(podUID, cntName)
-	if err != nil {
-		logger.Error(err, "Container not found in the initial map, assumed NOT running", "podUID", podUID, "containerName", cntName)
-		return false
-	}
-
-	// note that if container runtime is down when kubelet restarts, this set will be empty,
-	// so on kubelet restart containers will again fail admission, hitting https://github.com/kubernetes/kubernetes/issues/118559 again.
+	// Check if ANY container for this pod/container name is running.
+	// This handles the case where a container restarted before kubelet restart,
+	// so the containerMap might have multiple entries (old exited + new running).
+	// We need to check all of them to see if any are running.
+	//
+	// Note: if container runtime is down when kubelet restarts, containerRunningSet will be empty,
+	// so containers will fail admission, hitting https://github.com/kubernetes/kubernetes/issues/118559.
 	// This scenario should however be rare enough.
-	if !m.containerRunningSet.Has(cntID) {
-		logger.V(4).Info("Container not present in the initial running set", "podUID", podUID, "containerName", cntName, "containerID", cntID)
+	foundAnyContainer := false
+	foundRunningContainer := false
+
+	m.containerMap.Visit(func(visitPodUID, visitContainerName, visitContainerID string) {
+		if visitPodUID == podUID && visitContainerName == cntName {
+			foundAnyContainer = true
+			if m.containerRunningSet.Has(visitContainerID) {
+				foundRunningContainer = true
+				logger.V(4).Info("Container found in the initial running set", "podUID", podUID, "containerName", cntName, "containerID", visitContainerID)
+			}
+		}
+	})
+
+	if !foundAnyContainer {
+		logger.V(4).Info("Container not found in the initial map, assumed NOT running", "podUID", podUID, "containerName", cntName)
 		return false
 	}
 
-	// Once we make it here we know we have a running container.
-	logger.V(4).Info("Container found in the initial set, assumed running", "podUID", podUID, "containerName", cntName, "containerID", cntID)
+	if !foundRunningContainer {
+		logger.V(4).Info("Container found in map but not in running set", "podUID", podUID, "containerName", cntName)
+		return false
+	}
+
 	return true
 }

@@ -2829,7 +2829,6 @@ type partialObjectMetadataCheck func(*metav1beta1.PartialObjectMetadata)
 func expectPartialObjectMetaEventsProtobuf(t *testing.T, r io.Reader, values ...string) {
 	checks := []partialObjectMetadataCheck{}
 	for i, value := range values {
-		i, value := i, value
 		checks = append(checks, func(meta *metav1beta1.PartialObjectMetadata) {
 			if meta.Annotations["test"] != value {
 				t.Fatalf("expected event %d to have value %q instead of %q", i+1, value, meta.Annotations["test"])

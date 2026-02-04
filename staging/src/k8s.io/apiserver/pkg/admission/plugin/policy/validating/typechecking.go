@@ -183,14 +183,11 @@ func (c *TypeChecker) compiler(ctx *TypeCheckingContext, typeOverwrite typeOverw
 	if err != nil {
 		return nil, err
 	}
-	env, err := plugincel.NewCompositionEnv(plugincel.VariablesTypeName, envSet)
+	compiler, err := plugincel.NewCompositedCompilerForTypeChecking(envSet)
 	if err != nil {
 		return nil, err
 	}
-	compiler := &plugincel.CompositedCompiler{
-		Compiler:       &typeCheckingCompiler{typeOverwrite: typeOverwrite, compositionEnv: env},
-		CompositionEnv: env,
-	}
+	compiler.Compiler = &typeCheckingCompiler{typeOverwrite: typeOverwrite, compiler: compiler}
 	return compiler, nil
 }
 
@@ -449,8 +446,8 @@ func createVariableOpts(declType *apiservercel.DeclType, variables ...string) []
 }
 
 type typeCheckingCompiler struct {
-	compositionEnv *plugincel.CompositionEnv
-	typeOverwrite  typeOverwrite
+	compiler      *plugincel.CompositedCompiler
+	typeOverwrite typeOverwrite
 }
 
 // CompileCELExpression compiles the given expression.
@@ -469,7 +466,7 @@ func (c *typeCheckingCompiler) CompileCELExpression(expressionAccessor plugincel
 			ExpressionAccessor: expressionAccessor,
 		}
 	}
-	env, err := c.compositionEnv.Env(mode)
+	env, err := c.compiler.Env(mode)
 	if err != nil {
 		return resultError(fmt.Sprintf("fail to build env: %v", err), apiservercel.ErrorTypeInternal)
 	}

@@ -92,7 +92,7 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(ctx context.Context
 		Annotations: newPodAnnotations(pod),
 	}
 
-	dnsConfig, err := m.runtimeHelper.GetPodDNS(pod)
+	dnsConfig, err := m.runtimeHelper.GetPodDNS(ctx, pod)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +100,7 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(ctx context.Context
 
 	if !kubecontainer.IsHostNetworkPod(pod) {
 		// TODO: Add domain support in new runtime interface
-		podHostname, podDomain, err := m.runtimeHelper.GeneratePodHostNameAndDomain(pod)
+		podHostname, podDomain, err := m.runtimeHelper.GeneratePodHostNameAndDomain(logger, pod)
 		if err != nil {
 			return nil, err
 		}
@@ -136,7 +136,7 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(ctx context.Context
 		podSandboxConfig.PortMappings = portMappings
 	}
 
-	lc, err := m.generatePodSandboxLinuxConfig(pod)
+	lc, err := m.generatePodSandboxLinuxConfig(ctx, pod)
 	if err != nil {
 		return nil, err
 	}
@@ -161,7 +161,7 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(ctx context.Context
 // We've to call PodSandboxLinuxConfig always irrespective of the underlying OS as securityContext is not part of
 // podSandboxConfig. It is currently part of LinuxPodSandboxConfig. In future, if we have securityContext pulled out
 // in podSandboxConfig we should be able to use it.
-func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(pod *v1.Pod) (*runtimeapi.LinuxPodSandboxConfig, error) {
+func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(ctx context.Context, pod *v1.Pod) (*runtimeapi.LinuxPodSandboxConfig, error) {
 	cgroupParent := m.runtimeHelper.GetPodCgroupParent(pod)
 	lc := &runtimeapi.LinuxPodSandboxConfig{
 		CgroupParent: cgroupParent,
@@ -193,7 +193,7 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(pod *v1.Pod) (
 		if sc.RunAsGroup != nil && runtime.GOOS != "windows" {
 			lc.SecurityContext.RunAsGroup = &runtimeapi.Int64Value{Value: int64(*sc.RunAsGroup)}
 		}
-		namespaceOptions, err := runtimeutil.NamespacesForPod(pod, m.runtimeHelper, m.runtimeClassManager)
+		namespaceOptions, err := runtimeutil.NamespacesForPod(ctx, pod, m.runtimeHelper, m.runtimeClassManager)
 		if err != nil {
 			return nil, err
 		}

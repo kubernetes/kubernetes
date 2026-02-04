@@ -133,8 +133,8 @@ func (kl *Kubelet) HandlerSupportsUserNamespaces(rtHandler string) (bool, error)
 }
 
 // GetKubeletMappings gets the additional IDs allocated for the Kubelet.
-func (kl *Kubelet) GetKubeletMappings(idsPerPod uint32) (uint32, uint32, error) {
-	return kl.getKubeletMappings(idsPerPod)
+func (kl *Kubelet) GetKubeletMappings(logger klog.Logger, idsPerPod uint32) (uint32, uint32, error) {
+	return kl.getKubeletMappings(logger, idsPerPod)
 }
 
 func (kl *Kubelet) GetMaxPods() int {
@@ -286,9 +286,9 @@ func (kl *Kubelet) getRuntime() kubecontainer.Runtime {
 }
 
 // GetNode returns the node info for the configured node name of this Kubelet.
-func (kl *Kubelet) GetNode() (*v1.Node, error) {
+func (kl *Kubelet) GetNode(ctx context.Context) (*v1.Node, error) {
 	if kl.kubeClient == nil {
-		return kl.initialNode(context.TODO())
+		return kl.initialNode(ctx)
 	}
 	return kl.nodeLister.Get(string(kl.nodeName))
 }
@@ -298,11 +298,11 @@ func (kl *Kubelet) GetNode() (*v1.Node, error) {
 // Return kubelet's nodeInfo for this node, except on error or if in standalone mode,
 // in which case return a manufactured nodeInfo representing a node with no pods,
 // zero capacity, and the default labels.
-func (kl *Kubelet) getNodeAnyWay() (*v1.Node, error) {
-	if n, err := kl.GetNode(); err == nil {
+func (kl *Kubelet) getNodeAnyWay(ctx context.Context) (*v1.Node, error) {
+	if n, err := kl.GetNode(ctx); err == nil {
 		return n, nil
 	}
-	return kl.initialNode(context.TODO())
+	return kl.initialNode(ctx)
 }
 
 // GetNodeConfig returns the container manager node config.
@@ -317,8 +317,8 @@ func (kl *Kubelet) GetPodCgroupRoot() string {
 
 // getHostIPsAnyWay attempts to return the host IPs from kubelet's nodeInfo, or
 // the initialNode.
-func (kl *Kubelet) getHostIPsAnyWay() ([]net.IP, error) {
-	node, err := kl.getNodeAnyWay()
+func (kl *Kubelet) getHostIPsAnyWay(ctx context.Context) ([]net.IP, error) {
+	node, err := kl.getNodeAnyWay(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -334,20 +334,20 @@ func (kl *Kubelet) GetExtraSupplementalGroupsForPod(pod *v1.Pod) []int64 {
 
 // getPodVolumePathListFromDisk returns a list of the volume paths by reading the
 // volume directories for the given pod from the disk.
-func (kl *Kubelet) getPodVolumePathListFromDisk(podUID types.UID) ([]string, error) {
+func (kl *Kubelet) getPodVolumePathListFromDisk(logger klog.Logger, podUID types.UID) ([]string, error) {
 	volumes := []string{}
 	podVolDir := kl.getPodVolumesDir(podUID)
 
 	if pathExists, pathErr := mount.PathExists(podVolDir); pathErr != nil {
 		return volumes, fmt.Errorf("error checking if path %q exists: %v", podVolDir, pathErr)
 	} else if !pathExists {
-		klog.V(6).InfoS("Path does not exist", "path", podVolDir)
+		logger.V(6).Info("Path does not exist", "path", podVolDir)
 		return volumes, nil
 	}
 
 	volumePluginDirs, err := os.ReadDir(podVolDir)
 	if err != nil {
-		klog.ErrorS(err, "Could not read directory", "path", podVolDir)
+		logger.Error(err, "Could not read directory", "path", podVolDir)
 		return volumes, err
 	}
 	for _, volumePluginDir := range volumePluginDirs {
@@ -378,9 +378,9 @@ func (kl *Kubelet) getPodVolumePathListFromDisk(podUID types.UID) ([]string, err
 	return volumes, nil
 }
 
-func (kl *Kubelet) getMountedVolumePathListFromDisk(podUID types.UID) ([]string, error) {
+func (kl *Kubelet) getMountedVolumePathListFromDisk(logger klog.Logger, podUID types.UID) ([]string, error) {
 	mountedVolumes := []string{}
-	volumePaths, err := kl.getPodVolumePathListFromDisk(podUID)
+	volumePaths, err := kl.getPodVolumePathListFromDisk(logger, podUID)
 	if err != nil {
 		return mountedVolumes, err
 	}
@@ -403,7 +403,7 @@ func (kl *Kubelet) getMountedVolumePathListFromDisk(podUID types.UID) ([]string,
 
 // getPodVolumeSubpathListFromDisk returns a list of the volume-subpath paths by reading the
 // subpath directories for the given pod from the disk.
-func (kl *Kubelet) getPodVolumeSubpathListFromDisk(podUID types.UID) ([]string, error) {
+func (kl *Kubelet) getPodVolumeSubpathListFromDisk(logger klog.Logger, podUID types.UID) ([]string, error) {
 	volumes := []string{}
 	podSubpathsDir := kl.getPodVolumeSubpathsDir(podUID)
 
@@ -416,7 +416,7 @@ func (kl *Kubelet) getPodVolumeSubpathListFromDisk(podUID types.UID) ([]string, 
 	// Explicitly walks /<volume>/<container name>/<subPathIndex>
 	volumePluginDirs, err := os.ReadDir(podSubpathsDir)
 	if err != nil {
-		klog.ErrorS(err, "Could not read directory", "path", podSubpathsDir)
+		logger.Error(err, "Could not read directory", "path", podSubpathsDir)
 		return volumes, err
 	}
 	for _, volumePluginDir := range volumePluginDirs {
@@ -467,10 +467,11 @@ func (kl *Kubelet) setCachedMachineInfo(info *cadvisorapiv1.MachineInfo) {
 }
 
 // getLastStableNodeAddresses returns the last observed node addresses.
-func (kl *Kubelet) getLastObservedNodeAddresses() []v1.NodeAddress {
-	node, err := kl.GetNode()
+func (kl *Kubelet) getLastObservedNodeAddresses(ctx context.Context) []v1.NodeAddress {
+	logger := klog.FromContext(ctx)
+	node, err := kl.GetNode(ctx)
 	if err != nil || node == nil {
-		klog.V(4).InfoS("fail to obtain node from local cache", "node", kl.nodeName, "error", err)
+		logger.V(4).Info("fail to obtain node from local cache", "node", kl.nodeName, "error", err)
 		return nil
 	}
 	return node.Status.Addresses

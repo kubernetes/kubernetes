@@ -39,6 +39,10 @@ var newUnionMember = types.Name{Package: libValidationPkg, Name: "NewUnionMember
 var newUnionMembership = types.Name{Package: libValidationPkg, Name: "NewUnionMembership"}
 var unionVariablePrefix = "unionMembershipFor"
 
+// unionDefinitions stores all union definitions found by tag validators.
+// Key is the struct path.
+var unionDefinitions = map[string]unions{}
+
 func init() {
 	// Unions are comprised of multiple tags that need to share information.
 	// For field-based unions: tags are on struct fields, validation is on the struct
@@ -48,11 +52,29 @@ func init() {
 	// key examples:
 	//   - struct union: "MyStruct" (validation on the struct type)
 	//   - list union: "Pipeline.Tasks" (validation on the list field)
-	shared := map[string]unions{}
-	RegisterTypeValidator(unionTypeOrFieldValidator{shared})
-	RegisterFieldValidator(unionTypeOrFieldValidator{shared})
-	RegisterTagValidator(unionDiscriminatorTagValidator{shared})
-	RegisterTagValidator(unionMemberTagValidator{shared})
+	RegisterTypeValidator(unionTypeOrFieldValidator{unionDefinitions})
+	RegisterFieldValidator(unionTypeOrFieldValidator{unionDefinitions})
+	RegisterTagValidator(unionDiscriminatorTagValidator{unionDefinitions})
+	RegisterTagValidator(unionMemberTagValidator{unionDefinitions})
+}
+
+// MarkUnionDeclarative marks the union containing the given member as declarative.
+// parentPath is the path to the struct.
+// member is the field member (for struct unions).
+// fieldName is the field name (for list unions).
+func MarkUnionDeclarative(parentPath string, member *types.Member) {
+	us, ok := unionDefinitions[parentPath]
+	if !ok {
+		return
+	}
+	for _, u := range us {
+		// Check field members
+		for _, m := range u.fieldMembers {
+			if m == member {
+				u.isDeclarative = true
+			}
+		}
+	}
 }
 
 type unionTypeOrFieldValidator struct {
@@ -156,7 +178,7 @@ func (umtv unionMemberTagValidator) GetValidations(context Context, tag codetags
 func (umtv unionMemberTagValidator) Docs() TagDoc {
 	return TagDoc{
 		Tag:            umtv.TagName(),
-		StabilityLevel: Beta,
+		StabilityLevel: Stable,
 		Scopes:         umtv.ValidScopes().UnsortedList(),
 		Description:    "Indicates that this field is a member of a union.",
 		Args: []TagArgDoc{{
@@ -199,6 +221,8 @@ type union struct {
 	// "field name" (eg: `field[{"name": "succeeded"}]`), and the value is a
 	// list of selection criteria.
 	itemMembers map[string][]ListSelectorTerm
+	// isDeclarative indicates that the union is declarative.
+	isDeclarative bool
 }
 
 type unionMember struct {
@@ -303,6 +327,9 @@ func processUnionValidations(context Context, unions unions, varPrefix string,
 
 				extraArgs := append([]any{supportVarName, discriminatorExtractor}, extractorArgs...)
 				fn := Function(tagName, DefaultFlags, discriminatedValidator, extraArgs...)
+				if u.isDeclarative {
+					fn.Flags |= DeclarativeNative
+				}
 				result.Functions = append(result.Functions, fn)
 			} else {
 				supportVar := Variable(supportVarName, Function(tagName, DefaultFlags, newUnionMembership, getMemberArgs(u, context, false)...))
@@ -310,6 +337,9 @@ func processUnionValidations(context Context, unions unions, varPrefix string,
 
 				extraArgs := append([]any{supportVarName}, extractorArgs...)
 				fn := Function(tagName, DefaultFlags, undiscriminatedValidator, extraArgs...)
+				if u.isDeclarative {
+					fn.Flags |= DeclarativeNative
+				}
 				result.Functions = append(result.Functions, fn)
 			}
 		}

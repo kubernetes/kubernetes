@@ -1613,7 +1613,7 @@ func createDswpWithVolumeWithCustomPluginMgr(pv *v1.PersistentVolume, pvc *v1.Pe
 		actualStateOfWorld:  fakeASW,
 		pods: processedPods{
 			processedPods: make(map[types.UniquePodName]bool)},
-		csiMigratedPluginManager: csimigration.NewPluginManager(csiTranslator, utilfeature.DefaultFeatureGate),
+		csiMigratedPluginManager: csimigration.NewPluginManager(csiTranslator),
 		intreeToCSITranslator:    csiTranslator,
 		volumePluginMgr:          fakeVolumePluginMgr,
 	}

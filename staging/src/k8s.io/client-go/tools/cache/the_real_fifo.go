@@ -37,12 +37,25 @@ type RealFIFOOptions struct {
 	// KnownObjects is expected to return a list of keys that the consumer of
 	// this queue "knows about". It is used to decide which items are missing
 	// when Replace() is called; 'Deleted' deltas are produced for the missing items.
-	// KnownObjects is required.
+	// KnownObjects is required if AtomicEvents is false since it is used to
+	// query the state of the internal store for Replace and Resync handling.
 	KnownObjects KeyListerGetter
 
 	// If set, will be called for objects before enqueueing them. Please
 	// see the comment on TransformFunc for details.
 	Transformer TransformFunc
+
+	// AtomicEvents is used to specify whether the RealFIFO will emit events
+	// atomically or not. If it is set, a single event will be emitted
+	// atomically for Replace and Resync operations.
+	// If AtomicEvents is true, KnownObjects must be nil.
+	AtomicEvents bool
+
+	// UnlockWhileProcessing is used to specify whether the RealFIFO can unlock
+	// the lock while processing events. If it is set, the lock can be unlocked
+	// while processing events to allow other goroutines to add items to the queue.
+	// If UnlockWhileProcessing is true, AtomicEvents must be true as well.
+	UnlockWhileProcessing bool
 }
 
 const (
@@ -73,7 +86,8 @@ type RealFIFO struct {
 	keyFunc KeyFunc
 
 	// knownObjects list keys that are "known" --- affecting Delete(),
-	// Replace(), and Resync()
+	// Replace(), and Resync().
+	// It is nil if emitAtomicEvents is true.
 	knownObjects KeyListerGetter
 
 	// Indication the queue is closed.
@@ -86,7 +100,33 @@ type RealFIFO struct {
 
 	// batchSize determines the maximum number of objects we can combine into a batch.
 	batchSize int
+
+	// emitAtomicEvents defines whether events like Replace and Resync should be emitted
+	// atomically rather than as a series of events. This means that any call to the FIFO
+	// will emit a single event.
+	// If it is set:
+	// * a single ReplacedAll event will be emitted instead of multiple Replace events
+	// * a single SyncAll event will be emitted instead of multiple Sync events
+	emitAtomicEvents bool
+
+	// unlockWhileProcessing defines whether we can unlock while processing events.
+	// This may only be set if emitAtomicEvents is true. If unlockWhileProcessing is true,
+	// Pop and PopBatch must be called from a single threaded consumer.
+	unlockWhileProcessing bool
 }
+
+// ReplacedAllInfo is the object associated with a Delta of type=ReplacedAll
+type ReplacedAllInfo struct {
+	// ResourceVersion is the resource version passed to the Replace() call that created this Delta
+	ResourceVersion string
+	// Objects are the list of objects passed to the Replace() call that created this Delta,
+	// with any configured transformation already applied.
+	Objects []interface{}
+}
+
+// SyncAllInfo is the object associated with a Delta of type=SyncAll
+// It is used to trigger a resync of the entire queue.
+type SyncAllInfo struct{}
 
 var (
 	_ = Queue(&RealFIFO{})             // RealFIFO is a Queue
@@ -173,6 +213,45 @@ func (f *RealFIFO) addToItems_locked(deltaActionType DeltaType, skipTransform bo
 	return nil
 }
 
+// addReplaceToItemsLocked appends to the delta list.
+func (f *RealFIFO) addReplaceToItemsLocked(objs []interface{}, resourceVersion string) error {
+	// Replaced items must be transformed before being added to the queue. These objects must
+	// all be objects that have not been transformed yet.
+	if f.transformer != nil {
+		transformedObjs := make([]interface{}, len(objs))
+		for i, obj := range objs {
+			transformedObj, err := f.transformer(obj)
+			if err != nil {
+				return err
+			}
+			transformedObjs[i] = transformedObj
+		}
+		objs = transformedObjs
+	}
+
+	info := ReplacedAllInfo{
+		ResourceVersion: resourceVersion,
+		Objects:         objs,
+	}
+	f.items = append(f.items, Delta{
+		Type:   ReplacedAll,
+		Object: info,
+	})
+	f.cond.Broadcast()
+
+	return nil
+}
+
+func (f *RealFIFO) addResyncToItemsLocked() error {
+	f.items = append(f.items, Delta{
+		Type:   SyncAll,
+		Object: SyncAllInfo{},
+	})
+	f.cond.Broadcast()
+
+	return nil
+}
+
 // Add inserts an item, and puts it in the queue. The item is only enqueued
 // if it doesn't already exist in the set.
 func (f *RealFIFO) Add(obj interface{}) error {
@@ -217,10 +296,14 @@ func (f *RealFIFO) IsClosed() bool {
 }
 
 // Pop waits until an item is ready and processes it. If multiple items are
-// ready, they are returned in the order in which they were added/updated.
-// The item is removed from the queue (and the store) before it is processed.
-// process function is called under lock, so it is safe
-// update data structures in it that need to be in sync with the queue.
+// ready, they are returned in the order in which they were added/updated. The
+// item is removed from the queue (and the store) before it is processed. The
+// process function is only guaranteed to be called under lock if
+// UnlockWhileProcessing is false. If the process function is updating data
+// structures that need to be in sync with the queue, ensure
+// UnlockWhileProcessing is false. It is expected that the caller of Pop will be
+// a single threaded consumer since otherwise it is possible for multiple
+// PopProcessFuncs to be running simultaneously.
 func (f *RealFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
@@ -241,9 +324,14 @@ func (f *RealFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 	// The underlying array still exists and references this object, so the object will not be garbage collected unless we zero the reference.
 	f.items[0] = Delta{}
 	f.items = f.items[1:]
-	if f.initialPopulationCount > 0 {
-		f.initialPopulationCount--
-	}
+	// Decrement initialPopulationCount if needed.
+	// This is done in a defer so we only do this *after* processing is complete,
+	// so concurrent calls to hasSynced will not incorrectly return true while processing is still happening.
+	defer func() {
+		if f.initialPopulationCount > 0 {
+			f.initialPopulationCount--
+		}
+	}()
 
 	// Only log traces if the queue depth is greater than 10 and it takes more than
 	// 100 milliseconds to process one item from the queue.
@@ -259,12 +347,47 @@ func (f *RealFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 		defer trace.LogIfLong(100 * time.Millisecond)
 	}
 
-	// we wrap in Deltas here to be compatible with preview Pop functions and those interpreting the return value.
-	err := process(Deltas{item}, isInInitialList)
+	// Process the item, this may unlock the lock, and allow other goroutines to add items to the queue.
+	err := f.whileProcessing_locked(func() error {
+		// we wrap in Deltas here to be compatible with preview Pop functions and those interpreting the return value.
+		return process(Deltas{item}, isInInitialList)
+	})
 	return Deltas{item}, err
 }
 
-func (f *RealFIFO) PopBatch(process ProcessBatchFunc) error {
+// whileProcessing_locked calls the `process` function.
+// The lock must be held before calling `whileProcessing_locked`, and is held when `whileProcessing_locked` returns.
+// whileProcessing_locked releases the lock during the call to `process` if f.unlockWhileProcessing is true and the f.items queue is not too long.
+func (f *RealFIFO) whileProcessing_locked(process func() error) error {
+	// Unlock before calling `process` so new items can be enqueued during processing.
+	// Only do this if the queue contains less than 2 full batches of items,
+	// to prevent the queue from growing unboundedly.
+	if f.unlockWhileProcessing && len(f.items) < f.batchSize*2 {
+		f.lock.Unlock()
+		defer f.lock.Lock()
+	}
+	return process()
+}
+
+// batchable stores the delta types that can be batched
+var batchable = map[DeltaType]bool{
+	Sync:     true,
+	Replaced: true,
+	Added:    true,
+	Updated:  true,
+	Deleted:  true,
+}
+
+// PopBatch pops as many items as possible to be processed as a batch using processBatch,
+// or pop a single item using processSingle if multiple items cannot be batched.
+//
+// The processBatch and processSingle functions are only guaranteed to be called
+// under lock if UnlockWhileProcessing is false. If the process functions are
+// updating data structures that need to be in sync with the queue, ensure
+// UnlockWhileProcessing is false. It is expected that the caller of PopBatch
+// will be a single threaded consumer, since otherwise it is possible for
+// multiple ProcessBatchFunc or PopProcessFunc's to be running simultaneously.
+func (f *RealFIFO) PopBatch(processBatch ProcessBatchFunc, processSingle PopProcessFunc) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
@@ -282,12 +405,25 @@ func (f *RealFIFO) PopBatch(process ProcessBatchFunc) error {
 	isInInitialList := !f.hasSynced_locked()
 	unique := sets.NewString()
 	deltas := make([]Delta, 0, min(len(f.items), f.batchSize))
+	moveDeltaToProcessList := func(i int) {
+		deltas = append(deltas, f.items[i])
+		// The underlying array still exists and references this object, so the object will not be garbage collected unless we zero the reference.
+		f.items[i] = Delta{}
+	}
 	// only bundle unique items into a batch
 	for i := 0; i < f.batchSize && i < len(f.items); i++ {
 		if f.initialPopulationCount > 0 && i >= f.initialPopulationCount {
 			break
 		}
 		item := f.items[i]
+		if !batchable[item.Type] {
+			if len(deltas) == 0 {
+				// if an unbatchable delta is first in the list, process just that one by itself
+				moveDeltaToProcessList(i)
+			}
+			// close the batch when an unbatchable delta is encountered
+			break
+		}
 		id, err := f.keyOf(item)
 		if err != nil {
 			// close the batch here if error happens
@@ -295,23 +431,26 @@ func (f *RealFIFO) PopBatch(process ProcessBatchFunc) error {
 			// still pop the broken item out of queue to be compatible with the non-batch behavior it should be safe
 			// when 1st element is broken, however for Nth broken element, there's possible risk that broken item
 			// still can be processed and broke the uniqueness of the batch unexpectedly.
-			deltas = append(deltas, item)
-			// The underlying array still exists and references this object, so the object will not be garbage collected unless we zero the reference.
-			f.items[i] = Delta{}
+			moveDeltaToProcessList(i)
 			break
 		}
 		if unique.Has(id) {
+			// close the batch if a duplicate item is encountered
 			break
 		}
 		unique.Insert(id)
-		deltas = append(deltas, item)
-		// The underlying array still exists and references this object, so the object will not be garbage collected unless we zero the reference.
-		f.items[i] = Delta{}
+		moveDeltaToProcessList(i)
 	}
-	if f.initialPopulationCount > 0 {
-		f.initialPopulationCount -= len(deltas)
-	}
+
 	f.items = f.items[len(deltas):]
+	// Decrement initialPopulationCount if needed.
+	// This is done in a defer so we only do this *after* processing is complete,
+	// so concurrent calls to hasSynced will not incorrectly return true while processing is still happening.
+	defer func() {
+		if f.initialPopulationCount > 0 {
+			f.initialPopulationCount -= len(deltas)
+		}
+	}()
 
 	// Only log traces if the queue depth is greater than 10 and it takes more than
 	// 100 milliseconds to process one item from the queue (with a max of 1 second for the whole batch)
@@ -328,8 +467,14 @@ func (f *RealFIFO) PopBatch(process ProcessBatchFunc) error {
 		defer trace.LogIfLong(min(100*time.Millisecond*time.Duration(len(deltas)), time.Second))
 	}
 
-	err := process(deltas, isInInitialList)
-	return err
+	if len(deltas) == 1 {
+		return f.whileProcessing_locked(func() error {
+			return processSingle(Deltas{deltas[0]}, isInInitialList)
+		})
+	}
+	return f.whileProcessing_locked(func() error {
+		return processBatch(deltas, isInInitialList)
+	})
 }
 
 // Replace
@@ -340,22 +485,56 @@ func (f *RealFIFO) Replace(newItems []interface{}, resourceVersion string) error
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
+	var err error
+	if f.emitAtomicEvents {
+		err = f.addReplaceToItemsLocked(newItems, resourceVersion)
+	} else {
+		err = reconcileReplacement(f.items, f.knownObjects, newItems, f.keyOf,
+			func(obj DeletedFinalStateUnknown) error {
+				return f.addToItems_locked(Deleted, true, obj)
+			},
+			func(obj interface{}) error {
+				return f.addToItems_locked(Replaced, false, obj)
+			})
+	}
+	if err != nil {
+		return err
+	}
+
+	if !f.populated {
+		f.populated = true
+		f.initialPopulationCount = len(f.items)
+	}
+
+	return nil
+}
+
+// reconcileReplacement takes the items that are already in the queue and the set of new items
+// and based upon the state of the items in the queue and known objects will call onDelete and onReplace
+// depending upon whether the item is being deleted or replaced/added.
+func reconcileReplacement(
+	queuedItems []Delta,
+	knownObjects KeyListerGetter,
+	newItems []interface{},
+	keyOf func(obj interface{}) (string, error),
+	onDelete func(obj DeletedFinalStateUnknown) error,
+	onReplace func(obj interface{}) error,
+) error {
 	// determine the keys of everything we're adding.  We cannot add the items until after the synthetic deletes have been
 	// created for items that don't existing in newItems
 	newKeys := sets.Set[string]{}
 	for _, obj := range newItems {
-		key, err := f.keyOf(obj)
+		key, err := keyOf(obj)
 		if err != nil {
 			return KeyError{obj, err}
 		}
 		newKeys.Insert(key)
 	}
 
-	queuedItems := f.items
 	queuedKeys := []string{}
 	lastQueuedItemForKey := map[string]Delta{}
 	for _, queuedItem := range queuedItems {
-		queuedKey, err := f.keyOf(queuedItem.Object)
+		queuedKey, err := keyOf(queuedItem.Object)
 		if err != nil {
 			return KeyError{queuedItem.Object, err}
 		}
@@ -387,7 +566,7 @@ func (f *RealFIFO) Replace(newItems []interface{}, resourceVersion string) error
 		// if we got here, then the last entry we have for the queued item is *not* a deletion and we need to add a delete
 		deletedObj := lastQueuedItem.Object
 
-		retErr := f.addToItems_locked(Deleted, true, DeletedFinalStateUnknown{
+		retErr := onDelete(DeletedFinalStateUnknown{
 			Key: queuedKey,
 			Obj: deletedObj,
 		})
@@ -397,7 +576,7 @@ func (f *RealFIFO) Replace(newItems []interface{}, resourceVersion string) error
 	}
 
 	// Detect deletions for objects not present in the queue, but present in KnownObjects
-	knownKeys := f.knownObjects.ListKeys()
+	knownKeys := knownObjects.ListKeys()
 	for _, knownKey := range knownKeys {
 		if newKeys.Has(knownKey) { // still present
 			continue
@@ -406,7 +585,7 @@ func (f *RealFIFO) Replace(newItems []interface{}, resourceVersion string) error
 			continue
 		}
 
-		deletedObj, exists, err := f.knownObjects.GetByKey(knownKey)
+		deletedObj, exists, err := knownObjects.GetByKey(knownKey)
 		if err != nil {
 			deletedObj = nil
 			utilruntime.HandleError(fmt.Errorf("error during lookup, placing DeleteFinalStateUnknown marker without object: key=%q, err=%w", knownKey, err))
@@ -414,7 +593,7 @@ func (f *RealFIFO) Replace(newItems []interface{}, resourceVersion string) error
 			deletedObj = nil
 			utilruntime.HandleError(fmt.Errorf("key does not exist in known objects store, placing DeleteFinalStateUnknown marker without object: key=%q", knownKey))
 		}
-		retErr := f.addToItems_locked(Deleted, false, DeletedFinalStateUnknown{
+		retErr := onDelete(DeletedFinalStateUnknown{
 			Key: knownKey,
 			Obj: deletedObj,
 		})
@@ -425,15 +604,9 @@ func (f *RealFIFO) Replace(newItems []interface{}, resourceVersion string) error
 
 	// now that we have the deletes we need for items, we can add the newItems to the items queue
 	for _, obj := range newItems {
-		retErr := f.addToItems_locked(Replaced, false, obj)
-		if retErr != nil {
-			return fmt.Errorf("couldn't enqueue object: %w", retErr)
+		if err := onReplace(obj); err != nil {
+			return fmt.Errorf("couldn't enqueue object: %w", err)
 		}
-	}
-
-	if !f.populated {
-		f.populated = true
-		f.initialPopulationCount = len(f.items)
 	}
 
 	return nil
@@ -445,6 +618,10 @@ func (f *RealFIFO) Resync() error {
 	// TODO this cannot logically be done by the FIFO, it can only be done by the indexer
 	f.lock.Lock()
 	defer f.lock.Unlock()
+
+	if f.emitAtomicEvents {
+		return f.addResyncToItemsLocked()
+	}
 
 	if f.knownObjects == nil {
 		return nil
@@ -494,6 +671,8 @@ func (f *RealFIFO) Transformer() TransformFunc {
 
 // NewRealFIFO returns a Store which can be used to queue up items to
 // process.
+//
+// Deprecated: Use NewRealFIFOWithOptions instead.
 func NewRealFIFO(keyFunc KeyFunc, knownObjects KeyListerGetter, transformer TransformFunc) *RealFIFO {
 	return NewRealFIFOWithOptions(RealFIFOOptions{
 		KeyFunction:  keyFunc,
@@ -509,16 +688,29 @@ func NewRealFIFOWithOptions(opts RealFIFOOptions) *RealFIFO {
 		opts.KeyFunction = MetaNamespaceKeyFunc
 	}
 
-	if opts.KnownObjects == nil {
-		panic("coding error: knownObjects must be provided")
+	if opts.AtomicEvents {
+		// If we are emitting atomic events, we must not rely on the known objects store
+		// as it is a requirement to be able to release the lock while processing events.
+		if opts.KnownObjects != nil {
+			panic("coding error: knownObjects must not be provided when AtomicEvents is true")
+		}
+	} else {
+		if opts.UnlockWhileProcessing {
+			panic("coding error: UnlockWhileProcessing must be false when AtomicEvents is false")
+		}
+		if opts.KnownObjects == nil {
+			panic("coding error: knownObjects must be provided when AtomicEvents is false")
+		}
 	}
 
 	f := &RealFIFO{
-		items:        make([]Delta, 0, 10),
-		keyFunc:      opts.KeyFunction,
-		knownObjects: opts.KnownObjects,
-		transformer:  opts.Transformer,
-		batchSize:    defaultBatchSize,
+		items:                 make([]Delta, 0, 10),
+		keyFunc:               opts.KeyFunction,
+		knownObjects:          opts.KnownObjects,
+		transformer:           opts.Transformer,
+		batchSize:             defaultBatchSize,
+		emitAtomicEvents:      opts.AtomicEvents,
+		unlockWhileProcessing: opts.UnlockWhileProcessing,
 	}
 
 	f.cond.L = &f.lock

@@ -241,12 +241,6 @@ const (
 	// Enables JWKs metrics for Structured Authentication Configuration
 	StructuredAuthenticationConfigurationJWKSMetrics featuregate.Feature = "StructuredAuthenticationConfigurationJWKSMetrics"
 
-	// owner: @palnabarun
-	// kep: https://kep.k8s.io/3221
-	//
-	// Enables Structured Authorization Configuration
-	StructuredAuthorizationConfiguration featuregate.Feature = "StructuredAuthorizationConfiguration"
-
 	// owner: @aramase
 	//
 	// Enables validation of service account UID in TokenRequest API.
@@ -283,11 +277,6 @@ const (
 	//
 	// Enables post-start-hook for storage readiness
 	WatchCacheInitializationPostStartHook featuregate.Feature = "WatchCacheInitializationPostStartHook"
-
-	// owner: @serathius
-	// Enables watches without resourceVersion to be served from storage.
-	// Used to prevent https://github.com/kubernetes/kubernetes/issues/123072 until etcd fixes the issue.
-	WatchFromStorageWithoutResourceVersion featuregate.Feature = "WatchFromStorageWithoutResourceVersion"
 
 	// owner: @p0lyn0mial
 	//
@@ -383,6 +372,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	DeclarativeValidation: {
 		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA and LockToDefault in 1.36, remove in 1.39
 	},
 
 	DeclarativeValidationTakeover: {
@@ -472,12 +462,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
 	},
 
-	StructuredAuthorizationConfiguration: {
-		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	},
-
 	TokenRequestServiceAccountUIDValidation: {
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
 	},
@@ -493,11 +477,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	WatchCacheInitializationPostStartHook: {
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Beta},
-	},
-
-	WatchFromStorageWithoutResourceVersion: {
-		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Deprecated, LockToDefault: true},
+		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	WatchList: {

@@ -35,18 +35,46 @@ func TestVersionedValidationByFuzzing(t *testing.T) {
 	typesWithDeclarativeValidation := []schema.GroupVersion{
 		// Registered group versions for versioned validation fuzz testing:
 		{Group: "", Version: "v1"},
+		{Group: "batch", Version: "v1"},
+		{Group: "batch", Version: "v1beta1"},
 		{Group: "certificates.k8s.io", Version: "v1"},
 		{Group: "certificates.k8s.io", Version: "v1alpha1"},
 		{Group: "certificates.k8s.io", Version: "v1beta1"},
+		{Group: "resource.k8s.io", Version: "v1"},
 		{Group: "resource.k8s.io", Version: "v1beta1"},
 		{Group: "resource.k8s.io", Version: "v1beta2"},
-		{Group: "resource.k8s.io", Version: "v1"},
 		{Group: "storage.k8s.io", Version: "v1"},
-		{Group: "storage.k8s.io", Version: "v1beta1"},
 		{Group: "storage.k8s.io", Version: "v1alpha1"},
-		{Group: "node.k8s.io", Version: "v1beta1"},
+		{Group: "storage.k8s.io", Version: "v1beta1"},
 		{Group: "node.k8s.io", Version: "v1"},
 		{Group: "node.k8s.io", Version: "v1alpha1"},
+		{Group: "node.k8s.io", Version: "v1beta1"},
+		{Group: "network.k8s.io", Version: "v1"},
+		{Group: "network.k8s.io", Version: "v1beta1"},
+		{Group: "autoscaling", Version: "v1"},
+		{Group: "autoscaling", Version: "v1beta1"},
+		{Group: "autoscaling", Version: "v1beta2"},
+		{Group: "autoscaling", Version: "v2"},
+		{Group: "admissionregistration.k8s.io", Version: "v1"},
+		{Group: "admissionregistration.k8s.io", Version: "v1beta1"},
+		{Group: "admissionregistration.k8s.io", Version: "v1alpha1"},
+		{Group: "discovery.k8s.io", Version: "v1"},
+		{Group: "discovery.k8s.io", Version: "v1beta1"},
+		{Group: "admissionregistration.k8s.io", Version: "v1"},
+		{Group: "admissionregistration.k8s.io", Version: "v1beta1"},
+		{Group: "admissionregistration.k8s.io", Version: "v1alpha1"},
+	}
+
+	// subresourceOnly specifies the subresource path for types that can only be validated
+	// as subresources (e.g. autoscaling/Scale) and do not support root-level validation.
+	// For GVKs not in this map, the test defaults to fuzzing the root resource ("").
+	// Other resources with subresources (e.g. Pod status, exec) share validation logic with
+	// the root resource, so fuzzing the root is sufficient to verify validation equivalence.
+	subresourceOnly := map[schema.GroupVersionKind]string{
+		{Group: "autoscaling", Version: "v1", Kind: "Scale"}:      "scale",
+		{Group: "autoscaling", Version: "v1beta1", Kind: "Scale"}: "scale",
+		{Group: "autoscaling", Version: "v1beta2", Kind: "Scale"}: "scale",
+		{Group: "autoscaling", Version: "v2", Kind: "Scale"}:      "scale",
 	}
 
 	fuzzIters := *roundtrip.FuzzIters / 10 // TODO: Find a better way to manage test running time
@@ -61,7 +89,11 @@ func TestVersionedValidationByFuzzing(t *testing.T) {
 					if err != nil {
 						t.Fatalf("could not create a %v: %s", kind, err)
 					}
-					f.Fill(obj)
+
+					subresource := ""
+					if specific, ok := subresourceOnly[gvk]; ok {
+						subresource = specific
+					}
 
 					var opts []ValidationTestConfig
 					// TODO(API group level configuration): Consider configuring normalization rules at the
@@ -69,7 +101,10 @@ func TestVersionedValidationByFuzzing(t *testing.T) {
 					// This would allow each API group to register its own normalization rules independently.
 					allRules := append([]field.NormalizationRule{}, resourcevalidation.ResourceNormalizationRules...)
 					allRules = append(allRules, nodevalidation.NodeNormalizationRules...)
-					opts = append(opts, WithNormalizationRules(allRules...))
+					opts = append(opts, WithNormalizationRules(allRules...), WithFuzzer(f))
+					if subresource != "" {
+						opts = append(opts, WithSubResources(subresource))
+					}
 
 					VerifyVersionedValidationEquivalence(t, obj, nil, opts...)
 
@@ -77,7 +112,7 @@ func TestVersionedValidationByFuzzing(t *testing.T) {
 					if err != nil {
 						t.Fatalf("could not create a %v: %s", kind, err)
 					}
-					f.Fill(old)
+
 					VerifyVersionedValidationEquivalence(t, obj, old, opts...)
 				}
 			})

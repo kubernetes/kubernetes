@@ -198,7 +198,7 @@ func (op *createResourceDriverOp) run(tCtx ktesting.TContext, draManager framewo
 		numSlices++
 	}
 
-	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) int {
+	tCtx.Eventually(func(tCtx ktesting.TContext) int {
 		slices, err := draManager.ResourceSlices().ListWithDeviceTaintRules()
 		tCtx.ExpectNoError(err, "list ResourceSlices")
 		return len(slices)
@@ -278,7 +278,7 @@ func (op *allocResourceClaimsOp) run(tCtx ktesting.TContext) {
 	claims, err := tCtx.Client().ResourceV1().ResourceClaims(op.Namespace).List(tCtx, metav1.ListOptions{})
 	tCtx.ExpectNoError(err, "list claims")
 	tCtx.Logf("allocating %d ResourceClaims", len(claims.Items))
-	tCtx = ktesting.WithCancel(tCtx)
+	tCtx = tCtx.WithCancel()
 	defer tCtx.Cancel("allocResourceClaimsOp.run is done")
 
 	// Track cluster state.

@@ -74,25 +74,27 @@ func createADC(t testing.TB, tCtx ktesting.TContext, fakeKubeClient *fake.Client
 }
 
 func Test_NewAttachDetachController_Positive(t *testing.T) {
-	// Arrange
-	fakeKubeClient := controllervolumetesting.CreateTestClient()
-	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 	tCtx := ktesting.Init(t)
+
+	// Arrange
+	fakeKubeClient := controllervolumetesting.CreateTestClient(tCtx.Logger())
+	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 
 	// Act
 	createADC(t, tCtx, fakeKubeClient, informerFactory, nil)
 }
 
 func Test_AttachDetachControllerStateOfWorldPopulators_Positive(t *testing.T) {
+	logger, tCtx := ktesting.NewTestContext(t)
+
 	// Arrange
-	fakeKubeClient := controllervolumetesting.CreateTestClient()
+	fakeKubeClient := controllervolumetesting.CreateTestClient(logger)
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 
 	var plugins []volume.VolumePlugin
 	plugins = append(plugins, controllervolumetesting.CreateTestPlugin(false)...)
 	plugins = append(plugins, csi.ProbeVolumePlugins()...)
 
-	logger, tCtx := ktesting.NewTestContext(t)
 	adc := createADC(t, tCtx, fakeKubeClient, informerFactory, plugins)
 
 	// Act
@@ -279,7 +281,8 @@ func Test_AttachDetachControllerRecovery(t *testing.T) {
 }
 
 func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2 []*v1.Pod) {
-	fakeKubeClient := controllervolumetesting.CreateTestClient()
+	tCtx := ktesting.Init(t)
+	fakeKubeClient := controllervolumetesting.CreateTestClient(tCtx.Logger())
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, time.Second*1)
 	plugins := controllervolumetesting.CreateTestPlugin(true)
 	var prober volume.DynamicPluginProber = nil // TODO (#51147) inject mock
@@ -534,7 +537,8 @@ func Test_ADC_VolumeAttachmentRecovery(t *testing.T) {
 }
 
 func volumeAttachmentRecoveryTestCase(t *testing.T, tc vaTest) {
-	fakeKubeClient := controllervolumetesting.CreateTestClient()
+	tCtx := ktesting.Init(t)
+	fakeKubeClient := controllervolumetesting.CreateTestClient(tCtx.Logger())
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, time.Second*1)
 	var plugins []volume.VolumePlugin
 

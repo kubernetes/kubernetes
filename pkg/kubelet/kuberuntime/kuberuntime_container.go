@@ -766,7 +766,7 @@ func (m *kubeGenericRuntimeManager) executePreStopHook(ctx context.Context, pod 
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		defer utilruntime.HandleCrash()
+		defer utilruntime.HandleCrashWithContext(ctx)
 		if _, err := m.runner.Run(ctx, containerID, pod, containerSpec, containerSpec.Lifecycle.PreStop); err != nil {
 			logger.Error(err, "PreStop hook failed", "pod", klog.KObj(pod), "podUID", pod.UID,
 				"containerName", containerSpec.Name, "containerID", containerID.String())
@@ -922,7 +922,7 @@ func (m *kubeGenericRuntimeManager) killContainersWithSyncResult(ctx context.Con
 	}
 	for _, container := range runningPod.Containers {
 		go func(container *kubecontainer.Container) {
-			defer utilruntime.HandleCrash()
+			defer utilruntime.HandleCrashWithContext(ctx)
 			defer wg.Done()
 
 			killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, container.Name)
@@ -1008,9 +1008,9 @@ func (m *kubeGenericRuntimeManager) purgeInitContainers(ctx context.Context, pod
 	}
 }
 
-// hasAnyRegularContainerCreated returns true if any regular container has been
+// HasAnyRegularContainerCreated returns true if any regular container has been
 // created, which indicates all init containers have been initialized.
-func hasAnyRegularContainerCreated(pod *v1.Pod, podStatus *kubecontainer.PodStatus) bool {
+func HasAnyRegularContainerCreated(pod *v1.Pod, podStatus *kubecontainer.PodStatus) bool {
 	for _, container := range pod.Spec.Containers {
 		status := podStatus.FindContainerStatusByName(container.Name)
 		if status == nil {

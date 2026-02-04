@@ -27,7 +27,14 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	"k8s.io/apimachinery/pkg/runtime"
+	cbor "k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1alpha1 "k8s.io/apiserver/pkg/server/statusz/api/v1alpha1"
@@ -58,6 +65,9 @@ Paths: /livez /readyz
 `
 
 func TestHandleStatusz(t *testing.T) {
+	// Enable CBOR feature gate for CBOR test case
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CBORServingAndStorage, true)
+
 	delimiters = []string{":"}
 	fakeStartTime := time.Now()
 	fakeUptime := uptime(fakeStartTime)
@@ -68,14 +78,14 @@ func TestHandleStatusz(t *testing.T) {
 	fakeEmulationVersion := parseVersion(t, fakeEvStr)
 	fakeListedPaths := []string{"/livez/poststarthook/peer-discovery-cache-sync", "/livez/post", "/readyz/informer-sync", "/readyz/log", "/readyz/ping"}
 	tests := []struct {
-		name           string
-		acceptHeader   string
-		componentName  string
-		registry       fakeRegistry
-		wantStatusCode int
-		wantBody       string
-		wantJSONBody   *v1alpha1.Statusz
-		wantWarning    bool
+		name               string
+		acceptHeader       string
+		componentName      string
+		registry           fakeRegistry
+		wantStatusCode     int
+		wantBody           string
+		wantStructuredBody *v1alpha1.Statusz
+		wantWarning        bool
 	}{
 		{
 			name:          "valid request for text/plain",
@@ -100,7 +110,7 @@ func TestHandleStatusz(t *testing.T) {
 			),
 		},
 		{
-			name:          "valid request for v1alpha1",
+			name:          "valid request for application/json",
 			acceptHeader:  "application/json;v=v1alpha1;g=config.k8s.io;as=Statusz",
 			componentName: "test-server",
 			registry: fakeRegistry{
@@ -112,7 +122,7 @@ func TestHandleStatusz(t *testing.T) {
 				deprecated:   map[string]bool{},
 			},
 			wantStatusCode: http.StatusOK,
-			wantJSONBody: &v1alpha1.Statusz{
+			wantStructuredBody: &v1alpha1.Statusz{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       Kind,
 					APIVersion: fmt.Sprintf("%s/%s", GroupName, Version),
@@ -248,7 +258,7 @@ func TestHandleStatusz(t *testing.T) {
 				},
 			},
 			wantStatusCode: http.StatusOK,
-			wantJSONBody: &v1alpha1.Statusz{
+			wantStructuredBody: &v1alpha1.Statusz{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       Kind,
 					APIVersion: fmt.Sprintf("%s/%s", GroupName, Version),
@@ -264,6 +274,64 @@ func TestHandleStatusz(t *testing.T) {
 				Paths:            []string{"/livez", "/readyz"},
 			},
 			wantWarning: true,
+		},
+		{
+			name:          "valid request for application/yaml",
+			acceptHeader:  "application/yaml;v=v1alpha1;g=config.k8s.io;as=Statusz",
+			componentName: "test-server",
+			registry: fakeRegistry{
+				startTime:    fakeStartTime,
+				goVer:        fakeGoVersion,
+				binaryVer:    fakeBinaryVersion,
+				emulationVer: fakeEmulationVersion,
+				listedPaths:  fakeListedPaths,
+				deprecated:   map[string]bool{},
+			},
+			wantStatusCode: http.StatusOK,
+			wantStructuredBody: &v1alpha1.Statusz{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       Kind,
+					APIVersion: fmt.Sprintf("%s/%s", GroupName, Version),
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-server",
+				},
+				StartTime:        metav1.Time{Time: fakeStartTime},
+				UptimeSeconds:    int64(time.Since(fakeStartTime).Seconds()),
+				GoVersion:        fakeGoVersion,
+				BinaryVersion:    fakeBvStr,
+				EmulationVersion: fakeEvStr,
+				Paths:            []string{"/livez", "/readyz"},
+			},
+		},
+		{
+			name:          "valid request for application/cbor",
+			acceptHeader:  "application/cbor;v=v1alpha1;g=config.k8s.io;as=Statusz",
+			componentName: "test-server",
+			registry: fakeRegistry{
+				startTime:    fakeStartTime,
+				goVer:        fakeGoVersion,
+				binaryVer:    fakeBinaryVersion,
+				emulationVer: fakeEmulationVersion,
+				listedPaths:  fakeListedPaths,
+				deprecated:   map[string]bool{},
+			},
+			wantStatusCode: http.StatusOK,
+			wantStructuredBody: &v1alpha1.Statusz{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       Kind,
+					APIVersion: fmt.Sprintf("%s/%s", GroupName, Version),
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-server",
+				},
+				StartTime:        metav1.Time{Time: fakeStartTime},
+				UptimeSeconds:    int64(time.Since(fakeStartTime).Seconds()),
+				GoVersion:        fakeGoVersion,
+				BinaryVersion:    fakeBvStr,
+				EmulationVersion: fakeEvStr,
+				Paths:            []string{"/livez", "/readyz"},
+			},
 		},
 	}
 
@@ -289,12 +357,10 @@ func TestHandleStatusz(t *testing.T) {
 			}
 
 			if tt.wantStatusCode == http.StatusOK {
-				if tt.wantJSONBody != nil {
+				if tt.wantStructuredBody != nil {
 					var got v1alpha1.Statusz
-					if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
-						t.Fatalf("unexpected error while unmarshalling response: %v", err)
-					}
-					if diff := cmp.Diff(*tt.wantJSONBody, got, timeEqual()); diff != "" {
+					unmarshalResponse(t, w.Header().Get("Content-Type"), w.Body.Bytes(), &got)
+					if diff := cmp.Diff(*tt.wantStructuredBody, got, timeEqual()); diff != "" {
 						t.Errorf("Unexpected diff on response (-want,+got):\n%s", diff)
 					}
 					if tt.wantWarning {
@@ -303,12 +369,32 @@ func TestHandleStatusz(t *testing.T) {
 						}
 					}
 				} else {
-					if diff := cmp.Diff(tt.wantBody, string(w.Body.String())); diff != "" {
-						t.Errorf("Unexpected diff on response (-want,+got):\n%s", diff)
+					if !strings.Contains(string(w.Body.String()), tt.wantBody) {
+						t.Errorf("Unexpected response body:\n- want to contain: %s\n- got:  %s", tt.wantBody, string(w.Body.String()))
 					}
 				}
 			}
 		})
+	}
+}
+
+func unmarshalResponse(t *testing.T, contentType string, body []byte, got *v1alpha1.Statusz) {
+	t.Helper()
+	switch {
+	case strings.Contains(contentType, "application/json"):
+		if err := json.Unmarshal(body, got); err != nil {
+			t.Fatalf("unexpected error while unmarshalling JSON response: %v", err)
+		}
+	case strings.Contains(contentType, "application/cbor"):
+		if err := cbor.Unmarshal(body, got); err != nil {
+			t.Fatalf("unexpected error while unmarshalling CBOR response: %v", err)
+		}
+	case strings.Contains(contentType, "application/yaml"):
+		if err := yaml.Unmarshal(body, got); err != nil {
+			t.Fatalf("unexpected error while unmarshalling YAML response: %v", err)
+		}
+	default:
+		t.Fatalf("unexpected content type: %s", contentType)
 	}
 }
 
@@ -358,4 +444,19 @@ func timeEqual() cmp.Option {
 	return cmp.Comparer(func(expectedTime, actualTime metav1.Time) bool {
 		return expectedTime.Truncate(time.Second).Equal(actualTime.Truncate(time.Second))
 	})
+}
+
+// TestNewStatuszCodecFactory ensures all media types in the codec factory
+// are explicitly handled. If this test fails, a new media type was added
+// to the codec factory and needs to be explicitly added to the supported
+// or unsupported list in newStatuszCodecFactory.
+func TestNewStatuszCodecFactory(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CBORServingAndStorage, true)
+	scheme := runtime.NewScheme()
+	utilruntime.Must(v1alpha1.AddToScheme(scheme))
+
+	_, err := newStatuszCodecFactory(scheme, "", nil)
+	if err != nil {
+		t.Fatalf("unknown media type(s) detected - update newStatuszCodecFactory to explicitly handle them: %v", err)
+	}
 }

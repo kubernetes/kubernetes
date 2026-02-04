@@ -627,11 +627,6 @@ function write-windows-node-env {
 function build-linux-node-labels {
   local node_type=$1
   local node_labels=""
-  if [[ "${KUBE_PROXY_DAEMONSET:-}" == "true" && "${node_type}" != "master" ]]; then
-    # Add kube-proxy daemonset label to node to avoid situation during cluster
-    # upgrade/downgrade when there are two instances of kube-proxy running on a node.
-    node_labels="node.kubernetes.io/kube-proxy-ds-ready=true"
-  fi
   if [[ -n "${NODE_LABELS:-}" ]]; then
     node_labels="${node_labels:+${node_labels},}${NODE_LABELS}"
   fi
@@ -1153,7 +1148,6 @@ LOCAL_DNS_IP: $(yaml-quote "${LOCAL_DNS_IP:-}")
 DNS_DOMAIN: $(yaml-quote "${DNS_DOMAIN:-}")
 DNS_MEMORY_LIMIT: $(yaml-quote "${DNS_MEMORY_LIMIT:-}")
 ENABLE_DNS_HORIZONTAL_AUTOSCALER: $(yaml-quote "${ENABLE_DNS_HORIZONTAL_AUTOSCALER:-false}")
-KUBE_PROXY_DAEMONSET: $(yaml-quote "${KUBE_PROXY_DAEMONSET:-false}")
 KUBE_PROXY_TOKEN: $(yaml-quote "${KUBE_PROXY_TOKEN:-}")
 KUBE_PROXY_MODE: $(yaml-quote "${KUBE_PROXY_MODE:-iptables}")
 DETECT_LOCAL_MODE: $(yaml-quote "${DETECT_LOCAL_MODE:-}")

@@ -27,10 +27,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	runtimetest "k8s.io/apimachinery/pkg/runtime/testing"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"sigs.k8s.io/randfill"
 )
 
 // ValidateFunc is a function that runs validation.
@@ -88,8 +90,15 @@ func VerifyVersionedValidationEquivalence(t *testing.T, obj, old runtime.Object,
 	if internalObj == nil {
 		return
 	}
+	// We do fuzzing on the internal version of the object.
+	// This is because custom fuzzing function are only
+	// supported for internal objects.
+	// Fuzz the internal object if a fuzzer is provided.
+	if opts.Fuzzer != nil {
+		opts.Fuzzer.Fill(internalObj)
+	}
 	if old == nil {
-		runtimetest.RunValidationForEachVersion(t, legacyscheme.Scheme, []string{}, internalObj, accumulate, opts.SubResources...)
+		runtimetest.RunValidationForEachVersion(t, legacyscheme.Scheme, []string{}, internalObj, accumulate, opts.IgnoreObjectConversionErrors, opts.SubResources...)
 	} else {
 		// Convert old versioned object to internal format before validation.
 		// runtimetest.RunUpdateValidationForEachVersion requires unversioned (internal) objects as input.
@@ -100,7 +109,11 @@ func VerifyVersionedValidationEquivalence(t *testing.T, obj, old runtime.Object,
 		if internalOld == nil {
 			return
 		}
-		runtimetest.RunUpdateValidationForEachVersion(t, legacyscheme.Scheme, []string{}, internalObj, internalOld, accumulate, opts.SubResources...)
+		// Fuzz the internal old object if a fuzzer is provided.
+		if opts.Fuzzer != nil {
+			opts.Fuzzer.Fill(internalOld)
+		}
+		runtimetest.RunUpdateValidationForEachVersion(t, legacyscheme.Scheme, []string{}, internalObj, internalOld, accumulate, opts.IgnoreObjectConversionErrors, opts.SubResources...)
 	}
 
 	// Make a copy so we can modify it.
@@ -201,6 +214,13 @@ type validationOption struct {
 	SubResources []string
 	// NormalizationRules are the rules to apply to field paths before comparison.
 	NormalizationRules []field.NormalizationRule
+
+	// IgnoreObjectConversions skips the tests if the conversion from the internal object
+	// to the versioned object fails.
+	IgnoreObjectConversionErrors bool
+
+	// Fuzzer is the fuzzer to use for generating test objects.
+	Fuzzer *randfill.Filler
 }
 
 func WithSubResources(subResources ...string) ValidationTestConfig {
@@ -212,6 +232,18 @@ func WithSubResources(subResources ...string) ValidationTestConfig {
 func WithNormalizationRules(rules ...field.NormalizationRule) ValidationTestConfig {
 	return func(o *validationOption) {
 		o.NormalizationRules = rules
+	}
+}
+
+func WithIgnoreObjectConversionErrors() ValidationTestConfig {
+	return func(o *validationOption) {
+		o.IgnoreObjectConversionErrors = true
+	}
+}
+
+func WithFuzzer(fuzzer *randfill.Filler) ValidationTestConfig {
+	return func(o *validationOption) {
+		o.Fuzzer = fuzzer
 	}
 }
 
@@ -272,7 +304,7 @@ func verifyValidationEquivalence(t *testing.T, expectedErrs field.ErrorList, run
 	var imperativeErrs field.ErrorList
 
 	// The errOutputMatcher is used to verify the output matches the expected errors in test cases.
-	errOutputMatcher := field.ErrorMatcher{}.ByType().ByOrigin().ByFieldNormalized(opt.NormalizationRules)
+	errOutputMatcher := field.ErrorMatcher{}.ByType().ByOrigin().ByFieldNormalized(opt.NormalizationRules).ByDeclarativeNative()
 
 	// We only need to test both gate enabled and disabled together, because
 	// 1) the DeclarativeValidationTakeover won't take effect if DeclarativeValidation is disabled.
@@ -289,9 +321,17 @@ func verifyValidationEquivalence(t *testing.T, expectedErrs field.ErrorList, run
 		} else if len(declarativeTakeoverErrs) != 0 {
 			t.Errorf("expected no errors, but got: %v", declarativeTakeoverErrs)
 		}
+
+		// make sure all errors marked by covered by declarative validations, are actually covered.
+		for _, err := range declarativeTakeoverErrs {
+			if err.CoveredByDeclarative {
+				t.Errorf("error %v should be covered by declarative validation", err)
+			}
+		}
 	})
 
 	t.Run("hand written validation", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
 		featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 			features.DeclarativeValidationTakeover: false,
 			features.DeclarativeValidation:         false,

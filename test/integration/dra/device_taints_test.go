@@ -176,7 +176,7 @@ func testEvictCluster(tCtx ktesting.TContext, useRule bool) {
 	}
 	wg.Go(func() {
 		if err := controller.Run(tCtx, 10 /* workers */); err != nil {
-			tCtx.Errorf("Unexpected Run error: %w", err)
+			tCtx.Errorf("Unexpected Run error: %v", err)
 		}
 	})
 
@@ -241,7 +241,7 @@ func testEvictCluster(tCtx ktesting.TContext, useRule bool) {
 
 	if useRule {
 		// Check condition.
-		ktesting.Eventually(tCtx, getRule).WithPolling(10 * time.Second).Should(gomega.HaveField("Status.Conditions", gomega.ConsistOf(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+		tCtx.Eventually(getRule).WithPolling(10 * time.Second).Should(gomega.HaveField("Status.Conditions", gomega.ConsistOf(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
 			"Type":    gomega.Equal(resourcealpha.DeviceTaintConditionEvictionInProgress),
 			"Status":  gomega.Equal(metav1.ConditionFalse),
 			"Message": gomega.Equal(fmt.Sprintf("%d pods evicted since starting the controller.", numPods)),

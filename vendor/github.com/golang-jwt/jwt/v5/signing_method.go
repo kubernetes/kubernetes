@@ -12,9 +12,9 @@ var signingMethodLock = new(sync.RWMutex)
 // signature in Sign. The signature is then usually base64 encoded as part of a
 // JWT.
 type SigningMethod interface {
-	Verify(signingString string, sig []byte, key interface{}) error // Returns nil if signature is valid
-	Sign(signingString string, key interface{}) ([]byte, error)     // Returns signature or error
-	Alg() string                                                    // returns the alg identifier for this method (example: 'HS256')
+	Verify(signingString string, sig []byte, key any) error // Returns nil if signature is valid
+	Sign(signingString string, key any) ([]byte, error)     // Returns signature or error
+	Alg() string                                            // returns the alg identifier for this method (example: 'HS256')
 }
 
 // RegisterSigningMethod registers the "alg" name and a factory function for signing method.

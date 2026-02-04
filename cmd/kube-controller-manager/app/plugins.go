@@ -35,7 +35,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume/nfs"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	persistentvolumeconfig "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/config"
 	"k8s.io/utils/exec"
 )
@@ -123,12 +122,6 @@ func probeControllerVolumePlugins(logger klog.Logger, config persistentvolumecon
 	allPlugins = append(allPlugins, fc.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, iscsi.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, csi.ProbeVolumePlugins()...)
-
-	var err error
-	allPlugins, err = appendLegacyControllerProviders(logger, allPlugins, utilfeature.DefaultFeatureGate)
-	if err != nil {
-		return allPlugins, err
-	}
 
 	var filteredPlugins []volume.VolumePlugin
 	if filter == nil {

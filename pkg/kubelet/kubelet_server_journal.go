@@ -432,7 +432,7 @@ func heuristicsCopyFileLog(ctx context.Context, w io.Writer, logDir, logFileName
 func safeServiceName(s string) error {
 	// Max length of a service name is 256 across supported OSes
 	if len(s) > maxServiceLength {
-		return fmt.Errorf("length must be less than 100")
+		return fmt.Errorf("length must be less than %d", maxServiceLength)
 	}
 
 	if reServiceNameUnsafeCharacters.MatchString(s) {

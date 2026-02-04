@@ -17,6 +17,7 @@ limitations under the License.
 package validation_test
 
 import (
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -130,4 +131,50 @@ func TestObjectObjectFieldsRatcheting(t *testing.T) {
 		"nested": map[string]interface{}{
 			"small": 501,
 		}}, validation.WithRatcheting(nil)).IsValid())
+}
+
+var numericFormatSchema *spec.Schema = &spec.Schema{
+	SchemaProps: spec.SchemaProps{
+		Type: spec.StringOrArray{"object"},
+		Properties: map[string]spec.Schema{
+			"intThirtyTwo": {
+				SchemaProps: spec.SchemaProps{
+					Type:   spec.StringOrArray{"integer"},
+					Format: "int32",
+				},
+			},
+			"unrelated": {
+				SchemaProps: spec.SchemaProps{
+					Type: spec.StringOrArray{"string"},
+				},
+			},
+		},
+	},
+}
+
+func TestNumericFormatRatcheting(t *testing.T) {
+	validator := validation.NewRatchetingSchemaValidator(numericFormatSchema, nil, "", strfmt.Default)
+
+	// Ratcheting should allow existing invalid value if unchanged
+	assert.True(t, validator.ValidateUpdate(map[string]interface{}{
+		"intThirtyTwo": int64(math.MaxInt32 + 1),
+	}, map[string]interface{}{
+		"intThirtyTwo": int64(math.MaxInt32 + 1),
+	}, validation.WithRatcheting(nil)).IsValid())
+
+	// Ratcheting should allow existing invalid value if other fields change
+	assert.True(t, validator.ValidateUpdate(map[string]interface{}{
+		"intThirtyTwo": int64(math.MaxInt32 + 1),
+		"unrelated":    "changed",
+	}, map[string]interface{}{
+		"intThirtyTwo": int64(math.MaxInt32 + 1),
+		"unrelated":    "original",
+	}, validation.WithRatcheting(nil)).IsValid())
+
+	// Should fail if value changes to another invalid value
+	assert.False(t, validator.ValidateUpdate(map[string]interface{}{
+		"intThirtyTwo": int64(math.MaxInt32 + 2),
+	}, map[string]interface{}{
+		"intThirtyTwo": int64(math.MaxInt32 + 1),
+	}, validation.WithRatcheting(nil)).IsValid())
 }

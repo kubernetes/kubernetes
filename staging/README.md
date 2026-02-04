@@ -62,7 +62,7 @@ import (
 ### Adding the staging repository in `kubernetes/kubernetes`:
 
 1. Send an email to the SIG Architecture [mailing
-   list](https://groups.google.com/forum/#!forum/kubernetes-sig-architecture)
+   list](https://groups.google.com/a/kubernetes.io/g/sig-architecture)
    and the mailing list of the SIG which would own the repo requesting approval
    for creating the staging repository.
 

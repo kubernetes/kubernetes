@@ -373,30 +373,16 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.26"
-- name: CSIMigrationPortworx
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: "1.23"
-  - default: false
-    lockToDefault: false
-    preRelease: Beta
-    version: "1.25"
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: "1.31"
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: "1.33"
 - name: CSIServiceAccountTokenSecrets
   versionedSpecs:
   - default: true
     lockToDefault: false
     preRelease: Beta
     version: "1.35"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.36"
 - name: CSIVolumeHealth
   versionedSpecs:
   - default: false
@@ -423,6 +409,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.33"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.36"
 - name: DeclarativeValidationTakeover
   versionedSpecs:
   - default: false
@@ -767,12 +757,6 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.34"
-- name: InTreePluginPortworxUnregister
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: "1.23"
 - name: JobBackoffLimitPerIndex
   versionedSpecs:
   - default: false
@@ -887,6 +871,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.33"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.36"
 - name: KubeletInUserNamespace
   versionedSpecs:
   - default: false
@@ -1063,20 +1051,6 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.35"
-- name: MemoryManager
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: "1.21"
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: "1.22"
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: "1.32"
 - name: MemoryQoS
   versionedSpecs:
   - default: false
@@ -1481,6 +1455,10 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.34"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.36"
 - name: ReloadKubeletServerCertificateFile
   versionedSpecs:
   - default: true
@@ -1705,20 +1683,6 @@
     lockToDefault: true
     preRelease: GA
     version: "1.32"
-- name: ServiceTrafficDistribution
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: "1.30"
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: "1.31"
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: "1.33"
 - name: SidecarContainers
   versionedSpecs:
   - default: false
@@ -1839,20 +1803,6 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.35"
-- name: StructuredAuthorizationConfiguration
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: "1.29"
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: "1.30"
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: "1.32"
 - name: SupplementalGroupsPolicy
   versionedSpecs:
   - default: false
@@ -1889,24 +1839,6 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.34"
-- name: TopologyAwareHints
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: "1.21"
-  - default: false
-    lockToDefault: false
-    preRelease: Beta
-    version: "1.23"
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: "1.24"
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: "1.33"
 - name: TopologyManagerPolicyAlphaOptions
   versionedSpecs:
   - default: false
@@ -1934,7 +1866,7 @@
     preRelease: Beta
     version: "1.28"
   - default: true
-    lockToDefault: false
+    lockToDefault: true
     preRelease: GA
     version: "1.32"
 - name: TranslateStreamCloseWebsocketRequests
@@ -2013,16 +1945,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.31"
-- name: WatchFromStorageWithoutResourceVersion
-  versionedSpecs:
-  - default: false
+  - default: true
     lockToDefault: false
     preRelease: Beta
-    version: "1.27"
-  - default: false
-    lockToDefault: true
-    preRelease: Deprecated
-    version: "1.33"
+    version: "1.36"
 - name: WatchList
   versionedSpecs:
   - default: false

@@ -42,6 +42,8 @@ var (
 // testDeviceBindingConditions is the entry point for running each integration test that verifies DeviceBindingConditions.
 // Some of these tests use device taints, and they assume that DRADeviceTaints is enabled.
 func testDeviceBindingConditions(tCtx ktesting.TContext, enabled bool) {
+	tCtx.Parallel()
+
 	tCtx.Run("BasicFlow", func(tCtx ktesting.TContext) { testDeviceBindingConditionsBasicFlow(tCtx, enabled) })
 	if enabled {
 		tCtx.Run("FailureTaints", func(tCtx ktesting.TContext) { testDeviceBindingFailureConditionsReschedule(tCtx, true) })
@@ -119,7 +121,7 @@ func testDeviceBindingConditionsBasicFlow(tCtx ktesting.TContext, enabled bool) 
 	start := time.Now()
 	claim1 := createClaim(tCtx, namespace, "-a", class, claim)
 	pod := createPod(tCtx, namespace, "-a", podWithClaimName, claim1)
-	claim1 = waitForClaimAllocatedToDevice(tCtx, namespace, claim1.Name, 10*time.Second)
+	claim1 = waitForClaimAllocatedToDevice(tCtx, namespace, claim1.Name, schedulingTimeout)
 	end := time.Now()
 	gomega.NewWithT(tCtx).Expect(claim1).To(gomega.HaveField("Status.Allocation", gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
 		"Devices": gomega.Equal(resourceapi.DeviceAllocationResult{
@@ -141,7 +143,7 @@ func testDeviceBindingConditionsBasicFlow(tCtx ktesting.TContext, enabled bool) 
 	// Second pod should get the device with binding conditions.
 	claim2 := createClaim(tCtx, namespace, "-b", class, claim)
 	pod = createPod(tCtx, namespace, "-b", podWithClaimName, claim2)
-	claim2 = waitForClaimAllocatedToDevice(tCtx, namespace, claim2.Name, 10*time.Second)
+	claim2 = waitForClaimAllocatedToDevice(tCtx, namespace, claim2.Name, schedulingTimeout)
 	end = time.Now()
 	gomega.NewWithT(tCtx).Expect(claim2).To(gomega.HaveField("Status.Allocation", gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
 		"Devices": gomega.Equal(resourceapi.DeviceAllocationResult{
@@ -191,7 +193,7 @@ func testDeviceBindingConditionsBasicFlow(tCtx ktesting.TContext, enabled bool) 
 	)
 
 	// allocation restored?
-	claim2 = waitForClaimAllocatedToDevice(tCtx, namespace, claim2.Name, 10*time.Second)
+	claim2 = waitForClaimAllocatedToDevice(tCtx, namespace, claim2.Name, schedulingTimeout)
 
 	// Now it's safe to set the final binding condition.
 	// Allow the scheduler to proceed.
@@ -260,7 +262,7 @@ func testDeviceBindingFailureConditionsReschedule(tCtx ktesting.TContext, useTai
 	// ensuring the initial allocation occurs on the intended node.
 	claim1 := createClaim(tCtx, namespace, "-a", class, claim)
 	pod := createPod(tCtx, namespace, "-a", podWithClaimName, claim1)
-	claim1 = waitForClaimAllocatedToDevice(tCtx, namespace, claim1.Name, 10*time.Second)
+	claim1 = waitForClaimAllocatedToDevice(tCtx, namespace, claim1.Name, schedulingTimeout)
 	gomega.NewWithT(tCtx).Expect(claim1).To(gomega.HaveField("Status.Allocation", gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
 		"Devices": gomega.Equal(resourceapi.DeviceAllocationResult{
 			Results: []resourceapi.DeviceRequestAllocationResult{{
@@ -362,7 +364,7 @@ func testDeviceBindingFailureConditionsReschedule(tCtx ktesting.TContext, useTai
 	)
 
 	// allocation restored?
-	claim1 = waitForClaimAllocatedToDevice(tCtx, namespace, claim1.Name, 10*time.Second)
+	claim1 = waitForClaimAllocatedToDevice(tCtx, namespace, claim1.Name, schedulingTimeout)
 
 	gomega.NewWithT(tCtx).Expect(claim1).To(gomega.HaveField("Status.Allocation", gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
 		"Devices": gomega.Equal(resourceapi.DeviceAllocationResult{
@@ -422,7 +424,7 @@ profiles:
 	pod := createPod(tCtx, namespace, "-timeout-enforced", podWithClaimName, claim1)
 
 	// Wait until the claim is allocated.
-	allocatedClaim := waitForClaimAllocatedToDevice(tCtx, namespace, claim1.Name, 10*time.Second)
+	allocatedClaim := waitForClaimAllocatedToDevice(tCtx, namespace, claim1.Name, schedulingTimeout)
 
 	gomega.NewWithT(tCtx).Expect(allocatedClaim).To(gomega.HaveField(
 		"Status.Allocation",
@@ -444,10 +446,8 @@ profiles:
 
 	// The scheduler should hit the binding timeout and surface that on the pod.
 	// We poll the pod's conditions until we see a message containing "binding timeout".
-	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) *v1.Pod {
-		p, err := tCtx.Client().CoreV1().Pods(namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
-		tCtx.ExpectNoError(err, "get pod")
-		return p
+	tCtx.Eventually(func(tCtx ktesting.TContext) (*v1.Pod, error) {
+		return tCtx.Client().CoreV1().Pods(namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
 	}).WithTimeout(maxTO).WithPolling(300*time.Millisecond).Should(
 		gomega.HaveField("Status.Conditions",
 			gomega.ContainElement(
@@ -465,10 +465,8 @@ profiles:
 		"bindingTimeout should trigger roughly near %s (observed %v)", wantTO, elapsed,
 	)
 	// Verify that the pod remains unscheduled after the binding timeout.
-	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) *v1.Pod {
-		pod, err := tCtx.Client().CoreV1().Pods(namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
-		tCtx.ExpectNoError(err, "get pod")
-		return pod
+	tCtx.Eventually(func(tCtx ktesting.TContext) (*v1.Pod, error) {
+		return tCtx.Client().CoreV1().Pods(namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
 	}).WithTimeout(wantTO).WithPolling(200 * time.Millisecond).Should(gomega.SatisfyAll(
 		gomega.HaveField("Spec.NodeName", gomega.BeEmpty()),
 
@@ -521,7 +519,7 @@ profiles:
 	claim1 := createClaim(tCtx, namespace, "-timeout", class, claim)
 	pod := createPod(tCtx, namespace, "-timeout", podWithClaimName, claim1)
 
-	claim1 = waitForClaimAllocatedToDevice(tCtx, namespace, claim1.Name, 10*time.Second)
+	claim1 = waitForClaimAllocatedToDevice(tCtx, namespace, claim1.Name, schedulingTimeout)
 	gomega.NewWithT(tCtx).Expect(claim1).To(gomega.HaveField(
 		"Status.Allocation",
 		gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
@@ -555,7 +553,7 @@ profiles:
 	sliceWithoutBinding = createSlice(tCtx, sliceWithoutBinding)
 
 	// Ensure the ResourceSlice has been created before the binding timeout occurs.
-	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) error {
+	tCtx.Eventually(func(tCtx ktesting.TContext) error {
 		p, err := tCtx.Client().CoreV1().Pods(namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
 		if err == nil {
 			for _, c := range p.Status.Conditions {
@@ -566,14 +564,12 @@ profiles:
 		}
 		_, err = tCtx.Client().ResourceV1().ResourceSlices().Get(tCtx, sliceWithoutBinding.Name, metav1.GetOptions{})
 		return err
-	}).WithTimeout(10*time.Second).WithPolling(300*time.Millisecond).Should(
+	}).WithTimeout(schedulingTimeout).WithPolling(300*time.Millisecond).Should(
 		gomega.Succeed(), "slice must be created before binding timeout")
 
 	// Wait until the binding timeout occurs.
-	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) *v1.Pod {
-		p, err := tCtx.Client().CoreV1().Pods(namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
-		tCtx.ExpectNoError(err, "get pod")
-		return p
+	tCtx.Eventually(func(tCtx ktesting.TContext) (*v1.Pod, error) {
+		return tCtx.Client().CoreV1().Pods(namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
 	}).WithTimeout(20*time.Second).WithPolling(300*time.Millisecond).Should(
 		gomega.HaveField("Status.Conditions",
 			gomega.ContainElement(
@@ -586,11 +582,9 @@ profiles:
 	)
 
 	// Verify recovery to the newly added device without BindingConditions through rescheduling triggered by binding timeout.
-	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) *resourceapi.ResourceClaim {
-		c, err := tCtx.Client().ResourceV1().ResourceClaims(namespace).Get(tCtx, claim1.Name, metav1.GetOptions{})
-		tCtx.ExpectNoError(err)
-		return c
-	}).WithTimeout(10*time.Second).WithPolling(1*time.Second).Should(gomega.HaveField(
+	tCtx.Eventually(func(tCtx ktesting.TContext) (*resourceapi.ResourceClaim, error) {
+		return tCtx.Client().ResourceV1().ResourceClaims(namespace).Get(tCtx, claim1.Name, metav1.GetOptions{})
+	}).WithTimeout(schedulingTimeout).WithPolling(1*time.Second).Should(gomega.HaveField(
 		"Status.Allocation",
 		gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
 			"Devices": gomega.Equal(resourceapi.DeviceAllocationResult{

@@ -423,7 +423,7 @@ func newPersistentVolumeExpanderController(ctx context.Context, controllerContex
 		controllerContext.InformerFactory.Core().V1().PersistentVolumeClaims(),
 		plugins,
 		csiTranslator,
-		csimigration.NewPluginManager(csiTranslator, utilfeature.DefaultFeatureGate),
+		csimigration.NewPluginManager(csiTranslator),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init volume expand controller: %w", err)
@@ -460,8 +460,6 @@ func newEphemeralVolumeController(ctx context.Context, controllerContext Control
 	}, controllerName), nil
 }
 
-const defaultResourceClaimControllerWorkers = 50
-
 func newResourceClaimControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:        names.ResourceClaimController,
@@ -494,7 +492,7 @@ func newResourceClaimController(ctx context.Context, controllerContext Controlle
 	}
 
 	return newControllerLoop(func(ctx context.Context) {
-		ephemeralController.Run(ctx, defaultResourceClaimControllerWorkers)
+		ephemeralController.Run(ctx, int(controllerContext.ComponentConfig.ResourceClaimController.ConcurrentSyncs))
 	}, controllerName), nil
 }
 
