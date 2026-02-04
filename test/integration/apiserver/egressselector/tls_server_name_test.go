@@ -32,6 +32,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -322,10 +323,21 @@ func handleProxyConnection(t *testing.T, conn net.Conn) {
 		return
 	}
 
+	// Use channels to synchronize bidirectional copy
+	done := make(chan struct{}, 2)
 	go func() {
 		_, _ = io.Copy(backendConn, conn)
+		done <- struct{}{}
 	}()
-	_, _ = io.Copy(conn, backendConn)
+	go func() {
+		_, _ = io.Copy(conn, backendConn)
+		done <- struct{}{}
+	}()
+	// Wait for either direction to complete, then close both connections
+	<-done
+	_ = conn.Close()
+	_ = backendConn.Close()
+	<-done // Wait for the other goroutine to finish
 }
 
 // TestTLSServerNameWithBackend verifies end-to-end data transmission through a TLS proxy
@@ -340,9 +352,24 @@ func TestTLSServerNameWithBackend(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to start backend listener: %v", err)
 	}
-	defer func() { _ = backendListener.Close() }()
 	backendAddr := backendListener.Addr().String()
 	t.Logf("Backend server listening on %s", backendAddr)
+
+	var backendConns []net.Conn
+	var backendConnsMu sync.Mutex
+	var backendWg sync.WaitGroup
+
+	// Cleanup all backend connections
+	cleanupBackend := func() {
+		_ = backendListener.Close()
+		backendConnsMu.Lock()
+		for _, c := range backendConns {
+			_ = c.Close()
+		}
+		backendConnsMu.Unlock()
+		backendWg.Wait()
+	}
+	defer cleanupBackend()
 
 	go func() {
 		for {
@@ -350,9 +377,25 @@ func TestTLSServerNameWithBackend(t *testing.T) {
 			if err != nil {
 				return
 			}
+			backendConnsMu.Lock()
+			backendConns = append(backendConns, conn)
+			backendConnsMu.Unlock()
+
+			backendWg.Add(1)
+			// Create echo server
 			go func(c net.Conn) {
+				defer backendWg.Done()
 				defer func() { _ = c.Close() }()
-				_, _ = io.Copy(c, c)
+				buf := make([]byte, 4096)
+				for {
+					n, err := c.Read(buf)
+					if err != nil {
+						return
+					}
+					if _, err := c.Write(buf[:n]); err != nil {
+						return
+					}
+				}
 			}(conn)
 		}
 	}()
