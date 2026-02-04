@@ -18,6 +18,7 @@ package qos
 
 import (
 	v1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -87,88 +88,87 @@ func getQOSResources(list v1.ResourceList) sets.Set[string] {
 // A pod is besteffort if none of its containers have specified any requests or limits.
 // A pod is guaranteed only when requests and limits are specified for all the containers and they are equal.
 // A pod is burstable if limits and requests do not match across all containers.
-// TODO(ndixita): Refactor ComputePodQOS into smaller functions to make it more
-// readable and maintainable.
 func ComputePodQOS(pod *v1.Pod) v1.PodQOSClass {
-	requests := v1.ResourceList{}
-	limits := v1.ResourceList{}
-	isGuaranteed := true
-	// When pod-level resources are specified, we use them to determine QoS class.
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) &&
-		pod.Spec.Resources != nil {
-		if len(pod.Spec.Resources.Requests) > 0 {
-			// process requests
-			processResourceList(requests, pod.Spec.Resources.Requests)
-		}
-
-		if len(pod.Spec.Resources.Limits) > 0 {
-			// process limits
-			processResourceList(limits, pod.Spec.Resources.Limits)
-			qosLimitResources := getQOSResources(pod.Spec.Resources.Limits)
-			if !qosLimitResources.HasAll(string(v1.ResourceMemory), string(v1.ResourceCPU)) {
-				isGuaranteed = false
-			}
-		}
-	} else {
-		// note, ephemeral containers are not considered for QoS as they cannot define resources
-		allContainers := []v1.Container{}
-		allContainers = append(allContainers, pod.Spec.Containers...)
-		allContainers = append(allContainers, pod.Spec.InitContainers...)
-		for _, container := range allContainers {
-			// process requests
-			for name, quantity := range container.Resources.Requests {
-				if !isSupportedQoSComputeResource(name) {
-					continue
-				}
-				if quantity.Cmp(zeroQuantity) == 1 {
-					delta := quantity.DeepCopy()
-					if _, exists := requests[name]; !exists {
-						requests[name] = delta
-					} else {
-						delta.Add(requests[name])
-						requests[name] = delta
-					}
-				}
-			}
-			// process limits
-			qosLimitsFound := sets.NewString()
-			for name, quantity := range container.Resources.Limits {
-				if !isSupportedQoSComputeResource(name) {
-					continue
-				}
-				if quantity.Cmp(zeroQuantity) == 1 {
-					qosLimitsFound.Insert(string(name))
-					delta := quantity.DeepCopy()
-					if _, exists := limits[name]; !exists {
-						limits[name] = delta
-					} else {
-						delta.Add(limits[name])
-						limits[name] = delta
-					}
-				}
-			}
-
-			if !qosLimitsFound.HasAll(string(v1.ResourceMemory), string(v1.ResourceCPU)) {
-				isGuaranteed = false
-			}
-		}
-	}
-
+	requests, limits, isGuaranteed := collectPodResources(pod)
 	if len(requests) == 0 && len(limits) == 0 {
 		return v1.PodQOSBestEffort
 	}
-	// Check is requests match limits for all resources.
-	if isGuaranteed {
-		for name, req := range requests {
-			if lim, exists := limits[name]; !exists || lim.Cmp(req) != 0 {
-				isGuaranteed = false
-				break
-			}
-		}
-	}
-	if isGuaranteed &&
-		len(requests) == len(limits) {
+	if isGuaranteed && apiequality.Semantic.DeepEqual(requests, limits) {
 		return v1.PodQOSGuaranteed
 	}
 	return v1.PodQOSBurstable
+}
+
+func collectPodResources(pod *v1.Pod) (v1.ResourceList, v1.ResourceList, bool) {
+	// When pod-level resources are specified, we use them to determine QoS class.
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && pod.Spec.Resources != nil {
+		return collectPodLevelResources(pod)
+	}
+	return collectContainerLevelResources(pod)
+}
+
+func collectPodLevelResources(pod *v1.Pod) (v1.ResourceList, v1.ResourceList, bool) {
+	requests := v1.ResourceList{}
+	limits := v1.ResourceList{}
+
+	// process requests
+	processResourceList(requests, pod.Spec.Resources.Requests)
+	// process limits
+	processResourceList(limits, pod.Spec.Resources.Limits)
+
+	qosLimitResources := getQOSResources(pod.Spec.Resources.Limits)
+	isGuaranteed := qosLimitResources.HasAll(string(v1.ResourceMemory), string(v1.ResourceCPU))
+
+	return requests, limits, isGuaranteed
+}
+
+func collectContainerLevelResources(pod *v1.Pod) (v1.ResourceList, v1.ResourceList, bool) {
+	requests := v1.ResourceList{}
+	limits := v1.ResourceList{}
+	isGuaranteed := true
+
+	// note, ephemeral containers are not considered for QoS as they cannot define resources
+	allContainers := []v1.Container{}
+	allContainers = append(allContainers, pod.Spec.Containers...)
+	allContainers = append(allContainers, pod.Spec.InitContainers...)
+	for _, container := range allContainers {
+		// process requests
+		for name, quantity := range container.Resources.Requests {
+			if !isSupportedQoSComputeResource(name) {
+				continue
+			}
+			if quantity.Cmp(zeroQuantity) == 1 {
+				delta := quantity.DeepCopy()
+				if _, exists := requests[name]; !exists {
+					requests[name] = delta
+				} else {
+					delta.Add(requests[name])
+					requests[name] = delta
+				}
+			}
+		}
+		// process limits
+		qosLimitsFound := sets.NewString()
+		for name, quantity := range container.Resources.Limits {
+			if !isSupportedQoSComputeResource(name) {
+				continue
+			}
+			if quantity.Cmp(zeroQuantity) == 1 {
+				qosLimitsFound.Insert(string(name))
+				delta := quantity.DeepCopy()
+				if _, exists := limits[name]; !exists {
+					limits[name] = delta
+				} else {
+					delta.Add(limits[name])
+					limits[name] = delta
+				}
+			}
+		}
+
+		if !qosLimitsFound.HasAll(string(v1.ResourceMemory), string(v1.ResourceCPU)) {
+			isGuaranteed = false
+		}
+	}
+
+	return requests, limits, isGuaranteed
 }

@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -272,5 +273,252 @@ func newPodWithInitContainers(name string, containers []v1.Container, initContai
 			Containers:     containers,
 			InitContainers: initContainers,
 		},
+	}
+}
+
+func TestCollectPodLevelResources(t *testing.T) {
+	testCases := []struct {
+		name               string
+		reqs               v1.ResourceList
+		lims               v1.ResourceList
+		expectedReqs       v1.ResourceList
+		expectedLims       v1.ResourceList
+		expectedGuaranteed bool
+	}{
+		{
+			name:               "cpu+mem limits present -> Guaranteed",
+			reqs:               getResourceList("100m", "128Mi"),
+			lims:               getResourceList("750m", "512Mi"),
+			expectedReqs:       getResourceList("100m", "128Mi"),
+			expectedLims:       getResourceList("750m", "512Mi"),
+			expectedGuaranteed: true,
+		},
+		{
+			name:               "only cpu limit -> not Guaranteed",
+			reqs:               getResourceList("100m", "128Mi"),
+			lims:               getResourceList("750m", ""),
+			expectedReqs:       getResourceList("100m", "128Mi"),
+			expectedLims:       getResourceList("750m", ""),
+			expectedGuaranteed: false,
+		},
+		{
+			name:               "only memory limit -> not Guaranteed",
+			reqs:               getResourceList("100m", "128Mi"),
+			lims:               getResourceList("", "512Mi"),
+			expectedReqs:       getResourceList("100m", "128Mi"),
+			expectedLims:       getResourceList("", "512Mi"),
+			expectedGuaranteed: false,
+		},
+		{
+			name:               "no limits -> not Guaranteed",
+			reqs:               getResourceList("100m", "128Mi"),
+			lims:               getResourceList("", ""),
+			expectedReqs:       getResourceList("100m", "128Mi"),
+			expectedLims:       getResourceList("", ""),
+			expectedGuaranteed: false,
+		},
+		{
+			name:               "no requests and limits -> not Guaranteed",
+			reqs:               getResourceList("", ""),
+			lims:               getResourceList("", ""),
+			expectedReqs:       getResourceList("", ""),
+			expectedLims:       getResourceList("", ""),
+			expectedGuaranteed: false,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			pod := &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: testCase.reqs,
+						Limits:   testCase.lims,
+					},
+				},
+			}
+
+			actualReqs, actualLims, actualGuaranteed := collectPodLevelResources(pod)
+
+			if actualGuaranteed != testCase.expectedGuaranteed {
+				t.Errorf("invalid isGuaranteed, expected: %v, actual: %v", testCase.expectedGuaranteed, actualGuaranteed)
+			}
+			if !apiequality.Semantic.DeepEqual(actualReqs, testCase.expectedReqs) {
+				t.Errorf("invalid requests resource, expected: %v, actual: %v", testCase.expectedReqs, actualReqs)
+			}
+			if !apiequality.Semantic.DeepEqual(actualLims, testCase.expectedLims) {
+				t.Errorf("invalid limits resource, expected: %v, actual: %v", testCase.expectedLims, actualLims)
+			}
+		})
+	}
+}
+
+func TestCollectContainerLevelResources(t *testing.T) {
+	tests := []struct {
+		name               string
+		pod                *v1.Pod
+		expectedReq        v1.ResourceList
+		expectedLim        v1.ResourceList
+		expectedGuaranteed bool
+	}{
+		{
+			name: "single container: full CPU+Mem limits -> Guaranteed",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						newContainer("c1",
+							getResourceList("100m", "200Mi"),
+							getResourceList("200m", "400Mi"),
+						),
+					},
+				},
+			},
+			expectedReq:        getResourceList("100m", "200Mi"),
+			expectedLim:        getResourceList("200m", "400Mi"),
+			expectedGuaranteed: true,
+		},
+		{
+			name: "two containers and init container with CPU+Mem limits -> Guaranteed",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						newContainer(
+							"c1",
+							getResourceList("100m", "100Mi"),
+							getResourceList("200m", "200Mi"),
+						),
+						newContainer(
+							"c2",
+							getResourceList("300m", "400Mi"),
+							getResourceList("800m", "1000Mi"),
+						),
+					},
+					InitContainers: []v1.Container{
+						newContainer(
+							"init",
+							getResourceList("50m", "50Mi"),
+							getResourceList("100m", "100Mi"),
+						),
+					},
+				},
+			},
+			// Requests sum : CPU 100m+300m+50m=450m, Mem 100Mi+400Mi+50Mi=550Mi
+			expectedReq: getResourceList("450m", "550Mi"),
+			// Limits sum : CPU 200m+800m+100m=1100m, Mem 200Mi+1000Mi+100Mi=1300Mi
+			expectedLim:        getResourceList("1100m", "1300Mi"),
+			expectedGuaranteed: true,
+		},
+		{
+			name: "only CPU limit (Mem limit absent/zero) -> NotGuaranteed",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						newContainer(
+							"c1",
+							getResourceList("0", "0"),   // ignoring zero request
+							getResourceList("100m", ""), // missing memory limit, ignoring absent
+						),
+					},
+				},
+			},
+			expectedReq:        v1.ResourceList{},
+			expectedLim:        getResourceList("100m", ""),
+			expectedGuaranteed: false,
+		},
+		{
+			name: "two containers + init: one container missing CPU limit -> NotGuaranteed",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						newContainer(
+							"c1",
+							getResourceList("100m", "100Mi"),
+							getResourceList("200m", "300Mi"),
+						),
+						newContainer(
+							"c2",
+							getResourceList("300m", "100Mi"),
+							getResourceList("50m", "300Mi"),
+						),
+					},
+					InitContainers: []v1.Container{
+						newContainer(
+							"init1",
+							getResourceList("50m", "50Mi"),
+							getResourceList("", "50Mi"), // missing CPU limit
+						),
+					},
+				},
+			},
+			// Requests sum : CPU 100m+300m+50m=450m, Mem 100Mi+100Mi+50Mi=250Mi
+			expectedReq: getResourceList("450m", "250Mi"),
+			// Limits sum : CPU 200m+0+50m=250m,  Mem 300Mi+300Mi+50Mi=650Mi
+			expectedLim:        getResourceList("250m", "650Mi"),
+			expectedGuaranteed: false,
+		},
+		{
+			name: "ephemeral-container ignored for QoS; CPU+Mem limits exist -> Guaranteed",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						newContainer(
+							"c1",
+							getResourceList("250m", "256Mi"),
+							getResourceList("500m", "512Mi"),
+						),
+					},
+					EphemeralContainers: []v1.EphemeralContainer{
+						{
+							EphemeralContainerCommon: v1.EphemeralContainerCommon{
+								Name: "ec1",
+							},
+						},
+					},
+				},
+			},
+			expectedReq:        getResourceList("250m", "256Mi"),
+			expectedLim:        getResourceList("500m", "512Mi"),
+			expectedGuaranteed: true,
+		},
+		{
+			name: "non-QoS resources (hugepages) not considered; CPU+Mem limits exist -> Guaranteed",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						newContainer(
+							"c1",
+							addResource("hugepages-2Mi", "4Mi", getResourceList("250m", "256Mi")),
+							addResource("hugepages-2Mi", "4Mi", getResourceList("500m", "512Mi")),
+						),
+						newContainer(
+							"c2",
+							addResource("hugepages-1Gi", "2Gi", getResourceList("250m", "256Mi")),
+							addResource("hugepages-1Gi", "2Gi", getResourceList("500m", "512Mi")),
+						),
+					},
+				},
+			},
+			// requests sum: CPU 250m+250m=500m, Mem 256Mi+256Mi=512Mi
+			expectedReq: getResourceList("500m", "512Mi"),
+			// limits sum: CPU 500m+500m=1000m, Mem 512Mi+512Mi=1024Mi
+			expectedLim:        getResourceList("1000m", "1024Mi"),
+			expectedGuaranteed: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			actualReq, actualLim, actualGuaranteed := collectContainerLevelResources(tc.pod)
+
+			if !apiequality.Semantic.DeepEqual(actualReq, tc.expectedReq) {
+				t.Errorf("requests mismatch: actual=%v expected=%v", actualReq, tc.expectedReq)
+			}
+			if !apiequality.Semantic.DeepEqual(actualLim, tc.expectedLim) {
+				t.Errorf("limits mismatch: actual=%v expected=%v", actualLim, tc.expectedLim)
+			}
+			if actualGuaranteed != tc.expectedGuaranteed {
+				t.Errorf("isGuaranteed mismatch: actual=%v expected=%v", actualGuaranteed, tc.expectedGuaranteed)
+			}
+		})
 	}
 }
