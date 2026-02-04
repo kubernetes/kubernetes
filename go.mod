@@ -217,6 +217,9 @@ require (
 )
 
 replace (
+	go.etcd.io/etcd/api/v3 => github.com/Jefftree/etcd/api/v3 v3.0.0-20260203154226-a6dc519ade90
+	go.etcd.io/etcd/client/pkg/v3 => github.com/Jefftree/etcd/client/pkg/v3 v3.0.0-20260203154226-a6dc519ade90
+	go.etcd.io/etcd/client/v3 => github.com/Jefftree/etcd/client/v3 v3.0.0-20260203154226-a6dc519ade90
 	k8s.io/api => ./staging/src/k8s.io/api
 	k8s.io/apiextensions-apiserver => ./staging/src/k8s.io/apiextensions-apiserver
 	k8s.io/apimachinery => ./staging/src/k8s.io/apimachinery

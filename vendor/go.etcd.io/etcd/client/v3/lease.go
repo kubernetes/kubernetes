@@ -204,7 +204,7 @@ func NewLeaseFromLeaseClient(remote pb.LeaseClient, c *Client, keepAliveTimeout 
 		l.firstKeepAliveTimeout = defaultTTL
 	}
 	if c != nil {
-		l.lg = c.lg
+		l.lg = c.GetLogger()
 		l.callOpts = c.callOpts
 	}
 	reqLeaderCtx := WithRequireLeader(context.Background())

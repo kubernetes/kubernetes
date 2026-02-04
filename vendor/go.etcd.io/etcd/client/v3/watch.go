@@ -105,8 +105,8 @@ type WatchResponse struct {
 
 	closeErr error
 
-	// cancelReason is a reason of canceling watch
-	cancelReason string
+	// CancelReason is a reason of canceling watch
+	CancelReason string
 }
 
 // IsCreate returns true if the event tells that the key is newly created.
@@ -127,8 +127,8 @@ func (wr *WatchResponse) Err() error {
 	case wr.CompactRevision != 0:
 		return v3rpc.ErrCompacted
 	case wr.Canceled:
-		if len(wr.cancelReason) != 0 {
-			return v3rpc.Error(status.Error(codes.FailedPrecondition, wr.cancelReason))
+		if len(wr.CancelReason) != 0 {
+			return v3rpc.Error(status.Error(codes.FailedPrecondition, wr.CancelReason))
 		}
 		return v3rpc.ErrFutureRev
 	}
@@ -254,7 +254,7 @@ func NewWatchFromWatchClient(wc pb.WatchClient, c *Client) Watcher {
 	}
 	if c != nil {
 		w.callOpts = c.callOpts
-		w.lg = c.lg
+		w.lg = c.GetLogger()
 	}
 	return w
 }
@@ -296,7 +296,7 @@ func (w *watcher) newWatcherGRPCStream(inctx context.Context) *watchGRPCStream {
 
 // Watch posts a watch request to run() and waits for a new watcher channel
 func (w *watcher) Watch(ctx context.Context, key string, opts ...OpOption) WatchChan {
-	ow := opWatch(key, opts...)
+	ow := OpWatch(key, opts...)
 
 	var filters []pb.WatchCreateRequest_FilterType
 	if ow.filterPut {
@@ -580,7 +580,7 @@ func (w *watchGRPCStream) run() {
 		case pbresp := <-w.respc:
 			if cur == nil || pbresp.Created || pbresp.Canceled {
 				cur = pbresp
-			} else if cur != nil && cur.WatchId == pbresp.WatchId {
+			} else if cur.WatchId == pbresp.WatchId {
 				// merge new events
 				cur.Events = append(cur.Events, pbresp.Events...)
 				// update "Fragment" field; last response with "Fragment" == false
@@ -723,7 +723,7 @@ func (w *watchGRPCStream) dispatchEvent(pbresp *pb.WatchResponse) bool {
 		CompactRevision: pbresp.CompactRevision,
 		Created:         pbresp.Created,
 		Canceled:        pbresp.Canceled,
-		cancelReason:    pbresp.CancelReason,
+		CancelReason:    pbresp.CancelReason,
 	}
 
 	// watch IDs are zero indexed, so request notify watch responses are assigned a watch ID of InvalidWatchID to
@@ -896,7 +896,7 @@ func (w *watchGRPCStream) newWatchClient() (pb.Watch_WatchClient, error) {
 	w.resuming = resuming
 	w.substreams = make(map[int64]*watcherStream)
 
-	// connect to grpc stream while accepting watcher cancelation
+	// connect to grpc stream while accepting watcher cancellation
 	stopc := make(chan struct{})
 	donec := w.waitCancelSubstreams(stopc)
 	wc, err := w.openWatchClient()
