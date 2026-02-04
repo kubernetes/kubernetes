@@ -1,10 +1,6 @@
 {
   "spec": {
     "pinnedModules": {
-      "github.com/libopenstorage/openstorage": {
-        "Version": "v1.0.0",
-        "Reason": "portworx csi driver has been deprecated and will be removed - https://github.com/kubernetes/enhancements/issues/2589"
-      },
       "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc": {
         "Version": "v0.63.0",
         "Reason": "v0.64.0 has nil pointer panic when nil TracerProvider is passed - https://github.com/kubernetes/kubernetes/issues/135865"
