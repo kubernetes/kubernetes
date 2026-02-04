@@ -17,19 +17,27 @@ limitations under the License.
 package reconciler
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
+	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/csi"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/mount-utils"
 )
 
 func TestReconstructVolumes(t *testing.T) {
@@ -393,6 +401,115 @@ func TestReconstructVolumesMount(t *testing.T) {
 			verifyTearDownCalls(fakePlugin, 0)
 		})
 	}
+}
+func TestReconstructCSIGlobalMountAsUncertain(t *testing.T) {
+	logger := klog.NewKlogr()
+
+	tmpDir := t.TempDir()
+
+	// kubelet root
+	kubeletRoot := tmpDir
+	podsDir := filepath.Join(kubeletRoot, "pods")
+	require.NoError(t, os.MkdirAll(podsDir, 0755))
+
+	// CSI globalmount layout
+	csiPVDir := filepath.Join(
+		kubeletRoot,
+		"plugins",
+		"kubernetes.io",
+		"csi",
+		"pv",
+		"pv-test",
+	)
+	globalMountPath := filepath.Join(csiPVDir, "globalmount")
+	require.NoError(t, os.MkdirAll(globalMountPath, 0755))
+
+	// Fake mount
+	mounter := mount.NewFakeMounter(nil)
+	require.NoError(t, mounter.Mount(
+		"/dev/fake",
+		globalMountPath,
+		"ext4",
+		nil,
+	))
+
+	// vol_data.json
+	volData := csiVolumeData{
+		DriverName:   "test.csi.io",
+		VolumeHandle: "vol-test",
+		FSType:       "ext4",
+		ReadOnly:     false,
+	}
+
+	data, err := json.Marshal(volData)
+	require.NoError(t, err)
+
+	require.NoError(t, os.WriteFile(
+		filepath.Join(csiPVDir, "vol_data.json"),
+		data,
+		0644,
+	))
+
+	// Volume plugin manager (real CSI plugin)
+	pluginMgr := volume.VolumePluginMgr{}
+	volumeHost := volumetesting.NewFakeVolumeHost(
+		t,
+		tmpDir,
+		nil,
+		nil,
+	)
+
+	pluginMgr.InitPlugins(
+		[]volume.VolumePlugin{
+			csi.ProbeVolumePlugins()[0],
+		},
+		nil,
+		volumeHost,
+	)
+
+	// Actual State of World
+	asw := cache.NewActualStateOfWorld(
+		types.NodeName("node-1"),
+		&pluginMgr,
+	)
+
+	// Reconciler
+	rc := &reconciler{
+		kubeletPodsDir:     podsDir,
+		mounter:            mounter,
+		actualStateOfWorld: asw,
+		volumePluginMgr:    &pluginMgr,
+	}
+
+	// Act
+	rc.reconstructVolumes(logger)
+
+	// Assert: volume exists
+	volumes := asw.GetAllMountedVolumes()
+	require.Len(t, volumes, 1)
+
+	v := volumes[0]
+
+	// Correct UniqueVolumeName
+	plugin, err := pluginMgr.FindPluginByName("kubernetes.io/csi")
+	require.NoError(t, err)
+
+	expectedVolumeName, err := plugin.GetVolumeName(
+		buildCSIVolumeSpec(&volData),
+	)
+	require.NoError(t, err)
+
+	assert.Equal(
+		t,
+		v1.UniqueVolumeName(expectedVolumeName),
+		v.VolumeName,
+	)
+
+	assert.Equal(
+		t,
+		reconstructedCSIGlobalMountPodName,
+		v.PodName,
+	)
 }
 
 func getPodPVCAndPV(volumeMode v1.PersistentVolumeMode, podName, pvName, pvcName string) (*v1.Pod, *v1.PersistentVolume, *v1.PersistentVolumeClaim) {
