@@ -1132,7 +1132,9 @@ func Test_GenerateMapVolumeFunc_Plugin_Not_Found(t *testing.T) {
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			volumePluginMgr := &volume.VolumePluginMgr{}
-			volumePluginMgr.InitPlugins(tc.volumePlugins, nil, nil)
+			if err := volumePluginMgr.InitPlugins(tc.volumePlugins, nil, nil); err != nil {
+				t.Fatalf("failed to init plugins: %v", err)
+			}
 			asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
 			oex := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 				nil, /* kubeClient */
@@ -1182,7 +1184,9 @@ func Test_GenerateUnmapVolumeFunc_Plugin_Not_Found(t *testing.T) {
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			volumePluginMgr := &volume.VolumePluginMgr{}
-			volumePluginMgr.InitPlugins(tc.volumePlugins, nil, nil)
+			if err := volumePluginMgr.InitPlugins(tc.volumePlugins, nil, nil); err != nil {
+				t.Fatalf("failed to init plugins: %v", err)
+			}
 			asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
 			oex := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 				nil, /* kubeClient */
@@ -1224,7 +1228,9 @@ func Test_GenerateUnmapDeviceFunc_Plugin_Not_Found(t *testing.T) {
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			volumePluginMgr := &volume.VolumePluginMgr{}
-			volumePluginMgr.InitPlugins(tc.volumePlugins, nil, nil)
+			if err := volumePluginMgr.InitPlugins(tc.volumePlugins, nil, nil); err != nil {
+				t.Fatalf("failed to init plugins: %v", err)
+			}
 			asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
 			oex := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 				nil, /* kubeClient */
