@@ -214,7 +214,7 @@
 | WindowsCPUAndMemoryAffinity |  |  | 1.32– |  |  |  |  | [code](https://cs.k8s.io/?q=%5CbWindowsCPUAndMemoryAffinity%5Cb&i=nope&files=&excludeFiles=CHANGELOG&repos=kubernetes/kubernetes) [KEPs](https://cs.k8s.io/?q=%5CbWindowsCPUAndMemoryAffinity%5Cb&i=nope&files=&excludeFiles=CHANGELOG&repos=kubernetes/enhancements) |
 | WindowsGracefulNodeShutdown | :ballot_box_with_check:&nbsp;1.34+ |  | 1.32–1.33 | 1.34– |  |  | GracefulNodeShutdown | [code](https://cs.k8s.io/?q=%5CbWindowsGracefulNodeShutdown%5Cb&i=nope&files=&excludeFiles=CHANGELOG&repos=kubernetes/kubernetes) [KEPs](https://cs.k8s.io/?q=%5CbWindowsGracefulNodeShutdown%5Cb&i=nope&files=&excludeFiles=CHANGELOG&repos=kubernetes/enhancements) |
 | WindowsHostNetwork |  |  | 1.26–1.32 |  |  | 1.33– |  | [code](https://cs.k8s.io/?q=%5CbWindowsHostNetwork%5Cb&i=nope&files=&excludeFiles=CHANGELOG&repos=kubernetes/kubernetes) [KEPs](https://cs.k8s.io/?q=%5CbWindowsHostNetwork%5Cb&i=nope&files=&excludeFiles=CHANGELOG&repos=kubernetes/enhancements) |
-| WorkloadAwarePreemption |  |  | 1.36– |  |  |  | GenericWorkload | [code](https://cs.k8s.io/?q=%5CbWorkloadAwarePreemption%5Cb&i=nope&files=&excludeFiles=CHANGELOG&repos=kubernetes/kubernetes) [KEPs](https://cs.k8s.io/?q=%5CbWorkloadAwarePreemption%5Cb&i=nope&files=&excludeFiles=CHANGELOG&repos=kubernetes/enhancements) |
+| WorkloadAwarePreemption |  |  | 1.36– |  |  |  | GangScheduling | [code](https://cs.k8s.io/?q=%5CbWorkloadAwarePreemption%5Cb&i=nope&files=&excludeFiles=CHANGELOG&repos=kubernetes/kubernetes) [KEPs](https://cs.k8s.io/?q=%5CbWorkloadAwarePreemption%5Cb&i=nope&files=&excludeFiles=CHANGELOG&repos=kubernetes/enhancements) |
 
 ## Legend
 

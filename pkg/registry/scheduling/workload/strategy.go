@@ -45,10 +45,12 @@ func (workloadStrategy) NamespaceScoped() bool {
 }
 
 func (workloadStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+	workload := obj.(*scheduling.Workload)
 	if !feature.DefaultFeatureGate.Enabled(features.WorkloadAwarePreemption) {
-		workload := obj.(*scheduling.Workload)
 		workload.Spec.PriorityClassName = nil
 	}
+	// priority field is derived from PriorityClass and cannot be set by end users.
+	workload.Spec.Priority = nil
 }
 
 func (workloadStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
@@ -68,6 +70,10 @@ func (workloadStrategy) AllowCreateOnUpdate() bool {
 }
 
 func (workloadStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
+	// preserve old priority value on update because it cannot be set by end users.
+	oldWorkload := old.(*scheduling.Workload)
+	newWorkload := obj.(*scheduling.Workload)
+	newWorkload.Spec.Priority = oldWorkload.Spec.Priority
 }
 
 func (workloadStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {

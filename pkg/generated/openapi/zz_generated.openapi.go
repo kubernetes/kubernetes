@@ -53650,6 +53650,13 @@ func schema_k8sio_api_scheduling_v1alpha1_WorkloadSpec(ref common.ReferenceCallb
 							Format:      "",
 						},
 					},
+					"priority": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Priority reflects the priority of the workload. The higher value, the higher the priority. This field is populated from the PriorityClassName",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
 				},
 				Required: []string{"podGroups"},
 			},

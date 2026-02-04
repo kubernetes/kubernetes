@@ -340,5 +340,23 @@ func Validate_WorkloadSpec(ctx context.Context, op operation.Operation, fldPath 
 			return
 		}(fldPath.Child("priorityClassName"), obj.PriorityClassName, safe.Field(oldObj, func(oldObj *schedulingv1alpha1.WorkloadSpec) *string { return oldObj.PriorityClassName }), oldObj != nil)...)
 
+	// field schedulingv1alpha1.WorkloadSpec.Priority
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *int32, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("priority"), obj.Priority, safe.Field(oldObj, func(oldObj *schedulingv1alpha1.WorkloadSpec) *int32 { return oldObj.Priority }), oldObj != nil)...)
+
 	return errs
 }

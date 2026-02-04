@@ -354,6 +354,7 @@ func autoConvert_v1alpha1_WorkloadSpec_To_scheduling_WorkloadSpec(in *scheduling
 	out.ControllerRef = (*scheduling.TypedLocalObjectReference)(unsafe.Pointer(in.ControllerRef))
 	out.PodGroups = *(*[]scheduling.PodGroup)(unsafe.Pointer(&in.PodGroups))
 	out.PriorityClassName = (*string)(unsafe.Pointer(in.PriorityClassName))
+	out.Priority = (*int32)(unsafe.Pointer(in.Priority))
 	return nil
 }
 
@@ -366,6 +367,7 @@ func autoConvert_scheduling_WorkloadSpec_To_v1alpha1_WorkloadSpec(in *scheduling
 	out.ControllerRef = (*schedulingv1alpha1.TypedLocalObjectReference)(unsafe.Pointer(in.ControllerRef))
 	out.PodGroups = *(*[]schedulingv1alpha1.PodGroup)(unsafe.Pointer(&in.PodGroups))
 	out.PriorityClassName = (*string)(unsafe.Pointer(in.PriorityClassName))
+	out.Priority = (*int32)(unsafe.Pointer(in.Priority))
 	return nil
 }
 

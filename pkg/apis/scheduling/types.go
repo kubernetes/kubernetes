@@ -150,6 +150,13 @@ type WorkloadSpec struct {
 	//
 	// +optional
 	PriorityClassName *string
+
+	// Priority reflects the priority of the workload.
+	// The higher value, the higher the priority.
+	// This field is populated from the PriorityClassName
+	//
+	// +optional
+	Priority *int32
 }
 
 // TypedLocalObjectReference allows to reference typed object inside the same namespace.

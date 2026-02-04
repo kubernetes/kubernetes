@@ -123,6 +123,7 @@ var map_WorkloadSpec = map[string]string{
 	"controllerRef":     "ControllerRef is an optional reference to the controlling object, such as a Deployment or Job. This field is intended for use by tools like CLIs to provide a link back to the original workload definition. When set, it cannot be changed.",
 	"podGroups":         "PodGroups is the list of pod groups that make up the Workload. The maximum number of pod groups is 8. This field is immutable.",
 	"priorityClassName": "PriorityClassName is an optional reference for an existing PriorityClass of the workload. If no priority class is specified, but a global default priority class exists, it will default to that class. Otherwise, the workload's priority will be zero. This field is immutable.",
+	"priority":          "Priority reflects the priority of the workload. The higher value, the higher the priority. This field is populated from the PriorityClassName",
 }
 
 func (WorkloadSpec) SwaggerDoc() map[string]string {

@@ -60,6 +60,7 @@
         }
       }
     ],
-    "priorityClassName": "priorityClassNameValue"
+    "priorityClassName": "priorityClassNameValue",
+    "priority": 4
   }
 }

@@ -14434,6 +14434,9 @@ var schemaYAML = typed.YAMLObject(`types:
           elementRelationship: associative
           keys:
           - name
+    - name: priority
+      type:
+        scalar: numeric
     - name: priorityClassName
       type:
         scalar: string

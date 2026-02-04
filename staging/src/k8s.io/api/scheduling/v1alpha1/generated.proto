@@ -217,5 +217,13 @@ message WorkloadSpec {
   // +optional
   // +k8s:optional
   optional string priorityClassName = 3;
+
+  // Priority reflects the priority of the workload.
+  // The higher value, the higher the priority.
+  // This field is populated from the PriorityClassName
+  //
+  // +optional
+  // +k8s:optional
+  optional int32 priority = 4;
 }
 

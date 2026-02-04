@@ -436,6 +436,11 @@ func (m *WorkloadSpec) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.Priority != nil {
+		i = encodeVarintGenerated(dAtA, i, uint64(*m.Priority))
+		i--
+		dAtA[i] = 0x20
+	}
 	if m.PriorityClassName != nil {
 		i -= len(*m.PriorityClassName)
 		copy(dAtA[i:], *m.PriorityClassName)
@@ -633,6 +638,9 @@ func (m *WorkloadSpec) Size() (n int) {
 		l = len(*m.PriorityClassName)
 		n += 1 + l + sovGenerated(uint64(l))
 	}
+	if m.Priority != nil {
+		n += 1 + sovGenerated(uint64(*m.Priority))
+	}
 	return n
 }
 
@@ -765,6 +773,7 @@ func (this *WorkloadSpec) String() string {
 		`ControllerRef:` + strings.Replace(this.ControllerRef.String(), "TypedLocalObjectReference", "TypedLocalObjectReference", 1) + `,`,
 		`PodGroups:` + repeatedStringForPodGroups + `,`,
 		`PriorityClassName:` + valueToStringGenerated(this.PriorityClassName) + `,`,
+		`Priority:` + valueToStringGenerated(this.Priority) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -1948,6 +1957,26 @@ func (m *WorkloadSpec) Unmarshal(dAtA []byte) error {
 			s := string(dAtA[iNdEx:postIndex])
 			m.PriorityClassName = &s
 			iNdEx = postIndex
+		case 4:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Priority", wireType)
+			}
+			var v int32
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Priority = &v
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])

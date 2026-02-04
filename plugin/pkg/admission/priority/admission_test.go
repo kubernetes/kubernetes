@@ -289,38 +289,55 @@ func TestAdmitWorkload(t *testing.T) {
 
 	testCases := []struct {
 		name                           string
+		priorityClasses                []*scheduling.PriorityClass
 		prepareWorkload                *scheduling.Workload
 		expectError                    bool
 		expectedPriorityClass          string
+		expectedPriority               int32
 		workloadAwarePreemptionEnabled bool
 	}{
 		{
 			name:                           "workload with empty priorityClassName, valid and set priorityClassName to global default",
+			priorityClasses:                []*scheduling.PriorityClass{defaultClass1, nondefaultClass1},
 			prepareWorkload:                workload(nil),
 			expectError:                    false,
 			expectedPriorityClass:          "default1",
+			expectedPriority:               defaultClass1.Value,
 			workloadAwarePreemptionEnabled: true,
 		},
 		{
 			name:                           "workload with explicit priorityClassName listed in priorityClasses, valid",
+			priorityClasses:                []*scheduling.PriorityClass{defaultClass1, nondefaultClass1},
 			prepareWorkload:                workload(ptr.To("nondefault1")),
 			expectError:                    false,
 			expectedPriorityClass:          "nondefault1",
+			expectedPriority:               nondefaultClass1.Value,
 			workloadAwarePreemptionEnabled: true,
 		},
 		{
 			name:                           "workload with non-existent priorityClassName, invalid",
-			prepareWorkload:                workload(ptr.To("nonexistent")),
+			priorityClasses:                []*scheduling.PriorityClass{defaultClass1, nondefaultClass1},
+			prepareWorkload:                workload(ptr.To("non-existent")),
 			expectError:                    true,
 			expectedPriorityClass:          "",
+			expectedPriority:               0,
 			workloadAwarePreemptionEnabled: true,
 		},
 		{
-			name:                           "workload with non-existent priorityClassName but feature gate disabled, skips validation",
-			prepareWorkload:                workload(ptr.To("nonexistent")),
+			name:                           "workload with any priorityClassName but feature gate disabled, skips validation",
+			priorityClasses:                []*scheduling.PriorityClass{defaultClass1, nondefaultClass1},
+			prepareWorkload:                workload(ptr.To("non-existent")),
 			expectError:                    false,
-			expectedPriorityClass:          "nonexistent",
 			workloadAwarePreemptionEnabled: false,
+		},
+		{
+			name:                           "workload with no priorityClassName and no global default, priority should be zero",
+			priorityClasses:                []*scheduling.PriorityClass{nondefaultClass1},
+			prepareWorkload:                workload(nil),
+			expectError:                    false,
+			expectedPriorityClass:          "",
+			expectedPriority:               0,
+			workloadAwarePreemptionEnabled: true,
 		},
 	}
 
@@ -328,11 +345,12 @@ func TestAdmitWorkload(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.GenericWorkload:         true,
+				features.GangScheduling:          true,
 				features.WorkloadAwarePreemption: tt.workloadAwarePreemptionEnabled,
 			})
 
 			admissionPlugin := NewPlugin()
-			if err := addPriorityClasses(admissionPlugin, []*scheduling.PriorityClass{defaultClass1, nondefaultClass1}); err != nil {
+			if err := addPriorityClasses(admissionPlugin, tt.priorityClasses); err != nil {
 				t.Fatalf("unable to configure priority classes: %v", err)
 			}
 
@@ -340,8 +358,13 @@ func TestAdmitWorkload(t *testing.T) {
 			if (err != nil) != tt.expectError {
 				t.Errorf("Workload Admit(), error = %v, want = %v", err, tt.expectError)
 			}
-			if !tt.expectError && *tt.prepareWorkload.Spec.PriorityClassName != tt.expectedPriorityClass {
-				t.Errorf("Workload Admit(), priorityClassName = %s, want = %s", *tt.prepareWorkload.Spec.PriorityClassName, tt.expectedPriorityClass)
+			if !tt.expectError && tt.workloadAwarePreemptionEnabled {
+				if *tt.prepareWorkload.Spec.PriorityClassName != tt.expectedPriorityClass {
+					t.Errorf("Workload Admit(), priorityClassName = %s, want = %s", *tt.prepareWorkload.Spec.PriorityClassName, tt.expectedPriorityClass)
+				}
+				if *tt.prepareWorkload.Spec.Priority != tt.expectedPriority {
+					t.Errorf("Workload Admit(), Priority = %d, want = %d", *tt.prepareWorkload.Spec.Priority, tt.expectedPriority)
+				}
 			}
 		})
 	}

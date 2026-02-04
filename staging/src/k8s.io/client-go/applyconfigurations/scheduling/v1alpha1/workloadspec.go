@@ -36,6 +36,10 @@ type WorkloadSpecApplyConfiguration struct {
 	// Otherwise, the workload's priority will be zero.
 	// This field is immutable.
 	PriorityClassName *string `json:"priorityClassName,omitempty"`
+	// Priority reflects the priority of the workload.
+	// The higher value, the higher the priority.
+	// This field is populated from the PriorityClassName
+	Priority *int32 `json:"priority,omitempty"`
 }
 
 // WorkloadSpecApplyConfiguration constructs a declarative configuration of the WorkloadSpec type for use with
@@ -70,5 +74,13 @@ func (b *WorkloadSpecApplyConfiguration) WithPodGroups(values ...*PodGroupApplyC
 // If called multiple times, the PriorityClassName field is set to the value of the last call.
 func (b *WorkloadSpecApplyConfiguration) WithPriorityClassName(value string) *WorkloadSpecApplyConfiguration {
 	b.PriorityClassName = &value
+	return b
+}
+
+// WithPriority sets the Priority field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Priority field is set to the value of the last call.
+func (b *WorkloadSpecApplyConfiguration) WithPriority(value int32) *WorkloadSpecApplyConfiguration {
+	b.Priority = &value
 	return b
 }

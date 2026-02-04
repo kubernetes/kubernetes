@@ -63,6 +63,7 @@ func TestWorkloadStrategyCreate(t *testing.T) {
 		prepareWorkload                func(*scheduling.Workload)
 		workloadAwarePreemptionEnabled bool
 		expectPriorityClassName        *string
+		expectPriority                 *int32
 		expectValidationErrors         bool
 	}{
 		{
@@ -70,6 +71,7 @@ func TestWorkloadStrategyCreate(t *testing.T) {
 			prepareWorkload:                func(w *scheduling.Workload) {},
 			workloadAwarePreemptionEnabled: false,
 			expectPriorityClassName:        nil,
+			expectPriority:                 nil,
 			expectValidationErrors:         false,
 		},
 		{
@@ -83,6 +85,7 @@ func TestWorkloadStrategyCreate(t *testing.T) {
 			prepareWorkload:                func(w *scheduling.Workload) { w.Spec.PriorityClassName = ptr.To("high-priority") },
 			workloadAwarePreemptionEnabled: true,
 			expectPriorityClassName:        ptr.To("high-priority"),
+			expectPriority:                 nil,
 			expectValidationErrors:         false,
 		},
 		{
@@ -90,6 +93,14 @@ func TestWorkloadStrategyCreate(t *testing.T) {
 			prepareWorkload:                func(w *scheduling.Workload) { w.Spec.PriorityClassName = ptr.To("high-priority") },
 			workloadAwarePreemptionEnabled: false,
 			expectPriorityClassName:        nil,
+			expectPriority:                 nil,
+			expectValidationErrors:         false,
+		},
+		{
+			name:                           "priority field is always cleared on create",
+			prepareWorkload:                func(w *scheduling.Workload) { w.Spec.Priority = ptr.To(int32(1000)) },
+			workloadAwarePreemptionEnabled: false,
+			expectPriority:                 nil,
 			expectValidationErrors:         false,
 		},
 	}
@@ -98,6 +109,7 @@ func TestWorkloadStrategyCreate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.GenericWorkload:         true,
+				features.GangScheduling:          true,
 				features.WorkloadAwarePreemption: tt.workloadAwarePreemptionEnabled,
 			})
 
@@ -115,6 +127,10 @@ func TestWorkloadStrategyCreate(t *testing.T) {
 			if !reflect.DeepEqual(tt.expectPriorityClassName, w.Spec.PriorityClassName) {
 				t.Errorf("Expected priorityClassName = %v, got %v", tt.expectPriorityClassName, w.Spec.PriorityClassName)
 			}
+
+			if tt.expectPriority != nil && !reflect.DeepEqual(tt.expectPriority, w.Spec.Priority) {
+				t.Errorf("Expected priority = %v, got %v", tt.expectPriority, w.Spec.Priority)
+			}
 		})
 	}
 }
@@ -125,6 +141,7 @@ func TestWorkloadStrategyUpdate(t *testing.T) {
 		name                   string
 		prepareOldWorkload     func(*scheduling.Workload)
 		prepareNewWorkload     func(*scheduling.Workload)
+		expectPriority         int32
 		expectValidationErrors bool
 	}{
 		{
@@ -157,12 +174,20 @@ func TestWorkloadStrategyUpdate(t *testing.T) {
 			prepareNewWorkload:     func(w *scheduling.Workload) { w.Spec.PriorityClassName = ptr.To("low-priority") },
 			expectValidationErrors: true,
 		},
+		{
+			name:                   "priority field is always preserved on update",
+			prepareOldWorkload:     func(w *scheduling.Workload) { w.Spec.Priority = ptr.To(int32(1000)) },
+			prepareNewWorkload:     func(w *scheduling.Workload) { w.Spec.Priority = ptr.To(int32(2000)) },
+			expectPriority:         1000,
+			expectValidationErrors: false,
+		},
 	}
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.GenericWorkload: true,
+				features.GangScheduling:  true,
 			})
 
 			ctx := genericapirequest.NewDefaultContext()
@@ -177,6 +202,10 @@ func TestWorkloadStrategyUpdate(t *testing.T) {
 
 			if (len(errs) != 0) != tt.expectValidationErrors {
 				t.Errorf("Expected validation error = %v, got %v", tt.expectValidationErrors, errs)
+			}
+
+			if new.Spec.Priority != nil && tt.expectPriority != *new.Spec.Priority {
+				t.Errorf("Expected priority = %v, got %v", tt.expectPriority, new.Spec.Priority)
 			}
 		})
 	}

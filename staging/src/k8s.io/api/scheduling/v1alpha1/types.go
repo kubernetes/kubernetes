@@ -144,6 +144,14 @@ type WorkloadSpec struct {
 	// +optional
 	// +k8s:optional
 	PriorityClassName *string `json:"priorityClassName,omitempty" protobuf:"bytes,3,opt,name=priorityClassName"`
+
+	// Priority reflects the priority of the workload.
+	// The higher value, the higher the priority.
+	// This field is populated from the PriorityClassName
+	//
+	// +optional
+	// +k8s:optional
+	Priority *int32 `json:"priority,omitempty" protobuf:"varint,4,opt,name=priority"`
 }
 
 // TypedLocalObjectReference allows to reference typed object inside the same namespace.

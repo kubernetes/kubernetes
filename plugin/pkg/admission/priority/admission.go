@@ -120,10 +120,17 @@ func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 	}
 }
 
-// admitWorkload validates and resolves PriorityClass for a workload.
-// If no PriorityClassName is provided, it sets the globalDefault PriorityClass if it exists.
-// It also ensures that PriorityClass reference is among existing PriorityClasses.
-// PriorityClassName is only validated when workload-aware-preemption feature gate is enabled.
+// admitWorkload validates PriorityClassName and resolves Priority value for a workload.
+// This is only performed when workload-aware-preemption feature gate is enabled.
+//
+// PriorityClassName validation rules:
+// 1. If PriorityClassName is provided, it must refer to an existing PriorityClass.
+// 2. Otherwise, the PriorityClassName is set to the global default PriorityClass if it exists.
+//
+// Priority value resolution:
+// 1. If a valid PriorityClassName is provided, use the priority value of that PriorityClass.
+// 2. If a global default PriorityClass exists, use its priority value.
+// 3. Otherwise, use the default priority (0).
 func (p *Plugin) admitWorkload(a admission.Attributes) error {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.WorkloadAwarePreemption) {
 		return nil
@@ -136,21 +143,25 @@ func (p *Plugin) admitWorkload(a admission.Attributes) error {
 	}
 
 	if operation == admission.Create {
+		var priority int32 = 0
 		if workload.Spec.PriorityClassName == nil || len(*workload.Spec.PriorityClassName) == 0 {
-			defaultPriorityClassName, _, _, err := p.getDefaultPriority()
+			defaultPriorityClassName, defaultPriority, _, err := p.getDefaultPriority()
 			if err != nil {
 				return fmt.Errorf("failed to get default priority class: %w", err)
 			}
 			workload.Spec.PriorityClassName = &defaultPriorityClassName
+			priority = defaultPriority
 		} else {
-			_, err := p.lister.Get(*workload.Spec.PriorityClassName)
+			priorityClass, err := p.lister.Get(*workload.Spec.PriorityClassName)
 			if err != nil {
 				if errors.IsNotFound(err) {
 					return admission.NewForbidden(a, fmt.Errorf("no PriorityClass with name %v was found", *workload.Spec.PriorityClassName))
 				}
 				return fmt.Errorf("failed to resolve PriorityClass with name %s: %w", *workload.Spec.PriorityClassName, err)
 			}
+			priority = priorityClass.Value
 		}
+		workload.Spec.Priority = &priority
 	}
 	return nil
 }
