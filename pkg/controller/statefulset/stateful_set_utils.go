@@ -629,7 +629,8 @@ func inconsistentStatus(set *apps.StatefulSet, status *apps.StatefulSetStatus) b
 		status.UpdatedReplicas != set.Status.UpdatedReplicas ||
 		status.CurrentRevision != set.Status.CurrentRevision ||
 		status.AvailableReplicas != set.Status.AvailableReplicas ||
-		status.UpdateRevision != set.Status.UpdateRevision
+		status.UpdateRevision != set.Status.UpdateRevision ||
+		!statefulSetConditionsEqual(set.Status.Conditions, status.Conditions)
 }
 
 // completeRollingUpdate completes a rolling update when all of set's replica Pods have been updated
@@ -644,6 +645,81 @@ func completeRollingUpdate(set *apps.StatefulSet, status *apps.StatefulSetStatus
 		status.CurrentReplicas = status.UpdatedReplicas
 		status.CurrentRevision = status.UpdateRevision
 	}
+}
+
+// Reasons for statefulset conditions
+const (
+	MinimumReplicasAvailable   = "MinimumReplicasAvailable"
+	MinimumReplicasUnavailable = "MinimumReplicasUnavailable"
+)
+
+// NewStatefulSetCondition creates a new statefulset condition.
+func NewStatefulSetCondition(condType apps.StatefulSetConditionType, status v1.ConditionStatus, reason, message string) *apps.StatefulSetCondition {
+	return &apps.StatefulSetCondition{
+		Type:               condType,
+		Status:             status,
+		LastTransitionTime: metav1.Now(),
+		Reason:             reason,
+		Message:            message,
+	}
+}
+
+// GetStatefulSetCondition returns the condition with the provided type.
+func GetStatefulSetCondition(status apps.StatefulSetStatus, condType apps.StatefulSetConditionType) *apps.StatefulSetCondition {
+	for _, condition := range status.Conditions {
+		if condition.Type == condType {
+			return &condition
+		}
+	}
+	return nil
+}
+
+// SetStatefulSetCondition updates the statefulset to include the provided condition. If the condition that
+// we are about to add already exists and has the same status and reason then we are not going to update.
+func SetStatefulSetCondition(status *apps.StatefulSetStatus, condition apps.StatefulSetCondition) {
+	currentCond := GetStatefulSetCondition(*status, condition.Type)
+	if currentCond != nil && currentCond.Status == condition.Status && currentCond.Reason == condition.Reason {
+		return
+	}
+	if currentCond != nil && currentCond.Status == condition.Status {
+		condition.LastTransitionTime = currentCond.LastTransitionTime
+	}
+	newConditions := filterOutStatefulSetCondition(status.Conditions, condition.Type)
+	status.Conditions = append(newConditions, condition)
+}
+
+// filterOutStatefulSetCondition returns a new slice of statefulset conditions without conditions with the provided type.
+func filterOutStatefulSetCondition(conditions []apps.StatefulSetCondition, condType apps.StatefulSetConditionType) []apps.StatefulSetCondition {
+	var newConditions []apps.StatefulSetCondition
+	for _, condition := range conditions {
+		if condition.Type == condType {
+			continue
+		}
+		newConditions = append(newConditions, condition)
+	}
+	return newConditions
+}
+
+// statefulSetConditionsEqual compares two slices of StatefulSetCondition for equality.
+// It ignores LastTransitionTime if the status is the same.
+func statefulSetConditionsEqual(cond1, cond2 []apps.StatefulSetCondition) bool {
+	if len(cond1) != len(cond2) {
+		return false
+	}
+	cond1Map := make(map[apps.StatefulSetConditionType]apps.StatefulSetCondition)
+	for _, condition := range cond1 {
+		cond1Map[condition.Type] = condition
+	}
+	for _, c2 := range cond2 {
+		c1, exists := cond1Map[c2.Type]
+		if !exists {
+			return false
+		}
+		if c1.Status != c2.Status || c1.Reason != c2.Reason || c1.Message != c2.Message {
+			return false
+		}
+	}
+	return true
 }
 
 // ascendingOrdinal is a sort.Interface that Sorts a list of Pods based on the ordinals extracted

@@ -1834,3 +1834,57 @@ func TestGetStatefulSetMaxUnavailable(t *testing.T) {
 		})
 	}
 }
+
+func TestStatefulSetConditionHelpers(t *testing.T) {
+	now := metav1.Now()
+
+	t.Run("SetStatefulSetCondition preserves LastTransitionTime when status unchanged", func(t *testing.T) {
+		status := apps.StatefulSetStatus{
+			Conditions: []apps.StatefulSetCondition{
+				{Type: apps.StatefulSetAvailable, Status: v1.ConditionTrue, Reason: "OldReason", LastTransitionTime: now},
+			},
+		}
+		SetStatefulSetCondition(&status, apps.StatefulSetCondition{
+			Type: apps.StatefulSetAvailable, Status: v1.ConditionTrue, Reason: MinimumReplicasAvailable,
+			LastTransitionTime: metav1.NewTime(now.Add(time.Second)),
+		})
+		cond := GetStatefulSetCondition(status, apps.StatefulSetAvailable)
+		if cond == nil || !cond.LastTransitionTime.Equal(&now) {
+			t.Error("Expected LastTransitionTime to be preserved when status unchanged")
+		}
+	})
+
+	t.Run("SetStatefulSetCondition updates LastTransitionTime when status changes", func(t *testing.T) {
+		status := apps.StatefulSetStatus{
+			Conditions: []apps.StatefulSetCondition{
+				{Type: apps.StatefulSetAvailable, Status: v1.ConditionFalse, Reason: MinimumReplicasUnavailable, LastTransitionTime: now},
+			},
+		}
+		newTime := metav1.NewTime(now.Add(time.Second))
+		SetStatefulSetCondition(&status, apps.StatefulSetCondition{
+			Type: apps.StatefulSetAvailable, Status: v1.ConditionTrue, Reason: MinimumReplicasAvailable,
+			LastTransitionTime: newTime,
+		})
+		cond := GetStatefulSetCondition(status, apps.StatefulSetAvailable)
+		if cond == nil || cond.Status != v1.ConditionTrue {
+			t.Error("Expected condition to be updated")
+		}
+	})
+
+	t.Run("statefulSetConditionsEqual ignores LastTransitionTime", func(t *testing.T) {
+		later := metav1.NewTime(now.Add(time.Second))
+		cond1 := []apps.StatefulSetCondition{{Type: apps.StatefulSetAvailable, Status: v1.ConditionTrue, LastTransitionTime: now}}
+		cond2 := []apps.StatefulSetCondition{{Type: apps.StatefulSetAvailable, Status: v1.ConditionTrue, LastTransitionTime: later}}
+		if !statefulSetConditionsEqual(cond1, cond2) {
+			t.Error("Expected conditions to be equal (ignoring LastTransitionTime)")
+		}
+	})
+
+	t.Run("statefulSetConditionsEqual detects status change", func(t *testing.T) {
+		cond1 := []apps.StatefulSetCondition{{Type: apps.StatefulSetAvailable, Status: v1.ConditionTrue}}
+		cond2 := []apps.StatefulSetCondition{{Type: apps.StatefulSetAvailable, Status: v1.ConditionFalse}}
+		if statefulSetConditionsEqual(cond1, cond2) {
+			t.Error("Expected conditions to be different")
+		}
+	})
+}

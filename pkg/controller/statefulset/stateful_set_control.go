@@ -819,13 +819,14 @@ func (ssc *defaultStatefulSetControl) updateStatefulSetStatus(
 	// complete any in progress rolling update if necessary
 	completeRollingUpdate(set, status)
 
+	replicaCount := int(*set.Spec.Replicas)
+	maxUnavailable := 0
 	if utilfeature.DefaultFeatureGate.Enabled(features.MaxUnavailableStatefulSet) {
 		// Update metrics - this ensures metrics are always updated regardless of update strategy
 		podManagementPolicy := string(set.Spec.PodManagementPolicy)
-		replicaCount := int(*set.Spec.Replicas)
 
 		var err error
-		maxUnavailable := 1
+		maxUnavailable = 1
 		if set.Spec.UpdateStrategy.RollingUpdate != nil {
 			maxUnavailable, err = getStatefulSetMaxUnavailable(set.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable, replicaCount)
 			if err != nil {
@@ -833,6 +834,29 @@ func (ssc *defaultStatefulSetControl) updateStatefulSetStatus(
 			}
 		}
 		metrics.MaxUnavailable.WithLabelValues(set.Namespace, set.Name, podManagementPolicy).Set(float64(maxUnavailable))
+	}
+
+	// Set Available condition: available if we have at least (replicas - maxUnavailable) pods available.
+	minAvailable := int32(replicaCount - maxUnavailable)
+	if minAvailable < 0 {
+		minAvailable = 0
+	}
+	if status.AvailableReplicas >= minAvailable {
+		condition := NewStatefulSetCondition(
+			apps.StatefulSetAvailable,
+			v1.ConditionTrue,
+			MinimumReplicasAvailable,
+			"StatefulSet has minimum availability.",
+		)
+		SetStatefulSetCondition(status, *condition)
+	} else {
+		condition := NewStatefulSetCondition(
+			apps.StatefulSetAvailable,
+			v1.ConditionFalse,
+			MinimumReplicasUnavailable,
+			"StatefulSet does not have minimum availability.",
+		)
+		SetStatefulSetCondition(status, *condition)
 	}
 	// if the status is not inconsistent do not perform an update
 	if !inconsistentStatus(set, status) {
