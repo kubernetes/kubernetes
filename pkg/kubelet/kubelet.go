@@ -63,6 +63,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	versionutil "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/apiserver/pkg/server/flagz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformersv1 "k8s.io/client-go/informers/core/v1"
@@ -71,6 +72,7 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/certificate"
 	"k8s.io/client-go/util/flowcontrol"
 	cloudprovider "k8s.io/cloud-provider"
@@ -297,7 +299,7 @@ type Bootstrap interface {
 	GetConfiguration() kubeletconfiginternal.KubeletConfiguration
 	BirthCry()
 	StartGarbageCollection(ctx context.Context)
-	ListenAndServe(ctx context.Context, kubeCfg *kubeletconfiginternal.KubeletConfiguration, tlsOptions *server.TLSOptions, auth server.AuthInterface, tp trace.TracerProvider)
+	ListenAndServe(ctx context.Context, kubeCfg *kubeletconfiginternal.KubeletConfiguration, tlsConfig *tls.Config, auth server.AuthInterface, tp trace.TracerProvider)
 	ListenAndServeReadOnly(ctx context.Context, address net.IP, port uint, tp trace.TracerProvider)
 	ListenAndServePodResources(ctx context.Context)
 	Run(ctx context.Context, updates <-chan kubetypes.PodUpdate)
@@ -330,6 +332,7 @@ type Dependencies struct {
 	VolumePlugins             []volume.VolumePlugin
 	DynamicPluginProber       volume.DynamicPluginProber
 	TLSOptions                *server.TLSOptions
+	TLSConfig                 *tls.Config
 	RemoteRuntimeService      internalapi.RuntimeService
 	RemoteImageService        internalapi.ImageManagerService
 	PodStartupLatencyTracker  util.PodStartupLatencyTracker
@@ -895,6 +898,14 @@ func NewMainKubelet(ctx context.Context,
 	klet.imageManager = imageManager
 
 	if kubeDeps.TLSOptions != nil {
+		kubeDeps.TLSConfig = &tls.Config{}
+
+		kubeDeps.TLSConfig.MinVersion = kubeDeps.TLSOptions.MinVersion
+		kubeDeps.TLSConfig.CipherSuites = kubeDeps.TLSOptions.CipherSuites
+
+		getServingCertificate := func() *tls.Certificate { return nil }
+
+		// kubelet configuration that automatically rotates serving certs
 		if kubeCfg.ServerTLSBootstrap && utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
 			klet.serverCertificateManager, err = kubeletcertificate.NewKubeletServerCertificateManager(klet.kubeClient, kubeCfg, klet.nodeName, func() []v1.NodeAddress {
 				return klet.getLastObservedNodeAddresses(ctx)
@@ -902,29 +913,59 @@ func NewMainKubelet(ctx context.Context,
 			if err != nil {
 				return nil, fmt.Errorf("failed to initialize certificate manager: %w", err)
 			}
+			getServingCertificate = klet.serverCertificateManager.Current
 
-		} else if kubeDeps.TLSOptions.CertFile != "" && kubeDeps.TLSOptions.KeyFile != "" && utilfeature.DefaultFeatureGate.Enabled(features.ReloadKubeletServerCertificateFile) {
-			klet.serverCertificateManager, err = kubeletcertificate.NewKubeletServerCertificateDynamicFileManager(kubeDeps.TLSOptions.CertFile, kubeDeps.TLSOptions.KeyFile)
-			if err != nil {
-				return nil, fmt.Errorf("failed to initialize file based certificate manager: %w", err)
+		} else if kubeDeps.TLSOptions.CertFile != "" && kubeDeps.TLSOptions.KeyFile != "" {
+
+			if utilfeature.DefaultFeatureGate.Enabled(features.ReloadKubeletServerCertificateFile) {
+				// kubelet configuration that reloads serving certs from the disk when updated
+				klet.serverCertificateManager, err = kubeletcertificate.NewKubeletServerCertificateDynamicFileManager(kubeDeps.TLSOptions.CertFile, kubeDeps.TLSOptions.KeyFile)
+				if err != nil {
+					return nil, fmt.Errorf("failed to initialize file based certificate manager: %w", err)
+				}
+				getServingCertificate = klet.serverCertificateManager.Current
+
+			} else {
+				// kubelet configuration that sets static serving certs
+				servingCert, err := tls.LoadX509KeyPair(kubeDeps.TLSOptions.CertFile, kubeDeps.TLSOptions.KeyFile)
+				if err != nil {
+					return nil, fmt.Errorf("failed to load certificate: %w", err)
+				}
+				getServingCertificate = func() *tls.Certificate { return &servingCert }
 			}
 		}
 
-		if klet.serverCertificateManager != nil {
-			kubeDeps.TLSOptions.Config.GetCertificate = func(*tls.ClientHelloInfo) (*tls.Certificate, error) {
-				cert := klet.serverCertificateManager.Current()
-				if cert == nil {
-					return nil, fmt.Errorf("no serving certificate available for the kubelet")
-				}
-				return cert, nil
+		kubeDeps.TLSConfig.GetCertificate = func(*tls.ClientHelloInfo) (*tls.Certificate, error) {
+			cert := getServingCertificate()
+			if cert == nil {
+				return nil, fmt.Errorf("no serving certificate available for the kubelet")
 			}
+			return cert, nil
+		}
 
-			// GetCertificate is only preferred over the certificate files by
-			// Golang TLS if the ClientHelloInfo.ServerName is set, which it is
-			// not when connecting to a host by IP address. Clear the files to
-			// force the use of GetCertificate.
-			kubeDeps.TLSOptions.CertFile = ""
-			kubeDeps.TLSOptions.KeyFile = ""
+		if kubeDeps.TLSOptions.ClientCAFile != "" {
+			// Populate PeerCertificates in requests, but don't reject connections without verified certificates
+			kubeDeps.TLSConfig.ClientAuth = tls.RequestClientCert
+
+			if utilfeature.DefaultFeatureGate.Enabled(features.ReloadKubeletClientCAFile) {
+				// kubelet configuration that reloads Client CA Bundle from the disk when updated
+				klet.clientCAManager = dynamiccertificates.NewDynamicServingCertificateController(kubeDeps.TLSConfig.Clone(), kubeDeps.Auth, nil, nil, nil)
+
+				err := klet.clientCAManager.RunOnce()
+				if err != nil {
+					return nil, fmt.Errorf("unable to load client CA file %s: %w", kubeDeps.TLSOptions.ClientCAFile, err)
+				}
+
+				kubeDeps.TLSConfig.GetConfigForClient = klet.clientCAManager.GetConfigForClient
+
+			} else {
+				// kubelet configuration that sets static Client CA Bundle
+				clientCAs, err := certutil.NewPool(kubeDeps.TLSOptions.ClientCAFile)
+				if err != nil {
+					return nil, fmt.Errorf("unable to load client CA file %s: %w", kubeDeps.TLSOptions.ClientCAFile, err)
+				}
+				kubeDeps.TLSConfig.ClientCAs = clientCAs
+			}
 		}
 	}
 
@@ -1326,6 +1367,9 @@ type Kubelet struct {
 	// Handles certificate rotations.
 	serverCertificateManager certificate.Manager
 
+	// handles reloading of ClientCA from the disk
+	clientCAManager *dynamiccertificates.DynamicServingCertificateController
+
 	// Indicates that the node initialization happens in an external cloud controller
 	externalCloudProvider bool
 	// Reference to this node.
@@ -1711,6 +1755,11 @@ func (kl *Kubelet) initializeModules(ctx context.Context) error {
 	// Start the certificate manager if it was enabled.
 	if kl.serverCertificateManager != nil {
 		kl.serverCertificateManager.Start()
+	}
+
+	// Start the client CA manager if it was enabled.
+	if kl.clientCAManager != nil {
+		go kl.clientCAManager.Run(1, ctx.Done())
 	}
 
 	// Start out of memory watcher.
@@ -3180,9 +3229,9 @@ func (kl *Kubelet) BirthCry() {
 }
 
 // ListenAndServe runs the kubelet HTTP server.
-func (kl *Kubelet) ListenAndServe(ctx context.Context, kubeCfg *kubeletconfiginternal.KubeletConfiguration, tlsOptions *server.TLSOptions,
+func (kl *Kubelet) ListenAndServe(ctx context.Context, kubeCfg *kubeletconfiginternal.KubeletConfiguration, tlsConfig *tls.Config,
 	auth server.AuthInterface, tp trace.TracerProvider) {
-	server.ListenAndServeKubeletServer(ctx, kl, kl.resourceAnalyzer, kl.containerManager.GetHealthCheckers(), kl.flagz, kubeCfg, tlsOptions, auth, tp)
+	server.ListenAndServeKubeletServer(ctx, kl, kl.resourceAnalyzer, kl.containerManager.GetHealthCheckers(), kl.flagz, kubeCfg, tlsConfig, auth, tp)
 }
 
 // ListenAndServeReadOnly runs the kubelet HTTP server in read-only mode.

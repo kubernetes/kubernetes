@@ -800,6 +800,11 @@ const (
 	// Relaxed DNS search string validation.
 	RelaxedServiceNameValidation featuregate.Feature = "RelaxedServiceNameValidation"
 
+	// owner: @harshaln
+	//
+	// Enables running kubelet in a configuration that monitors and loads ClientCA from file paths
+	ReloadKubeletClientCAFile = "ReloadKubeletClientCAFile"
+
 	// owner: @zhangweikop
 	//
 	// Enable kubelet tls server to update certificate if the specified certificate files are changed.
@@ -1709,6 +1714,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	ReloadKubeletClientCAFile: {
+		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
+	},
+
 	ReloadKubeletServerCertificateFile: {
 		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
 	},
@@ -2410,6 +2419,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	RelaxedEnvironmentVariableValidation: {},
 
 	RelaxedServiceNameValidation: {},
+
+	ReloadKubeletClientCAFile: {},
 
 	ReloadKubeletServerCertificateFile: {},
 

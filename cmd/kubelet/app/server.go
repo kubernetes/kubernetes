@@ -1176,23 +1176,11 @@ func InitializeTLS(ctx context.Context, kf *options.KubeletFlags, kc *kubeletcon
 	}
 
 	tlsOptions := &server.TLSOptions{
-		Config: &tls.Config{
-			MinVersion:   minTLSVersion,
-			CipherSuites: tlsCipherSuites,
-		},
-		CertFile: kc.TLSCertFile,
-		KeyFile:  kc.TLSPrivateKeyFile,
-	}
-
-	if len(kc.Authentication.X509.ClientCAFile) > 0 {
-		clientCAs, err := certutil.NewPool(kc.Authentication.X509.ClientCAFile)
-		if err != nil {
-			return nil, fmt.Errorf("unable to load client CA file %s: %w", kc.Authentication.X509.ClientCAFile, err)
-		}
-		// Specify allowed CAs for client certificates
-		tlsOptions.Config.ClientCAs = clientCAs
-		// Populate PeerCertificates in requests, but don't reject connections without verified certificates
-		tlsOptions.Config.ClientAuth = tls.RequestClientCert
+		MinVersion:   minTLSVersion,
+		CipherSuites: tlsCipherSuites,
+		CertFile:     kc.TLSCertFile,
+		KeyFile:      kc.TLSPrivateKeyFile,
+		ClientCAFile: kc.Authentication.X509.ClientCAFile,
 	}
 
 	return tlsOptions, nil
@@ -1282,7 +1270,7 @@ func startKubelet(ctx context.Context, k kubelet.Bootstrap, podCfg *config.PodCo
 
 	// start the kubelet server
 	if enableServer {
-		go k.ListenAndServe(ctx, kubeCfg, kubeDeps.TLSOptions, kubeDeps.Auth, kubeDeps.TracerProvider)
+		go k.ListenAndServe(ctx, kubeCfg, kubeDeps.TLSConfig, kubeDeps.Auth, kubeDeps.TracerProvider)
 	}
 	if kubeCfg.ReadOnlyPort > 0 {
 		go k.ListenAndServeReadOnly(ctx, netutils.ParseIPSloppy(kubeCfg.Address), uint(kubeCfg.ReadOnlyPort), kubeDeps.TracerProvider)
