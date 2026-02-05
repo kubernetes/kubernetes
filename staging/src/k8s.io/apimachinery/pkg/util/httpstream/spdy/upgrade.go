@@ -45,12 +45,12 @@ type responseUpgrader struct {
 // read.
 type connWrapper struct {
 	net.Conn
-	closed    int32
+	closed    atomic.Int32
 	bufReader *bufio.Reader
 }
 
 func (w *connWrapper) Read(b []byte) (n int, err error) {
-	if atomic.LoadInt32(&w.closed) == 1 {
+	if w.closed.Load() == 1 {
 		return 0, io.EOF
 	}
 	return w.bufReader.Read(b)
@@ -58,7 +58,7 @@ func (w *connWrapper) Read(b []byte) (n int, err error) {
 
 func (w *connWrapper) Close() error {
 	err := w.Conn.Close()
-	atomic.StoreInt32(&w.closed, 1)
+	w.closed.Store(1)
 	return err
 }
 

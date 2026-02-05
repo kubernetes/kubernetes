@@ -347,14 +347,14 @@ func TestDeleteCollectionDeleteOptions(t *testing.T) {
 
 func TestDeleteCollectionWithNoContextDeadlineEnforced(t *testing.T) {
 	ctx := t.Context()
-	var invokedGot, hasDeadlineGot int32
+	var invokedGot, hasDeadlineGot atomic.Int32
 	fakeDeleterFn := func(ctx context.Context, _ rest.ValidateObjectFunc, _ *metav1.DeleteOptions, _ *metainternalversion.ListOptions) (runtime.Object, error) {
 		// we expect CollectionDeleter to be executed once
-		atomic.AddInt32(&invokedGot, 1)
+		invokedGot.Add(1)
 
 		// we don't expect any context deadline to be set
 		if _, hasDeadline := ctx.Deadline(); hasDeadline {
-			atomic.AddInt32(&hasDeadlineGot, 1)
+			hasDeadlineGot.Add(1)
 		}
 		return nil, nil
 	}
@@ -379,10 +379,10 @@ func TestDeleteCollectionWithNoContextDeadlineEnforced(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	handler.ServeHTTP(recorder, request)
-	if atomic.LoadInt32(&invokedGot) != 1 {
+	if invokedGot.Load() != 1 {
 		t.Errorf("expected collection deleter to be invoked")
 	}
-	if atomic.LoadInt32(&hasDeadlineGot) > 0 {
+	if hasDeadlineGot.Load() > 0 {
 		t.Errorf("expected context to not have any deadline")
 	}
 }

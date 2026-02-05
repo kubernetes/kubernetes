@@ -134,7 +134,7 @@ type SingleFileTracker struct {
 	// aligned, otherwise atomic operations will panic. Having it at the top of
 	// the struct will guarantee that, even on 32-bit arches.
 	// See https://pkg.go.dev/sync/atomic#pkg-note-BUG for more information.
-	count int64
+	count atomic.Int64
 
 	// upstreamHasSynced is changed from false (initial value) to true
 	// when UpstreamHasSynced is called.
@@ -158,7 +158,7 @@ func NewSingleFileTracker(name string) *SingleFileTracker {
 // Start should be called prior to processing each key which is part of the
 // initial list.
 func (t *SingleFileTracker) Start() {
-	atomic.AddInt64(&t.count, 1)
+	t.count.Add(1)
 }
 
 // Finished should be called when finished processing a key which was part of
@@ -167,7 +167,7 @@ func (t *SingleFileTracker) Start() {
 // return a wrong value. To help you notice this should it happen, Finished()
 // will panic if the internal counter goes negative.
 func (t *SingleFileTracker) Finished() {
-	result := atomic.AddInt64(&t.count, -1)
+	result := t.count.Add(-1)
 	if result < 0 {
 		panic("synctrack: negative counter; this logic error means HasSynced may return incorrect value")
 	}
@@ -187,7 +187,7 @@ func (t *SingleFileTracker) Finished() {
 func (t *SingleFileTracker) UpstreamHasSynced() {
 	// Upstream is done, but we might not be yet.
 	t.upstreamHasSynced.Store(true)
-	if atomic.LoadInt64(&t.count) == 0 {
+	if t.count.Load() == 0 {
 		// Mark as synced.
 		t.cancel()
 	}
