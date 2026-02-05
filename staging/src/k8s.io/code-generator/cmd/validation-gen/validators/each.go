@@ -51,11 +51,11 @@ func init() {
 
 type eachValTagValidator struct {
 	byPath    map[string]*listMetadata
-	validator Validator
+	validator TagValidationExtractor
 }
 
 func (evtv *eachValTagValidator) Init(cfg Config) {
-	evtv.validator = cfg.Validator
+	evtv.validator = cfg.TagValidator
 }
 
 func (eachValTagValidator) TagName() string {
@@ -104,7 +104,7 @@ func (evtv eachValTagValidator) GetValidations(context Context, tag codetags.Tag
 	if tag.ValueTag == nil {
 		return Validations{}, fmt.Errorf("missing validation tag")
 	}
-	if validations, err := evtv.validator.ExtractValidations(elemContext, *tag.ValueTag); err != nil {
+	if validations, err := evtv.validator.ExtractTagValidations(elemContext, *tag.ValueTag); err != nil {
 		return Validations{}, err
 	} else {
 		if validations.Empty() && !validations.OpaqueKeyType && !validations.OpaqueValType && !validations.OpaqueType {
@@ -240,11 +240,11 @@ func (evtv eachValTagValidator) Docs() TagDoc {
 }
 
 type eachKeyTagValidator struct {
-	validator Validator
+	validator TagValidationExtractor
 }
 
 func (ektv *eachKeyTagValidator) Init(cfg Config) {
-	ektv.validator = cfg.Validator
+	ektv.validator = cfg.TagValidator
 }
 
 func (eachKeyTagValidator) TagName() string {
@@ -275,7 +275,7 @@ func (ektv eachKeyTagValidator) GetValidations(context Context, tag codetags.Tag
 		ParentPath: context.Path,
 	}
 
-	if validations, err := ektv.validator.ExtractValidations(elemContext, *tag.ValueTag); err != nil {
+	if validations, err := ektv.validator.ExtractTagValidations(elemContext, *tag.ValueTag); err != nil {
 		return Validations{}, err
 	} else {
 		if len(validations.Variables) > 0 {

@@ -37,13 +37,13 @@ func init() {
 }
 
 type levelTagValidator struct {
-	validator Validator
+	validator TagValidationExtractor
 	tagName   string
 	level     ValidationStabilityLevel
 }
 
 func (ltv *levelTagValidator) Init(cfg Config) {
-	ltv.validator = cfg.Validator
+	ltv.validator = cfg.TagValidator
 }
 
 func (ltv *levelTagValidator) TagName() string {

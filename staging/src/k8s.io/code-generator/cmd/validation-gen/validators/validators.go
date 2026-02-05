@@ -134,7 +134,7 @@ type Config struct {
 	// to look up all sorts of other information.
 	GengoContext *generator.Context
 
-	// Validator provides a way to compose validations.
+	// TagValidator provides a way to compose validations.
 	//
 	// For example, it is possible to define a validation such as
 	// "+myValidator=+format=IP" by using the registry to extract the
@@ -143,7 +143,7 @@ type Config struct {
 	//
 	// This field MUST NOT be used during init, since other validators may not
 	// be initialized yet.
-	Validator Validator
+	TagValidator TagValidationExtractor
 }
 
 // Scope describes where a validation (or potential validation) is located.

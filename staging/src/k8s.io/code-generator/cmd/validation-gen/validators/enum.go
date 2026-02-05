@@ -71,11 +71,11 @@ If multiple +k8s:ifEnabled/+k8s:ifDisabled tags are used, the value is excluded 
 }
 
 type enumTagValidator struct {
-	validator Validator
+	validator TagValidationExtractor
 }
 
 func (etv *enumTagValidator) Init(cfg Config) {
-	etv.validator = cfg.Validator
+	etv.validator = cfg.TagValidator
 }
 
 func (enumTagValidator) TagName() string {

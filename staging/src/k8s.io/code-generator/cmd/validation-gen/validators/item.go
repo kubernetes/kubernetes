@@ -43,12 +43,12 @@ type keyValuePair struct {
 }
 
 type itemTagValidator struct {
-	validator  Validator
+	validator  TagValidationExtractor
 	listByPath map[string]*listMetadata
 }
 
 func (itv *itemTagValidator) Init(cfg Config) {
-	itv.validator = cfg.Validator
+	itv.validator = cfg.TagValidator
 }
 
 func (itemTagValidator) TagName() string {
@@ -160,7 +160,7 @@ func (itv *itemTagValidator) GetValidations(context Context, tag codetags.Tag) (
 		ParentPath:   context.Path,
 	}
 
-	validations, err := itv.validator.ExtractValidations(subContext, *tag.ValueTag)
+	validations, err := itv.validator.ExtractTagValidations(subContext, *tag.ValueTag)
 	if err != nil {
 		return Validations{}, err
 	}

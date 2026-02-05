@@ -102,7 +102,7 @@ func (reg *registry) init(c *generator.Context) {
 
 	cfg := Config{
 		GengoContext: c,
-		Validator:    reg,
+		TagValidator: reg,
 	}
 
 	for _, tv := range globalRegistry.tagValidators {
@@ -280,8 +280,16 @@ func RegisterFieldValidator(fv FieldValidator) {
 	globalRegistry.addFieldValidator(fv)
 }
 
-// Validator represents an aggregation of validator plugins.
-type Validator interface {
+// TagValidationExtractor represents an aggregation of validator plugins.
+type TagValidationExtractor interface {
+	// ExtractTagValidations extracts all validations associated with the given tags.
+	// Some tag validators may return empty validations and update internal state
+	// that is then used by FieldValidators.
+	ExtractTagValidations(context Context, Tags ...codetags.Tag) (Validations, error)
+}
+
+// ValidationExtractor represents an aggregation of validator plugins.
+type ValidationExtractor interface {
 
 	// ExtractTags extracts Tags from comment lines.
 	ExtractTags(context Context, comments []string) ([]codetags.Tag, error)
@@ -294,10 +302,8 @@ type Validator interface {
 	// logic.
 	ExtractValidations(context Context, Tags ...codetags.Tag) (Validations, error)
 
-	// ExtractTagValidations extracts all validations associated with the given tags.
-	// Some tag validators may return empty validations and update internal state
-	// that is then used by FieldValidators.
-	ExtractTagValidations(context Context, Tags ...codetags.Tag) (Validations, error)
+	// A ValidationExtractor is also a TagValidationExtractor.
+	TagValidationExtractor
 
 	// Docs returns documentation for each known tag.
 	Docs() []TagDoc
@@ -323,7 +329,7 @@ func (reg *registry) Stability(tag string) (TagStabilityLevel, error) {
 // InitGlobalValidator must be called exactly once by the main application to
 // initialize and safely access the global tag registry.  Once this is called,
 // no more validators may be registered.
-func InitGlobalValidator(c *generator.Context) Validator {
+func InitGlobalValidator(c *generator.Context) ValidationExtractor {
 	globalRegistry.init(c)
 	return globalRegistry
 }

@@ -152,7 +152,7 @@ func (g *genValidations) GenerateType(c *generator.Context, t *types.Type, w io.
 // typeDiscoverer contains fields necessary to build graphs of types.
 type typeDiscoverer struct {
 	initialized bool
-	validator   validators.Validator
+	validator   validators.ValidationExtractor
 	inputToPkg  map[string]string
 
 	// constantsByType holds a map of type to constants of that type.
@@ -165,7 +165,7 @@ type typeDiscoverer struct {
 
 // NewTypeDiscoverer creates a NewTypeDiscoverer.
 // Init must be called before calling DiscoverType.
-func NewTypeDiscoverer(validator validators.Validator, inputToPkg map[string]string) *typeDiscoverer {
+func NewTypeDiscoverer(validator validators.ValidationExtractor, inputToPkg map[string]string) *typeDiscoverer {
 	return &typeDiscoverer{
 		validator:       validator,
 		inputToPkg:      inputToPkg,
