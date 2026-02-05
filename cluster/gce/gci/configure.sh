@@ -570,10 +570,6 @@ function install-containerd-ubuntu {
   local -r custom_containerd="${UBUNTU_INSTALL_CONTAINERD_VERSION:-}"
   local -r custom_runc="${UBUNTU_INSTALL_RUNC_VERSION:-}"
 
-  apt-get update
-  apt-get install -y --no-install-recommends apt-transport-https ca-certificates \
-    socat curl gnupg2 nfs-common software-properties-common lsb-release
-
   # Both versions specified: skip apt, install binaries directly
   if [[ -n "${custom_containerd}" && -n "${custom_runc}" ]]; then
     echo "Installing containerd ${custom_containerd} and runc ${custom_runc} (skipping apt)"
