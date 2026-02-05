@@ -90,6 +90,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/logs"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/network/dns"
+	"k8s.io/kubernetes/pkg/kubelet/nodeinfocache"
 	"k8s.io/kubernetes/pkg/kubelet/nodeshutdown"
 	"k8s.io/kubernetes/pkg/kubelet/pleg"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager"
@@ -311,6 +312,7 @@ func newTestKubeletWithImageList(
 	kubelet.runtimeCache = containertest.NewFakeRuntimeCache(kubelet.containerRuntime)
 	kubelet.reasonCache = NewReasonCache()
 	kubelet.podCache = containertest.NewFakeCache(kubelet.containerRuntime)
+	kubelet.nodeInfoCache = nodeinfocache.New()
 	kubelet.podWorkers = &fakePodWorkers{
 		syncPodFn: kubelet.SyncPod,
 		cache:     kubelet.podCache,
@@ -417,7 +419,7 @@ func newTestKubeletWithImageList(
 	handlers = append(handlers, shutdownManager)
 
 	// Add this as cleanup predicate pod admitter
-	handlers = append(handlers, lifecycle.NewPredicateAdmitHandler(kubelet.GetCachedNode, lifecycle.NewAdmissionFailureHandlerStub(), kubelet.containerManager.UpdatePluginResources))
+	handlers = append(handlers, lifecycle.NewPredicateAdmitHandler(kubelet.GetCachedNode, lifecycle.NewAdmissionFailureHandlerStub(), kubelet.containerManager.UpdatePluginResources, lifecycle.NewNodeInfoProviderStub()))
 
 	if !excludeAdmitHandlers {
 		kubelet.allocationManager.AddPodAdmitHandlers(handlers)
@@ -1242,7 +1244,7 @@ func TestHandlePluginResources(t *testing.T) {
 	}
 
 	// add updatePluginResourcesFunc to admission handler, to test it's behavior.
-	kl.allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{lifecycle.NewPredicateAdmitHandler(kl.GetCachedNode, lifecycle.NewAdmissionFailureHandlerStub(), updatePluginResourcesFunc)})
+	kl.allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{lifecycle.NewPredicateAdmitHandler(kl.GetCachedNode, lifecycle.NewAdmissionFailureHandlerStub(), updatePluginResourcesFunc, lifecycle.NewNodeInfoProviderStub())})
 
 	recorder := record.NewFakeRecorder(20)
 	nodeRef := &v1.ObjectReference{
