@@ -45,6 +45,7 @@ type ErrorMatcher struct {
 	matchDetail              func(want, got string) bool
 	requireOriginWhenInvalid bool
 	matchDeclarativeNative   bool
+	matchShadow              bool
 	// normalizationRules holds the pre-compiled regex patterns for path normalization.
 	normalizationRules []NormalizationRule
 }
@@ -88,6 +89,9 @@ func (m ErrorMatcher) Matches(want, got *Error) bool {
 		return false
 	}
 	if m.matchDeclarativeNative && want.DeclarativeNative != got.DeclarativeNative {
+		return false
+	}
+	if m.matchShadow && want.Shadow != got.Shadow {
 		return false
 	}
 
@@ -156,6 +160,10 @@ func (m ErrorMatcher) Render(e *Error) string {
 	if m.matchDeclarativeNative {
 		comma()
 		buf.WriteString(fmt.Sprintf("DeclarativeNative=%t", e.DeclarativeNative))
+	}
+	if m.matchShadow {
+		comma()
+		buf.WriteString(fmt.Sprintf("Shadow=%t", e.Shadow))
 	}
 	return "{" + buf.String() + "}"
 }
@@ -237,6 +245,13 @@ func (m ErrorMatcher) RequireOriginWhenInvalid() ErrorMatcher {
 // value of field errors.
 func (m ErrorMatcher) ByDeclarativeNative() ErrorMatcher {
 	m.matchDeclarativeNative = true
+	return m
+}
+
+// ByShadow returns a derived ErrorMatcher which also matches by the Shadow
+// value of field errors.
+func (m ErrorMatcher) ByShadow() ErrorMatcher {
+	m.matchShadow = true
 	return m
 }
 

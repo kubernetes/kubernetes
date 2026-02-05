@@ -59,6 +59,9 @@ type Error struct {
 	// DeclarativeNative is true when this error originates from a declarative-native validation.
 	// This field is used to distinguish errors that are exclusively declarative and lack an imperative counterpart.
 	DeclarativeNative bool
+
+	// Shadow is true when this error is coming from a mirrored declarative validation.
+	Shadow bool
 }
 
 var _ error = &Error{}
@@ -460,6 +463,20 @@ func (e *Error) MarkDeclarativeNative() *Error {
 func (list ErrorList) MarkDeclarativeNative() ErrorList {
 	for _, err := range list {
 		err.DeclarativeNative = true
+	}
+	return list
+}
+
+// MarkShadow marks the error as a shadow of the handwritten validation code error.
+func (e *Error) MarkShadow() *Error {
+	e.Shadow = true
+	return e
+}
+
+// MarkShadow marks the errors as a shadow of the handwritten validation code errors.
+func (list ErrorList) MarkShadow() ErrorList {
+	for _, err := range list {
+		err.Shadow = true
 	}
 	return list
 }

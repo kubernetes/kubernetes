@@ -76,24 +76,24 @@ func WithNormalizationRules(rules []field.NormalizationRule) ValidationConfig {
 	}
 }
 
-// WithDeclarativeNative marks the validation configuration to indicate that it includes
+// WithDeclarativeEnforcement marks the validation configuration to indicate that it includes
 // declarative validations that are defined *only* declaratively, lacking corresponding imperative validation.
 // When set, declarative validation is always executed regardless of feature gates. Errors marked as
-// declarative-native are separated from the full set and returned alongside imperative errors.
-func WithDeclarativeNative() ValidationConfig {
+// declarative non-shadowed are separated from the full set and returned alongside imperative errors.
+func WithDeclarativeEnforcement() ValidationConfig {
 	return func(config *validationConfigOption) {
-		config.containsDeclarativeNative = true
+		config.containsDeclarativeNonShadowed = true
 	}
 }
 
 type validationConfigOption struct {
-	opType                    operation.Type
-	options                   []string
-	takeover                  bool
-	subresourceGVKMapper      GroupVersionKindProvider
-	validationIdentifier      string
-	normalizationRules        []field.NormalizationRule
-	containsDeclarativeNative bool
+	opType                         operation.Type
+	options                        []string
+	takeover                       bool
+	subresourceGVKMapper           GroupVersionKindProvider
+	validationIdentifier           string
+	normalizationRules             []field.NormalizationRule
+	containsDeclarativeNonShadowed bool
 }
 
 // validateDeclaratively validates obj and oldObj against declarative
@@ -347,7 +347,7 @@ func metricIdentifier(ctx context.Context, scheme *runtime.Scheme, obj runtime.O
 
 // ValidateDeclarativelyWithMigrationChecks runs declarative validation, and conditionally compares results
 // with imperative validation and merges errors based on the feature gate and `takeover` flag.
-// It proceeds if either the DeclarativeValidation feature gate is enabled or `containsDeclarativeNative` is set.
+// It proceeds if either the DeclarativeValidation feature gate is enabled or `containsDeclarativeNonShadowed` is set.
 func ValidateDeclarativelyWithMigrationChecks(ctx context.Context, scheme *runtime.Scheme, obj, oldObj runtime.Object, errs field.ErrorList, opType operation.Type, configOpts ...ValidationConfig) field.ErrorList {
 	declarativeValidationEnabled := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidation)
 	takeover := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationTakeover)
@@ -368,43 +368,43 @@ func ValidateDeclarativelyWithMigrationChecks(ctx context.Context, scheme *runti
 		opt(cfg)
 	}
 
-	// Short-circuit if neither DeclarativeValidation is enabled nor the object contains declarative native validation.
-	if !(declarativeValidationEnabled || cfg.containsDeclarativeNative) {
+	// Short-circuit if neither DeclarativeValidation is enabled nor the object contains declarative non shadowed validation.
+	if !declarativeValidationEnabled && !cfg.containsDeclarativeNonShadowed {
 		return errs
 	}
 
 	// Call the panic-safe wrapper with the real validation function.
-	declarativeErrs := panicSafeValidateFunc(validateDeclaratively, cfg.takeover || cfg.containsDeclarativeNative, cfg.validationIdentifier)(ctx, scheme, obj, oldObj, cfg)
+	declarativeErrs := panicSafeValidateFunc(validateDeclaratively, cfg.takeover || cfg.containsDeclarativeNonShadowed, cfg.validationIdentifier)(ctx, scheme, obj, oldObj, cfg)
 
-	mirroredDVErrors := field.ErrorList{}
-	dvNativeErrors := field.ErrorList{}
+	shadowedDVErrors := field.ErrorList{}
+	dvNonShadowedErrors := field.ErrorList{}
 
-	// When declarative native validation is present, we need to separate declarative native errors
-	// from mirrored declarative errors. This is to avoid comparing declarative native errors (which
+	// When declarative non shadowed validation is present, we need to separate declarative non shadowed errors
+	// from shadowed declarative errors. This is to avoid comparing declarative non shadowed errors (which
 	// have no imperative equivalent) with handwritten imperative errors.
-	if cfg.containsDeclarativeNative {
+	if cfg.containsDeclarativeNonShadowed {
 		for _, err := range declarativeErrs {
-			if err.DeclarativeNative {
-				dvNativeErrors = append(dvNativeErrors, err)
-			} else if err.Type == field.ErrorTypeInternal {
+			if err.Type == field.ErrorTypeInternal {
 				// Internal errors should fail both types of validation.
-				dvNativeErrors = append(dvNativeErrors, err)
-				mirroredDVErrors = append(mirroredDVErrors, err)
+				dvNonShadowedErrors = append(dvNonShadowedErrors, err)
+				shadowedDVErrors = append(shadowedDVErrors, err)
+			} else if !err.Shadow {
+				dvNonShadowedErrors = append(dvNonShadowedErrors, err)
 			} else {
-				mirroredDVErrors = append(mirroredDVErrors, err)
+				shadowedDVErrors = append(shadowedDVErrors, err)
 			}
 		}
 	} else {
-		mirroredDVErrors = declarativeErrs
+		shadowedDVErrors = declarativeErrs
 	}
 
 	if declarativeValidationEnabled {
-		compareDeclarativeErrorsAndEmitMismatches(ctx, errs, mirroredDVErrors, takeover, validationIdentifier, cfg.normalizationRules)
+		compareDeclarativeErrorsAndEmitMismatches(ctx, errs, shadowedDVErrors, takeover, validationIdentifier, cfg.normalizationRules)
 		if takeover {
-			errs = append(errs.RemoveCoveredByDeclarative(), mirroredDVErrors...)
+			errs = append(errs.RemoveCoveredByDeclarative(), shadowedDVErrors...)
 		}
 	}
-	errs = append(errs, dvNativeErrors...)
+	errs = append(errs, dvNonShadowedErrors...)
 	return errs
 }
 
