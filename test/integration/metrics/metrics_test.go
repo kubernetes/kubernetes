@@ -734,3 +734,4 @@ func parseMetric(r io.Reader, name string) (*dto.MetricFamily, error) {
 	}
 	return nil, fmt.Errorf("Metric not found %q", name)
 }
+
