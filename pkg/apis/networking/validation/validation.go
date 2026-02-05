@@ -784,7 +784,7 @@ func validateIPAddressParentReference(params *networking.ParentReference, fldPat
 	allErrs := field.ErrorList{}
 
 	if params == nil {
-		allErrs = append(allErrs, field.Required(fldPath.Child("parentRef"), "")).MarkCoveredByDeclarative()
+		allErrs = append(allErrs, field.Required(fldPath.Child("parentRef"), "").MarkCoveredByDeclarative())
 		return allErrs
 	}
 
@@ -798,7 +798,7 @@ func validateIPAddressParentReference(params *networking.ParentReference, fldPat
 
 	// resource is required
 	if params.Resource == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("resource"), "")).MarkCoveredByDeclarative()
+		allErrs = append(allErrs, field.Required(fldPath.Child("resource"), "").MarkCoveredByDeclarative())
 	} else {
 		for _, msg := range pathvalidation.IsValidPathSegmentName(params.Resource) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("resource"), params.Resource, msg))
@@ -807,7 +807,7 @@ func validateIPAddressParentReference(params *networking.ParentReference, fldPat
 
 	// name is required
 	if params.Name == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "")).MarkCoveredByDeclarative()
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "").MarkCoveredByDeclarative())
 	} else {
 		for _, msg := range pathvalidation.IsValidPathSegmentName(params.Name) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), params.Name, msg))
