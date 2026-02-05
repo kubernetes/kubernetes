@@ -569,6 +569,30 @@ var _ = SIGDescribe("StatefulSet", func() {
 			deletingPodForRollingUpdatePartitionTest(ctx, f, c, ns, ss)
 		})
 
+		ginkgo.It("can perform a rolling update with parallel pod management policy even if old replicas not ready due to not exist image", func(ctx context.Context) {
+			ss := e2estatefulset.NewStatefulSet("ss-image", ns, headlessSvcName, 1, nil, nil, labels)
+			image := ss.Spec.Template.Spec.Containers[0].Image
+			ss.Spec.Template.Spec.Containers[0].Image = "not-exist-image:v1"
+			ss.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
+			ss.Spec.UpdateStrategy = appsv1.StatefulSetUpdateStrategy{
+				Type: appsv1.RollingUpdateStatefulSetStrategyType,
+			}
+
+			ginkgo.By("Creating a new StatefulSet with not exist image")
+			_, err := c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+			e2estatefulset.WaitForStatusReplicas(ctx, c, ss, 1)
+
+			ginkgo.By(fmt.Sprintf("Updating stateful set template: update image from %s to %s", ss.Spec.Template.Spec.Containers[0].Image, image))
+			ss, err = updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.StatefulSet) {
+				update.Spec.Template.Spec.Containers[0].Image = image
+			})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Waiting for all pods to be running and ready")
+			e2estatefulset.WaitForRunningAndReady(ctx, c, *ss.Spec.Replicas, ss)
+		})
+
 		f.It("should perform rolling updates with maxUnavailable", framework.WithFeatureGate(features.MaxUnavailableStatefulSet), func(ctx context.Context) {
 			ginkgo.By("Creating a new StatefulSet")
 			ss := e2estatefulset.NewStatefulSet("ss-maxunavailable", ns, headlessSvcName, 5, nil, nil, labels)
