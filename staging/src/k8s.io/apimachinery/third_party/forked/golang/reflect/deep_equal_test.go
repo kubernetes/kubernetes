@@ -36,64 +36,64 @@ func TestEqualities(t *testing.T) {
 		X int
 	}
 
-	type Case struct {
-		a, b  interface{}
-		equal bool
-	}
-
-	table := []Case{
-		{1, 2, true},
-		{2, 1, false},
-		{"foo", "fo", false},
-		{"foo", "foo", true},
-		{"foo", "foobar", false},
-		{Foo{1}, Foo{2}, true},
-		{Foo{2}, Foo{1}, false},
-		{Bar{1}, Bar{10}, true},
-		{&Bar{1}, &Bar{10}, true},
-		{Baz{Bar{1}}, Baz{Bar{10}}, true},
-		{[...]string{}, [...]string{"1", "2", "3"}, false},
-		{[...]string{"1"}, [...]string{"1", "2", "3"}, false},
-		{[...]string{"1", "2", "3"}, [...]string{}, false},
-		{[...]string{"1", "2", "3"}, [...]string{"1", "2", "3"}, true},
-		{map[string]int{"foo": 1}, map[string]int{}, false},
-		{map[string]int{"foo": 1}, map[string]int{"foo": 2}, true},
-		{map[string]int{"foo": 2}, map[string]int{"foo": 1}, false},
-		{map[string]int{"foo": 1}, map[string]int{"foo": 2, "bar": 6}, false},
-		{map[string]int{"foo": 1, "bar": 6}, map[string]int{"foo": 2}, false},
-		{map[string]int{}, map[string]int(nil), true},
-		{[]string(nil), []string(nil), true},
-		{[]string{}, []string(nil), true},
-		{[]string(nil), []string{}, true},
-		{[]string{"1"}, []string(nil), false},
-		{[]string{}, []string{"1", "2", "3"}, false},
-		{[]string{"1"}, []string{"1", "2", "3"}, false},
-		{[]string{"1", "2", "3"}, []string{}, false},
+	table := []struct {
+		a, b                               interface{}
+		deepEqual                          bool // Expected result for DeepEqual
+		deepEqualWithNilDifferentFromEmpty bool // Expected result for DeepEqualWithNilDifferentFromEmpty
+	}{
+		// Custom equality functions
+		{1, 2, true, true},
+		{2, 1, false, false},
+		{"foo", "fo", false, false},
+		{"foo", "foo", true, true},
+		{"foo", "foobar", false, false},
+		{Foo{1}, Foo{2}, true, true},
+		{Foo{2}, Foo{1}, false, false},
+		{Bar{1}, Bar{10}, true, true},
+		{&Bar{1}, &Bar{10}, true, true},
+		{Baz{Bar{1}}, Baz{Bar{10}}, true, true},
+		// Arrays
+		{[...]string{}, [...]string{"1", "2", "3"}, false, false},
+		{[...]string{"1"}, [...]string{"1", "2", "3"}, false, false},
+		{[...]string{"1", "2", "3"}, [...]string{}, false, false},
+		{[...]string{"1", "2", "3"}, [...]string{"1", "2", "3"}, true, true},
+		// Maps with custom equality
+		{map[string]int{"foo": 1}, map[string]int{}, false, false},
+		{map[string]int{"foo": 1}, map[string]int{"foo": 2}, true, true},
+		{map[string]int{"foo": 2}, map[string]int{"foo": 1}, false, false},
+		{map[string]int{"foo": 1}, map[string]int{"foo": 2, "bar": 6}, false, false},
+		{map[string]int{"foo": 1, "bar": 6}, map[string]int{"foo": 2}, false, false},
+		// Nil vs empty (DeepEqual treats as equal, DeepEqualWithNilDifferentFromEmpty treats as different)
+		{map[string]int{}, map[string]int(nil), true, false},
+		{[]string(nil), []string(nil), true, true},
+		{[]string{}, []string(nil), true, false},
+		{[]string(nil), []string{}, true, false},
+		{[]int{}, []int(nil), true, false},
+		// Nil vs filled (both functions should return false)
+		{[]string{"1"}, []string(nil), false, false},
+		// Empty vs filled (both functions should return false)
+		{[]string{}, []string{"1"}, false, false},
+		{[]string{}, []string{"1", "2", "3"}, false, false},
+		{[]int{}, []int{1, 2, 3}, false, false},
+		{map[string]int{}, map[string]int{"foo": 1}, false, false},
+		// Filled vs empty (both functions should return false)
+		{[]string{"1"}, []string{}, false, false},
+		{[]string{"1"}, []string{"1", "2", "3"}, false, false},
+		{[]string{"1", "2", "3"}, []string{}, false, false},
+		{[]int{1, 2, 3}, []int{}, false, false},
+		{map[string]int{"foo": 1}, map[string]int{}, false, false},
+		// Nested nil/empty (DeepEqual treats as equal, DeepEqualWithNilDifferentFromEmpty treats as different)
+		{map[string][]int{}, map[string][]int(nil), true, false},
+		{map[string][]int{"foo": nil}, map[string][]int{"foo": {}}, true, false},
+		{Zap{A: nil, B: map[string][]int{"foo": nil}}, Zap{A: []int{}, B: map[string][]int{"foo": {}}}, true, false},
 	}
 
 	for _, item := range table {
-		if e, a := item.equal, e.DeepEqual(item.a, item.b); e != a {
-			t.Errorf("Expected (%+v == %+v) == %v, but got %v", item.a, item.b, e, a)
+		if e, a := item.deepEqual, e.DeepEqual(item.a, item.b); e != a {
+			t.Errorf("DeepEqual: Expected (%+v == %+v) == %v, but got %v", item.a, item.b, e, a)
 		}
-	}
-
-	// Cases which hinge upon implicit nil/empty map/slice equality
-	implicitTable := []Case{
-		{map[string][]int{}, map[string][]int(nil), true},
-		{[]int{}, []int(nil), true},
-		{map[string][]int{"foo": nil}, map[string][]int{"foo": {}}, true},
-		{Zap{A: nil, B: map[string][]int{"foo": nil}}, Zap{A: []int{}, B: map[string][]int{"foo": {}}}, true},
-	}
-
-	for _, item := range implicitTable {
-		if e, a := item.equal, e.DeepEqual(item.a, item.b); e != a {
-			t.Errorf("Expected (%+v == %+v) == %v, but got %v", item.a, item.b, e, a)
-		}
-	}
-
-	for _, item := range implicitTable {
-		if e, a := !item.equal, e.DeepEqualWithNilDifferentFromEmpty(item.a, item.b); e != a {
-			t.Errorf("Expected (%+v == %+v) == %v, but got %v", item.a, item.b, e, a)
+		if e, a := item.deepEqualWithNilDifferentFromEmpty, e.DeepEqualWithNilDifferentFromEmpty(item.a, item.b); e != a {
+			t.Errorf("DeepEqualWithNilDifferentFromEmpty: Expected (%+v == %+v) == %v, but got %v", item.a, item.b, e, a)
 		}
 	}
 }
