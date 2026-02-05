@@ -18,6 +18,7 @@ package dynamicresources
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -201,10 +202,29 @@ func (c *claimTracker) List() ([]*resourceapi.ResourceClaim, error) {
 	return result, nil
 }
 
+// errClaimTrackerConcurrentModification gets returned if ListAllAllocatedDevices
+// or GatherAllocatedState need to be retried.
+//
+// There is a rare race when a claim is initially in-flight:
+// - allocated is created from cache (claim not there)
+// - someone removes from the in-flight claims and adds to the cache
+// - we start checking in-flight claims (claim not there anymore)
+// => claim ignored
+//
+// A proper fix would be to rewrite the assume cache, allocatedDevices,
+// and the in-flight map so that they are under a single lock. But that's
+// a pretty big change and prevents reusing the assume cache. So instead
+// we check for changes in the set of allocated devices and keep trying
+// until we get an attempt with no concurrent changes.
+//
+// A claim being first in the cache, then only in-flight cannot happen,
+// so we don't need to re-check the in-flight claims.
+var errClaimTrackerConcurrentModification = errors.New("conflicting concurrent modification")
+
 func (c *claimTracker) ListAllAllocatedDevices() (sets.Set[structured.DeviceID], error) {
 	// Start with a fresh set that matches the current known state of the
 	// world according to the informers.
-	allocated := c.allocatedDevices.Get()
+	allocated, revision := c.allocatedDevices.Get()
 
 	// Whatever is in flight also has to be checked.
 	c.inFlightAllocations.Range(func(key, value any) bool {
@@ -215,8 +235,13 @@ func (c *claimTracker) ListAllAllocatedDevices() (sets.Set[structured.DeviceID],
 		})
 		return true
 	})
-	// There's no reason to return an error in this implementation, but the error might be helpful for other implementations.
-	return allocated, nil
+
+	if revision == c.allocatedDevices.Revision() {
+		// Our current result is valid, nothing changed in the meantime.
+		return allocated, nil
+	}
+
+	return nil, errClaimTrackerConcurrentModification
 }
 
 func (c *claimTracker) AssumeClaimAfterAPICall(claim *resourceapi.ResourceClaim) error {
