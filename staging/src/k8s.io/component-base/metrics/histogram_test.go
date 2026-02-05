@@ -29,6 +29,7 @@ import (
 	tracenoop "go.opentelemetry.io/otel/trace/noop"
 
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
+	internalmetrics "k8s.io/component-base/metrics/internal"
 )
 
 func TestHistogram(t *testing.T) {
@@ -768,4 +769,92 @@ func createContextWithSpan(traceID, spanID string) (context.Context, trace.Span)
 	ctx, span := tracer.Start(ctx, "test-span")
 
 	return ctx, span
+}
+
+func TestNativeHistogramMetricCollection(t *testing.T) {
+	originalEnabled := internalmetrics.NativeHistogramsEnabled()
+	defer func() {
+		internalmetrics.SetNativeHistogramsEnabled(originalEnabled)
+	}()
+
+	version := apimachineryversion.Info{
+		Major:      "1",
+		Minor:      "30",
+		GitVersion: "v1.30.0",
+	}
+
+	tests := []struct {
+		name                   string
+		enableNativeHistograms bool
+		observeValues          []float64
+		expectNativeHistogram  bool
+	}{
+		{
+			name:                   "native histograms disabled - no native histogram data",
+			enableNativeHistograms: false,
+			observeValues:          []float64{0.1, 0.5, 1.0, 2.5},
+			expectNativeHistogram:  false,
+		},
+		{
+			name:                   "native histograms enabled - should have native histogram data",
+			enableNativeHistograms: true,
+			observeValues:          []float64{0.1, 0.5, 1.0, 2.5},
+			expectNativeHistogram:  true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			internalmetrics.SetNativeHistogramsEnabled(tc.enableNativeHistograms)
+
+			registry := newKubeRegistry(version)
+			hist := NewHistogram(&HistogramOpts{
+				Name:           "test_native_histogram",
+				Help:           "Test histogram for native histogram support",
+				Buckets:        []float64{0.1, 0.5, 1, 2, 5, 10},
+				StabilityLevel: ALPHA,
+			})
+			registry.MustRegister(hist)
+
+			// Observe some values
+			for _, v := range tc.observeValues {
+				hist.Observe(v)
+			}
+
+			// Gather metrics
+			metricFamilies, err := registry.Gather()
+			require.NoError(t, err, "Failed to gather metrics")
+			require.Len(t, metricFamilies, 1, "Expected exactly one metric family")
+
+			mf := metricFamilies[0]
+			require.Len(t, mf.GetMetric(), 1, "Expected exactly one metric")
+
+			histogram := mf.GetMetric()[0].GetHistogram()
+			require.NotNil(t, histogram, "Expected histogram metric")
+
+			// Verify classic buckets are always present
+			assert.NotEmpty(t, histogram.GetBucket(), "Classic buckets should always be present")
+
+			// Verify sample count matches observed values
+			assert.Equal(t, uint64(len(tc.observeValues)), histogram.GetSampleCount(),
+				"Sample count should match number of observed values")
+
+			// Check for native histogram data
+			// Native histograms have Schema set (it's nil when not using native histograms)
+			if tc.expectNativeHistogram {
+				assert.NotNil(t, histogram.Schema,
+					"Schema should not be nil when native histograms are enabled")
+				assert.NotEqual(t, int32(0), histogram.GetSchema(),
+					"Native histogram Schema should be non-zero when enabled")
+				// Since we observed positive values, PositiveSpan should have data
+				assert.NotEmpty(t, histogram.GetPositiveSpan(),
+					"PositiveSpan should have data when native histograms are enabled and positive values are observed")
+			} else {
+				// When disabled, native histogram fields should be empty/nil
+				assert.Nil(t, histogram.Schema, "Schema should be nil when native histograms are disabled")
+				assert.Empty(t, histogram.GetPositiveSpan(), "PositiveSpan should be empty when native histograms are disabled")
+				assert.Empty(t, histogram.GetNegativeSpan(), "NegativeSpan should be empty when native histograms are disabled")
+			}
+		})
+	}
 }
