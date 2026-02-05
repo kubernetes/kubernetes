@@ -100,12 +100,18 @@ func (rtv requirednessTagValidator) doRequired(context Context) (Validations, er
 	case types.Pointer:
 		return Validations{Functions: []FunctionGen{Function(requiredTagName, ShortCircuit, requiredPointerValidator)}}, nil
 	case types.Struct:
-		// The +k8s:required tag on a non-pointer struct is not supported.
-		// If you encounter this error and believe you have a valid use case
-		// for forbiddening a non-pointer struct, please let us know! We need
-		// to understand your scenario to determine if we need to adjust
-		// this behavior or provide alternative validation mechanisms.
-		return Validations{}, fmt.Errorf("non-pointer structs cannot use the %q tag", requiredTagName)
+		// We cannot reliably enforce required presence semantics for non-pointer structs.
+		//
+		// Practically, a non-pointer struct becomes "implicitly required" if it has
+		// any validations which fail on the zero-value (e.g. required members, or
+		// union/oneOf semantics requiring at least one member to be set). If it has
+		// only optional members and no such semantic constraints, it is effectively
+		// optional at runtime.
+		//
+		// Still, OpenAPI +required / +optional are allowed on non-pointer structs,
+		// and we want to allow colocated declarative validation tags so linters can
+		// enforce tag pairing. Treat this tag as documentation-only.
+		return Validations{Comments: []string{"+k8s:required on non-pointer structs is accepted for schema/linting, but does not emit presence validation; requiredness may be implied by nested validations"}}, nil
 	}
 	return Validations{Functions: []FunctionGen{Function(requiredTagName, ShortCircuit, requiredValueValidator)}}, nil
 }
@@ -171,12 +177,15 @@ func (rtv requirednessTagValidator) doOptional(context Context) (Validations, er
 	case types.Pointer:
 		return Validations{Functions: []FunctionGen{Function(optionalTagName, ShortCircuit|NonError, optionalPointerValidator)}}, nil
 	case types.Struct:
-		// The +k8s:optional tag on a non-pointer struct is not supported.
-		// If you encounter this error and believe you have a valid use case
-		// for forbiddening a non-pointer struct, please let us know! We need
-		// to understand your scenario to determine if we need to adjust
-		// this behavior or provide alternative validation mechanisms.
-		return Validations{}, fmt.Errorf("non-pointer structs cannot use the %q tag", optionalTagName)
+		// We cannot reliably enforce optional presence semantics for non-pointer structs.
+		// See doRequired() for details.
+		//
+		// The Optional* validators are used primarily to short-circuit further
+		// field/type validations when a value was not specified
+		//
+		// Accept the tag to enable OpenAPI/declarative tag pairing (linting), but do
+		// not emit runtime validations.
+		return Validations{Comments: []string{"+k8s:optional on non-pointer structs is accepted for schema/linting, but does not emit presence validation; requiredness/optionality is determined by nested validations"}}, nil
 	}
 	return Validations{Functions: []FunctionGen{Function(optionalTagName, ShortCircuit|NonError, optionalValueValidator)}}, nil
 }
@@ -311,9 +320,11 @@ func (rtv requirednessTagValidator) Docs() TagDoc {
 	case requirednessRequired:
 		doc.StabilityLevel = Stable
 		doc.Description = "Indicates that a field must be specified by clients."
+		doc.Docs = "Note: for non-pointer struct fields, validation-gen cannot detect presence vs omission; this tag is accepted for schema/linting but may not emit runtime presence validation."
 	case requirednessOptional:
 		doc.StabilityLevel = Stable
 		doc.Description = "Indicates that a field is optional to clients."
+		doc.Docs = "Note: for non-pointer struct fields, validation-gen cannot detect presence vs omission; this tag is accepted for schema/linting but may not emit runtime presence validation."
 	case requirednessForbidden:
 		doc.StabilityLevel = Alpha
 		doc.Description = "Indicates that a field may not be specified."
