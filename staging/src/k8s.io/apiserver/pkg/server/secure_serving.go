@@ -172,6 +172,12 @@ func (s *SecureServingInfo) Serve(handler http.Handler, shutdownTimeout time.Dur
 		ReadHeaderTimeout: 32 * time.Second, // just shy of requestTimeoutUpperBound
 	}
 
+	if s.ServerTimeoutConfig != nil {
+		secureServer.WriteTimeout = s.ServerTimeoutConfig.WriteTimeout
+		secureServer.ReadTimeout = s.ServerTimeoutConfig.ReadTimeout
+		secureServer.ReadHeaderTimeout = s.ServerTimeoutConfig.ReadHeaderTimeout
+	}
+
 	if !s.DisableHTTP2 {
 		// At least 99% of serialized resources in surveyed clusters were smaller than 256kb.
 		// This should be big enough to accommodate most API POST requests in a single frame,

@@ -764,6 +764,58 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 				conf.ImageMinimumGCAge = metav1.Duration{Duration: 1 * time.Nanosecond}
 				return conf
 			},
+		}, {
+			name: "KubeletServerCAAndCertReload enabled while TLSCertFile is not set",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.FeatureGates["KubeletServerCAAndCertReload"] = true
+				conf.TLSPrivateKeyFile = "something"
+				conf.TLSCertFile = ""
+				conf.Authentication.X509.ClientCAFile = "something"
+				return conf
+			},
+			errMsg: "invalid configuration: TLSCertFile, TLSPrivateKeyFile and Authentication.X509.ClientCAFile need to be set if KubeletServerCAAndCertReload is enabled",
+		}, {
+			name: "KubeletServerCAAndCertReload enabled while TLSPrivateKeyFile is not set",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.FeatureGates["KubeletServerCAAndCertReload"] = true
+				conf.TLSPrivateKeyFile = ""
+				conf.TLSCertFile = "something"
+				conf.Authentication.X509.ClientCAFile = "something"
+				return conf
+			},
+			errMsg: "invalid configuration: TLSCertFile, TLSPrivateKeyFile and Authentication.X509.ClientCAFile need to be set if KubeletServerCAAndCertReload is enabled",
+		}, {
+			name: "KubeletServerCAAndCertReload enabled while ClientCAFile is not set",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.FeatureGates["KubeletServerCAAndCertReload"] = true
+				conf.TLSPrivateKeyFile = "something"
+				conf.TLSCertFile = "something"
+				conf.Authentication.X509.ClientCAFile = ""
+				return conf
+			},
+			errMsg: "invalid configuration: TLSCertFile, TLSPrivateKeyFile and Authentication.X509.ClientCAFile need to be set if KubeletServerCAAndCertReload is enabled",
+		}, {
+			name: "KubeletServerCAAndCertReload and RotateKubeletServerCertificate enabled",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.FeatureGates["KubeletServerCAAndCertReload"] = true
+				conf.FeatureGates["RotateKubeletServerCertificate"] = true
+				conf.TLSPrivateKeyFile = "something"
+				conf.TLSCertFile = "something"
+				conf.Authentication.X509.ClientCAFile = "something"
+				return conf
+			},
+			errMsg: "invalid configuration: KubeletServerCAAndCertReload and RotateKubeletServerCertificate are mutually exclusive features and should not be enabled together",
+		}, {
+			name: "KubeletServerCAAndCertReload and ReloadKubeletServerCertificateFile enabled",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.FeatureGates["KubeletServerCAAndCertReload"] = true
+				conf.FeatureGates["ReloadKubeletServerCertificateFile"] = true
+				conf.TLSPrivateKeyFile = "something"
+				conf.TLSCertFile = "something"
+				conf.Authentication.X509.ClientCAFile = "something"
+				return conf
+			},
+			errMsg: "invalid configuration: KubeletServerCAAndCertReload and ReloadKubeletServerCertificateFile are mutually exclusive features and should not be enabled together",
 		},
 	}
 

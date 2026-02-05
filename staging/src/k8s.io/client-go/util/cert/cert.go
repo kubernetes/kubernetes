@@ -267,6 +267,58 @@ func GenerateSelfSignedCertKeyWithOptions(opts SelfSignedCertKeyOptions) ([]byte
 	return certBuffer.Bytes(), keyBuffer.Bytes(), nil
 }
 
+func GenerateCAAndCertKeyWithOptions(host string, alternateIPs []net.IP, alternateDNS []string) (ca, certificate, certKey []byte, err error) {
+	cert, key, err := GenerateSelfSignedCertKeyWithOptions(SelfSignedCertKeyOptions{
+		Host:         host,
+		AlternateIPs: alternateIPs,
+		AlternateDNS: alternateDNS,
+	})
+
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	var leafCert *x509.Certificate
+	var caCert *x509.Certificate
+
+	for {
+		block, rest := pem.Decode(cert)
+
+		if block == nil {
+			break // No more PEM blocks found
+		}
+		if block.Type != "CERTIFICATE" {
+			cert = rest
+			continue
+		}
+
+		c, err := x509.ParseCertificate(block.Bytes)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+
+		if c.IsCA {
+			caCert = c
+		} else {
+			leafCert = c
+		}
+
+		cert = rest
+	}
+
+	certBuffer := bytes.Buffer{}
+	if err := pem.Encode(&certBuffer, &pem.Block{Type: CertificateBlockType, Bytes: leafCert.Raw}); err != nil {
+		return nil, nil, nil, err
+	}
+
+	caBuffer := bytes.Buffer{}
+	if err := pem.Encode(&caBuffer, &pem.Block{Type: CertificateBlockType, Bytes: caCert.Raw}); err != nil {
+		return nil, nil, nil, err
+	}
+
+	return caBuffer.Bytes(), certBuffer.Bytes(), key, err
+}
+
 func ipsToStrings(ips []net.IP) []string {
 	ss := make([]string, 0, len(ips))
 	for _, ip := range ips {

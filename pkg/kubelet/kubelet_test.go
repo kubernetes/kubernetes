@@ -3307,6 +3307,8 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 		Config: &tls.Config{
 			MinVersion: 0,
 		},
+		CertFile: "placeholder",
+		KeyFile:  "placeholder",
 	}
 	fakeRuntime, endpoint := createAndStartFakeRemoteRuntime(t)
 	defer func() {
@@ -3334,6 +3336,9 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 		TLSOptions:           tlsOptions,
 	}
 	crOptions := &kubeletconfig.ContainerRuntimeOptions{}
+
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ReloadKubeletServerCertificateFile, false)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RotateKubeletServerCertificate, false)
 
 	testMainKubelet, err := NewMainKubelet(
 		tCtx,
@@ -3394,6 +3399,9 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 	// testMainKubelet.secretManager.RegisterPod(pod)
 	assert.Nil(t, testMainKubelet.configMapManager, "configmap manager should be nil if kubelet is in standalone mode")
 	assert.Nil(t, testMainKubelet.secretManager, "secret manager should be nil if kubelet is in standalone mode")
+	assert.Nil(t, testMainKubelet.serverCertificateManager, "serverCertificateManager should be nil")
+	assert.NotEmpty(t, kubeDep.TLSOptions.CertFile, "CertFile should not be cleared")
+	assert.NotEmpty(t, kubeDep.TLSOptions.KeyFile, "KeyFile should not be cleared")
 }
 
 func TestSyncPodSpans(t *testing.T) {

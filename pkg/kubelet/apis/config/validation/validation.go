@@ -153,6 +153,15 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 	if kc.ServerTLSBootstrap && !localFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: serverTLSBootstrap %v requires feature gate RotateKubeletServerCertificate", kc.ServerTLSBootstrap))
 	}
+	if localFeatureGate.Enabled(features.KubeletServerCAAndCertReload) && (kc.TLSCertFile == "" || kc.TLSPrivateKeyFile == "" || kc.Authentication.X509.ClientCAFile == "") {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: TLSCertFile, TLSPrivateKeyFile and Authentication.X509.ClientCAFile need to be set if KubeletServerCAAndCertReload is enabled"))
+	}
+	if localFeatureGate.Enabled(features.KubeletServerCAAndCertReload) && localFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: KubeletServerCAAndCertReload and RotateKubeletServerCertificate are mutually exclusive features and should not be enabled together"))
+	}
+	if localFeatureGate.Enabled(features.KubeletServerCAAndCertReload) && localFeatureGate.Enabled(features.ReloadKubeletServerCertificateFile) {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: KubeletServerCAAndCertReload and ReloadKubeletServerCertificateFile are mutually exclusive features and should not be enabled together"))
+	}
 	if kc.RunOnce {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: runOnce (--runOnce) %v, Runonce mode has been deprecated and should not be set", kc.RunOnce))
 	}

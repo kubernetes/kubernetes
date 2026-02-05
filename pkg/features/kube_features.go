@@ -527,6 +527,11 @@ const (
 	// separate filesystems.
 	KubeletSeparateDiskGC featuregate.Feature = "KubeletSeparateDiskGC"
 
+	// owner: @harshaln
+	//
+	// Enables running kubelet in a configuration that monitors and loads ClientCA and ServingCerts from file paths
+	KubeletServerCAAndCertReload = "KubeletServerCAAndCertReload"
+
 	// owner: @aramase
 	// kep: http://kep.k8s.io/4412
 	//
@@ -1441,6 +1446,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	KubeletServerCAAndCertReload: {
+		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha}, // remove in 1.38
+	},
+
 	KubeletServiceAccountTokenForCredentialProviders: {
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
@@ -2251,6 +2260,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	KubeletRegistrationGetOnExistsOnly: {},
 
 	KubeletSeparateDiskGC: {},
+
+	KubeletServerCAAndCertReload: {},
 
 	KubeletServiceAccountTokenForCredentialProviders: {},
 

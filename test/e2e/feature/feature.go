@@ -249,6 +249,10 @@ var (
 	// The tests need separate disk settings on nodes and separate filesystems in storage.conf
 	KubeletSeparateDiskGC = framework.WithFeature(framework.ValidFeatures.Add("KubeletSeparateDiskGC"))
 
+	// Owner: sig-auth
+	// Enables dynamic reloading of client CA and server certs in kubelet's TLS config.
+	KubeletServerCAAndCertReload = framework.WithFeature(framework.ValidFeatures.Add("KubeletServerCAAndCertReload"))
+
 	// Owner: sig-storage
 	LSCIQuotaMonitoring = framework.WithFeature(framework.ValidFeatures.Add("LSCIQuotaMonitoring"))
 

@@ -371,6 +371,21 @@ type SecureServingInfo struct {
 
 	// DisableHTTP2 indicates that http2 should not be enabled.
 	DisableHTTP2 bool
+
+	// ServerTimeoutConfig allows constimization to httpServer timeout config.
+	ServerTimeoutConfig *TimeoutConfig
+}
+
+// TimeoutConfig is applied to httpServer instance
+type TimeoutConfig struct {
+	// corresponds to http.Server.ReadTimeout; Default is 0
+	ReadTimeout time.Duration
+
+	// corresponds to http.Server.WriteTimeout; Default is 0
+	WriteTimeout time.Duration
+
+	// corresponds to http.Server.ReadHeaderTimeout; Default is 0
+	ReadHeaderTimeout time.Duration
 }
 
 type AuthenticationInfo struct {

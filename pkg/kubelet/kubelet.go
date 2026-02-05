@@ -298,6 +298,7 @@ type Bootstrap interface {
 	BirthCry()
 	StartGarbageCollection(ctx context.Context)
 	ListenAndServe(ctx context.Context, kubeCfg *kubeletconfiginternal.KubeletConfiguration, tlsOptions *server.TLSOptions, auth server.AuthInterface, tp trace.TracerProvider)
+	SecureServe(ctx context.Context, kubeCfg *kubeletconfiginternal.KubeletConfiguration, tlsOptions *server.TLSOptions, auth server.AuthInterface, tp trace.TracerProvider)
 	ListenAndServeReadOnly(ctx context.Context, address net.IP, port uint, tp trace.TracerProvider)
 	ListenAndServePodResources(ctx context.Context)
 	Run(ctx context.Context, updates <-chan kubetypes.PodUpdate)
@@ -3175,6 +3176,11 @@ func (kl *Kubelet) BirthCry() {
 func (kl *Kubelet) ListenAndServe(ctx context.Context, kubeCfg *kubeletconfiginternal.KubeletConfiguration, tlsOptions *server.TLSOptions,
 	auth server.AuthInterface, tp trace.TracerProvider) {
 	server.ListenAndServeKubeletServer(ctx, kl, kl.resourceAnalyzer, kl.containerManager.GetHealthCheckers(), kl.flagz, kubeCfg, tlsOptions, auth, tp)
+}
+
+func (kl *Kubelet) SecureServe(ctx context.Context, kubeCfg *kubeletconfiginternal.KubeletConfiguration, tlsOptions *server.TLSOptions,
+	auth server.AuthInterface, tp trace.TracerProvider) {
+	server.SecureServeKubeletServer(ctx, kl, kl.resourceAnalyzer, kl.containerManager.GetHealthCheckers(), kl.flagz, kubeCfg, tlsOptions, auth, tp)
 }
 
 // ListenAndServeReadOnly runs the kubelet HTTP server in read-only mode.
