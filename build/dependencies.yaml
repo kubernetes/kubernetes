@@ -83,48 +83,48 @@ dependencies:
 
   # agnhost - E2E test image
   - name: "agnhost"
-    version: 2.61
+    version: 2.63.0
     refPaths:
     - path: test/utils/image/manifest.go
-      match: configs\[Agnhost\] = Config{list\.PromoterE2eRegistry, "agnhost", "\d+\.\d+"}
+      match: configs\[Agnhost\] = Config{list\.PromoterE2eRegistry, "agnhost", "\d+\.\d+\.\d+"}
     - path: test/images/kitten/BASEIMAGE
-      match: agnhost:\d+\.\d+-
+      match: agnhost:\d+\.\d+\.\d+-
     - path: test/images/nautilus/BASEIMAGE
-      match: agnhost:\d+\.\d+-
+      match: agnhost:\d+\.\d+\.\d+-
     - path: test/e2e/testing-manifests/kubectl/agnhost-primary-pod.yaml
-      match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+
+      match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+\.\d+
     - path: test/e2e/testing-manifests/serviceloadbalancer/netexecrc.yaml
-      match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+
+      match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+\.\d+
     - path: test/e2e/testing-manifests/ingress/multiple-certs/rc.yaml
-      match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+
+      match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+\.\d+
     - path: test/e2e/testing-manifests/ingress/http/rc.yaml
-      match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+
+      match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+\.\d+
     - path: test/e2e/testing-manifests/ingress/http2/rc.yaml
-      match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+
+      match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+\.\d+
     - path: test/e2e/testing-manifests/ingress/pre-shared-cert/rc.yaml
-      match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+
+      match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+\.\d+
     - path: test/e2e/testing-manifests/ingress/gce/static-ip-2/rc.yaml
-      match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+
+      match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+\.\d+
     - path: test/e2e/testing-manifests/ingress/neg/rc.yaml
-      match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+
+      match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+\.\d+
     - path: test/e2e/testing-manifests/ingress/static-ip/rc.yaml
-      match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+
+      match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+\.\d+
     - path: test/e2e/testing-manifests/ingress/neg-exposed/rc.yaml
-      match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+
+      match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+\.\d+
     - path: test/e2e/testing-manifests/ingress/neg-clusterip/rc.yaml
-      match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+
+      match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+\.\d+
     - path: test/e2e/dra/test-driver/deploy/example/pod-inline.yaml
-      match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+
+      match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+\.\d+
     - path: test/e2e/dra/test-driver/deploy/example/pod-external.yaml
-      match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+
+      match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+\.\d+
     - path: test/e2e/dra/test-driver/deploy/example/pod-external-toleration.yaml
-      match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+
+      match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+\.\d+
     - path: test/fixtures/pkg/kubectl/cmd/auth/rbac-resource-plus.yaml
-      match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+
+      match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+\.\d+
     - path: test/fixtures/doc-yaml/user-guide/multi-pod.yaml
-      match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+
+      match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+\.\d+
     - path: hack/testdata/pod-with-large-name.yaml
-      match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+
+      match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+\.\d+
 
   - name: "node-problem-detector"
     version: 1.34.0
