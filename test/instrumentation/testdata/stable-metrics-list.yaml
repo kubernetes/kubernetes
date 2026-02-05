@@ -214,18 +214,20 @@
   stabilityLevel: BETA
 - name: pod_failures_handled_by_failure_policy_total
   subsystem: job_controller
-  help: '`The number of failed Pods handled by failure policy with respect to the
-    failure policy action applied based on the matched rule. Possible values of the
-    action label correspond to the possible values for the failure policy rule action,
-    which are: "FailJob", "Ignore" and "Count".`'
+  help: "`The number of failed Pods handled by failure policy with\n\t\t\trespect
+    to the failure policy action applied based on the matched\n\t\t\trule. Possible
+    values of the action label correspond to the\n\t\t\tpossible values for the failure
+    policy rule action, which are:\n\t\t\t\"FailJob\", \"Ignore\" and \"Count\".`"
   type: Counter
   stabilityLevel: BETA
   labels:
   - action
 - name: terminated_pods_tracking_finalizer_total
   subsystem: job_controller
-  help: '`The number of terminated pods (phase=Failed|Succeeded) that have the finalizer
-    batch.kubernetes.io/job-tracking. The event label can be "add" or "delete".`'
+  help: |-
+    `The number of terminated pods (phase=Failed|Succeeded)
+    that have the finalizer batch.kubernetes.io/job-tracking
+    The event label can be "add" or "delete".`
   type: Counter
   stabilityLevel: BETA
   labels:
