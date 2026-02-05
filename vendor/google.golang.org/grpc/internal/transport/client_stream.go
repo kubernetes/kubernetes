@@ -47,7 +47,7 @@ type ClientStream struct {
 	// reading its value).
 	headerValid      bool
 	noHeaders        bool        // set if the client never received headers (set only after the stream is done).
-	headerChanClosed uint32      // set when headerChan is closed. Used to avoid closing headerChan multiple times.
+	headerChanClosed atomic.Uint32      // set when headerChan is closed. Used to avoid closing headerChan multiple times.
 	bytesReceived    atomic.Bool // indicates whether any bytes have been received on this stream
 	unprocessed      atomic.Bool // set if the server sends a refused stream or GOAWAY including this stream
 }

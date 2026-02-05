@@ -68,11 +68,11 @@ var (
 
 // serverConnectionCounter counts the number of connections a server has seen
 // (equal to the number of http2Servers created). Must be accessed atomically.
-var serverConnectionCounter uint64
+var serverConnectionCounter atomic.Uint64
 
 // http2Server implements the ServerTransport interface with HTTP2.
 type http2Server struct {
-	lastRead        int64 // Keep this field 64-bit aligned. Accessed atomically.
+	lastRead        atomic.Int64 // Keep this field 64-bit aligned. Accessed atomically.
 	done            chan struct{}
 	conn            net.Conn
 	loopy           *loopyWriter
@@ -99,7 +99,7 @@ type http2Server struct {
 	// Flag to signify that number of ping strikes should be reset to 0.
 	// This is set whenever data or header frames are sent.
 	// 1 means yes.
-	resetPingStrikes      uint32 // Accessed atomically.
+	resetPingStrikes      atomic.Uint32 // Accessed atomically.
 	initialWindowSize     int32
 	bdpEst                *bdpEstimator
 	maxSendHeaderListSize *uint32
@@ -269,7 +269,7 @@ func NewServerTransport(conn net.Conn, config *ServerConfig) (_ ServerTransport,
 		bufferPool:        config.BufferPool,
 	}
 	t.setResetPingStrikes = func() {
-		atomic.StoreUint32(&t.resetPingStrikes, 1)
+		t.resetPingStrikes.Store(1)
 	}
 	var czSecurity credentials.ChannelzSecurityValue
 	if au, ok := authInfo.(credentials.ChannelzSecurityInfo); ok {
@@ -297,7 +297,7 @@ func NewServerTransport(conn net.Conn, config *ServerConfig) (_ ServerTransport,
 		}
 	}
 
-	t.connectionID = atomic.AddUint64(&serverConnectionCounter, 1)
+	t.connectionID = serverConnectionCounter.Add(1)
 	t.framer.writer.Flush()
 
 	defer func() {
@@ -330,7 +330,7 @@ func NewServerTransport(conn net.Conn, config *ServerConfig) (_ ServerTransport,
 	if err != nil {
 		return nil, connectionErrorf(false, err, "transport: http2Server.HandleStreams failed to read initial settings frame: %v", err)
 	}
-	atomic.StoreInt64(&t.lastRead, time.Now().UnixNano())
+	t.lastRead.Store(time.Now().UnixNano())
 	sf, ok := frame.(*http2.SettingsFrame)
 	if !ok {
 		return nil, connectionErrorf(false, nil, "transport: http2Server.HandleStreams saw invalid preface type %T from client", frame)
@@ -671,7 +671,7 @@ func (t *http2Server) HandleStreams(ctx context.Context, handle func(*ServerStre
 	for {
 		t.controlBuf.throttle()
 		frame, err := t.framer.readFrame()
-		atomic.StoreInt64(&t.lastRead, time.Now().UnixNano())
+		t.lastRead.Store(time.Now().UnixNano())
 		if err != nil {
 			if se, ok := err.(http2.StreamError); ok {
 				if t.logger.V(logLevel) {
@@ -923,7 +923,7 @@ func (t *http2Server) handlePing(f *http2.PingFrame) {
 	// A reset ping strikes means that we don't need to check for policy
 	// violation for this ping and the pingStrikes counter should be set
 	// to 0.
-	if atomic.CompareAndSwapUint32(&t.resetPingStrikes, 1, 0) {
+	if t.resetPingStrikes.CompareAndSwap(1, 0) {
 		t.pingStrikes = 0
 		return
 	}
@@ -1228,7 +1228,7 @@ func (t *http2Server) keepalive() {
 			}
 			return
 		case <-kpTimer.C:
-			lastRead := atomic.LoadInt64(&t.lastRead)
+			lastRead := t.lastRead.Load()
 			if lastRead > prevNano {
 				// There has been read activity since the last time we were
 				// here. Setup the timer to fire at kp.Time seconds from

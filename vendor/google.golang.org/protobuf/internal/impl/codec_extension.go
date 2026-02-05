@@ -62,7 +62,7 @@ func makeExtensionFieldInfo(xd protoreflect.ExtensionDescriptor) *extensionField
 }
 
 type lazyExtensionValue struct {
-	atomicOnce uint32 // atomically set if value is valid
+	atomicOnce atomic.Uint32 // atomically set if value is valid
 	mu         sync.Mutex
 	xi         *extensionFieldInfo
 	value      protoreflect.Value
@@ -92,7 +92,7 @@ func (f *ExtensionField) canLazy(xt protoreflect.ExtensionType) bool {
 	if f.typ == nil {
 		return true
 	}
-	if f.typ == xt && f.lazy != nil && atomic.LoadUint32(&f.lazy.atomicOnce) == 0 {
+	if f.typ == xt && f.lazy != nil && f.lazy.atomicOnce.Load() == 0 {
 		return true
 	}
 	return false
@@ -102,7 +102,7 @@ func (f *ExtensionField) canLazy(xt protoreflect.ExtensionType) bool {
 // yet expanded, which means it's present and already checked for
 // initialized required fields.
 func (f *ExtensionField) isUnexpandedLazy() bool {
-	return f.lazy != nil && atomic.LoadUint32(&f.lazy.atomicOnce) == 0
+	return f.lazy != nil && f.lazy.atomicOnce.Load() == 0
 }
 
 // lazyBuffer retrieves the buffer for a lazy extension if it's not yet expanded.
@@ -123,7 +123,7 @@ func (f *ExtensionField) lazyBuffer() []byte {
 func (f *ExtensionField) lazyInit() {
 	f.lazy.mu.Lock()
 	defer f.lazy.mu.Unlock()
-	if atomic.LoadUint32(&f.lazy.atomicOnce) == 1 {
+	if f.lazy.atomicOnce.Load() == 1 {
 		return
 	}
 	if f.lazy.xi != nil {
@@ -161,7 +161,7 @@ func (f *ExtensionField) lazyInit() {
 	}
 	f.lazy.xi = nil
 	f.lazy.b = nil
-	atomic.StoreUint32(&f.lazy.atomicOnce, 1)
+	f.lazy.atomicOnce.Store(1)
 }
 
 // Set sets the type and value of the extension field.
@@ -176,7 +176,7 @@ func (f *ExtensionField) Set(t protoreflect.ExtensionType, v protoreflect.Value)
 // This may be called concurrently.
 func (f *ExtensionField) Value() protoreflect.Value {
 	if f.lazy != nil {
-		if atomic.LoadUint32(&f.lazy.atomicOnce) == 0 {
+		if f.lazy.atomicOnce.Load() == 0 {
 			f.lazyInit()
 		}
 		return f.lazy.value
@@ -224,5 +224,5 @@ func IsLazy(m protoreflect.Message, fd protoreflect.FieldDescriptor) bool {
 	if !ok {
 		return false
 	}
-	return f.typ == xt && f.lazy != nil && atomic.LoadUint32(&f.lazy.atomicOnce) == 0
+	return f.typ == xt && f.lazy != nil && f.lazy.atomicOnce.Load() == 0
 }

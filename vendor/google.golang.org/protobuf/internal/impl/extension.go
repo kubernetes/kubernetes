@@ -32,7 +32,7 @@ type ExtensionInfo struct {
 	//
 	// extensionInfoFullInit: The ExtensionInfo is fully initialized.
 	// This state is only entered after lazy initialization is complete.
-	init uint32
+	init atomic.Uint32
 	mu   sync.Mutex
 
 	goType reflect.Type
@@ -86,7 +86,7 @@ const (
 func InitExtensionInfo(xi *ExtensionInfo, xd protoreflect.ExtensionDescriptor, goType reflect.Type) {
 	xi.goType = goType
 	xi.desc = extensionTypeDescriptor{xd, xi}
-	xi.init = extensionInfoDescInit
+	xi.init.Store(extensionInfoDescInit)
 }
 
 func (xi *ExtensionInfo) New() protoreflect.Value {
@@ -108,14 +108,14 @@ func (xi *ExtensionInfo) IsValidInterface(v any) bool {
 	return xi.lazyInit().IsValidGo(reflect.ValueOf(v))
 }
 func (xi *ExtensionInfo) TypeDescriptor() protoreflect.ExtensionTypeDescriptor {
-	if atomic.LoadUint32(&xi.init) < extensionInfoDescInit {
+	if xi.init.Load() < extensionInfoDescInit {
 		xi.lazyInitSlow()
 	}
 	return &xi.desc
 }
 
 func (xi *ExtensionInfo) lazyInit() Converter {
-	if atomic.LoadUint32(&xi.init) < extensionInfoFullInit {
+	if xi.init.Load() < extensionInfoFullInit {
 		xi.lazyInitSlow()
 	}
 	return xi.conv
@@ -125,10 +125,10 @@ func (xi *ExtensionInfo) lazyInitSlow() {
 	xi.mu.Lock()
 	defer xi.mu.Unlock()
 
-	if xi.init == extensionInfoFullInit {
+	if xi.init.Load() == extensionInfoFullInit {
 		return
 	}
-	defer atomic.StoreUint32(&xi.init, extensionInfoFullInit)
+	defer xi.init.Store(extensionInfoFullInit)
 
 	if xi.desc.ExtensionDescriptor == nil {
 		xi.initFromLegacy()

@@ -730,8 +730,8 @@ type trace struct {
 	traceID   uint64        // Trace information if non-zero.
 	spanID    uint64
 
-	refs int32     // how many buckets this is in
-	disc discarded // scratch space to avoid allocation
+	refs atomic.Int32 // how many buckets this is in
+	disc discarded    // scratch space to avoid allocation
 
 	finishStack []byte // where finish was called, if DebugUseAfterFinish is set
 
@@ -754,7 +754,7 @@ func (tr *trace) reset() {
 	tr.recycler = nil
 	tr.mu.Unlock()
 
-	tr.refs = 0
+	tr.refs.Store(0)
 	tr.disc = 0
 	tr.finishStack = nil
 	for i := range tr.eventsBuf {
@@ -862,11 +862,11 @@ func (tr *trace) SetMaxEvents(m int) {
 }
 
 func (tr *trace) ref() {
-	atomic.AddInt32(&tr.refs, 1)
+	tr.refs.Add(1)
 }
 
 func (tr *trace) unref() {
-	if atomic.AddInt32(&tr.refs, -1) == 0 {
+	if tr.refs.Add(-1) == 0 {
 		tr.mu.RLock()
 		if tr.recycler != nil {
 			// freeTrace clears tr, so we hold tr.recycler and tr.events here.

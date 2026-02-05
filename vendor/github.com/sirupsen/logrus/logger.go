@@ -37,7 +37,7 @@ type Logger struct {
 	// The logging level the logger should log at. This is typically (and defaults
 	// to) `logrus.Info`, which allows Info(), Warn(), Error() and Fatal() to be
 	// logged.
-	Level Level
+	Level atomic.Uint32
 	// Used to sync writing to the log. Locking is enabled by Default
 	mu MutexWrap
 	// Reusable empty entry
@@ -85,14 +85,15 @@ func (mw *MutexWrap) Disable() {
 //
 // It's recommended to make this a global instance called `log`.
 func New() *Logger {
-	return &Logger{
+	l := &Logger{
 		Out:          os.Stderr,
 		Formatter:    new(TextFormatter),
 		Hooks:        make(LevelHooks),
-		Level:        InfoLevel,
 		ExitFunc:     os.Exit,
 		ReportCaller: false,
 	}
+	l.Level.Store(uint32(InfoLevel))
+	return l
 }
 
 func (logger *Logger) newEntry() *Entry {
@@ -355,12 +356,12 @@ func (logger *Logger) SetNoLock() {
 }
 
 func (logger *Logger) level() Level {
-	return Level(atomic.LoadUint32((*uint32)(&logger.Level)))
+	return Level(logger.Level.Load())
 }
 
 // SetLevel sets the logger level.
 func (logger *Logger) SetLevel(level Level) {
-	atomic.StoreUint32((*uint32)(&logger.Level), uint32(level))
+	logger.Level.Store(uint32(level))
 }
 
 // GetLevel returns the logger level.

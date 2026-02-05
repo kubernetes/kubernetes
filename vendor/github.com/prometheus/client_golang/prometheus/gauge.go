@@ -91,7 +91,7 @@ type gauge struct {
 	// valBits contains the bits of the represented float64 value. It has
 	// to go first in the struct to guarantee alignment for atomic
 	// operations.  http://golang.org/pkg/sync/atomic/#pkg-note-BUG
-	valBits uint64
+	valBits atomic.Uint64
 
 	selfCollector
 
@@ -104,7 +104,7 @@ func (g *gauge) Desc() *Desc {
 }
 
 func (g *gauge) Set(val float64) {
-	atomic.StoreUint64(&g.valBits, math.Float64bits(val))
+	g.valBits.Store(math.Float64bits(val))
 }
 
 func (g *gauge) SetToCurrentTime() {
@@ -121,9 +121,9 @@ func (g *gauge) Dec() {
 
 func (g *gauge) Add(val float64) {
 	for {
-		oldBits := atomic.LoadUint64(&g.valBits)
+		oldBits := g.valBits.Load()
 		newBits := math.Float64bits(math.Float64frombits(oldBits) + val)
-		if atomic.CompareAndSwapUint64(&g.valBits, oldBits, newBits) {
+		if g.valBits.CompareAndSwap(oldBits, newBits) {
 			return
 		}
 	}
@@ -134,7 +134,7 @@ func (g *gauge) Sub(val float64) {
 }
 
 func (g *gauge) Write(out *dto.Metric) error {
-	val := math.Float64frombits(atomic.LoadUint64(&g.valBits))
+	val := math.Float64frombits(g.valBits.Load())
 	return populateMetric(GaugeValue, val, g.labelPairs, nil, out, nil)
 }
 

@@ -243,7 +243,7 @@ type UnsafeAuthWriter interface {
 
 type authStore struct {
 	// atomic operations; need 64-bit align, or 32-bit tests will crash
-	revision uint64
+	revision atomic.Uint64
 
 	lg        *zap.Logger
 	be        AuthBackend
@@ -964,7 +964,6 @@ func NewAuthStore(lg *zap.Logger, be AuthBackend, tp TokenProvider, bcryptCost i
 	tx.Lock()
 	enabled := tx.UnsafeReadAuthEnabled()
 	as := &authStore{
-		revision:       tx.UnsafeReadAuthRevision(),
 		lg:             lg,
 		be:             be,
 		enabled:        enabled,
@@ -972,6 +971,7 @@ func NewAuthStore(lg *zap.Logger, be AuthBackend, tp TokenProvider, bcryptCost i
 		tokenProvider:  tp,
 		bcryptCost:     bcryptCost,
 	}
+	as.revision.Store(tx.UnsafeReadAuthRevision())
 
 	if enabled {
 		as.tokenProvider.enable()
@@ -998,16 +998,16 @@ func hasRootRole(u *authpb.User) bool {
 }
 
 func (as *authStore) commitRevision(tx UnsafeAuthWriter) {
-	atomic.AddUint64(&as.revision, 1)
+	as.revision.Add(1)
 	tx.UnsafeSaveAuthRevision(as.Revision())
 }
 
 func (as *authStore) setRevision(rev uint64) {
-	atomic.StoreUint64(&as.revision, rev)
+	as.revision.Store(rev)
 }
 
 func (as *authStore) Revision() uint64 {
-	return atomic.LoadUint64(&as.revision)
+	return as.revision.Load()
 }
 
 func (as *authStore) AuthInfoFromTLS(ctx context.Context) (ai *AuthInfo) {

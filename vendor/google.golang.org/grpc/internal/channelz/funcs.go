@@ -36,23 +36,23 @@ var (
 	db = newChannelMap()
 	// EntriesPerPage defines the number of channelz entries to be shown on a web page.
 	EntriesPerPage = 50
-	curState       int32
+	curState       atomic.Int32
 )
 
 // TurnOn turns on channelz data collection.
 func TurnOn() {
-	atomic.StoreInt32(&curState, 1)
+	curState.Store(1)
 }
 
 func init() {
 	internal.ChannelzTurnOffForTesting = func() {
-		atomic.StoreInt32(&curState, 0)
+		curState.Store(0)
 	}
 }
 
 // IsOn returns whether channelz data collection is on.
 func IsOn() bool {
-	return atomic.LoadInt32(&curState) == 1
+	return curState.Load() == 1
 }
 
 // GetTopChannels returns a slice of top channel's ChannelMetric, along with a
@@ -208,17 +208,17 @@ func RemoveEntry(id int64) {
 
 // IDGenerator is an incrementing atomic that tracks IDs for channelz entities.
 type IDGenerator struct {
-	id int64
+	id atomic.Int64
 }
 
 // Reset resets the generated ID back to zero.  Should only be used at
 // initialization or by tests sensitive to the ID number.
 func (i *IDGenerator) Reset() {
-	atomic.StoreInt64(&i.id, 0)
+	i.id.Store(0)
 }
 
 func (i *IDGenerator) genID() int64 {
-	return atomic.AddInt64(&i.id, 1)
+	return i.id.Add(1)
 }
 
 // Identifier is an opaque channelz identifier used to expose channelz symbols

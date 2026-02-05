@@ -34,7 +34,7 @@ type watcherHub struct {
 	// count must be the first element to keep 64-bit alignment for atomic
 	// access
 
-	count int64 // current number of watchers.
+	count atomic.Int64 // current number of watchers.
 
 	mutex        sync.Mutex
 	watchers     map[string]*list.List
@@ -101,14 +101,14 @@ func (wh *watcherHub) watch(key string, recursive, stream bool, index, storeInde
 		}
 		w.removed = true
 		l.Remove(elem)
-		atomic.AddInt64(&wh.count, -1)
+		wh.count.Add(-1)
 		reportWatcherRemoved()
 		if l.Len() == 0 {
 			delete(wh.watchers, key)
 		}
 	}
 
-	atomic.AddInt64(&wh.count, 1)
+	wh.count.Add(1)
 	reportWatcherAdded()
 
 	return w, nil
@@ -158,7 +158,7 @@ func (wh *watcherHub) notifyWatchers(e *Event, nodePath string, deleted bool) {
 					// and decrease the counter
 					w.removed = true
 					l.Remove(curr)
-					atomic.AddInt64(&wh.count, -1)
+					wh.count.Add(-1)
 					reportWatcherRemoved()
 				}
 			}

@@ -37,7 +37,7 @@ const (
 // SupportedNlFamilies contains the list of netlink families this netlink package supports
 var SupportedNlFamilies = []int{unix.NETLINK_ROUTE, unix.NETLINK_XFRM, unix.NETLINK_NETFILTER}
 
-var nextSeqNr uint32
+var nextSeqNr atomic.Uint32
 
 // Default netlink socket timeout, 60s
 var SocketTimeoutTv = unix.Timeval{Sec: 60, Usec: 0}
@@ -547,7 +547,7 @@ func (req *NetlinkRequest) ExecuteIter(sockType int, resType uint16, f func(msg 
 	if req.Sockets != nil {
 		if sh, ok := req.Sockets[sockType]; ok {
 			s = sh.Socket
-			req.Seq = atomic.AddUint32(&sh.Seq, 1)
+			req.Seq = sh.Seq.Add(1)
 		}
 	}
 	sharedSocket := s != nil
@@ -681,7 +681,7 @@ func NewNetlinkRequest(proto, flags int) *NetlinkRequest {
 			Len:   uint32(unix.SizeofNlMsghdr),
 			Type:  uint16(proto),
 			Flags: unix.NLM_F_REQUEST | uint16(flags),
-			Seq:   atomic.AddUint32(&nextSeqNr, 1),
+			Seq:   nextSeqNr.Add(1),
 		},
 	}
 }
@@ -690,8 +690,8 @@ type NetlinkSocket struct {
 	fd             int32
 	file           *os.File
 	lsa            unix.SockaddrNetlink
-	sendTimeout    int64 // Access using atomic.Load/StoreInt64
-	receiveTimeout int64 // Access using atomic.Load/StoreInt64
+	sendTimeout    atomic.Int64 // Access using atomic.Load/StoreInt64
+	receiveTimeout atomic.Int64 // Access using atomic.Load/StoreInt64
 	sync.Mutex
 }
 
@@ -836,8 +836,8 @@ func (s *NetlinkSocket) GetFd() int {
 }
 
 func (s *NetlinkSocket) GetTimeouts() (send, receive time.Duration) {
-	return time.Duration(atomic.LoadInt64(&s.sendTimeout)),
-		time.Duration(atomic.LoadInt64(&s.receiveTimeout))
+	return time.Duration(s.sendTimeout.Load()),
+		time.Duration(s.receiveTimeout.Load())
 }
 
 func (s *NetlinkSocket) Send(request *NetlinkRequest) error {
@@ -849,7 +849,7 @@ func (s *NetlinkSocket) Send(request *NetlinkRequest) error {
 		deadline time.Time
 		innerErr error
 	)
-	sendTimeout := atomic.LoadInt64(&s.sendTimeout)
+	sendTimeout := s.sendTimeout.Load()
 	if sendTimeout != 0 {
 		deadline = time.Now().Add(time.Duration(sendTimeout))
 	}
@@ -888,7 +888,7 @@ func (s *NetlinkSocket) Receive() ([]syscall.NetlinkMessage, *unix.SockaddrNetli
 		from     unix.Sockaddr
 		innerErr error
 	)
-	receiveTimeout := atomic.LoadInt64(&s.receiveTimeout)
+	receiveTimeout := s.receiveTimeout.Load()
 	if receiveTimeout != 0 {
 		deadline = time.Now().Add(time.Duration(receiveTimeout))
 	}
@@ -929,13 +929,13 @@ func (s *NetlinkSocket) Receive() ([]syscall.NetlinkMessage, *unix.SockaddrNetli
 
 // SetSendTimeout allows to set a send timeout on the socket
 func (s *NetlinkSocket) SetSendTimeout(timeout *unix.Timeval) error {
-	atomic.StoreInt64(&s.sendTimeout, timeout.Nano())
+	s.sendTimeout.Store(timeout.Nano())
 	return nil
 }
 
 // SetReceiveTimeout allows to set a receive timeout on the socket
 func (s *NetlinkSocket) SetReceiveTimeout(timeout *unix.Timeval) error {
-	atomic.StoreInt64(&s.receiveTimeout, timeout.Nano())
+	s.receiveTimeout.Store(timeout.Nano())
 	return nil
 }
 
@@ -1076,7 +1076,7 @@ func netlinkRouteAttrAndValue(b []byte) (*unix.RtAttr, []byte, int, error) {
 // SocketHandle contains the netlink socket and the associated
 // sequence counter for a specific netlink family
 type SocketHandle struct {
-	Seq    uint32
+	Seq    atomic.Uint32
 	Socket *NetlinkSocket
 }
 

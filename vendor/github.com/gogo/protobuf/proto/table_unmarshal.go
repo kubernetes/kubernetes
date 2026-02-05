@@ -69,7 +69,7 @@ type unmarshalInfo struct {
 
 	// 0 = only typ field is initialized
 	// 1 = completely initialized
-	initialized     int32
+	initialized     atomic.Int32
 	lock            sync.Mutex                    // prevents double initialization
 	dense           []unmarshalFieldInfo          // fields indexed by tag #
 	sparse          map[uint64]unmarshalFieldInfo // fields indexed by tag #
@@ -134,7 +134,7 @@ func getUnmarshalInfo(t reflect.Type) *unmarshalInfo {
 // b is a byte stream to unmarshal into m.
 // This is top routine used when recursively unmarshaling submessages.
 func (u *unmarshalInfo) unmarshal(m pointer, b []byte) error {
-	if atomic.LoadInt32(&u.initialized) == 0 {
+	if u.initialized.Load() == 0 {
 		u.computeUnmarshalInfo()
 	}
 	if u.isMessageSet {
@@ -272,7 +272,7 @@ func (u *unmarshalInfo) unmarshal(m pointer, b []byte) error {
 func (u *unmarshalInfo) computeUnmarshalInfo() {
 	u.lock.Lock()
 	defer u.lock.Unlock()
-	if u.initialized != 0 {
+	if u.initialized.Load() != 0 {
 		return
 	}
 	t := u.typ
@@ -434,7 +434,7 @@ func (u *unmarshalInfo) computeUnmarshalInfo() {
 	// Set mask for required field check.
 	u.reqMask = uint64(1)<<uint(len(u.reqFields)) - 1
 
-	atomic.StoreInt32(&u.initialized, 1)
+	u.initialized.Store(1)
 }
 
 // setTag stores the unmarshal information for the given tag.

@@ -53,7 +53,7 @@ func (a *InternalMessageInfo) Merge(dst, src Message) {
 type mergeInfo struct {
 	typ reflect.Type
 
-	initialized int32 // 0: only typ is valid, 1: everything is valid
+	initialized atomic.Int32 // 0: only typ is valid, 1: everything is valid
 	lock        sync.Mutex
 
 	fields       []mergeFieldInfo
@@ -109,7 +109,7 @@ func (mi *mergeInfo) merge(dst, src pointer) {
 		return // Nothing to do.
 	}
 
-	if atomic.LoadInt32(&mi.initialized) == 0 {
+	if mi.initialized.Load() == 0 {
 		mi.computeMergeInfo()
 	}
 
@@ -163,7 +163,7 @@ func (mi *mergeInfo) merge(dst, src pointer) {
 func (mi *mergeInfo) computeMergeInfo() {
 	mi.lock.Lock()
 	defer mi.lock.Unlock()
-	if mi.initialized != 0 {
+	if mi.initialized.Load() != 0 {
 		return
 	}
 	t := mi.typ
@@ -672,5 +672,5 @@ func (mi *mergeInfo) computeMergeInfo() {
 		mi.unrecognized = toField(&f)
 	}
 
-	atomic.StoreInt32(&mi.initialized, 1)
+	mi.initialized.Store(1)
 }

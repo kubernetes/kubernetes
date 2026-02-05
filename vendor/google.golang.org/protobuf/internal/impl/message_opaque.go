@@ -9,7 +9,6 @@ import (
 	"math"
 	"reflect"
 	"strings"
-	"sync/atomic"
 
 	"google.golang.org/protobuf/internal/filedesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -46,7 +45,7 @@ func opaqueInitHook(mi *MessageInfo) bool {
 		return false
 	}
 
-	defer atomic.StoreUint32(&mi.initDone, 1)
+	defer mi.initDone.Store(1)
 
 	mi.fields = map[protoreflect.FieldNumber]*fieldInfo{}
 	fds := mi.Desc.Fields()

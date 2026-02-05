@@ -41,7 +41,7 @@ type Channel struct {
 	trace       *ChannelTrace
 	// traceRefCount is the number of trace events that reference this channel.
 	// Non-zero traceRefCount means the trace of this channel cannot be deleted.
-	traceRefCount int32
+	traceRefCount atomic.Int32
 
 	// ChannelMetrics holds connectivity state, target and call metrics for the
 	// channel within channelz.
@@ -253,15 +253,15 @@ func (c *Channel) getChannelTrace() *ChannelTrace {
 }
 
 func (c *Channel) incrTraceRefCount() {
-	atomic.AddInt32(&c.traceRefCount, 1)
+	c.traceRefCount.Add(1)
 }
 
 func (c *Channel) decrTraceRefCount() {
-	atomic.AddInt32(&c.traceRefCount, -1)
+	c.traceRefCount.Add(-1)
 }
 
 func (c *Channel) getTraceRefCount() int {
-	i := atomic.LoadInt32(&c.traceRefCount)
+	i := c.traceRefCount.Load()
 	return int(i)
 }
 

@@ -79,7 +79,7 @@ func (t *atomicTime) Time() time.Time {
 }
 
 type containerData struct {
-	oomEvents                uint64
+	oomEvents                atomic.Uint64
 	handler                  container.ContainerHandler
 	info                     containerInfo
 	memoryCache              *memory.InMemoryCache
@@ -699,7 +699,7 @@ func (cd *containerData) updateStats() error {
 		}
 	}
 
-	stats.OOMEvents = atomic.LoadUint64(&cd.oomEvents)
+	stats.OOMEvents = cd.oomEvents.Load()
 
 	var customStatsErr error
 	cm := cd.collectorManager.(*collector.GenericCollectorManager)

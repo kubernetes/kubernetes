@@ -50,22 +50,23 @@ type Generator struct {
 	// high order 2 bytes
 	prefix uint64
 	// low order 6 bytes
-	suffix uint64
+	suffix atomic.Uint64
 }
 
 func NewGenerator(memberID uint16, now time.Time) *Generator {
 	prefix := uint64(memberID) << suffixLen
 	unixMilli := uint64(now.UnixNano()) / uint64(time.Millisecond/time.Nanosecond)
 	suffix := lowbit(unixMilli, tsLen) << cntLen
-	return &Generator{
+	g := &Generator{
 		prefix: prefix,
-		suffix: suffix,
 	}
+	g.suffix.Store(suffix)
+	return g
 }
 
 // Next generates a id that is unique.
 func (g *Generator) Next() uint64 {
-	suffix := atomic.AddUint64(&g.suffix, 1)
+	suffix := g.suffix.Add(1)
 	id := g.prefix | lowbit(suffix, suffixLen)
 	return id
 }

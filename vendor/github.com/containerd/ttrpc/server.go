@@ -346,7 +346,7 @@ func (c *serverConn) run(sctx context.Context) {
 		recvErr                = make(chan error, 1)
 		done                   = make(chan struct{})
 		streams                = sync.Map{}
-		active       int32
+		active       atomic.Int32
 		lastStreamID uint32
 	)
 
@@ -487,7 +487,7 @@ func (c *serverConn) run(sctx context.Context) {
 				}
 
 				streams.Store(id, sh)
-				atomic.AddInt32(&active, 1)
+				active.Add(1)
 			}
 			// TODO: else we must ignore this for future compat. log this?
 		}
@@ -499,7 +499,7 @@ func (c *serverConn) run(sctx context.Context) {
 			shutdown chan struct{}
 		)
 
-		activeN := atomic.LoadInt32(&active)
+		activeN := active.Load()
 		if activeN > 0 {
 			newstate = connStateActive
 			shutdown = nil
@@ -547,7 +547,7 @@ func (c *serverConn) run(sctx context.Context) {
 				// the server is localClosed but not remoteClosed. Once the server
 				// is closing, the whole stream may be considered finished
 				streams.Delete(response.id)
-				atomic.AddInt32(&active, -1)
+				active.Add(-1)
 			}
 		case err := <-recvErr:
 			// TODO(stevvooe): Not wildly clear what we should do in this

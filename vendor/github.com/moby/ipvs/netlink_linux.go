@@ -9,7 +9,6 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"syscall"
 	"time"
 	"unsafe"
@@ -119,7 +118,7 @@ func fillDestination(d *Destination) nl.NetlinkRequestData {
 
 func (i *Handle) doCmdwithResponse(s *Service, d *Destination, cmd uint8) ([][]byte, error) {
 	req := newIPVSRequest(cmd)
-	req.Seq = atomic.AddUint32(&i.seq, 1)
+	req.Seq = i.seq.Add(1)
 
 	if s == nil {
 		req.Flags |= syscall.NLM_F_DUMP                    // Flag to dump all messages
@@ -410,7 +409,7 @@ func (i *Handle) doGetServicesCmd(svc *Service) ([]*Service, error) {
 // doCmdWithoutAttr a simple wrapper of netlink socket execute command
 func (i *Handle) doCmdWithoutAttr(cmd uint8) ([][]byte, error) {
 	req := newIPVSRequest(cmd)
-	req.Seq = atomic.AddUint32(&i.seq, 1)
+	req.Seq = i.seq.Add(1)
 	return execute(i.sock, req, 0)
 }
 
@@ -601,7 +600,7 @@ func (i *Handle) doGetConfigCmd() (*Config, error) {
 // doSetConfigCmd a wrapper function to be used by SetConfig
 func (i *Handle) doSetConfigCmd(c *Config) error {
 	req := newIPVSRequest(ipvsCmdSetConfig)
-	req.Seq = atomic.AddUint32(&i.seq, 1)
+	req.Seq = i.seq.Add(1)
 
 	req.AddData(nl.NewRtAttr(ipvsCmdAttrTimeoutTCP, nl.Uint32Attr(uint32(c.TimeoutTCP.Seconds()))))
 	req.AddData(nl.NewRtAttr(ipvsCmdAttrTimeoutTCPFin, nl.Uint32Attr(uint32(c.TimeoutTCPFin.Seconds()))))

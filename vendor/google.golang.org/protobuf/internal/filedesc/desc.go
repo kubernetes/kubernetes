@@ -55,8 +55,8 @@ type (
 		fileRaw
 		L1 FileL1
 
-		once uint32     // atomically set if L2 is valid
-		mu   sync.Mutex // protects L2
+		once atomic.Uint32 // atomically set if L2 is valid
+		mu   sync.Mutex    // protects L2
 		L2   *FileL2
 	}
 	FileL1 struct {
@@ -160,7 +160,7 @@ func (fd *File) OptionImports() protoreflect.FileImports {
 }
 
 func (fd *File) lazyInit() *FileL2 {
-	if atomic.LoadUint32(&fd.once) == 0 {
+	if fd.once.Load() == 0 {
 		fd.lazyInitOnce()
 	}
 	return fd.L2
@@ -171,7 +171,7 @@ func (fd *File) lazyInitOnce() {
 	if fd.L2 == nil {
 		fd.lazyRawInit() // recursively initializes all L2 structures
 	}
-	atomic.StoreUint32(&fd.once, 1)
+	fd.once.Store(1)
 	fd.mu.Unlock()
 }
 

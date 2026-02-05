@@ -598,12 +598,12 @@ func newHistogram(desc *Desc, opts HistogramOpts, labelValues ...string) Histogr
 	}
 	// Finally we know the final length of h.upperBounds and can make buckets
 	// for both counts as well as exemplars:
-	h.counts[0] = &histogramCounts{buckets: make([]uint64, len(h.upperBounds))}
-	atomic.StoreUint64(&h.counts[0].nativeHistogramZeroThresholdBits, math.Float64bits(h.nativeHistogramZeroThreshold))
-	atomic.StoreInt32(&h.counts[0].nativeHistogramSchema, h.nativeHistogramSchema)
-	h.counts[1] = &histogramCounts{buckets: make([]uint64, len(h.upperBounds))}
-	atomic.StoreUint64(&h.counts[1].nativeHistogramZeroThresholdBits, math.Float64bits(h.nativeHistogramZeroThreshold))
-	atomic.StoreInt32(&h.counts[1].nativeHistogramSchema, h.nativeHistogramSchema)
+	h.counts[0] = &histogramCounts{buckets: make([]atomic.Uint64, len(h.upperBounds))}
+	h.counts[0].nativeHistogramZeroThresholdBits.Store(math.Float64bits(h.nativeHistogramZeroThreshold))
+	h.counts[0].nativeHistogramSchema.Store(h.nativeHistogramSchema)
+	h.counts[1] = &histogramCounts{buckets: make([]atomic.Uint64, len(h.upperBounds))}
+	h.counts[1].nativeHistogramZeroThresholdBits.Store(math.Float64bits(h.nativeHistogramZeroThreshold))
+	h.counts[1].nativeHistogramSchema.Store(h.nativeHistogramSchema)
 	h.exemplars = make([]atomic.Value, len(h.upperBounds)+1)
 
 	h.init(h) // Init self-collection.
@@ -616,26 +616,26 @@ type histogramCounts struct {
 
 	// sumBits contains the bits of the float64 representing the sum of all
 	// observations.
-	sumBits uint64
-	count   uint64
+	sumBits atomic.Uint64
+	count   atomic.Uint64
 
 	// nativeHistogramZeroBucket counts all (positive and negative)
 	// observations in the zero bucket (with an absolute value less or equal
 	// the current threshold, see next field.
-	nativeHistogramZeroBucket uint64
+	nativeHistogramZeroBucket atomic.Uint64
 	// nativeHistogramZeroThresholdBits is the bit pattern of the current
 	// threshold for the zero bucket. It's initially equal to
 	// nativeHistogramZeroThreshold but may change according to the bucket
 	// count limitation strategy.
-	nativeHistogramZeroThresholdBits uint64
+	nativeHistogramZeroThresholdBits atomic.Uint64
 	// nativeHistogramSchema may change over time according to the bucket
 	// count limitation strategy and therefore has to be saved here.
-	nativeHistogramSchema int32
+	nativeHistogramSchema atomic.Int32
 	// Number of (positive and negative) sparse buckets.
-	nativeHistogramBucketsNumber uint32
+	nativeHistogramBucketsNumber atomic.Uint32
 
 	// Regular buckets.
-	buckets []uint64
+	buckets []atomic.Uint64
 
 	// The sparse buckets for native histograms are implemented with a
 	// sync.Map for now. A dedicated data structure will likely be more
@@ -654,14 +654,14 @@ type histogramCounts struct {
 // too.
 func (hc *histogramCounts) observe(v float64, bucket int, doSparse bool) {
 	if bucket < len(hc.buckets) {
-		atomic.AddUint64(&hc.buckets[bucket], 1)
+		hc.buckets[bucket].Add(1)
 	}
 	atomicAddFloat(&hc.sumBits, v)
 	if doSparse && !math.IsNaN(v) {
 		var (
 			key                  int
-			schema               = atomic.LoadInt32(&hc.nativeHistogramSchema)
-			zeroThreshold        = math.Float64frombits(atomic.LoadUint64(&hc.nativeHistogramZeroThresholdBits))
+			schema               = hc.nativeHistogramSchema.Load()
+			zeroThreshold        = math.Float64frombits(hc.nativeHistogramZeroThresholdBits.Load())
 			bucketCreated, isInf bool
 		)
 		if math.IsInf(v, 0) {
@@ -688,21 +688,23 @@ func (hc *histogramCounts) observe(v float64, bucket int, doSparse bool) {
 		if isInf {
 			key++
 		}
+		var one atomic.Int64
+		one.Store(1)
 		switch {
 		case v > zeroThreshold:
-			bucketCreated = addToBucket(&hc.nativeHistogramBucketsPositive, key, 1)
+			bucketCreated = addToBucket(&hc.nativeHistogramBucketsPositive, key, &one)
 		case v < -zeroThreshold:
-			bucketCreated = addToBucket(&hc.nativeHistogramBucketsNegative, key, 1)
+			bucketCreated = addToBucket(&hc.nativeHistogramBucketsNegative, key, &one)
 		default:
-			atomic.AddUint64(&hc.nativeHistogramZeroBucket, 1)
+			hc.nativeHistogramZeroBucket.Add(1)
 		}
 		if bucketCreated {
-			atomic.AddUint32(&hc.nativeHistogramBucketsNumber, 1)
+			hc.nativeHistogramBucketsNumber.Add(1)
 		}
 	}
 	// Increment count last as we take it as a signal that the observation
 	// is complete.
-	atomic.AddUint64(&hc.count, 1)
+	hc.count.Add(1)
 }
 
 type histogram struct {
@@ -722,7 +724,7 @@ type histogram struct {
 	//
 	// Fields with atomic access first! See alignment constraint:
 	// http://golang.org/pkg/sync/atomic/#pkg-note-BUG
-	countAndHotIdx uint64
+	countAndHotIdx atomic.Uint64
 
 	selfCollector
 	desc *Desc
@@ -787,7 +789,7 @@ func (h *histogram) Write(out *dto.Metric) error {
 	// Adding 1<<63 switches the hot index (from 0 to 1 or from 1 to 0)
 	// without touching the count bits. See the struct comments for a full
 	// description of the algorithm.
-	n := atomic.AddUint64(&h.countAndHotIdx, 1<<63)
+	n := h.countAndHotIdx.Add(1 << 63)
 	// count is contained unchanged in the lower 63 bits.
 	count := n & ((1 << 63) - 1)
 	// The most significant bit tells us which counts is hot. The complement
@@ -800,7 +802,7 @@ func (h *histogram) Write(out *dto.Metric) error {
 	his := &dto.Histogram{
 		Bucket:           make([]*dto.Bucket, len(h.upperBounds)),
 		SampleCount:      proto.Uint64(count),
-		SampleSum:        proto.Float64(math.Float64frombits(atomic.LoadUint64(&coldCounts.sumBits))),
+		SampleSum:        proto.Float64(math.Float64frombits(coldCounts.sumBits.Load())),
 		CreatedTimestamp: timestamppb.New(h.lastResetTime),
 	}
 	out.Histogram = his
@@ -808,7 +810,7 @@ func (h *histogram) Write(out *dto.Metric) error {
 
 	var cumCount uint64
 	for i, upperBound := range h.upperBounds {
-		cumCount += atomic.LoadUint64(&coldCounts.buckets[i])
+		cumCount += coldCounts.buckets[i].Load()
 		his.Bucket[i] = &dto.Bucket{
 			CumulativeCount: proto.Uint64(cumCount),
 			UpperBound:      proto.Float64(upperBound),
@@ -827,16 +829,16 @@ func (h *histogram) Write(out *dto.Metric) error {
 		his.Bucket = append(his.Bucket, b)
 	}
 	if h.nativeHistogramSchema > math.MinInt32 {
-		his.ZeroThreshold = proto.Float64(math.Float64frombits(atomic.LoadUint64(&coldCounts.nativeHistogramZeroThresholdBits)))
-		his.Schema = proto.Int32(atomic.LoadInt32(&coldCounts.nativeHistogramSchema))
-		zeroBucket := atomic.LoadUint64(&coldCounts.nativeHistogramZeroBucket)
+		his.ZeroThreshold = proto.Float64(math.Float64frombits(coldCounts.nativeHistogramZeroThresholdBits.Load()))
+		his.Schema = proto.Int32(coldCounts.nativeHistogramSchema.Load())
+		zeroBucket := &coldCounts.nativeHistogramZeroBucket
 
 		defer func() {
 			coldCounts.nativeHistogramBucketsPositive.Range(addAndReset(&hotCounts.nativeHistogramBucketsPositive, &hotCounts.nativeHistogramBucketsNumber))
 			coldCounts.nativeHistogramBucketsNegative.Range(addAndReset(&hotCounts.nativeHistogramBucketsNegative, &hotCounts.nativeHistogramBucketsNumber))
 		}()
 
-		his.ZeroCount = proto.Uint64(zeroBucket)
+		his.ZeroCount = proto.Uint64(zeroBucket.Load())
 		his.NegativeSpan, his.NegativeDelta = makeBuckets(&coldCounts.nativeHistogramBucketsNegative)
 		his.PositiveSpan, his.PositiveDelta = makeBuckets(&coldCounts.nativeHistogramBucketsPositive)
 
@@ -903,7 +905,7 @@ func (h *histogram) observe(v float64, bucket int) {
 	// We increment h.countAndHotIdx so that the counter in the lower
 	// 63 bits gets incremented. At the same time, we get the new value
 	// back, which we can use to find the currently-hot counts.
-	n := atomic.AddUint64(&h.countAndHotIdx, 1)
+	n := h.countAndHotIdx.Add(1)
 	hotCounts := h.counts[n>>63]
 	hotCounts.observe(v, bucket, doSparse)
 	if doSparse {
@@ -920,7 +922,7 @@ func (h *histogram) limitBuckets(counts *histogramCounts, value float64, bucket 
 	if h.nativeHistogramMaxBuckets == 0 {
 		return // No limit configured.
 	}
-	if h.nativeHistogramMaxBuckets >= atomic.LoadUint32(&counts.nativeHistogramBucketsNumber) {
+	if h.nativeHistogramMaxBuckets >= counts.nativeHistogramBucketsNumber.Load() {
 		return // Bucket limit not exceeded yet.
 	}
 
@@ -929,13 +931,13 @@ func (h *histogram) limitBuckets(counts *histogramCounts, value float64, bucket 
 
 	// The hot counts might have been swapped just before we acquired the
 	// lock. Re-fetch the hot counts first...
-	n := atomic.LoadUint64(&h.countAndHotIdx)
+	n := h.countAndHotIdx.Load()
 	hotIdx := n >> 63
 	coldIdx := (^n) >> 63
 	hotCounts := h.counts[hotIdx]
 	coldCounts := h.counts[coldIdx]
 	// ...and then check again if we really have to reduce the bucket count.
-	if h.nativeHistogramMaxBuckets >= atomic.LoadUint32(&hotCounts.nativeHistogramBucketsNumber) {
+	if h.nativeHistogramMaxBuckets >= hotCounts.nativeHistogramBucketsNumber.Load() {
 		return // Bucket limit not exceeded after all.
 	}
 	// Try the various strategies in order.
@@ -975,7 +977,7 @@ func (h *histogram) maybeReset(
 	// Repeat the latest observation to not lose it completely.
 	cold.observe(value, bucket, true)
 	// Make coldCounts the new hot counts while resetting countAndHotIdx.
-	n := atomic.SwapUint64(&h.countAndHotIdx, (coldIdx<<63)+1)
+	n := h.countAndHotIdx.Swap((coldIdx<<63)+1)
 	count := n & ((1 << 63) - 1)
 	waitForCooldown(count, hot)
 	// Finally, reset the formerly hot counts, too.
@@ -990,7 +992,7 @@ func (h *histogram) reset() {
 	h.mtx.Lock()
 	defer h.mtx.Unlock()
 
-	n := atomic.LoadUint64(&h.countAndHotIdx)
+	n := h.countAndHotIdx.Load()
 	hotIdx := n >> 63
 	coldIdx := (^n) >> 63
 	hot := h.counts[hotIdx]
@@ -998,7 +1000,7 @@ func (h *histogram) reset() {
 	// Completely reset coldCounts.
 	h.resetCounts(cold)
 	// Make coldCounts the new hot counts while resetting countAndHotIdx.
-	n = atomic.SwapUint64(&h.countAndHotIdx, coldIdx<<63)
+	n = h.countAndHotIdx.Swap(coldIdx<<63)
 	count := n & ((1 << 63) - 1)
 	waitForCooldown(count, hot)
 	// Finally, reset the formerly hot counts, too.
@@ -1015,7 +1017,7 @@ func (h *histogram) reset() {
 // include an existing bucket, the method returns false. The caller must have
 // locked h.mtx.
 func (h *histogram) maybeWidenZeroBucket(hot, cold *histogramCounts) bool {
-	currentZeroThreshold := math.Float64frombits(atomic.LoadUint64(&hot.nativeHistogramZeroThresholdBits))
+	currentZeroThreshold := math.Float64frombits(hot.nativeHistogramZeroThresholdBits.Load())
 	if currentZeroThreshold >= h.nativeHistogramMaxZeroThreshold {
 		return false
 	}
@@ -1028,11 +1030,11 @@ func (h *histogram) maybeWidenZeroBucket(hot, cold *histogramCounts) bool {
 	if smallestKey == math.MaxInt32 {
 		return false
 	}
-	newZeroThreshold := getLe(smallestKey, atomic.LoadInt32(&hot.nativeHistogramSchema))
+	newZeroThreshold := getLe(smallestKey, hot.nativeHistogramSchema.Load())
 	if newZeroThreshold > h.nativeHistogramMaxZeroThreshold {
 		return false // New threshold would exceed the max threshold.
 	}
-	atomic.StoreUint64(&cold.nativeHistogramZeroThresholdBits, math.Float64bits(newZeroThreshold))
+	cold.nativeHistogramZeroThresholdBits.Store(math.Float64bits(newZeroThreshold))
 	// Remove applicable buckets.
 	if _, loaded := cold.nativeHistogramBucketsNegative.LoadAndDelete(smallestKey); loaded {
 		atomicDecUint32(&cold.nativeHistogramBucketsNumber)
@@ -1041,7 +1043,7 @@ func (h *histogram) maybeWidenZeroBucket(hot, cold *histogramCounts) bool {
 		atomicDecUint32(&cold.nativeHistogramBucketsNumber)
 	}
 	// Make cold counts the new hot counts.
-	n := atomic.AddUint64(&h.countAndHotIdx, 1<<63)
+	n := h.countAndHotIdx.Add(1 << 63)
 	count := n & ((1 << 63) - 1)
 	// Swap the pointer names to represent the new roles and make
 	// the rest less confusing.
@@ -1050,26 +1052,26 @@ func (h *histogram) maybeWidenZeroBucket(hot, cold *histogramCounts) bool {
 	// Add all the now cold counts to the new hot counts...
 	addAndResetCounts(hot, cold)
 	// ...adjust the new zero threshold in the cold counts, too...
-	atomic.StoreUint64(&cold.nativeHistogramZeroThresholdBits, math.Float64bits(newZeroThreshold))
+	cold.nativeHistogramZeroThresholdBits.Store(math.Float64bits(newZeroThreshold))
 	// ...and then merge the newly deleted buckets into the wider zero
 	// bucket.
 	mergeAndDeleteOrAddAndReset := func(hotBuckets, coldBuckets *sync.Map) func(k, v interface{}) bool {
 		return func(k, v interface{}) bool {
 			key := k.(int)
-			bucket := v.(*int64)
+			bucket := v.(*atomic.Int64)
 			if key == smallestKey {
 				// Merge into hot zero bucket...
-				atomic.AddUint64(&hot.nativeHistogramZeroBucket, uint64(atomic.LoadInt64(bucket)))
+				hot.nativeHistogramZeroBucket.Add(uint64(bucket.Load()))
 				// ...and delete from cold counts.
 				coldBuckets.Delete(key)
 				atomicDecUint32(&cold.nativeHistogramBucketsNumber)
 			} else {
 				// Add to corresponding hot bucket...
-				if addToBucket(hotBuckets, key, atomic.LoadInt64(bucket)) {
-					atomic.AddUint32(&hot.nativeHistogramBucketsNumber, 1)
+				if addToBucket(hotBuckets, key, bucket) {
+					hot.nativeHistogramBucketsNumber.Add(1)
 				}
 				// ...and reset cold bucket.
-				atomic.StoreInt64(bucket, 0)
+				bucket.Store(0)
 			}
 			return true
 		}
@@ -1085,18 +1087,18 @@ func (h *histogram) maybeWidenZeroBucket(hot, cold *histogramCounts) bool {
 // bucket count (or even no reduction at all). The method does nothing if the
 // schema is already -4.
 func (h *histogram) doubleBucketWidth(hot, cold *histogramCounts) {
-	coldSchema := atomic.LoadInt32(&cold.nativeHistogramSchema)
+	coldSchema := cold.nativeHistogramSchema.Load()
 	if coldSchema == -4 {
 		return // Already at lowest resolution.
 	}
 	coldSchema--
-	atomic.StoreInt32(&cold.nativeHistogramSchema, coldSchema)
+	cold.nativeHistogramSchema.Store(coldSchema)
 	// Play it simple and just delete all cold buckets.
-	atomic.StoreUint32(&cold.nativeHistogramBucketsNumber, 0)
+	cold.nativeHistogramBucketsNumber.Store(0)
 	deleteSyncMap(&cold.nativeHistogramBucketsNegative)
 	deleteSyncMap(&cold.nativeHistogramBucketsPositive)
 	// Make coldCounts the new hot counts.
-	n := atomic.AddUint64(&h.countAndHotIdx, 1<<63)
+	n := h.countAndHotIdx.Add(1 << 63)
 	count := n & ((1 << 63) - 1)
 	// Swap the pointer names to represent the new roles and make
 	// the rest less confusing.
@@ -1105,20 +1107,20 @@ func (h *histogram) doubleBucketWidth(hot, cold *histogramCounts) {
 	// Add all the now cold counts to the new hot counts...
 	addAndResetCounts(hot, cold)
 	// ...adjust the schema in the cold counts, too...
-	atomic.StoreInt32(&cold.nativeHistogramSchema, coldSchema)
+	cold.nativeHistogramSchema.Store(coldSchema)
 	// ...and then merge the cold buckets into the wider hot buckets.
 	merge := func(hotBuckets *sync.Map) func(k, v interface{}) bool {
 		return func(k, v interface{}) bool {
 			key := k.(int)
-			bucket := v.(*int64)
+			bucket := v.(*atomic.Int64)
 			// Adjust key to match the bucket to merge into.
 			if key > 0 {
 				key++
 			}
 			key /= 2
 			// Add to corresponding hot bucket.
-			if addToBucket(hotBuckets, key, atomic.LoadInt64(bucket)) {
-				atomic.AddUint32(&hot.nativeHistogramBucketsNumber, 1)
+			if addToBucket(hotBuckets, key, bucket) {
+				hot.nativeHistogramBucketsNumber.Add(1)
 			}
 			return true
 		}
@@ -1127,20 +1129,20 @@ func (h *histogram) doubleBucketWidth(hot, cold *histogramCounts) {
 	cold.nativeHistogramBucketsPositive.Range(merge(&hot.nativeHistogramBucketsPositive))
 	cold.nativeHistogramBucketsNegative.Range(merge(&hot.nativeHistogramBucketsNegative))
 	// Play it simple again and just delete all cold buckets.
-	atomic.StoreUint32(&cold.nativeHistogramBucketsNumber, 0)
+	cold.nativeHistogramBucketsNumber.Store(0)
 	deleteSyncMap(&cold.nativeHistogramBucketsNegative)
 	deleteSyncMap(&cold.nativeHistogramBucketsPositive)
 }
 
 func (h *histogram) resetCounts(counts *histogramCounts) {
-	atomic.StoreUint64(&counts.sumBits, 0)
-	atomic.StoreUint64(&counts.count, 0)
-	atomic.StoreUint64(&counts.nativeHistogramZeroBucket, 0)
-	atomic.StoreUint64(&counts.nativeHistogramZeroThresholdBits, math.Float64bits(h.nativeHistogramZeroThreshold))
-	atomic.StoreInt32(&counts.nativeHistogramSchema, h.nativeHistogramSchema)
-	atomic.StoreUint32(&counts.nativeHistogramBucketsNumber, 0)
+	counts.sumBits.Store(0)
+	counts.count.Store(0)
+	counts.nativeHistogramZeroBucket.Store(0)
+	counts.nativeHistogramZeroThresholdBits.Store(math.Float64bits(h.nativeHistogramZeroThreshold))
+	counts.nativeHistogramSchema.Store(h.nativeHistogramSchema)
+	counts.nativeHistogramBucketsNumber.Store(0)
 	for i := range h.upperBounds {
-		atomic.StoreUint64(&counts.buckets[i], 0)
+		counts.buckets[i].Store(0)
 	}
 	deleteSyncMap(&counts.nativeHistogramBucketsNegative)
 	deleteSyncMap(&counts.nativeHistogramBucketsPositive)
@@ -1531,10 +1533,10 @@ func makeBuckets(buckets *sync.Map) ([]*dto.BucketSpan, []int64) {
 
 // addToBucket increments the sparse bucket at key by the provided amount. It
 // returns true if a new sparse bucket had to be created for that.
-func addToBucket(buckets *sync.Map, key int, increment int64) bool {
+func addToBucket(buckets *sync.Map, key int, increment *atomic.Int64) bool {
 	if existingBucket, ok := buckets.Load(key); ok {
 		// Fast path without allocation.
-		atomic.AddInt64(existingBucket.(*int64), increment)
+		increment.Add(int64(existingBucket.(*atomic.Int64).Load()))
 		return false
 	}
 	// Bucket doesn't exist yet. Slow path allocating new counter.
@@ -1542,7 +1544,7 @@ func addToBucket(buckets *sync.Map, key int, increment int64) bool {
 	if actualBucket, loaded := buckets.LoadOrStore(key, &newBucket); loaded {
 		// The bucket was created concurrently in another goroutine.
 		// Have to increment after all.
-		atomic.AddInt64(actualBucket.(*int64), increment)
+		increment.Add(actualBucket.(*atomic.Int64).Load())
 		return false
 	}
 	return true
@@ -1553,13 +1555,13 @@ func addToBucket(buckets *sync.Map, key int, increment int64) bool {
 // according to the buckets ranged through. It then resets all buckets ranged
 // through to 0 (but leaves them in place so that they don't need to get
 // recreated on the next scrape).
-func addAndReset(hotBuckets *sync.Map, bucketNumber *uint32) func(k, v interface{}) bool {
+func addAndReset(hotBuckets *sync.Map, bucketNumber *atomic.Uint32) func(k, v interface{}) bool {
 	return func(k, v interface{}) bool {
-		bucket := v.(*int64)
-		if addToBucket(hotBuckets, k.(int), atomic.LoadInt64(bucket)) {
-			atomic.AddUint32(bucketNumber, 1)
+		bucket := v.(*atomic.Int64)
+		if addToBucket(hotBuckets, k.(int), bucket) {
+			bucketNumber.Add(1)
 		}
-		atomic.StoreInt64(bucket, 0)
+		bucket.Store(0)
 		return true
 	}
 }
@@ -1639,18 +1641,18 @@ func getLe(key int, schema int32) float64 {
 // waitForCooldown returns after the count field in the provided histogramCounts
 // has reached the provided count value.
 func waitForCooldown(count uint64, counts *histogramCounts) {
-	for count != atomic.LoadUint64(&counts.count) {
+	for count != counts.count.Load() {
 		runtime.Gosched() // Let observations get work done.
 	}
 }
 
 // atomicAddFloat adds the provided float atomically to another float
 // represented by the bit pattern the bits pointer is pointing to.
-func atomicAddFloat(bits *uint64, v float64) {
+func atomicAddFloat(bits *atomic.Uint64, v float64) {
 	for {
-		loadedBits := atomic.LoadUint64(bits)
+		loadedBits := bits.Load()
 		newBits := math.Float64bits(math.Float64frombits(loadedBits) + v)
-		if atomic.CompareAndSwapUint64(bits, loadedBits, newBits) {
+		if bits.CompareAndSwap(loadedBits, newBits) {
 			break
 		}
 	}
@@ -1658,25 +1660,25 @@ func atomicAddFloat(bits *uint64, v float64) {
 
 // atomicDecUint32 atomically decrements the uint32 p points to.  See
 // https://pkg.go.dev/sync/atomic#AddUint32 to understand how this is done.
-func atomicDecUint32(p *uint32) {
-	atomic.AddUint32(p, ^uint32(0))
+func atomicDecUint32(p *atomic.Uint32) {
+	p.Add(^uint32(0))
 }
 
 // addAndResetCounts adds certain fields (count, sum, conventional buckets, zero
 // bucket) from the cold counts to the corresponding fields in the hot
 // counts. Those fields are then reset to 0 in the cold counts.
 func addAndResetCounts(hot, cold *histogramCounts) {
-	atomic.AddUint64(&hot.count, atomic.LoadUint64(&cold.count))
-	atomic.StoreUint64(&cold.count, 0)
-	coldSum := math.Float64frombits(atomic.LoadUint64(&cold.sumBits))
+	hot.count.Add(cold.count.Load())
+	cold.count.Store(0)
+	coldSum := math.Float64frombits(cold.sumBits.Load())
 	atomicAddFloat(&hot.sumBits, coldSum)
-	atomic.StoreUint64(&cold.sumBits, 0)
+	cold.sumBits.Store(0)
 	for i := range hot.buckets {
-		atomic.AddUint64(&hot.buckets[i], atomic.LoadUint64(&cold.buckets[i]))
-		atomic.StoreUint64(&cold.buckets[i], 0)
+		hot.buckets[i].Add(cold.buckets[i].Load())
+		cold.buckets[i].Store(0)
 	}
-	atomic.AddUint64(&hot.nativeHistogramZeroBucket, atomic.LoadUint64(&cold.nativeHistogramZeroBucket))
-	atomic.StoreUint64(&cold.nativeHistogramZeroBucket, 0)
+	hot.nativeHistogramZeroBucket.Add(cold.nativeHistogramZeroBucket.Load())
+	cold.nativeHistogramZeroBucket.Store(0)
 }
 
 type nativeExemplars struct {

@@ -34,7 +34,7 @@ type SubChannel struct {
 	sockets       map[int64]string
 	parent        *Channel
 	trace         *ChannelTrace
-	traceRefCount int32
+	traceRefCount atomic.Int32
 
 	ChannelMetrics ChannelMetrics
 }
@@ -136,15 +136,15 @@ func (sc *SubChannel) getChannelTrace() *ChannelTrace {
 }
 
 func (sc *SubChannel) incrTraceRefCount() {
-	atomic.AddInt32(&sc.traceRefCount, 1)
+	sc.traceRefCount.Add(1)
 }
 
 func (sc *SubChannel) decrTraceRefCount() {
-	atomic.AddInt32(&sc.traceRefCount, -1)
+	sc.traceRefCount.Add(-1)
 }
 
 func (sc *SubChannel) getTraceRefCount() int {
-	i := atomic.LoadInt32(&sc.traceRefCount)
+	i := sc.traceRefCount.Load()
 	return int(i)
 }
 

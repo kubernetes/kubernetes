@@ -76,7 +76,7 @@ type RunFns struct {
 	LogWriter io.Writer
 
 	// resultsCount is used to generate the results filename for each container
-	resultsCount uint32
+	resultsCount atomic.Uint32
 
 	// functionFilterProvider provides a filter to perform the function.
 	// this is a variable so it can be mocked in tests
@@ -481,8 +481,8 @@ func (r *RunFns) ffp(spec runtimeutil.FunctionSpec, api *yaml.RNode, currentUser
 	var resultsFile string
 	if r.ResultsDir != "" {
 		resultsFile = filepath.Join(r.ResultsDir, fmt.Sprintf(
-			"results-%v.yaml", r.resultsCount))
-		atomic.AddUint32(&r.resultsCount, 1)
+			"results-%v.yaml", r.resultsCount.Load()))
+		r.resultsCount.Add(1)
 	}
 	if !r.DisableContainers && spec.Container.Image != "" {
 		// TODO: Add a test for this behavior

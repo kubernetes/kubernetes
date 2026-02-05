@@ -43,10 +43,10 @@ type ClientConn interface {
 // idle mode when appropriate. Must be created by NewManager.
 type Manager struct {
 	// State accessed atomically.
-	lastCallEndTime           int64 // Unix timestamp in nanos; time when the most recent RPC completed.
-	activeCallsCount          int32 // Count of active RPCs; -math.MaxInt32 means channel is idle or is trying to get there.
-	activeSinceLastTimerCheck int32 // Boolean; True if there was an RPC since the last timer callback.
-	closed                    int32 // Boolean; True when the manager is closed.
+	lastCallEndTime           atomic.Int64 // Unix timestamp in nanos; time when the most recent RPC completed.
+	activeCallsCount          atomic.Int32 // Count of active RPCs; -math.MaxInt32 means channel is idle or is trying to get there.
+	activeSinceLastTimerCheck atomic.Int32 // Boolean; True if there was an RPC since the last timer callback.
+	closed                    atomic.Int32 // Boolean; True when the manager is closed.
 
 	// Can be accessed without atomics or mutex since these are set at creation
 	// time and read-only after that.
@@ -72,12 +72,13 @@ type Manager struct {
 // NewManager creates a new idleness manager implementation for the
 // given idle timeout.  It begins in idle mode.
 func NewManager(cc ClientConn, timeout time.Duration) *Manager {
-	return &Manager{
-		cc:               cc,
-		timeout:          timeout,
-		actuallyIdle:     true,
-		activeCallsCount: -math.MaxInt32,
+	m := &Manager{
+		cc:           cc,
+		timeout:      timeout,
+		actuallyIdle: true,
 	}
+	m.activeCallsCount.Store(-math.MaxInt32)
+	return m
 }
 
 // resetIdleTimerLocked resets the idle timer to the given duration.  Called
@@ -109,18 +110,18 @@ func (m *Manager) handleIdleTimeout() {
 		return
 	}
 
-	if atomic.LoadInt32(&m.activeCallsCount) > 0 {
+	if m.activeCallsCount.Load() > 0 {
 		m.resetIdleTimer(m.timeout)
 		return
 	}
 
 	// There has been activity on the channel since we last got here. Reset the
 	// timer and return.
-	if atomic.LoadInt32(&m.activeSinceLastTimerCheck) == 1 {
+	if m.activeSinceLastTimerCheck.Load() == 1 {
 		// Set the timer to fire after a duration of idle timeout, calculated
 		// from the time the most recent RPC completed.
-		atomic.StoreInt32(&m.activeSinceLastTimerCheck, 0)
-		m.resetIdleTimer(time.Duration(atomic.LoadInt64(&m.lastCallEndTime)-time.Now().UnixNano()) + m.timeout)
+		m.activeSinceLastTimerCheck.Store(0)
+		m.resetIdleTimer(time.Duration(m.lastCallEndTime.Load()-time.Now().UnixNano()) + m.timeout)
 		return
 	}
 
@@ -150,7 +151,7 @@ func (m *Manager) handleIdleTimeout() {
 func (m *Manager) tryEnterIdleMode(checkActivity bool) bool {
 	// Setting the activeCallsCount to -math.MaxInt32 indicates to OnCallBegin()
 	// that the channel is either in idle mode or is trying to get there.
-	if !atomic.CompareAndSwapInt32(&m.activeCallsCount, 0, -math.MaxInt32) {
+	if !m.activeCallsCount.CompareAndSwap(0, -math.MaxInt32) {
 		// This CAS operation can fail if an RPC started after we checked for
 		// activity in the timer handler, or one was ongoing from before the
 		// last time the timer fired, or if a test is attempting to enter idle
@@ -163,16 +164,16 @@ func (m *Manager) tryEnterIdleMode(checkActivity bool) bool {
 	m.idleMu.Lock()
 	defer m.idleMu.Unlock()
 
-	if atomic.LoadInt32(&m.activeCallsCount) != -math.MaxInt32 {
+	if m.activeCallsCount.Load() != -math.MaxInt32 {
 		// We raced and lost to a new RPC. Very rare, but stop entering idle.
-		atomic.AddInt32(&m.activeCallsCount, math.MaxInt32)
+		m.activeCallsCount.Add(math.MaxInt32)
 		return false
 	}
-	if checkActivity && atomic.LoadInt32(&m.activeSinceLastTimerCheck) == 1 {
+	if checkActivity && m.activeSinceLastTimerCheck.Load() == 1 {
 		// A very short RPC could have come in (and also finished) after we
 		// checked for calls count and activity in handleIdleTimeout(), but
 		// before the CAS operation. So, we need to check for activity again.
-		atomic.AddInt32(&m.activeCallsCount, math.MaxInt32)
+		m.activeCallsCount.Add(math.MaxInt32)
 		return false
 	}
 
@@ -195,16 +196,16 @@ func (m *Manager) OnCallBegin() {
 		return
 	}
 
-	if atomic.AddInt32(&m.activeCallsCount, 1) > 0 {
+	if m.activeCallsCount.Add(1) > 0 {
 		// Channel is not idle now. Set the activity bit and allow the call.
-		atomic.StoreInt32(&m.activeSinceLastTimerCheck, 1)
+		m.activeSinceLastTimerCheck.Store(1)
 		return
 	}
 
 	// Channel is either in idle mode or is in the process of moving to idle
 	// mode. Attempt to exit idle mode to allow this RPC.
 	m.ExitIdleMode()
-	atomic.StoreInt32(&m.activeSinceLastTimerCheck, 1)
+	m.activeSinceLastTimerCheck.Store(1)
 }
 
 // ExitIdleMode instructs m to call the ClientConn's ExitIdleMode and update its
@@ -232,7 +233,7 @@ func (m *Manager) ExitIdleMode() {
 	m.cc.ExitIdleMode()
 
 	// Undo the idle entry process. This also respects any new RPC attempts.
-	atomic.AddInt32(&m.activeCallsCount, math.MaxInt32)
+	m.activeCallsCount.Add(math.MaxInt32)
 	m.actuallyIdle = false
 
 	// Start a new timer to fire after the configured idle timeout.
@@ -251,7 +252,7 @@ func (m *Manager) UnsafeSetNotIdle() {
 	m.idleMu.Lock()
 	defer m.idleMu.Unlock()
 
-	atomic.AddInt32(&m.activeCallsCount, math.MaxInt32)
+	m.activeCallsCount.Add( math.MaxInt32)
 	m.actuallyIdle = false
 	m.resetIdleTimerLocked(m.timeout)
 }
@@ -263,22 +264,22 @@ func (m *Manager) OnCallEnd() {
 	}
 
 	// Record the time at which the most recent call finished.
-	atomic.StoreInt64(&m.lastCallEndTime, time.Now().UnixNano())
+	m.lastCallEndTime.Store(time.Now().UnixNano())
 
 	// Decrement the active calls count. This count can temporarily go negative
 	// when the timer callback is in the process of moving the channel to idle
 	// mode, but one or more RPCs come in and complete before the timer callback
 	// can get done with the process of moving to idle mode.
-	atomic.AddInt32(&m.activeCallsCount, -1)
+	m.activeCallsCount.Add(-1)
 }
 
 func (m *Manager) isClosed() bool {
-	return atomic.LoadInt32(&m.closed) == 1
+	return m.closed.Load() == 1
 }
 
 // Close stops the timer associated with the Manager, if it exists.
 func (m *Manager) Close() {
-	atomic.StoreInt32(&m.closed, 1)
+	m.closed.Store(1)
 
 	m.idleMu.Lock()
 	if m.timer != nil {

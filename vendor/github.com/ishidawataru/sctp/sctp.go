@@ -277,10 +277,6 @@ func setInitOpts(fd int, options InitMsg) error {
 	return err
 }
 
-func setNumOstreams(fd, num int) error {
-	return setInitOpts(fd, InitMsg{NumOstreams: uint16(num)})
-}
-
 type SCTPAddr struct {
 	IPAddrs []net.IPAddr
 	Port    int
@@ -422,19 +418,19 @@ func SCTPBind(fd int, addr *SCTPAddr, flags int) error {
 }
 
 type SCTPConn struct {
-	_fd                 int32
+	_fd                 atomic.Int32
 	notificationHandler NotificationHandler
 }
 
 func (c *SCTPConn) fd() int {
-	return int(atomic.LoadInt32(&c._fd))
+	return int(c._fd.Load())
 }
 
 func NewSCTPConn(fd int, handler NotificationHandler) *SCTPConn {
 	conn := &SCTPConn{
-		_fd:                 int32(fd),
 		notificationHandler: handler,
 	}
+	conn._fd.Store(int32(fd))
 	return conn
 }
 
@@ -697,7 +693,7 @@ func (c *SCTPConn) RemoteAddr() net.Addr {
 func (c *SCTPConn) PeelOff(id int) (*SCTPConn, error) {
 	type peeloffArg struct {
 		assocId int32
-		sd      int
+		sd      int32
 	}
 	param := peeloffArg{
 		assocId: int32(id),
@@ -707,7 +703,9 @@ func (c *SCTPConn) PeelOff(id int) (*SCTPConn, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &SCTPConn{_fd: int32(param.sd)}, nil
+	var conn SCTPConn
+	conn._fd.Store(int32(param.sd))
+	return &conn, nil
 }
 
 func (c *SCTPConn) SetDeadline(t time.Time) error {

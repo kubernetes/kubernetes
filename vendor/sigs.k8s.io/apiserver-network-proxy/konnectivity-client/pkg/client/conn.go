@@ -51,7 +51,7 @@ type conn struct {
 	// closing is an atomic bool represented as a 0 or 1, and set to true when the connection is being closed.
 	// closing should only be accessed through atomic methods.
 	// TODO: switch this to an atomic.Bool once the client is exclusively buit with go1.19+
-	closing uint32
+	closing atomic.Uint32
 }
 
 var _ net.Conn = &conn{}
@@ -126,7 +126,7 @@ func (c *conn) SetWriteDeadline(t time.Time) error {
 // Close closes the connection, sends best-effort close signal to proxy
 // service, and frees resources.
 func (c *conn) Close() error {
-	old := atomic.SwapUint32(&c.closing, 1)
+	old := c.closing.Swap(1)
 	if old != 0 {
 		// prevent duplicate messages
 		return nil

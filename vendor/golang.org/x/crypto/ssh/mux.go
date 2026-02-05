@@ -101,7 +101,7 @@ type mux struct {
 
 // When debugging, each new chanList instantiation has a different
 // offset.
-var globalOff uint32
+var globalOff atomic.Uint32
 
 func (m *mux) Wait() error {
 	m.errCond.L.Lock()
@@ -122,7 +122,7 @@ func newMux(p packetConn) *mux {
 		errCond:          newCond(),
 	}
 	if debugMux {
-		m.chanList.offset = atomic.AddUint32(&globalOff, 1)
+		m.chanList.offset = globalOff.Add(1)
 	}
 
 	go m.loop()

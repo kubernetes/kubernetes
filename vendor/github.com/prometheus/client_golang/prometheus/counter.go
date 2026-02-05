@@ -105,8 +105,8 @@ type counter struct {
 	// valInt stores values that are exact integers. Both have to go first
 	// in the struct to guarantee alignment for atomic operations.
 	// http://golang.org/pkg/sync/atomic/#pkg-note-BUG
-	valBits uint64
-	valInt  uint64
+	valBits atomic.Uint64
+	valInt  atomic.Uint64
 
 	selfCollector
 	desc *Desc
@@ -130,14 +130,14 @@ func (c *counter) Add(v float64) {
 
 	ival := uint64(v)
 	if float64(ival) == v {
-		atomic.AddUint64(&c.valInt, ival)
+		c.valInt.Add(ival)
 		return
 	}
 
 	for {
-		oldBits := atomic.LoadUint64(&c.valBits)
+		oldBits := c.valBits.Load()
 		newBits := math.Float64bits(math.Float64frombits(oldBits) + v)
-		if atomic.CompareAndSwapUint64(&c.valBits, oldBits, newBits) {
+		if c.valBits.CompareAndSwap(oldBits, newBits) {
 			return
 		}
 	}
@@ -149,12 +149,12 @@ func (c *counter) AddWithExemplar(v float64, e Labels) {
 }
 
 func (c *counter) Inc() {
-	atomic.AddUint64(&c.valInt, 1)
+	c.valInt.Add(1)
 }
 
 func (c *counter) get() float64 {
-	fval := math.Float64frombits(atomic.LoadUint64(&c.valBits))
-	ival := atomic.LoadUint64(&c.valInt)
+	fval := math.Float64frombits(c.valBits.Load())
+	ival := c.valInt.Load()
 	return fval + float64(ival)
 }
 
