@@ -414,6 +414,23 @@ func TestTypeCheck(t *testing.T) {
 			},
 		},
 		{
+			name: "params with untyped schema",
+			policy: &v1.ValidatingAdmissionPolicy{Spec: v1.ValidatingAdmissionPolicySpec{
+				ParamKind: &v1.ParamKind{
+					APIVersion: "v1",
+					Kind:       "Config",
+				},
+				Validations: []v1.Validation{
+					{
+						Expression: "params != null",
+					},
+				},
+				MatchConstraints: deploymentPolicy.Spec.MatchConstraints,
+			}},
+			schemaToReturn: &spec.Schema{},
+			assertions:     []assertionFunc{toBeEmpty},
+		},
+		{
 			name:   "multiple expressions",
 			policy: multiExpressionPolicy,
 			schemaToReturn: &spec.Schema{
