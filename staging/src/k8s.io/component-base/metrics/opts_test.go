@@ -226,3 +226,54 @@ func TestResetLabelValueAllowLists(t *testing.T) {
 	ResetLabelValueAllowLists()
 	assert.Empty(t, labelValueAllowLists)
 }
+
+func TestToPromHistogramOptsWithNativeHistograms(t *testing.T) {
+	// Save the original value and restore after the test
+	originalEnabled := nativeHistogramsEnabled.Load()
+	defer func() {
+		nativeHistogramsEnabled.Store(originalEnabled)
+	}()
+
+	tests := []struct {
+		name                                string
+		enableNativeHistograms              bool
+		expectedNativeHistogramBucketFactor float64
+		expectedNativeHistogramMaxBuckets   uint32
+	}{
+		{
+			name:                                "native histograms disabled",
+			enableNativeHistograms:              false,
+			expectedNativeHistogramBucketFactor: 0,
+			expectedNativeHistogramMaxBuckets:   0,
+		},
+		{
+			name:                                "native histograms enabled",
+			enableNativeHistograms:              true,
+			expectedNativeHistogramBucketFactor: DefNativeHistogramBucketFactor,
+			expectedNativeHistogramMaxBuckets:   DefNativeHistogramMaxBucketNumber,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			nativeHistogramsEnabled.Store(tc.enableNativeHistograms)
+
+			opts := &HistogramOpts{
+				Namespace: "test",
+				Name:      "histogram",
+				Help:      "test histogram",
+				Buckets:   []float64{0.1, 0.5, 1, 2, 5},
+			}
+
+			promOpts := opts.toPromHistogramOpts()
+
+			assert.Equal(t, tc.expectedNativeHistogramBucketFactor, promOpts.NativeHistogramBucketFactor,
+				"NativeHistogramBucketFactor mismatch")
+			assert.Equal(t, tc.expectedNativeHistogramMaxBuckets, promOpts.NativeHistogramMaxBucketNumber,
+				"NativeHistogramMaxBucketNumber mismatch")
+
+			// Verify classic buckets are always present
+			assert.Equal(t, opts.Buckets, promOpts.Buckets, "Classic buckets should always be present")
+		})
+	}
+}

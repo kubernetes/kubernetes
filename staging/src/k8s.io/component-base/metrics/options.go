@@ -32,6 +32,11 @@ type Options struct {
 	DisabledMetrics             []string
 	AllowListMapping            map[string]string
 	AllowListMappingManifest    string
+	// EnableNativeHistograms enables native histogram support for histogram metrics.
+	// When true, histogram metrics will be exposed in both classic and native
+	// histogram formats (when using protobuf exposition format).
+	// This should be set based on the NativeHistograms feature gate.
+	EnableNativeHistograms bool
 }
 
 // NewOptions returns default metrics options
@@ -104,6 +109,11 @@ func (o *Options) Apply() {
 		SetLabelAllowListFromCLI(o.AllowListMapping)
 	} else if len(o.AllowListMappingManifest) > 0 {
 		SetLabelAllowListFromManifest(o.AllowListMappingManifest)
+	}
+	// Enable native histograms if requested.
+	// This must be called before metrics are registered to take effect.
+	if o.EnableNativeHistograms {
+		EnableNativeHistograms()
 	}
 }
 

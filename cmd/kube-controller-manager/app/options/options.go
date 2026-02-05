@@ -43,6 +43,7 @@ import (
 	"k8s.io/component-base/logs"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics"
+	metricsfeatures "k8s.io/component-base/metrics/features"
 	cmoptions "k8s.io/controller-manager/options"
 	kubectrlmgrconfigv1alpha1 "k8s.io/kube-controller-manager/config/v1alpha1"
 	kubecontrollerconfig "k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
@@ -529,6 +530,7 @@ func (s KubeControllerManagerOptions) Config(ctx context.Context, allControllers
 	if err := s.ApplyTo(c, allControllers, disabledByDefaultControllers, controllerAliases); err != nil {
 		return nil, err
 	}
+	s.Metrics.EnableNativeHistograms = utilfeature.DefaultFeatureGate.Enabled(metricsfeatures.NativeHistograms)
 	s.Metrics.Apply()
 
 	if s.ParsedFlags != nil {

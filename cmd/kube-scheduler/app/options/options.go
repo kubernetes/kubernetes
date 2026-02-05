@@ -47,6 +47,7 @@ import (
 	"k8s.io/component-base/logs"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics"
+	metricsfeatures "k8s.io/component-base/metrics/features"
 	zpagesfeatures "k8s.io/component-base/zpages/features"
 	"k8s.io/klog/v2"
 	schedulerappconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
@@ -261,6 +262,7 @@ func (o *Options) ApplyTo(logger klog.Logger, c *schedulerappconfig.Config) erro
 			return err
 		}
 	}
+	o.Metrics.EnableNativeHistograms = utilfeature.DefaultFeatureGate.Enabled(metricsfeatures.NativeHistograms)
 	o.Metrics.Apply()
 
 	// Apply value independently instead of using ApplyDeprecated() because it can't be configured via ComponentConfig.

@@ -91,7 +91,7 @@ func (h *Histogram) DeprecatedVersion() *semver.Version {
 // and stores a reference to it
 func (h *Histogram) initializeMetric() {
 	h.HistogramOpts.annotateStabilityLevel()
-	// this actually creates the underlying prometheus gauge.
+	// this actually creates the underlying prometheus histogram.
 	h.setPrometheusHistogram(prometheus.NewHistogram(h.HistogramOpts.toPromHistogramOpts()))
 }
 
