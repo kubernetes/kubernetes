@@ -72,7 +72,8 @@ type Struct struct {
 	// +k8s:validateFalse="field Struct.ByteField"
 	ByteField byte `json:"byteField"`
 
-	// non-pointer struct fields cannot be required or optional
+	// +k8s:required
+	OtherStructField OtherStruct `json:"otherStructField"`
 
 	// +k8s:required
 	// +k8s:validateFalse="field Struct.OtherStructPtrField"
