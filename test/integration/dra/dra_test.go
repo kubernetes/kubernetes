@@ -162,7 +162,7 @@ func TestDRA(t *testing.T) {
 				tCtx.Run("PublishResourceSlices", func(tCtx ktesting.TContext) {
 					testPublishResourceSlices(tCtx, true, features.DRADeviceTaints, features.DRAPartitionableDevices, features.DRADeviceBindingConditions)
 				})
-				tCtx.Run("ExtendedResource", func(tCtx ktesting.TContext) { testExtendedResource(tCtx, false, true) })
+				tCtx.Run("ExplicitExtendedResource", func(tCtx ktesting.TContext) { testExtendedResource(tCtx, false, true) })
 				tCtx.Run("ImplicitExtendedResource", func(tCtx ktesting.TContext) { testExtendedResource(tCtx, false, false) })
 				tCtx.Run("ResourceClaimDeviceStatus", func(tCtx ktesting.TContext) { testResourceClaimDeviceStatus(tCtx, false) })
 				tCtx.Run("DeviceBindingConditions", func(tCtx ktesting.TContext) { testDeviceBindingConditions(tCtx, false) })
@@ -236,8 +236,7 @@ func TestDRA(t *testing.T) {
 				tCtx.Run("PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, true) })
 				tCtx.Run("PrioritizedListScoring", func(tCtx ktesting.TContext) { testPrioritizedListScoring(tCtx) })
 				tCtx.Run("PublishResourceSlices", func(tCtx ktesting.TContext) { testPublishResourceSlices(tCtx, true) })
-				// note testExtendedResource depends on testPublishResourceSlices to provide the devices
-				tCtx.Run("ExtendedResource", func(tCtx ktesting.TContext) { testExtendedResource(tCtx, true, true) })
+				tCtx.Run("ExplicitExtendedResource", func(tCtx ktesting.TContext) { testExtendedResource(tCtx, true, true) })
 				tCtx.Run("ImplicitExtendedResource", func(tCtx ktesting.TContext) { testExtendedResource(tCtx, true, false) })
 				tCtx.Run("ResourceClaimDeviceStatus", func(tCtx ktesting.TContext) { testResourceClaimDeviceStatus(tCtx, true) })
 				tCtx.Run("MaxResourceSlice", testMaxResourceSlice)
@@ -799,8 +798,13 @@ func testExtendedResource(tCtx ktesting.TContext, enabled, explicit bool) {
 		}
 	}
 	class, driverName := createTestClassWithSpec(tCtx, namespace, spec)
-
-	if !explicit {
+	if explicit {
+		if enabled {
+			require.NotEmpty(tCtx, class.Spec.ExtendedResourceName, "should store ExtendedResourceName")
+		} else {
+			require.Empty(tCtx, class.Spec.ExtendedResourceName, "should strip ExtendedResourceName")
+		}
+	} else {
 		// For implicit extended resources, derive the resource name from the class.
 		resourceName = resourceapi.ResourceDeviceClassPrefix + class.Name
 	}
@@ -808,35 +812,33 @@ func testExtendedResource(tCtx ktesting.TContext, enabled, explicit bool) {
 	slice := st.MakeResourceSlice("worker-0", driverName).Devices(device1)
 	createSlice(tCtx, slice.Obj())
 
-	tCtx.Run("scheduler", func(tCtx ktesting.TContext) {
-		startScheduler(tCtx)
+	startScheduler(tCtx)
 
-		podWithOneContainer := st.MakePod().Name(podName).Namespace(namespace).Container("test-container").Obj()
-		pod := createPodWithExtendedResource(tCtx, namespace, resourceName, "1", podWithOneContainer)
+	podWithOneContainer := st.MakePod().Name(podName).Namespace(namespace).Container("test-container").Obj()
+	pod := createPodWithExtendedResource(tCtx, namespace, resourceName, "1", podWithOneContainer)
 
-		var schedulingAttempted gtypes.GomegaMatcher
-		if enabled {
-			// pod can be scheduled as the drivers in testPublishResourceSlices provide the devices.
-			schedulingAttempted = gomega.HaveField("Status.Conditions", gomega.ContainElement(
-				gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
-					"Type":   gomega.Equal(v1.PodScheduled),
-					"Status": gomega.Equal(v1.ConditionTrue),
-				}),
-			))
-		} else {
-			schedulingAttempted = gomega.HaveField("Status.Conditions", gomega.ContainElement(
-				gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
-					"Type":    gomega.Equal(v1.PodScheduled),
-					"Status":  gomega.Equal(v1.ConditionFalse),
-					"Reason":  gomega.Equal("Unschedulable"),
-					"Message": gomega.Equal(fmt.Sprintf("0/8 nodes are available: 8 Insufficient %s. no new claims to deallocate, preemption: 0/8 nodes are available: 8 Preemption is not helpful for scheduling.", resourceName)),
-				}),
-			))
-		}
-		tCtx.Eventually(func(tCtx ktesting.TContext) (*v1.Pod, error) {
-			return tCtx.Client().CoreV1().Pods(namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
-		}).WithTimeout(time.Minute).WithPolling(time.Second).Should(schedulingAttempted)
-	})
+	var schedulingAttempted gtypes.GomegaMatcher
+	if enabled {
+		// Scheduled using device1 in the slice above.
+		schedulingAttempted = gomega.HaveField("Status.Conditions", gomega.ContainElement(
+			gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+				"Type":   gomega.Equal(v1.PodScheduled),
+				"Status": gomega.Equal(v1.ConditionTrue),
+			}),
+		))
+	} else {
+		schedulingAttempted = gomega.HaveField("Status.Conditions", gomega.ContainElement(
+			gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+				"Type":    gomega.Equal(v1.PodScheduled),
+				"Status":  gomega.Equal(v1.ConditionFalse),
+				"Reason":  gomega.Equal("Unschedulable"),
+				"Message": gomega.Equal(fmt.Sprintf("0/8 nodes are available: 8 Insufficient %s. no new claims to deallocate, preemption: 0/8 nodes are available: 8 Preemption is not helpful for scheduling.", resourceName)),
+			}),
+		))
+	}
+	tCtx.Eventually(func(tCtx ktesting.TContext) (*v1.Pod, error) {
+		return tCtx.Client().CoreV1().Pods(namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
+	}).WithTimeout(time.Minute).WithPolling(time.Second).Should(schedulingAttempted)
 }
 
 func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disabledFeatures ...featuregate.Feature) {
