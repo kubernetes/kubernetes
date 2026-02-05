@@ -53,22 +53,22 @@ func (md *cachedMetrics) GetMetrics() (*Metrics, error) {
 // error
 type cacheOnce struct {
 	m    sync.Mutex
-	done uint32
+	done atomic.Uint32
 }
 
 // Copied from sync.Once but we don't want to cache the results if there is an
 // error
 func (o *cacheOnce) cache(f func() error) {
-	if atomic.LoadUint32(&o.done) == 1 {
+	if o.done.Load() == 1 {
 		return
 	}
 	// Slow-path.
 	o.m.Lock()
 	defer o.m.Unlock()
-	if o.done == 0 {
+	if o.done.Load() == 0 {
 		err := f()
 		if err == nil {
-			atomic.StoreUint32(&o.done, 1)
+			o.done.Store(1)
 		}
 	}
 }
