@@ -461,6 +461,7 @@ func TestSyncHandler(t *testing.T) {
 			claimInformer := informerFactory.Resource().V1().ResourceClaims()
 			templateInformer := informerFactory.Resource().V1().ResourceClaimTemplates()
 			setupMetrics()
+			before := getCreateMetricSnapshot(t)
 
 			features := Features{
 				AdminAccess:     tc.adminAccessEnabled,
@@ -525,7 +526,7 @@ func TestSyncHandler(t *testing.T) {
 			}
 			assert.Equal(t, tc.expectedStatuses, actualStatuses, "pod resource claim statuses")
 
-			expectMetrics(t, tc.expectedMetrics)
+			expectMetricsDelta(t, before, tc.expectedMetrics)
 		})
 	}
 }
@@ -1277,35 +1278,49 @@ type expectedMetrics struct {
 	numFailureWithAdmin int
 }
 
-func expectMetrics(t *testing.T, em expectedMetrics) {
+type createMetricSnapshot struct {
+	created          float64
+	createdWithAdmin float64
+	failed           float64
+	failedWithAdmin  float64
+}
+
+func getCreateMetricSnapshot(t *testing.T) createMetricSnapshot {
 	t.Helper()
 
-	// Check created claims
-	actualCreated, err := testutil.GetCounterMetricValue(resourceclaimmetrics.ResourceClaimCreate.WithLabelValues("success", "false"))
+	created, err := testutil.GetCounterMetricValue(resourceclaimmetrics.ResourceClaimCreate.WithLabelValues("success", "false"))
 	handleErr(t, err, "ResourceClaimCreateSuccesses")
-	if actualCreated != float64(em.numCreated) {
-		t.Errorf("Expected claims to be created %d, got %v", em.numCreated, actualCreated)
-	}
-
-	// Check created claims with admin access
-	actualCreatedWithAdmin, err := testutil.GetCounterMetricValue(resourceclaimmetrics.ResourceClaimCreate.WithLabelValues("success", "true"))
+	createdWithAdmin, err := testutil.GetCounterMetricValue(resourceclaimmetrics.ResourceClaimCreate.WithLabelValues("success", "true"))
 	handleErr(t, err, "ResourceClaimCreateSuccessesWithAdminAccess")
-	if actualCreatedWithAdmin != float64(em.numCreatedWithAdmin) {
-		t.Errorf("Expected claims with admin access to be created %d, got %v", em.numCreatedWithAdmin, actualCreatedWithAdmin)
-	}
-
-	// Check failed claims
-	actualFailed, err := testutil.GetCounterMetricValue(resourceclaimmetrics.ResourceClaimCreate.WithLabelValues("failure", "false"))
+	failed, err := testutil.GetCounterMetricValue(resourceclaimmetrics.ResourceClaimCreate.WithLabelValues("failure", "false"))
 	handleErr(t, err, "ResourceClaimCreateFailures")
-	if actualFailed != float64(em.numFailures) {
-		t.Errorf("Expected claims to have failed %d, got %v", em.numFailures, actualFailed)
-	}
-
-	// Check failed claims with admin access
-	actualFailedWithAdmin, err := testutil.GetCounterMetricValue(resourceclaimmetrics.ResourceClaimCreate.WithLabelValues("failure", "true"))
+	failedWithAdmin, err := testutil.GetCounterMetricValue(resourceclaimmetrics.ResourceClaimCreate.WithLabelValues("failure", "true"))
 	handleErr(t, err, "ResourceClaimCreateFailuresWithAdminAccess")
-	if actualFailedWithAdmin != float64(em.numFailureWithAdmin) {
-		t.Errorf("Expected claims with admin access to have failed %d, got %v", em.numFailureWithAdmin, actualFailedWithAdmin)
+
+	return createMetricSnapshot{
+		created:          created,
+		createdWithAdmin: createdWithAdmin,
+		failed:           failed,
+		failedWithAdmin:  failedWithAdmin,
+	}
+}
+
+func expectMetricsDelta(t *testing.T, before createMetricSnapshot, em expectedMetrics) {
+	t.Helper()
+
+	after := getCreateMetricSnapshot(t)
+
+	if diff := after.created - before.created; diff != float64(em.numCreated) {
+		t.Errorf("Expected created claims delta %d, got %v", em.numCreated, diff)
+	}
+	if diff := after.createdWithAdmin - before.createdWithAdmin; diff != float64(em.numCreatedWithAdmin) {
+		t.Errorf("Expected created claims with admin access delta %d, got %v", em.numCreatedWithAdmin, diff)
+	}
+	if diff := after.failed - before.failed; diff != float64(em.numFailures) {
+		t.Errorf("Expected failed claims delta %d, got %v", em.numFailures, diff)
+	}
+	if diff := after.failedWithAdmin - before.failedWithAdmin; diff != float64(em.numFailureWithAdmin) {
+		t.Errorf("Expected failed claims with admin access delta %d, got %v", em.numFailureWithAdmin, diff)
 	}
 }
 func handleErr(t *testing.T, err error, metricName string) {
