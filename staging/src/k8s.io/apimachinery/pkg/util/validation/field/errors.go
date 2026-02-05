@@ -59,6 +59,29 @@ type Error struct {
 	// DeclarativeNative is true when this error originates from a declarative-native validation.
 	// This field is used to distinguish errors that are exclusively declarative and lack an imperative counterpart.
 	DeclarativeNative bool
+
+	// ValidationStabilityLevel denotes the validation stability level of the declarative validation from this error is returned. This should be used in the declarative validations only.
+	ValidationStabilityLevel validationStabilityLevel
+}
+
+// ValidationLevel denotes the stability level of a validation.
+type validationStabilityLevel int
+
+const (
+	unknown validationStabilityLevel = iota
+	stabilityLevelAlpha
+	stabilityLevelBeta
+)
+
+func (v validationStabilityLevel) String() string {
+	switch v {
+	case stabilityLevelAlpha:
+		return "alpha"
+	case stabilityLevelBeta:
+		return "beta"
+	default:
+		return "unknown"
+	}
 }
 
 var _ error = &Error{}
@@ -117,6 +140,7 @@ func (e *Error) ErrorBody() string {
 	if len(e.Detail) != 0 {
 		s += fmt.Sprintf(": %s", e.Detail)
 	}
+
 	return s
 }
 
@@ -460,6 +484,34 @@ func (e *Error) MarkDeclarativeNative() *Error {
 func (list ErrorList) MarkDeclarativeNative() ErrorList {
 	for _, err := range list {
 		err.DeclarativeNative = true
+	}
+	return list
+}
+
+// MarkAlpha marks the error as an alpha validation error.
+func (e *Error) MarkAlpha() *Error {
+	e.ValidationStabilityLevel = stabilityLevelAlpha
+	return e
+}
+
+// MarkAlpha marks the errors as alpha validation errors.
+func (list ErrorList) MarkAlpha() ErrorList {
+	for _, err := range list {
+		err.ValidationStabilityLevel = stabilityLevelAlpha
+	}
+	return list
+}
+
+// MarkBeta marks the error as a beta validation error.
+func (e *Error) MarkBeta() *Error {
+	e.ValidationStabilityLevel = stabilityLevelBeta
+	return e
+}
+
+// MarkBeta marks the errors as beta validation errors.
+func (list ErrorList) MarkBeta() ErrorList {
+	for _, err := range list {
+		err.ValidationStabilityLevel = stabilityLevelBeta
 	}
 	return list
 }

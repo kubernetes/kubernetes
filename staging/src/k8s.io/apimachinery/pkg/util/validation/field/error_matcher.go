@@ -40,11 +40,12 @@ type ErrorMatcher struct {
 	matchField bool
 	// TODO(thockin): consider whether value could be assumed - if the
 	// "want" error has a nil value, don't match on value.
-	matchValue               bool
-	matchOrigin              bool
-	matchDetail              func(want, got string) bool
-	requireOriginWhenInvalid bool
-	matchDeclarativeNative   bool
+	matchValue                    bool
+	matchOrigin                   bool
+	matchDetail                   func(want, got string) bool
+	requireOriginWhenInvalid      bool
+	matchDeclarativeNative        bool
+	matchValidationStabilityLevel bool
 	// normalizationRules holds the pre-compiled regex patterns for path normalization.
 	normalizationRules []NormalizationRule
 }
@@ -88,6 +89,9 @@ func (m ErrorMatcher) Matches(want, got *Error) bool {
 		return false
 	}
 	if m.matchDeclarativeNative && want.DeclarativeNative != got.DeclarativeNative {
+		return false
+	}
+	if m.matchValidationStabilityLevel && want.ValidationStabilityLevel != got.ValidationStabilityLevel {
 		return false
 	}
 
@@ -156,6 +160,10 @@ func (m ErrorMatcher) Render(e *Error) string {
 	if m.matchDeclarativeNative {
 		comma()
 		buf.WriteString(fmt.Sprintf("DeclarativeNative=%t", e.DeclarativeNative))
+	}
+	if m.matchValidationStabilityLevel {
+		comma()
+		buf.WriteString(fmt.Sprintf("ValidationStabilityLevel=%s", e.ValidationStabilityLevel))
 	}
 	return "{" + buf.String() + "}"
 }
@@ -237,6 +245,13 @@ func (m ErrorMatcher) RequireOriginWhenInvalid() ErrorMatcher {
 // value of field errors.
 func (m ErrorMatcher) ByDeclarativeNative() ErrorMatcher {
 	m.matchDeclarativeNative = true
+	return m
+}
+
+// ByValidationStabilityLevel returns a derived ErrorMatcher which also matches by the validation stability level
+// value of field errors.
+func (m ErrorMatcher) ByValidationStabilityLevel() ErrorMatcher {
+	m.matchValidationStabilityLevel = true
 	return m
 }
 

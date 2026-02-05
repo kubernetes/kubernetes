@@ -75,7 +75,8 @@ type listMetadata struct {
 
 	// customUnique indicates that k8s:customUnique is set on this list.
 	// It disables generation of uniqueness validation for this list.
-	customUnique bool
+	customUnique   bool
+	stabilityLevel ValidationStabilityLevel
 }
 
 // makeListMapMatchFunc generates a function that compares two list-map
@@ -140,6 +141,7 @@ func (lttv listTypeTagValidator) GetValidations(context Context, tag codetags.Ta
 		lm = &listMetadata{}
 		lttv.byPath[context.Path.String()] = lm
 	}
+	lm.stabilityLevel = context.StabilityLevel
 	if lm.ownership != "" {
 		return Validations{}, fmt.Errorf("listType cannot be specified more than once")
 	}
@@ -182,7 +184,7 @@ func (lttv listTypeTagValidator) GetValidations(context Context, tag codetags.Ta
 func (lttv listTypeTagValidator) Docs() TagDoc {
 	doc := TagDoc{
 		Tag:            lttv.TagName(),
-		StabilityLevel: Stable,
+		StabilityLevel: TagStabilityLevelStable,
 		Scopes:         lttv.ValidScopes().UnsortedList(),
 		Description:    "Declares a list field's semantic type and ownership behavior. atomic: single ownership, set: shared ownership with uniqueness, map: shared ownership with key-based uniqueness.",
 		Payloads: []TagPayloadDoc{{
@@ -250,7 +252,7 @@ func (lmktv listMapKeyTagValidator) GetValidations(context Context, tag codetags
 func (lmktv listMapKeyTagValidator) Docs() TagDoc {
 	doc := TagDoc{
 		Tag:            lmktv.TagName(),
-		StabilityLevel: Stable,
+		StabilityLevel: TagStabilityLevelStable,
 		Scopes:         lmktv.ValidScopes().UnsortedList(),
 		Description:    "Declares a named sub-field of a list's value-type to be part of the list-map key.",
 		Payloads: []TagPayloadDoc{{
@@ -290,6 +292,8 @@ func (utv uniqueTagValidator) GetValidations(context Context, tag codetags.Tag) 
 		utv.byPath[context.Path.String()] = lm
 	}
 
+	lm.stabilityLevel = context.StabilityLevel
+
 	// If listType has already run and set a non-atomic ownership, this is an error.
 	if lm.ownership != "" && lm.ownership != ownershipSingle {
 		return Validations{}, fmt.Errorf("unique tag may not be used with listType=set or listType=map")
@@ -319,7 +323,7 @@ func (utv uniqueTagValidator) GetValidations(context Context, tag codetags.Tag) 
 func (utv uniqueTagValidator) Docs() TagDoc {
 	doc := TagDoc{
 		Tag:            utv.TagName(),
-		StabilityLevel: Alpha,
+		StabilityLevel: TagStabilityLevelAlpha,
 		Scopes:         utv.ValidScopes().UnsortedList(),
 		Description:    "Declares that a list field's elements are unique. This tag can be used with listType=atomic to add uniqueness constraints, or independently to specify uniqueness semantics.",
 		Payloads: []TagPayloadDoc{{
@@ -369,7 +373,7 @@ func (cutv customUniqueTagValidator) GetValidations(context Context, tag codetag
 func (cutv customUniqueTagValidator) Docs() TagDoc {
 	doc := TagDoc{
 		Tag:            cutv.TagName(),
-		StabilityLevel: Alpha,
+		StabilityLevel: TagStabilityLevelAlpha,
 		Scopes:         cutv.ValidScopes().UnsortedList(),
 		Description:    "Indicates that uniqueness validation for this list is implemented via custom, handwritten validation. This disables generation of uniqueness validation for this list.",
 		Payloads:       nil,
@@ -453,6 +457,9 @@ func (lv listValidator) GetValidations(context Context) (Validations, error) {
 		comment := "lists with set semantics require unique values"
 		f := Function("listValidator", DefaultFlags, validateUnique, Identifier(matchArg)).
 			WithComment(comment)
+		if lm.stabilityLevel != "" {
+			f = f.WithStabilityLevel(lm.stabilityLevel)
+		}
 		result.AddFunction(f)
 	}
 	if lm.semantic == semanticMap {
@@ -464,7 +471,7 @@ func (lv listValidator) GetValidations(context Context) (Validations, error) {
 		comment := "lists with map semantics require unique keys"
 
 		f := Function("listValidator", DefaultFlags, validateUnique, matchArg).
-			WithComment(comment)
+			WithComment(comment).WithStabilityLevel(lm.stabilityLevel)
 		result.AddFunction(f)
 	}
 
