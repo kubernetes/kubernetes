@@ -866,6 +866,9 @@ func (m *ManagerImpl) allocateContainerResources(ctx context.Context, pod *v1.Po
 		}
 		allocDevices, err := m.devicesToAllocate(ctx, podUID, contName, resource, needed, devicesToReuse[resource])
 		if err != nil {
+			m.mutex.Lock()
+			m.allocatedDevices = m.podDevices.devices()
+			m.mutex.Unlock()
 			return err
 		}
 		if allocDevices == nil || len(allocDevices) <= 0 {
@@ -913,6 +916,9 @@ func (m *ManagerImpl) allocateContainerResources(ctx context.Context, pod *v1.Po
 		}
 
 		if len(resp.ContainerResponses) == 0 {
+			m.mutex.Lock()
+			m.allocatedDevices = m.podDevices.devices()
+			m.mutex.Unlock()
 			return fmt.Errorf("no containers return in allocation response %v", resp)
 		}
 
@@ -1125,6 +1131,18 @@ func (m *ManagerImpl) GetAllocatableDevices() ResourceDeviceInstances {
 // GetDevices returns the devices used by the specified container
 func (m *ManagerImpl) GetDevices(podUID, containerName string) ResourceDeviceInstances {
 	return m.podDevices.getContainerDevices(podUID, containerName)
+}
+
+// GetAllocatedDevices returns a copy of all allocated devices, keyed by resource name.
+// This is primarily intended for test code but can be used for debugging and inspection.
+func (m *ManagerImpl) GetAllocatedDevices() map[string]sets.Set[string] {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	result := make(map[string]sets.Set[string])
+	for resource, devices := range m.allocatedDevices {
+		result[resource] = devices.Clone()
+	}
+	return result
 }
 
 func (m *ManagerImpl) UpdateAllocatedResourcesStatus(pod *v1.Pod, status *v1.PodStatus) {
