@@ -30476,3 +30476,142 @@ func TestValidateWorkloadReference(t *testing.T) {
 		}
 	}
 }
+
+
+func TestValidatePodBinding(t *testing.T) {
+	testCases := []struct {
+		name        string
+		binding     core.Binding
+		expectError bool
+		errContains string
+	}{
+		{
+			name: "valid binding with lowercase node name",
+			binding: core.Binding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-pod",
+					Namespace: "default",
+				},
+				Target: core.ObjectReference{
+					Kind: "Node",
+					Name: "valid-node-name",
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "valid binding with empty kind (defaults to Node)",
+			binding: core.Binding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-pod",
+					Namespace: "default",
+				},
+				Target: core.ObjectReference{
+					Name: "valid-node-name",
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "invalid binding with uppercase node name",
+			binding: core.Binding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-pod",
+					Namespace: "default",
+				},
+				Target: core.ObjectReference{
+					Kind: "Node",
+					Name: "INVALID-NODE-NAME",
+				},
+			},
+			expectError: true,
+			errContains: "a lowercase RFC 1123 subdomain",
+		},
+		{
+			name: "invalid binding with empty node name",
+			binding: core.Binding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-pod",
+					Namespace: "default",
+				},
+				Target: core.ObjectReference{
+					Kind: "Node",
+					Name: "",
+				},
+			},
+			expectError: true,
+			errContains: "Required value",
+		},
+		{
+			name: "invalid binding with node name containing invalid characters",
+			binding: core.Binding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-pod",
+					Namespace: "default",
+				},
+				Target: core.ObjectReference{
+					Kind: "Node",
+					Name: "node_with_underscore",
+				},
+			},
+			expectError: true,
+			errContains: "a lowercase RFC 1123 subdomain",
+		},
+		{
+			name: "invalid binding with unsupported target kind",
+			binding: core.Binding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-pod",
+					Namespace: "default",
+				},
+				Target: core.ObjectReference{
+					Kind: "Pod",
+					Name: "some-pod",
+				},
+			},
+			expectError: true,
+			errContains: "Unsupported value",
+		},
+		{
+			name: "valid binding with node name containing dots",
+			binding: core.Binding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-pod",
+					Namespace: "default",
+				},
+				Target: core.ObjectReference{
+					Kind: "Node",
+					Name: "node.example.com",
+				},
+			},
+			expectError: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := ValidatePodBinding(&tc.binding)
+			if tc.expectError {
+				if len(errs) == 0 {
+					t.Errorf("Expected error but got none")
+				} else if tc.errContains != "" {
+					found := false
+					for _, err := range errs {
+						if strings.Contains(err.Error(), tc.errContains) {
+							found = true
+							break
+						}
+					}
+					if !found {
+						t.Errorf("Expected error containing %q but got %v", tc.errContains, errs)
+					}
+				}
+			} else {
+				if len(errs) != 0 {
+					t.Errorf("Expected no error but got %v", errs)
+				}
+			}
+		})
+	}
+}
+
