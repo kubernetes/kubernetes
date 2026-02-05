@@ -2439,7 +2439,7 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	WindowsHostNetwork: {},
 
-	WorkloadAwarePreemption: {GenericWorkload}, // TODO: we need to depend on Workload Scheduling Cycle feature gate instead, not GenericWorkload.
+	WorkloadAwarePreemption: {GenericWorkload},
 
 	apiextensionsfeatures.CRDObservedGenerationTracking: {},
 

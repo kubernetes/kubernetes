@@ -305,7 +305,7 @@ func TestPrepareCandidate(t *testing.T) {
 	tests := []struct {
 		name      string
 		nodeNames []string
-		candidate *fakeCandidate
+		candidate *candidate
 		preemptor Preemptor
 
 		testPods []*v1.Pod
@@ -324,7 +324,7 @@ func TestPrepareCandidate(t *testing.T) {
 	}{
 		{
 			name: "no victims",
-			candidate: &fakeCandidate{
+			candidate: &candidate{
 				victims: &extenderv1.Victims{},
 			},
 			preemptor: singlePreemptor,
@@ -337,7 +337,7 @@ func TestPrepareCandidate(t *testing.T) {
 		{
 			name: "one victim without condition",
 
-			candidate: &fakeCandidate{
+			candidate: &candidate{
 				name: node1Name,
 				victims: &extenderv1.Victims{
 					Pods: []*v1.Pod{
@@ -357,7 +357,7 @@ func TestPrepareCandidate(t *testing.T) {
 		{
 			name: "one victim, but victim is already being deleted",
 
-			candidate: &fakeCandidate{
+			candidate: &candidate{
 				name: node1Name,
 				victims: &extenderv1.Victims{
 					Pods: []*v1.Pod{
@@ -375,7 +375,7 @@ func TestPrepareCandidate(t *testing.T) {
 		{
 			name: "one victim, but victim is already deleted",
 
-			candidate: &fakeCandidate{
+			candidate: &candidate{
 				name: node1Name,
 				victims: &extenderv1.Victims{
 					Pods: []*v1.Pod{
@@ -392,7 +392,7 @@ func TestPrepareCandidate(t *testing.T) {
 		{
 			name: "one victim with same condition",
 
-			candidate: &fakeCandidate{
+			candidate: &candidate{
 				name: node1Name,
 				victims: &extenderv1.Victims{
 					Pods: []*v1.Pod{
@@ -412,7 +412,7 @@ func TestPrepareCandidate(t *testing.T) {
 		{
 			name: "one victim, not-found victim error is ignored when patching",
 
-			candidate: &fakeCandidate{
+			candidate: &candidate{
 				name: node1Name,
 				victims: &extenderv1.Victims{
 					Pods: []*v1.Pod{
@@ -430,7 +430,7 @@ func TestPrepareCandidate(t *testing.T) {
 		{
 			name: "one victim, but pod deletion failed",
 
-			candidate: &fakeCandidate{
+			candidate: &candidate{
 				name: node1Name,
 				victims: &extenderv1.Victims{
 					Pods: []*v1.Pod{
@@ -449,7 +449,7 @@ func TestPrepareCandidate(t *testing.T) {
 		{
 			name: "one victim, not-found victim error is ignored when deleting",
 
-			candidate: &fakeCandidate{
+			candidate: &candidate{
 				name: node1Name,
 				victims: &extenderv1.Victims{
 					Pods: []*v1.Pod{
@@ -467,7 +467,7 @@ func TestPrepareCandidate(t *testing.T) {
 		{
 			name: "one victim, but patch pod failed",
 
-			candidate: &fakeCandidate{
+			candidate: &candidate{
 				name: node1Name,
 				victims: &extenderv1.Victims{
 					Pods: []*v1.Pod{
@@ -486,7 +486,7 @@ func TestPrepareCandidate(t *testing.T) {
 		{
 			name: "two victims without condition, one passes successfully and the second fails",
 
-			candidate: &fakeCandidate{
+			candidate: &candidate{
 				name: node1Name,
 				victims: &extenderv1.Victims{
 					Pods: []*v1.Pod{
@@ -763,13 +763,13 @@ func TestPrepareCandidateAsyncSetsPreemptingSets(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		candidate  *fakeCandidate
+		candidate  *candidate
 		lastVictim *v1.Pod
 		preemptor  Preemptor
 	}{
 		{
 			name: "no victims",
-			candidate: &fakeCandidate{
+			candidate: &candidate{
 				victims: &extenderv1.Victims{},
 			},
 			lastVictim: nil,
@@ -777,7 +777,7 @@ func TestPrepareCandidateAsyncSetsPreemptingSets(t *testing.T) {
 		},
 		{
 			name: "one victim",
-			candidate: &fakeCandidate{
+			candidate: &candidate{
 				name: node1Name,
 				victims: &extenderv1.Victims{
 					Pods: []*v1.Pod{
@@ -790,7 +790,7 @@ func TestPrepareCandidateAsyncSetsPreemptingSets(t *testing.T) {
 		},
 		{
 			name: "two victims",
-			candidate: &fakeCandidate{
+			candidate: &candidate{
 				name: node1Name,
 				victims: &extenderv1.Victims{
 					Pods: []*v1.Pod{
@@ -804,7 +804,7 @@ func TestPrepareCandidateAsyncSetsPreemptingSets(t *testing.T) {
 		},
 		{
 			name: "workload preemptor with two victims",
-			candidate: &fakeCandidate{
+			candidate: &candidate{
 				name: node1Name,
 				victims: &extenderv1.Victims{
 					Pods: []*v1.Pod{
@@ -1082,7 +1082,7 @@ func TestAsyncPreemptionFailure(t *testing.T) {
 				currentPreemptor = NewPodPreemptor(defaultPreemptorPod)
 			}
 
-			candidate := &fakeCandidate{
+			candidate := &candidate{
 				name: node1Name,
 				victims: &extenderv1.Victims{
 					Pods: tt.victims,

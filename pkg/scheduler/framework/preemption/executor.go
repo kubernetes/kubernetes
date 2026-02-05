@@ -83,14 +83,14 @@ func newExecutor(fh fwk.Handle) *Executor {
 		// Otherwise we should delete the victim.
 		if waitingPod := e.fh.GetWaitingPod(victim.UID); waitingPod != nil {
 			if waitingPod.Preempt(pluginName, "preempted") {
-				logger.V(2).Info("Preemptor podGroup preempted a waiting pod", "preemptor", klog.KObj(preemptor), "waitingPod", klog.KObj(victim), "domain", c.Name())
+				logger.V(2).Info("Preemptor preempted a waiting pod", "preemptor", klog.KObj(preemptor), "waitingPod", klog.KObj(victim), "domain", c.Name())
 				skipAPICall = true
 			}
 		}
 		if !skipAPICall {
 			message := fmt.Sprintf("%s: preempting to accommodate a higher priority pod", representative.Spec.SchedulerName)
 			if preemptor.IsPodGroup() {
-				message = fmt.Sprintf("%s: preempting to accommodate a higher priority workload", representative.Spec.SchedulerName)
+				message = fmt.Sprintf("%s: preempting to accommodate a higher priority pod group", representative.Spec.SchedulerName)
 			}
 			condition := &v1.PodCondition{
 				Type:               v1.DisruptionTarget,
@@ -119,7 +119,7 @@ func newExecutor(fh fwk.Handle) *Executor {
 				logger.V(2).Info("Victim Pod is already deleted", "preemptor", klog.KObj(preemptor), "victim", klog.KObj(victim), "node", c.Name())
 				return nil
 			}
-			logger.V(2).Info("Preemptor Pod preempted victim Pod", "preemptor", klog.KObj(preemptor), "victim", klog.KObj(victim), "node", c.Name())
+			logger.V(2).Info("Preemptor preempted victim Pod", "preemptor", klog.KObj(preemptor), "victim", klog.KObj(victim), "node", c.Name())
 		}
 
 		fh.EventRecorder().Eventf(victim, representative, v1.EventTypeNormal, "Preempted", "Preempting", "Preempted by pod %v on node %v", representative.UID, c.Name())
@@ -170,7 +170,9 @@ func (e *Executor) prepareCandidateAsync(c Candidate, preemptor Preemptor, plugi
 	}
 
 	e.mu.Lock()
-	e.preempting.Insert(representative.UID)
+	for _, p := range preemptor.Members() {
+		e.preempting.Insert(p.UID)
+	}
 	e.mu.Unlock()
 
 	go func() {
@@ -197,7 +199,7 @@ func (e *Executor) prepareCandidateAsync(c Candidate, preemptor Preemptor, plugi
 		// this node. So, we should remove their nomination. Removing their
 		// nomination updates these pods and moves them to the active queue. It
 		// lets scheduler find another place for them sooner than after waiting for preemption completion.
-		nominatedPods := getLowerPriorityNominatedPods(e.fh, representative, c.Name())
+		nominatedPods := getLowerPriorityNominatedPods(e.fh, representative, getNodes(c))
 		if err := clearNominatedNodeName(ctx, e.fh.ClientSet(), e.fh.APICacher(), nominatedPods...); err != nil {
 			utilruntime.HandleErrorWithContext(ctx, err, "Cannot clear 'NominatedNodeName' field from lower priority pods on the same target node", "node", c.Name())
 			result = metrics.GoroutineResultError
@@ -230,7 +232,9 @@ func (e *Executor) prepareCandidateAsync(c Candidate, preemptor Preemptor, plugi
 		if preemptLastVictim {
 			lastVictim := victimPods[len(victimPods)-1]
 			e.mu.Lock()
-			e.lastVictimsPendingPreemption[representative.UID] = pendingVictim{namespace: lastVictim.Namespace, name: lastVictim.Name}
+			for _, p := range preemptor.Members() {
+				e.lastVictimsPendingPreemption[p.UID] = pendingVictim{namespace: lastVictim.Namespace, name: lastVictim.Name}
+			}
 			e.mu.Unlock()
 
 			if err := e.PreemptPod(ctx, c, preemptor, lastVictim, pluginName); err != nil {
@@ -239,8 +243,10 @@ func (e *Executor) prepareCandidateAsync(c Candidate, preemptor Preemptor, plugi
 			}
 		}
 		e.mu.Lock()
-		e.preempting.Delete(representative.UID)
-		delete(e.lastVictimsPendingPreemption, representative.UID)
+		for _, p := range preemptor.Members() {
+			e.preempting.Delete(p.UID)
+			delete(e.lastVictimsPendingPreemption, p.UID)
+		}
 		e.mu.Unlock()
 
 		logger.V(2).Info("Async Preemption finished completely", "preemptor", klog.KObj(preemptor), "node", c.Name(), "result", result)
@@ -280,7 +286,7 @@ func (e *Executor) prepareCandidate(ctx context.Context, c Candidate, preemptor 
 	// this node. So, we should remove their nomination. Removing their
 	// nomination updates these pods and moves them to the active queue. It
 	// lets scheduler find another place for them sooner than after waiting for preemption completion.
-	nominatedPods := getLowerPriorityNominatedPods(fh, preemptor.GetRepresentativePod(), c.Name())
+	nominatedPods := getLowerPriorityNominatedPods(fh, preemptor.GetRepresentativePod(), getNodes(c))
 	if err := clearNominatedNodeName(ctx, cs, fh.APICacher(), nominatedPods...); err != nil {
 		utilruntime.HandleErrorWithContext(ctx, err, "Cannot clear 'NominatedNodeName' field")
 		// We do not return as this error is not critical.
@@ -349,8 +355,11 @@ func clearNominatedNodeName(ctx context.Context, cs clientset.Interface, apiCach
 // manipulation of NodeInfo and PreFilter state per nominated pod. It may not be
 // worth the complexity, especially because we generally expect to have a very
 // small number of nominated pods per node.
-func getLowerPriorityNominatedPods(pn fwk.PodNominator, pod *v1.Pod, nodeName string) []*v1.Pod {
-	podInfos := pn.NominatedPodsForNode(nodeName)
+func getLowerPriorityNominatedPods(pn fwk.PodNominator, pod *v1.Pod, nodes []string) []*v1.Pod {
+	var podInfos []fwk.PodInfo
+	for _, nodeName := range nodes {
+		podInfos = append(podInfos, pn.NominatedPodsForNode(nodeName)...)
+	}
 
 	if len(podInfos) == 0 {
 		return nil
@@ -364,4 +373,18 @@ func getLowerPriorityNominatedPods(pn fwk.PodNominator, pod *v1.Pod, nodeName st
 		}
 	}
 	return lowerPriorityPods
+}
+
+func getNodes(s Candidate) []string {
+	names := make(map[string]bool)
+	for _, pod := range s.Victims().Pods {
+		nodeName := pod.Spec.NodeName
+		names[nodeName] = true
+	}
+
+	var res []string
+	for name := range names {
+		res = append(res, name)
+	}
+	return res
 }

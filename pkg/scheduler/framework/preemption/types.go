@@ -1,11 +1,29 @@
+/*
+Copyright The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package preemption
 
 import (
+	"sync/atomic"
+
 	v1 "k8s.io/api/core/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
+	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	fwk "k8s.io/kube-scheduler/framework"
-	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 // Preemptor abstracts the entity that initiates preemption.
@@ -54,7 +72,7 @@ type preemptor struct {
 	priority         int32
 	pods             []*v1.Pod
 	preemptionPolicy *v1.PreemptionPolicy
-	isWorkload       bool
+	isPodGroup       bool
 }
 
 func NewPodPreemptor(p *v1.Pod) Preemptor {
@@ -62,7 +80,7 @@ func NewPodPreemptor(p *v1.Pod) Preemptor {
 		priority:         corev1helpers.PodPriority(p),
 		pods:             []*v1.Pod{p},
 		preemptionPolicy: p.Spec.PreemptionPolicy,
-		isWorkload:       false,
+		isPodGroup:       false,
 	}
 }
 
@@ -71,7 +89,7 @@ func (p *preemptor) Priority() int32 {
 }
 
 func (p *preemptor) IsPodGroup() bool {
-	return p.isWorkload
+	return p.isPodGroup
 }
 
 func (p *preemptor) Members() []*v1.Pod {
@@ -83,7 +101,7 @@ func (p *preemptor) IsEligibleToPreemptOthers() bool {
 }
 
 func (p *preemptor) SupportExtenders() bool {
-	return !p.isWorkload
+	return !p.isPodGroup
 }
 
 func (p *preemptor) GetNamespace() string {
@@ -100,7 +118,7 @@ func (p *preemptor) GetName() string {
 
 	firstPod := p.GetRepresentativePod()
 
-	if p.isWorkload {
+	if p.isPodGroup {
 		ref := firstPod.Spec.WorkloadRef
 
 		// Start with the Workload Name (e.g., "my-job")
@@ -155,9 +173,10 @@ type Domain interface {
 
 type domain struct {
 	Domain
-	nodes         []fwk.NodeInfo
-	name          string
-	podGroupIndex map[podGroupKey][]fwk.PodInfo
+	nodes                          []fwk.NodeInfo
+	name                           string
+	podGroupIndex                  map[util.PodGroupKey][]fwk.PodInfo
+	workloadAwarePreemptionEnabled bool
 }
 
 func (d *domain) Nodes() []fwk.NodeInfo {
@@ -165,23 +184,22 @@ func (d *domain) Nodes() []fwk.NodeInfo {
 }
 
 func (d *domain) GetAllPossibleVictims(nodeInfoLister fwk.NodeInfoLister) []PreemptionUnit {
-	processedPodGroups := make(map[podGroupKey]bool)
+	processedPodGroups := make(map[util.PodGroupKey]bool)
 	var allVictims []PreemptionUnit
 
 	for _, node := range d.nodes {
 		for _, pi := range node.GetPods() {
 			pod := pi.GetPod()
 
-			workloadAwarePreemptionEnabeld := utilfeature.DefaultFeatureGate.Enabled(features.WorkloadAwarePreemption)
-
-			if ref := pod.Spec.WorkloadRef; workloadAwarePreemptionEnabeld && ref != nil {
-				key := newPodGroupKey(pod.Namespace, pod.Spec.WorkloadRef)
+			// TODO: Validate against the PodGroup's policy (PodGroup.PodGroupPolicy).
+			// Currently, the API to retrieve the full PodGroup object is not available.
+			if ref := pod.Spec.WorkloadRef; d.workloadAwarePreemptionEnabled && ref != nil {
+				key := util.NewPodGroupKey(pod.Namespace, pod.Spec.WorkloadRef)
 
 				// Deduplication Check
 				if processedPodGroups[key] {
 					continue
 				}
-
 				// Get all pods for this gang (Global Lookup via Index)
 				gangPods := d.podGroupIndex[key]
 
@@ -226,9 +244,10 @@ func (d *domain) Snapshot() Domain {
 	}
 
 	return &domain{
-		nodes:         snapshotNodes,
-		name:          d.name,
-		podGroupIndex: d.podGroupIndex,
+		nodes:                          snapshotNodes,
+		name:                           d.name,
+		podGroupIndex:                  d.podGroupIndex,
+		workloadAwarePreemptionEnabled: d.workloadAwarePreemptionEnabled,
 	}
 }
 
@@ -276,7 +295,7 @@ func (d *domain) newPreemptionUnit(pods []fwk.PodInfo, priority int32, nodeInfos
 	return &preemptionUnit{
 		affectedNodes: nodes,
 		priority:      priority,
-		isPodGroup:    len(pods) > 1,
+		isPodGroup:    len(pods) > 1 || pods[0].GetPod().Spec.WorkloadRef != nil,
 		pods:          pods,
 	}
 }
@@ -295,4 +314,65 @@ func (pu *preemptionUnit) IsPodGroup() bool {
 
 func (pu *preemptionUnit) AffectedNodes() map[string]fwk.NodeInfo {
 	return pu.affectedNodes
+}
+
+// Candidate represents a nominated node on which the preemptor can be scheduled,
+// along with the list of victims that should be evicted for the preemptor to fit the node.
+type Candidate interface {
+	// Victims wraps a list of to-be-preempted Pods and the number of PDB violation.
+	Victims() *extenderv1.Victims
+	// Name returns the target domain(for pod group)/node name where the preemptor gets nominated to run.
+	Name() string
+}
+
+type candidate struct {
+	victims *extenderv1.Victims
+	name    string
+}
+
+// Victims returns s.victims.
+func (s *candidate) Victims() *extenderv1.Victims {
+	return s.victims
+}
+
+// Name returns s.name.
+func (s *candidate) Name() string {
+	return s.name
+}
+
+type candidateList struct {
+	idx   int32
+	items []Candidate
+}
+
+// newCandidateList creates a new candidate list with the given capacity.
+func newCandidateList(capacity int32) *candidateList {
+	return &candidateList{idx: -1, items: make([]Candidate, capacity)}
+}
+
+// add adds a new candidate to the internal array atomically.
+// Note: in case the list has reached its capacity, the candidate is disregarded
+// and not added to the internal array.
+func (cl *candidateList) add(c *candidate) {
+	if idx := atomic.AddInt32(&cl.idx, 1); idx < int32(len(cl.items)) {
+		cl.items[idx] = c
+	}
+}
+
+// size returns the number of candidate stored. Note that some add() operations
+// might still be executing when this is called, so care must be taken to
+// ensure that all add() operations complete before accessing the elements of
+// the list.
+func (cl *candidateList) size() int32 {
+	n := atomic.LoadInt32(&cl.idx) + 1
+	if n >= int32(len(cl.items)) {
+		n = int32(len(cl.items))
+	}
+	return n
+}
+
+// get returns the internal candidate array. This function is NOT atomic and
+// assumes that all add() operations have been completed.
+func (cl *candidateList) get() []Candidate {
+	return cl.items[:cl.size()]
 }

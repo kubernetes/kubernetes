@@ -1480,7 +1480,6 @@ func TestDryRunPreemption(t *testing.T) {
 	labelKeys := []string{"hostname", "zone", "region"}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			updateWorkloadAwarePreemptionFlag(t, tt.workloadAwarePreemption)
 
 			nodes := make([]*v1.Node, len(tt.nodeNames))
@@ -3088,7 +3087,7 @@ func TestPreempt(t *testing.T) {
 					for _, patchedPod := range patchedPods {
 						var message string
 						if test.preemptor.IsPodGroup() {
-							message = fmt.Sprintf("%s: preempting to accommodate a higher priority workload", patchedPod.Spec.SchedulerName)
+							message = fmt.Sprintf("%s: preempting to accommodate a higher priority pod group", patchedPod.Spec.SchedulerName)
 						} else {
 							message = fmt.Sprintf("%s: preempting to accommodate a higher priority pod", patchedPod.Spec.SchedulerName)
 						}

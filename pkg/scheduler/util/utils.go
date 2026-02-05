@@ -213,3 +213,33 @@ func GetHostPorts(pod *v1.Pod) []v1.ContainerPort {
 	}
 	return ports
 }
+
+// podGroupKey uniquely identifies a specific instance of a PodGroup.
+type PodGroupKey struct {
+	namespace    string
+	workloadName string
+	podGroupName string
+	replicaKey   string
+}
+
+func (pgk PodGroupKey) GetName() string {
+	if pgk.replicaKey == "" {
+		return fmt.Sprintf("%s-%s", pgk.workloadName, pgk.podGroupName)
+	}
+	return fmt.Sprintf("%s-%s-%s", pgk.workloadName, pgk.podGroupName, pgk.replicaKey)
+}
+
+func (pgk PodGroupKey) GetNamespace() string {
+	return pgk.namespace
+}
+
+var _ klog.KMetadata = &PodGroupKey{}
+
+func NewPodGroupKey(namespace string, workloadRef *v1.WorkloadReference) PodGroupKey {
+	return PodGroupKey{
+		namespace:    namespace,
+		workloadName: workloadRef.Name,
+		podGroupName: workloadRef.PodGroup,
+		replicaKey:   workloadRef.PodGroupReplicaKey,
+	}
+}

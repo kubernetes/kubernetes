@@ -153,6 +153,7 @@ func New(_ context.Context, dpArgs runtime.Object, fh fwk.Handle, fts feature.Fe
 			return pl.fh.RunFilterPluginsWithNominatedPods(ctx, state, pods[0], nodes[0])
 		}
 
+		// TODO: Adapt this logic to support PodGroups once Workload Scheduling is implemented.
 		return nil
 	}
 

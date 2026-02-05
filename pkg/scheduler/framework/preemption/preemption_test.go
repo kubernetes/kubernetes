@@ -53,6 +53,7 @@ import (
 
 var (
 	w1 = &v1.WorkloadReference{PodGroup: "pg1"}
+	w2 = &v1.WorkloadReference{PodGroup: "pg2"}
 
 	midPriority, highPriority = int32(100), int32(1000)
 
@@ -68,12 +69,6 @@ func init() {
 
 type FakePostFilterPlugin struct {
 	numViolatingVictim int
-}
-
-func (pl *FakePostFilterPlugin) SelectVictimsOnNode(
-	ctx context.Context, state fwk.CycleState, pod *v1.Pod,
-	nodeInfo fwk.NodeInfo, pdbs []*policy.PodDisruptionBudget) (victims []*v1.Pod, numViolatingVictim int, status *fwk.Status) {
-	return append(victims, nodeInfo.GetPods()[0].GetPod()), pl.numViolatingVictim, nil
 }
 
 func (pl *FakePostFilterPlugin) SelectVictimsOnDomain(ctx context.Context, state fwk.CycleState, preemptor Preemptor, domain Domain, pdbs []*policy.PodDisruptionBudget) (victims []*v1.Pod, numViolatingVictim int, status *fwk.Status) {
@@ -100,12 +95,6 @@ func (pl *FakePostFilterPlugin) OrderedScoreFuncs(ctx context.Context, nodesToVi
 }
 
 type FakePreemptionScorePostFilterPlugin struct{}
-
-func (pl *FakePreemptionScorePostFilterPlugin) SelectVictimsOnNode(
-	ctx context.Context, state fwk.CycleState, pod *v1.Pod,
-	nodeInfo fwk.NodeInfo, pdbs []*policy.PodDisruptionBudget) (victims []*v1.Pod, numViolatingVictim int, status *fwk.Status) {
-	return append(victims, nodeInfo.GetPods()[0].GetPod()), 1, nil
-}
 
 func (pl *FakePreemptionScorePostFilterPlugin) SelectVictimsOnDomain(ctx context.Context, state fwk.CycleState, preemptor Preemptor, domain Domain, pdbs []*policy.PodDisruptionBudget) (victims []*v1.Pod, numViolatingVictim int, status *fwk.Status) {
 	for _, node := range domain.Nodes() {
@@ -147,7 +136,7 @@ func newPodGroupPreemptor(priority int32, members []*v1.Pod, policy *v1.Preempti
 	return &preemptor{
 		priority:         priority,
 		pods:             members,
-		isWorkload:       true,
+		isPodGroup:       true,
 		preemptionPolicy: policy,
 	}
 }
@@ -263,6 +252,73 @@ func TestDryRunPreemption(t *testing.T) {
 			},
 			workloadAwarePreemption: true,
 		},
+		{
+			name: "pod group as preemptor and whole cluster as domain and has pod group for preempion",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(veryLargeRes).Obj(),
+				st.MakeNode().Name("node2").Capacity(veryLargeRes).Obj(),
+			},
+			preemptors: []Preemptor{
+				newPodGroupPreemptor(highPriority,
+					[]*v1.Pod{
+						st.MakePod().Name("pr1").UID("pr1").WorkloadRef(w1).Priority(highPriority).Obj(),
+						st.MakePod().Name("pr2").UID("pr2").WorkloadRef(w1).Priority(highPriority).Obj(),
+					}, nil),
+			},
+			initPods: []*v1.Pod{
+				st.MakePod().Name("p1").UID("p1").Node("node1").Priority(midPriority).Obj(),
+				st.MakePod().Name("p2").UID("p2").Node("node2").Priority(midPriority).Obj(),
+			},
+			numViolatingVictim: 0,
+			expected: [][]Candidate{
+				{
+					&candidate{
+						victims: &extenderv1.Victims{
+							Pods: []*v1.Pod{
+								st.MakePod().Name("p1").UID("p1").Node("node1").Priority(midPriority).Obj(),
+								st.MakePod().Name("p2").UID("p2").Node("node2").Priority(midPriority).Obj(),
+							},
+						},
+						name: "Cluster-Scope-pg1",
+					},
+				},
+			},
+			workloadAwarePreemption: true,
+		},
+		{
+			name: "pod group as preemptor and whole cluster as domain with pod group victim",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(veryLargeRes).Obj(),
+				st.MakeNode().Name("node2").Capacity(veryLargeRes).Obj(),
+			},
+			preemptors: []Preemptor{
+				newPodGroupPreemptor(highPriority,
+					[]*v1.Pod{
+						st.MakePod().Name("pr1").UID("pr1").WorkloadRef(w1).Priority(highPriority).Obj(),
+						st.MakePod().Name("pr2").UID("pr2").WorkloadRef(w1).Priority(highPriority).Obj(),
+					}, nil),
+			},
+			initPods: []*v1.Pod{
+				// Victim PodGroup (Workload w2) spread across nodes
+				st.MakePod().Name("p1").UID("p1").Node("node1").WorkloadRef(w2).Priority(midPriority).Obj(),
+				st.MakePod().Name("p2").UID("p2").Node("node2").WorkloadRef(w2).Priority(midPriority).Obj(),
+			},
+			numViolatingVictim: 0,
+			expected: [][]Candidate{
+				{
+					&candidate{
+						victims: &extenderv1.Victims{
+							Pods: []*v1.Pod{
+								st.MakePod().Name("p1").UID("p1").Node("node1").WorkloadRef(w2).Priority(midPriority).Obj(),
+								st.MakePod().Name("p2").UID("p2").Node("node2").WorkloadRef(w2).Priority(midPriority).Obj(),
+							},
+						},
+						name: "Cluster-Scope-pg1",
+					},
+				},
+			},
+			workloadAwarePreemption: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -319,9 +375,10 @@ func TestDryRunPreemption(t *testing.T) {
 			for cycle, preemptor := range tt.preemptors {
 				state := framework.NewCycleState()
 				pe := Evaluator{
-					PluginName: "FakePostFilter",
-					Handler:    fwk,
-					Interface:  fakePostPlugin,
+					PluginName:                     "FakePostFilter",
+					Handler:                        fwk,
+					Interface:                      fakePostPlugin,
+					workloadAwarePreemptionEnabled: tt.workloadAwarePreemption,
 				}
 				got, _, _ := pe.DryRunPreemption(ctx, state, preemptor, pe.NewDomains(preemptor, nodeInfos), nil, 0, int32(len(nodeInfos)))
 				// Sort the values (inner victims) and the candidate itself (by its NominatedNodeName).
@@ -463,9 +520,10 @@ func TestSelectCandidate(t *testing.T) {
 			for _, preemptor := range tt.preemptors {
 				state := framework.NewCycleState()
 				pe := Evaluator{
-					PluginName: "FakePreemptionScorePostFilter",
-					Handler:    fwk,
-					Interface:  fakePreemptionScorePostFilterPlugin,
+					PluginName:                     "FakePreemptionScorePostFilter",
+					Handler:                        fwk,
+					Interface:                      fakePreemptionScorePostFilterPlugin,
+					workloadAwarePreemptionEnabled: tt.workloadAwarePreemption,
 				}
 				candidates, _, _ := pe.DryRunPreemption(ctx, state, preemptor, pe.NewDomains(preemptor, nodeInfos), nil, 0, int32(len(nodeInfos)))
 				s := pe.SelectCandidate(ctx, candidates)
@@ -479,21 +537,6 @@ func TestSelectCandidate(t *testing.T) {
 			}
 		})
 	}
-}
-
-type fakeCandidate struct {
-	victims *extenderv1.Victims
-	name    string
-}
-
-// Victims returns s.victims.
-func (s *fakeCandidate) Victims() *extenderv1.Victims {
-	return s.victims
-}
-
-// Name returns s.name.
-func (s *fakeCandidate) Name() string {
-	return s.name
 }
 
 type fakeExtender struct {
@@ -601,7 +644,7 @@ func TestCallExtenders(t *testing.T) {
 			Obj()
 		makeCandidates = func(nodeName string, pods ...*v1.Pod) []Candidate {
 			return []Candidate{
-				&fakeCandidate{
+				&candidate{
 					name: nodeName,
 					victims: &extenderv1.Victims{
 						Pods: pods,
