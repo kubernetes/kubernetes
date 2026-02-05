@@ -1574,6 +1574,73 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c *generator.Context
 			emitFunctionCall(sw, c, v.Function, "ctx", "op", "fldPath", "obj", "oldObj")
 			sw.Do("\n}", targs)
 		}
+	case validators.MultiWrapperFunction:
+		// MultiWrapperFunction generates a closure to execute multiple validation functions.
+		targs := generator.Args{
+			"field":      mkSymbolArgs(c, fieldPkgSymbols),
+			"operation":  mkSymbolArgs(c, operationPkgSymbols),
+			"context":    mkSymbolArgs(c, contextPkgSymbols),
+			"objType":    v.ObjType,
+			"objTypePfx": "*",
+		}
+		// Use the nilable form to pass pointers to standard validation functions.
+		if util.IsNilableType(v.ObjType) {
+			targs["objTypePfx"] = ""
+		}
+
+		sw.Do("func(", targs)
+		sw.Do("    ctx $.context.Context|raw$, ", targs)
+		sw.Do("    op $.operation.Operation|raw$, ", targs)
+		sw.Do("    fldPath *$.field.Path|raw$, ", targs)
+		sw.Do("    obj, oldObj $.objTypePfx$$.objType|raw$ ", targs)
+		sw.Do(")    $.field.ErrorList|raw$ {\n", targs)
+		sw.Do("errs := $.field.ErrorList|raw${}\n", targs)
+
+		// Determine if any wrapped functions short-circuit.
+		hasShortCircuits := false
+		lastShortCircuitIdx := -1
+		for i, fg := range v.Functions {
+			if fg.Flags.IsSet(validators.ShortCircuit) {
+				hasShortCircuits = true
+				lastShortCircuitIdx = i
+			}
+		}
+		if hasShortCircuits {
+			sw.Do("earlyReturn := false\n", nil)
+		}
+
+		for i, fg := range v.Functions {
+			isNonError := fg.Flags.IsSet(validators.NonError)
+
+			if fg.Flags.IsSet(validators.ShortCircuit) {
+				// Short-circuiting functions stop execution if they return an error.
+				sw.Do("if e := ", nil)
+				emitFunctionCall(sw, c, fg, "ctx", "op", "fldPath", "obj", "oldObj")
+				sw.Do("; len(e) != 0 {\n", nil)
+				if !isNonError {
+					sw.Do("  errs = append(errs, e...)\n", nil)
+				}
+				sw.Do("  earlyReturn = true\n", nil)
+				sw.Do("}\n", nil)
+
+				// If a failure occurred during short-circuiting, return early.
+				if i == lastShortCircuitIdx {
+					sw.Do("if earlyReturn {\n", nil)
+					sw.Do("  return errs\n", nil)
+					sw.Do("}\n", nil)
+				}
+			} else {
+				// Standard functions append errors to the list.
+				if isNonError {
+					emitFunctionCall(sw, c, fg, "ctx", "op", "fldPath", "obj", "oldObj")
+				} else {
+					sw.Do("errs = append(errs, ", nil)
+					emitFunctionCall(sw, c, fg, "ctx", "op", "fldPath", "obj", "oldObj")
+					sw.Do("...)\n", nil)
+				}
+			}
+		}
+		sw.Do("return errs\n}", nil)
 	case validators.Literal:
 		sw.Do("$.$", v)
 	case validators.FunctionGen:
