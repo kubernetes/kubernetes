@@ -593,6 +593,12 @@
     lockToDefault: true
     preRelease: GA
     version: "1.35"
+- name: ExtendWebSocketsToKubelet
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.36"
 - name: ExternalServiceAccountTokenSigner
   versionedSpecs:
   - default: false
@@ -1137,10 +1143,10 @@
     version: "1.33"
 - name: NodeDeclaredFeatures
   versionedSpecs:
-  - default: false
+  - default: true
     lockToDefault: false
-    preRelease: Alpha
-    version: "1.35"
+    preRelease: Beta
+    version: "1.36"
 - name: NodeInclusionPolicyInPodTopologySpread
   versionedSpecs:
   - default: false
