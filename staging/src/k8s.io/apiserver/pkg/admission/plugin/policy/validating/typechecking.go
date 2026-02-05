@@ -177,7 +177,7 @@ func (c *TypeChecker) CreateContext(policy *v1.ValidatingAdmissionPolicy) *TypeC
 
 func (c *TypeChecker) compiler(ctx *TypeCheckingContext, typeOverwrite typeOverwrite) (*plugincel.CompositedCompiler, error) {
 	envSet, err := buildEnvSet(
-		/* hasParams */ ctx.paramDeclType != nil,
+		/* hasParams */ !ctx.paramGVK.Empty(),
 		/* hasAuthorizer */ true,
 		typeOverwrite)
 	if err != nil {
@@ -205,7 +205,7 @@ func (c *TypeChecker) CheckExpression(ctx *TypeCheckingContext, expression strin
 			continue
 		}
 		options := plugincel.OptionalVariableDeclarations{
-			HasParams:     ctx.paramDeclType != nil,
+			HasParams:     !ctx.paramGVK.Empty(),
 			HasAuthorizer: true,
 		}
 		compiler.CompileAndStoreVariables(convertv1beta1Variables(ctx.variables), options, environment.StoredExpressions)
@@ -414,8 +414,10 @@ func buildEnvSet(hasParams bool, hasAuthorizer bool, types typeOverwrite) (*envi
 	varOpts = append(varOpts, createVariableOpts(types.object, plugincel.ObjectVarName, plugincel.OldObjectVarName)...)
 
 	// params, defined by ParamKind
-	if hasParams && types.params != nil {
-		declTypes = append(declTypes, types.params)
+	if hasParams {
+		if types.params != nil {
+			declTypes = append(declTypes, types.params)
+		}
 		varOpts = append(varOpts, createVariableOpts(types.params, plugincel.ParamsVarName)...)
 	}
 
