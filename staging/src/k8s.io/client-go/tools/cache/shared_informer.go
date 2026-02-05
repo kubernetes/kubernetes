@@ -312,6 +312,8 @@ func NewSharedIndexInformerWithOptions(lw ListerWatcher, exampleObject runtime.O
 		defaultEventHandlerResyncPeriod: options.ResyncPeriod,
 		clock:                           realClock,
 		cacheMutationDetector:           NewCacheMutationDetector(fmt.Sprintf("%T", exampleObject)),
+		identifier:                      options.Identifier,
+		fifoMetricsProvider:             options.FIFOMetricsProvider,
 		keyFunc:                         DeletionHandlingMetaNamespaceKeyFunc,
 	}
 }
@@ -328,6 +330,14 @@ type SharedIndexInformerOptions struct {
 	// ObjectDescription is the sharedIndexInformer's object description. This is passed through to the
 	// underlying Reflector's type description.
 	ObjectDescription string
+
+	// Identifier is used to identify the FIFO for metrics and logging purposes.
+	// If not set, metrics will not be published.
+	Identifier InformerNameAndResource
+
+	// FIFOMetricsProvider is the metrics provider for the FIFO queue.
+	// If not set, metrics will be no-ops.
+	FIFOMetricsProvider FIFOMetricsProvider
 }
 
 // InformerSynced is a function that can be used to determine if an informer has synced.  This is useful for determining if caches have synced.
@@ -451,6 +461,12 @@ type sharedIndexInformer struct {
 
 	transform TransformFunc
 
+	// identifier is used to identify this informer for metrics and logging purposes.
+	identifier InformerNameAndResource
+
+	// fifoMetricsProvider is the metrics provider for the FIFO queue.
+	fifoMetricsProvider FIFOMetricsProvider
+
 	// keyFunc is called when processing deltas by the underlying process function.
 	keyFunc KeyFunc
 }
@@ -543,7 +559,7 @@ func (s *sharedIndexInformer) RunWithContext(ctx context.Context) {
 		s.startedLock.Lock()
 		defer s.startedLock.Unlock()
 
-		fifo := newQueueFIFO(s.indexer, s.transform)
+		fifo := newQueueFIFO(s.indexer, s.transform, s.identifier, s.fifoMetricsProvider)
 
 		cfg := &Config{
 			Queue:             fifo,

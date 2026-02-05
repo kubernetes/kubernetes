@@ -73,7 +73,7 @@ func runTestReflectorDataConsistencyDetector(t *testing.T, transformer Transform
 	defer cancel()
 
 	store := NewStore(MetaNamespaceKeyFunc)
-	fifo := newQueueFIFO(store, transformer)
+	fifo := newQueueFIFO(store, transformer, InformerNameAndResource{}, nil)
 
 	lw := &ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
