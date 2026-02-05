@@ -419,9 +419,7 @@ func createRequestsAndMappings(pod *v1.Pod, extendedResources map[v1.ResourceNam
 	for resource := range extendedResources {
 		resourceNames = append(resourceNames, resource)
 	}
-	sort.Slice(resourceNames, func(i, j int) bool {
-		return resourceNames[i] < resourceNames[j]
-	})
+	slices.Sort(resourceNames)
 
 	for _, resource := range resourceNames {
 		class := deviceClassMapping.GetDeviceClass(resource)
