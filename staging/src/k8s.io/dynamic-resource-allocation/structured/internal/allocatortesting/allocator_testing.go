@@ -895,6 +895,33 @@ func deviceRequestAllocationResultWithBindingConditions(request, driver, pool, d
 	}
 }
 
+type AllocatorTestCase struct {
+	features                 Features
+	claimsToAllocate         []wrapResourceClaim
+	allocatedDevices         []DeviceID
+	allocatedSharedDeviceIDs sets.Set[SharedDeviceID]
+	allocatedCapacityDevices ConsumedCapacityCollection
+	classes                  []*resourceapi.DeviceClass
+	slices                   []*resourceapi.ResourceSlice
+	node                     *v1.Node
+
+	expectResults []any
+	expectError   types.GomegaMatcher // can be used to check for no error or match specific error
+
+	// Test case setting expectNumAllocateOneInvocations do not run against the "stable" variant of the allocator,
+	// which doesn't provide the stats and also falls over with excessive runtime for them.
+	expectNumAllocateOneInvocations int64
+
+	// expectNumAllocateOneInvocationsByChannel overrides expectNumAllocateOneInvocations with
+	// different values for specific implementations (e.g. "experimental").
+	//
+	// Ignored unless expectNumAllocateOneInvocations is also set.
+	// expectNumAllocateOneInvocations should contain the "best" result, so
+	// expectNumAllocateOneInvocationsByChannel is only needed as long as we have "worse"
+	// implementations.
+	expectNumAllocateOneInvocationsByChannel map[internal.AllocatorChannel]int64
+}
+
 // TestAllocator runs as many of the shared tests against a specific allocator implementation as possible.
 // Test cases which depend on features that are not supported by the implementation are silently skipped.
 func TestAllocator(t *testing.T,
@@ -947,33 +974,7 @@ func TestAllocator(t *testing.T,
 		Effect:   resourceapi.DeviceTaintEffectNoSchedule,
 	}
 
-	testcases := map[string]struct {
-		features                 Features
-		claimsToAllocate         []wrapResourceClaim
-		allocatedDevices         []DeviceID
-		allocatedSharedDeviceIDs sets.Set[SharedDeviceID]
-		allocatedCapacityDevices ConsumedCapacityCollection
-		classes                  []*resourceapi.DeviceClass
-		slices                   []*resourceapi.ResourceSlice
-		node                     *v1.Node
-
-		expectResults []any
-		expectError   types.GomegaMatcher // can be used to check for no error or match specific error
-
-		// Test case setting expectNumAllocateOneInvocations do not run against the "stable" variant of the allocator,
-		// which doesn't provide the stats and also falls over with excessive runtime for them.
-		expectNumAllocateOneInvocations int64
-
-		// expectNumAllocateOneInvocationsByChannel overrides expectNumAllocateOneInvocations with
-		// different values for specific implementations (e.g. "experimental").
-		//
-		// Ignored unless expectNumAllocateOneInvocations is also set.
-		// expectNumAllocateOneInvocations should contain the "best" result, so
-		// expectNumAllocateOneInvocationsByChannel is only needed as long as we have "worse"
-		// implementations.
-		expectNumAllocateOneInvocationsByChannel map[internal.AllocatorChannel]int64
-	}{
-
+	testcases := map[string]AllocatorTestCase{
 		"empty": {},
 		"simple": {
 			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),
@@ -1119,76 +1120,6 @@ func TestAllocator(t *testing.T,
 				localNodeSelector(node1),
 				deviceAllocationResult(req0, driverA, pool1, device1, false),
 				deviceAllocationResult(req0, driverA, pool2, device1, false),
-			)},
-		},
-		"lexicographical-sorting-pools": {
-			claimsToAllocate: objects(claimWithRequests(claim0, nil, request(req0, classA, 2))),
-			classes:          objects(class(classA, driverA)),
-			slices: unwrapResourceSlices(
-				// pool-3 before pool-2 before pool-1 in input.
-				sliceWithOneDevice(slice1, node1, resourcePool(pool3, 1), driverA),
-				sliceWithOneDevice(slice2, node1, resourcePool(pool2, 1), driverA),
-				sliceWithOneDevice(slice3, node1, resourcePool(pool1, 1), driverA),
-			),
-			node: node(node1, region1),
-
-			expectResults: []any{allocationResult(
-				localNodeSelector(node1),
-				deviceAllocationResult(req0, driverA, pool1, device1, false),
-				deviceAllocationResult(req0, driverA, pool2, device1, false),
-			)},
-		},
-		"lexicographical-sorting-pools-with-binding-conditions": {
-			claimsToAllocate: objects(claimWithRequests(claim0, nil, request(req0, classA, 2))),
-			classes:          objects(class(classA, driverA)),
-			slices: unwrapResourceSlices(
-				sliceWithDevices(slice1, node1, resourcePool(pool1, 1), driverA,
-					device(device1, nil, nil).withBindingConditions([]string{"Ready"}, nil),
-				),
-				sliceWithDevices(slice2, node1, resourcePool(pool3, 1), driverA, device(device2, nil, nil)),
-				sliceWithDevices(slice3, node1, resourcePool(pool2, 1), driverA, device(device3, nil, nil)),
-			),
-			node: node(node1, region1),
-
-			expectResults: []any{allocationResult(
-				localNodeSelector(node1),
-				deviceAllocationResult(req0, driverA, pool2, device3, false),
-				deviceAllocationResult(req0, driverA, pool3, device2, false),
-			)},
-		},
-		"lexicographical-sorting-slices": {
-			claimsToAllocate: objects(claimWithRequests(claim0, nil, request(req0, classA, 2))),
-			classes:          objects(class(classA, driverA)),
-			slices: unwrapResourceSlices(
-				// slice-3 before slice-2 before slice-1 in input.
-				sliceWithDevices(slice3, node1, resourcePool(pool1, 3), driverA, device(device3, nil, nil)),
-				sliceWithDevices(slice2, node1, resourcePool(pool1, 3), driverA, device(device2, nil, nil)),
-				sliceWithDevices(slice1, node1, resourcePool(pool1, 3), driverA, device(device1, nil, nil)),
-			),
-			node: node(node1, region1),
-
-			expectResults: []any{allocationResult(
-				localNodeSelector(node1),
-				deviceAllocationResult(req0, driverA, pool1, device1, false),
-				deviceAllocationResult(req0, driverA, pool1, device2, false),
-			)},
-		},
-		"lexicographical-sorting-slices-with-binding-conditions": {
-			claimsToAllocate: objects(claimWithRequests(claim0, nil, request(req0, classA, 2))),
-			classes:          objects(class(classA, driverA)),
-			slices: unwrapResourceSlices(
-				sliceWithDevices(slice1, node1, resourcePool(pool1, 3), driverA,
-					device(device1, nil, nil).withBindingConditions([]string{"Ready"}, nil),
-				),
-				sliceWithDevices(slice3, node1, resourcePool(pool1, 3), driverA, device(device3, nil, nil)),
-				sliceWithDevices(slice2, node1, resourcePool(pool1, 3), driverA, device(device2, nil, nil)),
-			),
-			node: node(node1, region1),
-
-			expectResults: []any{allocationResult(
-				localNodeSelector(node1),
-				deviceAllocationResult(req0, driverA, pool1, device2, false),
-				deviceAllocationResult(req0, driverA, pool1, device3, false),
 			)},
 		},
 		"obsolete-slice": {
@@ -6341,6 +6272,20 @@ func TestAllocator(t *testing.T,
 		},
 	}
 
+	RunTestAllocator(t, supportedFeatures, newAllocator, testcases)
+}
+
+func RunTestAllocator(t *testing.T,
+	supportedFeatures Features,
+	newAllocator func(
+		ctx context.Context,
+		features Features,
+		allocateState AllocatedState,
+		classLister DeviceClassLister,
+		slices []*resourceapi.ResourceSlice,
+		celCache *cel.Cache,
+	) (Allocator, error),
+	testcases map[string]AllocatorTestCase) {
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
