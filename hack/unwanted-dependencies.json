@@ -166,8 +166,7 @@
         "sigs.k8s.io/apiserver-network-proxy/konnectivity-client"
       ],
       "github.com/google/btree": [
-        "go.etcd.io/etcd/server/v3",
-        "k8s.io/apiserver"
+        "go.etcd.io/etcd/server/v3"
       ],
       "github.com/google/gofuzz": [
         "github.com/json-iterator/go"
