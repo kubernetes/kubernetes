@@ -162,11 +162,14 @@ func createPod(tCtx ktesting.TContext, namespace string, suffix string, pod *v1.
 	return pod
 }
 
-func waitForPodScheduled(tCtx ktesting.TContext, namespace, podName string) {
+func waitForPodScheduled(tCtx ktesting.TContext, namespace, podName string) *v1.Pod {
 	tCtx.Helper()
 
+	var pod *v1.Pod
 	tCtx.Eventually(func(tCtx ktesting.TContext) (*v1.Pod, error) {
-		return tCtx.Client().CoreV1().Pods(namespace).Get(tCtx, podName, metav1.GetOptions{})
+		p, err := tCtx.Client().CoreV1().Pods(namespace).Get(tCtx, podName, metav1.GetOptions{})
+		pod = p
+		return p, err
 	}).WithTimeout(60*time.Second).Should(
 		gomega.HaveField("Status.Conditions", gomega.ContainElement(
 			gomega.And(
@@ -176,6 +179,7 @@ func waitForPodScheduled(tCtx ktesting.TContext, namespace, podName string) {
 		)),
 		"Pod %s should have been scheduled.", podName,
 	)
+	return pod
 }
 
 func deleteAndWait[T any](tCtx ktesting.TContext, del func(context.Context, string, metav1.DeleteOptions) error, get func(context.Context, string, metav1.GetOptions) (T, error), name string) {

@@ -193,7 +193,7 @@ func TestIsPodRunningPreemption(t *testing.T) {
 			fakeLister := &fakePodLister{
 				pods: tt.podsInPodLister,
 			}
-			a := Executor{
+			a := &Executor{
 				podLister:                    fakeLister,
 				preempting:                   tt.preemptingSet,
 				lastVictimsPendingPreemption: tt.lastVictimSet,

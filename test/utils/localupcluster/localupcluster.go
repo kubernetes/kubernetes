@@ -436,7 +436,7 @@ func (c *Cluster) runComponentWithRetry(tCtx ktesting.TContext, cmd *Cmd) {
 		cmd.Start(tCtx)
 		c.running[KubeComponentName(cmd.Name)] = cmd
 		err := func() (finalErr error) {
-			tCtx, finalize := ktesting.WithError(tCtx, &finalErr)
+			tCtx, finalize := tCtx.WithError(&finalErr)
 			defer finalize()
 			c.checkReadiness(tCtx, cmd)
 			return nil
@@ -456,7 +456,7 @@ func (c *Cluster) runComponentWithRetry(tCtx ktesting.TContext, cmd *Cmd) {
 
 func (c *Cluster) checkReadiness(tCtx ktesting.TContext, cmd *Cmd) {
 	restConfig := c.LoadConfig(tCtx)
-	tCtx = ktesting.WithRESTConfig(tCtx, restConfig)
+	tCtx = tCtx.WithRESTConfig(restConfig)
 	tCtx = tCtx.WithStep(fmt.Sprintf("wait for %s readiness", cmd.Name))
 
 	switch KubeComponentName(cmd.Name) {

@@ -28,7 +28,7 @@ func TestWithError(t *testing.T) {
 		assert.Panics(t, func() {
 			tCtx := Init(t)
 			var err error
-			_, finalize := WithError(tCtx, &err)
+			_, finalize := tCtx.WithError(&err)
 			defer finalize()
 
 			panic("pass me through")
@@ -99,7 +99,7 @@ second error`,
 		t.Run(name, func(t *testing.T) {
 			tCtx := Init(t)
 			err := normalErr
-			tCtx, finalize := WithError(tCtx, &err)
+			tCtx, finalize := tCtx.WithError(&err)
 			func() {
 				defer finalize()
 				tc.cb(tCtx)

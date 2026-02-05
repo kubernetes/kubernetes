@@ -62,8 +62,8 @@ func TestCancelAutomatic(t *testing.T) {
 func TestCancelCtx(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	var discardLogger klog.Logger
-	tCtx = ktesting.WithLogger(tCtx, discardLogger)
-	tCtx = ktesting.WithRESTConfig(tCtx, new(rest.Config))
+	tCtx = tCtx.WithLogger(discardLogger)
+	tCtx = tCtx.WithRESTConfig(new(rest.Config))
 	baseCtx := tCtx
 
 	tCtx.Cleanup(func() {
@@ -112,7 +112,7 @@ func TestRun(t *testing.T) {
 	client := clientset.New(nil)
 	dynamic := dynamic.New(nil)
 	apiextensions := apiextensions.New(nil)
-	tCtx = ktesting.WithClients(tCtx, cfg, mapper, client, dynamic, apiextensions)
+	tCtx = tCtx.WithClients(cfg, mapper, client, dynamic, apiextensions)
 
 	tCtx.Run("sub", func(tCtx ktesting.TContext) {
 		assert.Equal(t, cfg, tCtx.RESTConfig(), "RESTConfig")

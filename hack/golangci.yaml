@@ -225,7 +225,7 @@ linters:
       
       # OptionalOrRequired is being enabled over time. For now, each API group should be added to this list until we comb through each group and fix the missing tags.
       - text: "must be marked as optional or required"
-        path: "staging/src/k8s.io/api/(admission|apidiscovery|apiserverinternal|apps|authentication|authorization|autoscaling|batch|certificates|coordination|core|discovery|events|extensions|flowcontrol|networking|node|policy|rbac|resource|storage|storagemigration)"
+        path: "staging/src/k8s.io/api/(admission|apidiscovery|apiserverinternal|apps|authentication|authorization|autoscaling|batch|certificates|coordination|core|discovery|events|extensions|flowcontrol|networking|policy|rbac|resource|storage|storagemigration)"
       
       # OptionalOrRequired - Existing fields that are marked as both optional and required (based on standard optional vs kubebuilder:validation:Required) and should not be fixed.
       - text: "field (PortStatus|IngressPortStatus)\\.Error must not be marked as both optional and required"
@@ -541,40 +541,95 @@ linters:
       # By default, all analyzers are enabled but in
       # Kubernetes we want to be more selective and
       # disable those which are not useful for it.
+      #
+      # Analyzers which are kept enabled are not
+      # called out here, see https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/modernize#section-documentation
+      # for the full list.
       disable:
         # Replace interface{} with any.
+        #
+        # Disabled because developers may
+        # prefer to use `interface{}` for
+        # consistency with existing code
+        # and it's just syntactic sugar.
         - any
         # Replace for-range over b.N with b.Loop.
+        #
+        # Only a hint for new tests because there's
+        # too much existing code that isn't worth
+        # updating.
         - bloop
         # Replace []byte(fmt.Sprintf) with fmt.Appendf.
+        #
+        # A useful hint for new code, but
+        # should only be updated in old code
+        # where it really matters.
         - fmtappendf
         # Remove redundant re-declaration of loop variables.
+        #
+        # A useful hint that this is no longer necessary with
+        # the Go version that Kubernetes depends on.
         - forvar
         # Replace explicit loops over maps with calls to maps package.
+        #
+        # Completely disabled because the benefit
+        # isn't immediately obvious.
         - mapsloop
         # Replace if/else statements with calls to min or max.
+        #
+        # A useful hint for new code.
         - minmax
         # Suggest replacing omitempty with omitzero for struct fields.
+        #
+        # Disabled because might interfere
+        # with encoding of API structs.
         - omitzero
         # Replace 3-clause for loops with for-range over integers.
+        #
+        # A useful hint for new code (makes it shorter).
         - rangeint
         # Replace reflect.TypeOf(x) with TypeFor[T]().
+        #
+        # A useful hint for new code, it could be more efficient.
         - reflecttypefor
         # Replace loops with slices.Contains or slices.ContainsFunc.
+        #
+        # A useful hint because it can make  code more obvious
+        # and/or avoid helper functions.
         - slicescontains
         # Replace sort.Slice with slices.Sort for basic types.
+        #
+        # A useful hint because the code becomes shorter.
         - slicessort
         # Use iterators instead of Len/At-style APIs.
+        #
+        # A useful hint because the code becomes shorter.
         - stditerators
         # Replace HasPrefix/TrimPrefix with CutPrefix.
+        #
+        # A useful hint because the code becomes shorter.
         - stringscutprefix
         # Replace ranging over Split/Fields with SplitSeq/FieldsSeq.
+        #
+        # A useful hint because it's more efficient.
         - stringsseq
         # Replace += with strings.Builder.
+        #
+        # Disabled because in code which
+        # isn't performance-sensitive +=
+        # can be a bit more readable.
         - stringsbuilder
         # Replace context.WithCancel with t.Context in tests.
+        #
+        # Disabled because in Kubernetes,
+        # test/utils/ktesting handles
+        # context cancellation and also
+        # addresses other pain points.
         - testingcontext
         # Replace wg.Add(1)/go/wg.Done() with wg.Go.
+        #
+        # A useful hint leading to shorter code.
+        # Makes wait.Group obsolete.
         - waitgroup
 
     revive:
