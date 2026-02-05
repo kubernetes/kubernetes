@@ -271,6 +271,28 @@ func testWebhookConverter(t *testing.T, watchCache bool) {
 	etcd3watcher.TestOnlySetFatalOnDecodeError(false)
 	defer etcd3watcher.TestOnlySetFatalOnDecodeError(true)
 
+	// To avoid the high cost of restarting the API server for every test case, we start
+	// the infrastructure (API Server + Webhook Server) ONCE at the beginning of the test.
+	//
+	// We use a 'dynamicWebhookHandler' to swap the conversion logic (the handler)
+	// for each test case without restarting the actual HTTP server.
+	//
+	// This allows us to start the webhook server ONCE at the beginning of the test.
+	// Crucially, this allows us to enforce teardown order: API Server stops -> Webhook Server stops.
+
+	// Create the mutable handler.
+	proxyHandler := &dynamicWebhookHandler{}
+
+	// Start Webhook Server FIRST.
+	// This ensures its deferred teardown runs LAST (after API server stop).
+	webhookTearDown, webhookClientConfig, err := StartConversionWebhookServer(proxyHandler)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer webhookTearDown()
+
+	// Start API Server SECOND.
+	// This ensures its deferred teardown runs FIRST.
 	tearDown, config, options, err := fixtures.StartDefaultServer(t, fmt.Sprintf("--watch-cache=%v", watchCache))
 	if err != nil {
 		t.Fatal(err)
@@ -315,12 +337,12 @@ func testWebhookConverter(t *testing.T, watchCache bool) {
 	for _, test := range tests {
 		t.Run(test.group, func(t *testing.T) {
 			upCh, handler := closeOnCall(test.handler)
-			tearDown, webhookClientConfig, err := StartConversionWebhookServer(handler)
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer tearDown()
 
+			// Inject the logic for this specific test case
+			proxyHandler.set(handler)
+			defer proxyHandler.set(nil)
+
+			// Configure the CRD to use the shared webhook server
 			ctc.setConversionWebhook(t, webhookClientConfig, test.reviewVersions)
 			defer ctc.removeConversionWebhook(t)
 
@@ -1614,4 +1636,31 @@ func TestWebhookConversion_WhitespaceCABundleEtcdBypass(t *testing.T) {
 	}
 	verifyMultiVersionObject(t, "v1beta1", obj)
 
+}
+
+// dynamicWebhookHandler is a thread-safe http. Handler that allows swapping
+// the underlying delegate handler at runtime. This is useful for sharing a single
+// server instance across multiple test cases that require different behaviors.
+type dynamicWebhookHandler struct {
+	mu       sync.RWMutex
+	delegate http.Handler
+}
+
+// ServeHTTP implements http.Handler. It delegates the request to the currently
+// configured handler. If no handler is set, it returns an internal server error.
+func (h *dynamicWebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	if h.delegate != nil {
+		h.delegate.ServeHTTP(w, r)
+	} else {
+		http.Error(w, "unexpected call", http.StatusInternalServerError)
+	}
+}
+
+// set safely swaps the underlying delegate handler.
+func (h *dynamicWebhookHandler) set(delegate http.Handler) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.delegate = delegate
 }
