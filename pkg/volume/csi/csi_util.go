@@ -63,9 +63,14 @@ func saveVolumeData(dir string, fileName string, data map[string]string) error {
 	if err != nil {
 		return errors.New(log("failed to save volume data file %s: %v", dataFilePath, err))
 	}
-	defer file.Close()
+	// defer closing the file is not enough, because if validation fails during
+	// saving the file, we can't report the error.
 	if err := json.NewEncoder(file).Encode(data); err != nil {
+		file.Close()
 		return errors.New(log("failed to save volume data file %s: %v", dataFilePath, err))
+	}
+	if err := file.Close(); err != nil {
+		return errors.New(log("failed to close volume data file %s: %v", dataFilePath, err))
 	}
 	klog.V(4).Info(log("volume data file saved successfully [%s]", dataFilePath))
 	return nil
