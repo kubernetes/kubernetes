@@ -7285,11 +7285,11 @@ func ValidateNodeUpdate(node, oldNode *core.Node) field.ErrorList {
 	if len(oldNode.Spec.PodCIDRs) > 0 {
 		// compare the entire slice
 		if len(oldNode.Spec.PodCIDRs) != len(node.Spec.PodCIDRs) {
-			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "podCIDRs"), "node updates may not change podCIDR except from \"\" to valid"))
+			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "podCIDRs"), "node updates may not change podCIDR except from \"\" to valid").MarkCoveredByDeclarative())
 		} else {
 			for idx, value := range oldNode.Spec.PodCIDRs {
 				if value != node.Spec.PodCIDRs[idx] {
-					allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "podCIDRs"), "node updates may not change podCIDR except from \"\" to valid"))
+					allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "podCIDRs"), "node updates may not change podCIDR except from \"\" to valid").MarkCoveredByDeclarative())
 				}
 			}
 		}
@@ -7297,7 +7297,7 @@ func ValidateNodeUpdate(node, oldNode *core.Node) field.ErrorList {
 
 	// Allow controller manager updating provider ID when not set
 	if len(oldNode.Spec.ProviderID) > 0 && oldNode.Spec.ProviderID != node.Spec.ProviderID {
-		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "providerID"), "node updates may not change providerID except from \"\" to valid"))
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "providerID"), "node updates may not change providerID except from \"\" to valid").MarkCoveredByDeclarative())
 	}
 
 	if node.Spec.ConfigSource != nil {
@@ -7756,7 +7756,7 @@ func ValidateSecret(secret *core.Secret) field.ErrorList {
 func ValidateSecretUpdate(newSecret, oldSecret *core.Secret) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&newSecret.ObjectMeta, &oldSecret.ObjectMeta, field.NewPath("metadata"))
 
-	allErrs = append(allErrs, ValidateImmutableField(newSecret.Type, oldSecret.Type, field.NewPath("type"))...)
+	allErrs = append(allErrs, ValidateImmutableField(newSecret.Type, oldSecret.Type, field.NewPath("type")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
 	if oldSecret.Immutable != nil && *oldSecret.Immutable {
 		if newSecret.Immutable == nil || !*newSecret.Immutable {
 			allErrs = append(allErrs, field.Forbidden(field.NewPath("immutable"), "field is immutable when `immutable` is set"))
@@ -8160,7 +8160,7 @@ func ValidateResourceQuotaUpdate(newResourceQuota, oldResourceQuota *core.Resour
 		oldScopes.Insert(string(scope))
 	}
 	if !oldScopes.Equal(newScopes) {
-		allErrs = append(allErrs, field.Invalid(fldPath, newResourceQuota.Spec.Scopes, fieldImmutableErrorMsg))
+		allErrs = append(allErrs, field.Invalid(fldPath, newResourceQuota.Spec.Scopes, fieldImmutableErrorMsg).MarkCoveredByDeclarative())
 	}
 
 	return allErrs

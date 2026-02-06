@@ -52,6 +52,7 @@ type CertificateSigningRequest struct {
 // CertificateSigningRequestSpec contains the certificate request.
 type CertificateSigningRequestSpec struct {
 	// Base64-encoded PKCS#10 CSR data
+	// +k8s:immutable
 	Request []byte `json:"request" protobuf:"bytes,1,opt,name=request"`
 
 	// Requested signer for the request. It is a qualified name in the form:
@@ -65,6 +66,7 @@ type CertificateSigningRequestSpec struct {
 	// Distribution of trust for signers happens out of band.
 	// You can select on this field using `spec.signerName`.
 	// +optional
+	// +k8s:immutable
 	SignerName *string `json:"signerName,omitempty" protobuf:"bytes,7,opt,name=signerName"`
 
 	// expirationSeconds is the requested duration of validity of the issued
@@ -87,6 +89,7 @@ type CertificateSigningRequestSpec struct {
 	// The minimum valid value for expirationSeconds is 600, i.e. 10 minutes.
 	//
 	// +optional
+	// +k8s:immutable
 	ExpirationSeconds *int32 `json:"expirationSeconds,omitempty" protobuf:"varint,8,opt,name=expirationSeconds"`
 
 	// allowedUsages specifies a set of usage contexts the key will be
@@ -120,6 +123,7 @@ type CertificateSigningRequestSpec struct {
 	//  "microsoft sgc",
 	//  "netscape sgc"
 	// +listType=atomic
+	// +k8s:immutable
 	Usages []KeyUsage `json:"usages,omitempty" protobuf:"bytes,5,opt,name=usages"`
 
 	// Information about the requesting user.

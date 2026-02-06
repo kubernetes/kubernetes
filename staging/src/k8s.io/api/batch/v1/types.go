@@ -382,6 +382,7 @@ type JobSpec struct {
 	// Normally, the system sets this field for you.
 	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
 	// +optional
+	// +k8s:immutable
 	Selector *metav1.LabelSelector `json:"selector,omitempty" protobuf:"bytes,4,opt,name=selector"`
 
 	// manualSelector controls generation of pod labels and pod selectors.

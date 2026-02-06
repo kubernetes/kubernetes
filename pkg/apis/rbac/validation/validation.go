@@ -163,7 +163,7 @@ func ValidateRoleBindingUpdate(roleBinding *rbac.RoleBinding, oldRoleBinding *rb
 	allErrs = append(allErrs, validation.ValidateObjectMetaUpdate(&roleBinding.ObjectMeta, &oldRoleBinding.ObjectMeta, field.NewPath("metadata"))...)
 
 	if oldRoleBinding.RoleRef != roleBinding.RoleRef {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("roleRef"), roleBinding.RoleRef, "cannot change roleRef"))
+		allErrs = append(allErrs, field.Invalid(field.NewPath("roleRef"), roleBinding.RoleRef, "cannot change roleRef").MarkCoveredByDeclarative())
 	}
 
 	return allErrs
@@ -207,7 +207,7 @@ func ValidateClusterRoleBindingUpdate(roleBinding *rbac.ClusterRoleBinding, oldR
 	allErrs = append(allErrs, validation.ValidateObjectMetaUpdate(&roleBinding.ObjectMeta, &oldRoleBinding.ObjectMeta, field.NewPath("metadata"))...)
 
 	if oldRoleBinding.RoleRef != roleBinding.RoleRef {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("roleRef"), roleBinding.RoleRef, "cannot change roleRef"))
+		allErrs = append(allErrs, field.Invalid(field.NewPath("roleRef"), roleBinding.RoleRef, "cannot change roleRef").MarkCoveredByDeclarative())
 	}
 
 	return allErrs

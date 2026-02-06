@@ -74,6 +74,7 @@ type ClusterTrustBundleSpec struct {
 	// using a `spec.signerName=NAME` field selector.
 	//
 	// +optional
+	// +k8s:immutable
 	SignerName string `json:"signerName,omitempty" protobuf:"bytes,1,opt,name=signerName"`
 
 	// trustBundle contains the individual X.509 trust anchors for this

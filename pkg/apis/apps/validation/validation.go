@@ -363,7 +363,7 @@ func ValidateControllerRevisionUpdate(newHistory, oldHistory *apps.ControllerRev
 
 	errs = append(errs, apivalidation.ValidateObjectMetaUpdate(&newHistory.ObjectMeta, &oldHistory.ObjectMeta, field.NewPath("metadata"))...)
 	errs = append(errs, validateControllerRevision(newHistory)...)
-	errs = append(errs, apivalidation.ValidateImmutableField(newHistory.Data, oldHistory.Data, field.NewPath("data"))...)
+	errs = append(errs, apivalidation.ValidateImmutableField(newHistory.Data, oldHistory.Data, field.NewPath("data")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
 	return errs
 }
 
@@ -709,7 +709,7 @@ func ValidateDeploymentStatus(status *apps.DeploymentStatus, fldPath *field.Path
 func ValidateDeploymentUpdate(update, old *apps.Deployment, opts apivalidation.PodValidationOptions) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidateDeploymentSpec(&update.Spec, &old.Spec, field.NewPath("spec"), opts)...)
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.Spec.Selector, old.Spec.Selector, field.NewPath("spec").Child("selector"))...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.Spec.Selector, old.Spec.Selector, field.NewPath("spec").Child("selector")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
 	return allErrs
 }
 
@@ -764,7 +764,7 @@ func ValidateReplicaSetUpdate(rs, oldRs *apps.ReplicaSet, opts apivalidation.Pod
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&rs.ObjectMeta, &oldRs.ObjectMeta, field.NewPath("metadata"))...)
 	allErrs = append(allErrs, ValidateReplicaSetSpec(&rs.Spec, &oldRs.Spec, field.NewPath("spec"), opts)...)
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(rs.Spec.Selector, oldRs.Spec.Selector, field.NewPath("spec").Child("selector"))...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(rs.Spec.Selector, oldRs.Spec.Selector, field.NewPath("spec").Child("selector")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
 	return allErrs
 }
 

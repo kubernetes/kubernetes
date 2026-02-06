@@ -63,18 +63,18 @@ func ValidateStorageClass(storageClass *storage.StorageClass) field.ErrorList {
 func ValidateStorageClassUpdate(storageClass, oldStorageClass *storage.StorageClass) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&storageClass.ObjectMeta, &oldStorageClass.ObjectMeta, field.NewPath("metadata"))
 	if !reflect.DeepEqual(oldStorageClass.Parameters, storageClass.Parameters) {
-		allErrs = append(allErrs, field.Forbidden(field.NewPath("parameters"), "updates to parameters are forbidden."))
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("parameters"), "updates to parameters are forbidden.").MarkCoveredByDeclarative())
 	}
 
 	if storageClass.Provisioner != oldStorageClass.Provisioner {
-		allErrs = append(allErrs, field.Forbidden(field.NewPath("provisioner"), "updates to provisioner are forbidden."))
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("provisioner"), "updates to provisioner are forbidden.").MarkCoveredByDeclarative())
 	}
 
 	if *storageClass.ReclaimPolicy != *oldStorageClass.ReclaimPolicy {
-		allErrs = append(allErrs, field.Forbidden(field.NewPath("reclaimPolicy"), "updates to reclaimPolicy are forbidden."))
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("reclaimPolicy"), "updates to reclaimPolicy are forbidden.").MarkCoveredByDeclarative())
 	}
 
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(storageClass.VolumeBindingMode, oldStorageClass.VolumeBindingMode, field.NewPath("volumeBindingMode"))...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(storageClass.VolumeBindingMode, oldStorageClass.VolumeBindingMode, field.NewPath("volumeBindingMode")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
 	return allErrs
 }
 
@@ -403,7 +403,7 @@ func ValidateCSIDriverUpdate(new, old *storage.CSIDriver) field.ErrorList {
 	allErrs = append(allErrs, validateCSIDriverSpec(&new.Spec, field.NewPath("spec"))...)
 
 	// immutable fields should not be mutated.
-	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(new.Spec.AttachRequired, old.Spec.AttachRequired, field.NewPath("spec", "attachedRequired"))...)
+	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(new.Spec.AttachRequired, old.Spec.AttachRequired, field.NewPath("spec", "attachedRequired")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
 	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(new.Spec.VolumeLifecycleModes, old.Spec.VolumeLifecycleModes, field.NewPath("spec", "volumeLifecycleModes"))...)
 
 	return allErrs
