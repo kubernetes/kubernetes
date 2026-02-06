@@ -410,7 +410,6 @@ func (o PortForwardOptions) Validate() error {
 	return nil
 }
 
-// RunPortForward implements all the necessary functionality for port-forward cmd.
 // Deprecated: Use RunPortForwardContext instead, which allows canceling.
 func (o PortForwardOptions) RunPortForward() error {
 	return o.RunPortForwardContext(context.Background())
