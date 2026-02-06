@@ -34,7 +34,6 @@ func NewExpiring() *Expiring {
 func NewExpiringWithClock(clock clock.Clock) *Expiring {
 	return &Expiring{
 		clock: clock,
-		cache: make(map[interface{}]entry),
 	}
 }
 
@@ -52,7 +51,7 @@ type Expiring struct {
 	// mu protects the below fields
 	mu sync.RWMutex
 	// cache is the internal map that backs the cache.
-	cache map[interface{}]entry
+	cache sync.Map
 	// generation is used as a cheap resource version for cache entries. Cleanups
 	// are scheduled with a key and generation. When the cleanup runs, it first
 	// compares its generation with the current generation of the entry. It
@@ -73,13 +72,12 @@ type entry struct {
 }
 
 // Get looks up an entry in the cache.
-func (c *Expiring) Get(key interface{}) (val interface{}, ok bool) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	e, ok := c.cache[key]
+func (c *Expiring) Get(key interface{}) (interface{}, bool) {
+	val, ok := c.cache.Load(key)
 	if !ok {
 		return nil, false
 	}
+	e := val.(entry)
 	if !c.AllowExpiredGet && !c.clock.Now().Before(e.expiry) {
 		return nil, false
 	}
@@ -101,11 +99,11 @@ func (c *Expiring) Set(key interface{}, val interface{}, ttl time.Duration) {
 
 	c.generation++
 
-	c.cache[key] = entry{
+	c.cache.Store(key, entry{
 		val:        val,
 		expiry:     expiry,
 		generation: c.generation,
-	}
+	})
 
 	// Run GC inline before pushing the new entry.
 	c.gc(now)
@@ -132,21 +130,25 @@ func (c *Expiring) Delete(key interface{}) {
 //
 // del must be called under the write lock.
 func (c *Expiring) del(key interface{}, generation uint64) {
-	e, ok := c.cache[key]
+	val, ok := c.cache.Load(key)
 	if !ok {
 		return
 	}
+	e := val.(entry)
 	if generation != 0 && generation != e.generation {
 		return
 	}
-	delete(c.cache, key)
+	c.cache.Delete(key)
 }
 
 // Len returns the number of items in the cache.
 func (c *Expiring) Len() int {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return len(c.cache)
+	count := 0
+	c.cache.Range(func(key, value interface{}) bool {
+		count++
+		return true
+	})
+	return count
 }
 
 func (c *Expiring) gc(now time.Time) {

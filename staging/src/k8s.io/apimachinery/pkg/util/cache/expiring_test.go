@@ -92,10 +92,16 @@ func TestExpiration(t *testing.T) {
 	// remove the key.
 	c.Set("a", "a", time.Second)
 
-	e := c.cache["a"]
+	val, ok := c.cache.Load("a")
+	if !ok {
+		t.Fatalf("key 'a' not found in cache")
+	}
+	e := val.(entry)
+
 	e.generation++
 	e.expiry = e.expiry.Add(1 * time.Second)
-	c.cache["a"] = e
+
+	c.cache.Store("a", e)
 
 	fc.Step(1 * time.Second)
 	if _, ok := c.Get("a"); !ok {
