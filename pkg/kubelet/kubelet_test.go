@@ -1836,6 +1836,126 @@ func TestCheckpointContainer(t *testing.T) {
 	}
 }
 
+func TestCheckpointPod(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+
+	kubelet := testKubelet.kubelet
+	fakeRuntime := testKubelet.fakeRuntime
+
+	runningPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345678",
+			Name:      "podFoo",
+			Namespace: "nsFoo",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "containerFoo",
+				},
+			},
+		},
+	}
+
+	// Register the pod in the pod manager
+	kubelet.podManager.SetPods([]*v1.Pod{runningPod})
+
+	tests := []struct {
+		name            string
+		podUID          types.UID
+		podFullName     string
+		sandboxStatuses []*runtimeapi.PodSandboxStatus
+		podPhase        v1.PodPhase
+		expectedError   bool
+		expectedPath    string
+	}{
+		{
+			name:          "Checkpoint with wrong pod UID",
+			podUID:        "wrong-uid",
+			podFullName:   "wrong-podName",
+			podPhase:      v1.PodRunning,
+			expectedError: true,
+		},
+		{
+			name:          "Checkpoint with default path",
+			podUID:        runningPod.UID,
+			podFullName:   "podFoo_nsFoo",
+			podPhase:      v1.PodPending,
+			expectedError: true,
+		},
+		{
+			name:          "Checkpoint with default path",
+			podUID:        runningPod.UID,
+			podFullName:   "podFoo_nsFoo",
+			podPhase:      v1.PodFailed,
+			expectedError: true,
+		},
+		{
+			name:          "Checkpoint with default path",
+			podUID:        runningPod.UID,
+			podFullName:   "podFoo_nsFoo",
+			podPhase:      v1.PodSucceeded,
+			expectedError: true,
+		},
+		{
+			name:          "Checkpoint with default path",
+			podUID:        runningPod.UID,
+			podFullName:   "podFoo_nsFoo",
+			podPhase:      v1.PodSucceeded,
+			expectedError: true,
+		},
+		{
+			name:          "Checkpoint with default path",
+			podUID:        runningPod.UID,
+			podFullName:   "podFoo_nsFoo",
+			podPhase:      v1.PodRunning,
+			expectedError: false,
+			expectedPath: filepath.Join(
+				kubelet.getPodCheckpointsDir(),
+				"checkpoint-podFoo_nsFoo-",
+			),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+
+			logger, _ := ktesting.NewTestContext(t)
+			kubelet.statusManager.SetPodStatus(logger, runningPod, v1.PodStatus{Phase: test.podPhase})
+
+			fakeRuntime.PodStatus = kubecontainer.PodStatus{
+				SandboxStatuses: test.sandboxStatuses,
+			}
+			options := &runtimeapi.CheckpointPodRequest{}
+			status := kubelet.CheckpointPod(
+				tCtx,
+				test.podUID,
+				test.podFullName,
+				options,
+			)
+
+			if test.expectedError {
+				require.Error(t, status)
+				return
+			}
+			require.NoError(t, status)
+
+			require.True(
+				t,
+				strings.HasPrefix(
+					options.Path,
+					test.expectedPath,
+				),
+				"expected path prefix %q, got %q",
+				test.expectedPath,
+				options.Path,
+			)
+		})
+	}
+}
+
 func TestSyncPodsSetStatusToFailedForPodsThatRunTooLong(t *testing.T) {
 	ctx := ktesting.Init(t)
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)

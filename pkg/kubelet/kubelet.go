@@ -3288,6 +3288,38 @@ func (kl *Kubelet) CheckpointContainer(
 	return nil
 }
 
+func (kl *Kubelet) CheckpointPod(
+	ctx context.Context,
+	podUID types.UID,
+	podFullName string,
+	options *runtimeapi.CheckpointPodRequest,
+) error {
+	existingStatus, ok := kl.statusManager.GetPodStatus(podUID)
+	if !ok {
+		return fmt.Errorf("failed to get status for pod %v, phase %v", podFullName, existingStatus.Phase)
+	}
+	if existingStatus.Phase != v1.PodRunning {
+		return fmt.Errorf("pod %v is not in running state, cannot be checkpointed", podFullName)
+	}
+
+	options.Path = filepath.Join(
+		kl.getPodCheckpointsDir(),
+		fmt.Sprintf(
+			"checkpoint-%s-%s.tar",
+			podFullName,
+			time.Now().Format(time.RFC3339),
+		),
+	)
+
+	options.PodSandboxId = string(podUID)
+
+	if err := kl.containerRuntime.CheckpointPod(ctx, options); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // ListMetricDescriptors gets the descriptors for the metrics that will be returned in ListPodSandboxMetrics.
 func (kl *Kubelet) ListMetricDescriptors(ctx context.Context) ([]*runtimeapi.MetricDescriptor, error) {
 	return kl.containerRuntime.ListMetricDescriptors(ctx)
