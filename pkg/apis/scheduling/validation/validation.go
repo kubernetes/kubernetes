@@ -60,7 +60,7 @@ func ValidatePriorityClassUpdate(pc, oldPc *scheduling.PriorityClass) field.Erro
 	// value is immutable.
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(pc.Value, oldPc.Value, field.NewPath("value")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
 	// preemptionPolicy is immutable.
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(pc.PreemptionPolicy, oldPc.PreemptionPolicy, field.NewPath("preemptionPolicy"))...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(pc.PreemptionPolicy, oldPc.PreemptionPolicy, field.NewPath("preemptionPolicy")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
 	return allErrs
 }
 

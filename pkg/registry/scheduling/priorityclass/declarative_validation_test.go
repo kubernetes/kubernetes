@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	scheduling "k8s.io/kubernetes/pkg/apis/scheduling"
 )
 
@@ -95,6 +96,13 @@ func testValidateUpdateForDeclarative(t *testing.T, apiVersion string) {
 				field.Invalid(field.NewPath("value"), 200, "field is immutable").WithOrigin("immutable"),
 			},
 		},
+		"invalid update changing preemptionPolicy": {
+			old:    validPC,
+			update: mkValidPriorityClass(tweakPreemptionPolicy(&preemptNever)),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("preemptionPolicy"), &preemptNever, "field is immutable").WithOrigin("immutable"),
+			},
+		},
 		// TODO: Add more test cases
 	}
 
@@ -127,3 +135,11 @@ func tweakValue(value int32) func(*scheduling.PriorityClass) {
 		pc.Value = value
 	}
 }
+
+func tweakPreemptionPolicy(policy *api.PreemptionPolicy) func(*scheduling.PriorityClass) {
+	return func(pc *scheduling.PriorityClass) {
+		pc.PreemptionPolicy = policy
+	}
+}
+
+var preemptNever = api.PreemptNever
