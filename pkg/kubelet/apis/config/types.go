@@ -545,6 +545,11 @@ type KubeletConfiguration struct {
 	// +featureGate=UserNamespacesSupport
 	// +optional
 	UserNamespaces *UserNamespaces
+
+	// GoTraceback is the value to set the GOTRACEBACK environment variable to.
+	// Valid values are "none", "single", "all", "system", "crash".
+	// If not specified, the environment variable or default behavior is used.
+	GoTraceback string
 }
 
 // KubeletAuthorizationMode denotes the authorization mode for the kubelet

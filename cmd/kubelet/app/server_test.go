@@ -521,3 +521,58 @@ readOnlyPort: 9999
 		})
 	}
 }
+
+func TestGoTracebackConfig(t *testing.T) {
+	testCases := []struct {
+		desc        string
+		dropin      string
+		expectValue string
+		expectError bool
+	}{
+		{
+			desc: "set goTraceback to crash",
+			dropin: `
+apiVersion: kubelet.config.k8s.io/v1beta1
+kind: KubeletConfiguration
+goTraceback: crash
+`,
+			expectValue: "crash",
+		},
+		{
+			desc: "set goTraceback to system",
+			dropin: `
+apiVersion: kubelet.config.k8s.io/v1beta1
+kind: KubeletConfiguration
+goTraceback: system
+`,
+			expectValue: "system",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			tempDir := t.TempDir()
+			kubeletConfDir := filepath.Join(tempDir, "kubelet.conf.d")
+			err := os.Mkdir(kubeletConfDir, 0755)
+			require.NoError(t, err)
+
+			err = os.WriteFile(filepath.Join(kubeletConfDir, "10-kubelet.conf"), []byte(tc.dropin), 0644)
+			require.NoError(t, err)
+
+			kubeletConfig := &kubeletconfiginternal.KubeletConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "KubeletConfiguration",
+					APIVersion: "kubelet.config.k8s.io/v1beta1",
+				},
+			}
+
+			_, err = mergeKubeletConfigurations(kubeletConfig, kubeletConfDir)
+			if tc.expectError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tc.expectValue, kubeletConfig.GoTraceback)
+			}
+		})
+	}
+}

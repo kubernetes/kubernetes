@@ -70700,6 +70700,13 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							Format:      "int32",
 						},
 					},
+					"goTraceback": {
+						SchemaProps: spec.SchemaProps{
+							Description: "goTraceback is the value to set the GOTRACEBACK environment variable to. Valid values are \"none\", \"single\", \"all\", \"system\", \"crash\". If not specified, the environment variable or default behavior is used.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 					"containerLogMaxWorkers": {
 						SchemaProps: spec.SchemaProps{
 							Description: "ContainerLogMaxWorkers specifies the maximum number of concurrent workers to spawn for performing the log rotate operations. Set this count to 1 for disabling the concurrent log rotation workflows Default: 1",
