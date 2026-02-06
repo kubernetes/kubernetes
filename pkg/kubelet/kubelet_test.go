@@ -1835,6 +1835,108 @@ func TestCheckpointContainer(t *testing.T) {
 	}
 }
 
+func TestCheckpointPod(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+
+	fakeRuntime := testKubelet.fakeRuntime
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345678",
+			Name:      "podFoo",
+			Namespace: "nsFoo",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "containerFoo",
+				},
+			},
+		},
+	}
+
+	// Register the pod in the pod manager
+	kubelet.podManager.SetPods([]*v1.Pod{pod})
+
+	tests := []struct {
+		name             string
+		podUID           types.UID
+		podFullName      string
+		sandboxStatuses  []*runtimeapi.PodSandboxStatus
+		expectedStatus   bool
+		expectedLocation string
+	}{
+		{
+			name:           "Checkpoint with wrong pod UID",
+			podUID:         "wrong-uid",
+			podFullName:    "podFoo_nsFoo",
+			expectedStatus: true,
+		},
+		{
+			name:            "Checkpoint with no sandbox",
+			podUID:          pod.UID,
+			podFullName:     "podFoo_nsFoo",
+			sandboxStatuses: nil,
+			expectedStatus:  true,
+		},
+		{
+			name:        "Checkpoint with default location",
+			podUID:      pod.UID,
+			podFullName: "podFoo_nsFoo",
+			sandboxStatuses: []*runtimeapi.PodSandboxStatus{
+				{
+					Id: "sandbox1234",
+				},
+			},
+			expectedStatus: false,
+			expectedLocation: filepath.Join(
+				kubelet.getPodCheckpointsDir(),
+				"checkpoint-podFoo_nsFoo-",
+			),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			fakeRuntime.PodStatus = kubecontainer.PodStatus{
+				SandboxStatuses: test.sandboxStatuses,
+			}
+			options := &runtimeapi.CheckpointPodRequest{}
+			status := kubelet.CheckpointPod(
+				tCtx,
+				test.podUID,
+				test.podFullName,
+				options,
+			)
+
+			if test.expectedStatus {
+				require.Error(t, status)
+				return
+			}
+			require.NoError(t, status)
+
+			require.True(
+				t,
+				strings.HasPrefix(
+					options.Path,
+					test.expectedLocation,
+				),
+				"expected location prefix %q, got %q",
+				test.expectedLocation,
+				options.Path,
+			)
+			require.Equal(
+				t,
+				options.PodSandboxId,
+				test.sandboxStatuses[0].Id,
+			)
+		})
+	}
+}
+
 func TestSyncPodsSetStatusToFailedForPodsThatRunTooLong(t *testing.T) {
 	ctx := ktesting.Init(t)
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
