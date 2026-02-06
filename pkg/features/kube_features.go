@@ -150,6 +150,12 @@ const (
 	// Enables container Checkpoint support in the kubelet
 	ContainerCheckpoint featuregate.Feature = "ContainerCheckpoint"
 
+	// owner: @adrianreber @rst0git
+	// kep: https://kep.k8s.io/5823
+	//
+	// Enables Pod-Level Checkpoint/Restore in the kubelet
+	KubeletLocalPodCheckpointRestore featuregate.Feature = "KubeletLocalPodCheckpointRestore"
+
 	// onwer: @yuanwang04
 	// kep: https://kep.k8s.io/5307
 	//
@@ -1178,6 +1184,11 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	KubeletLocalPodCheckpointRestore: {
+		// TODO: switch to 1.36. Currently the TestAuthFilters will not work with 1.35
+		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	ContainerRestartRules: {
 		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
@@ -2136,6 +2147,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	ClusterTrustBundleProjection: {ClusterTrustBundle},
 
 	ContainerCheckpoint: {},
+
+	KubeletLocalPodCheckpointRestore: {},
 
 	ContainerRestartRules: {},
 

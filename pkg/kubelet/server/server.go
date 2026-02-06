@@ -105,6 +105,7 @@ const (
 	statsPath           = "/stats/"
 	logsPath            = "/logs/"
 	checkpointPath      = "/checkpoint/"
+	checkpointPodPath   = "/checkpointpod/"
 	pprofBasePath       = "/debug/pprof/"
 	debugFlagPath       = "/debug/flags/v"
 	podsPath            = "/pods"
@@ -275,6 +276,7 @@ type HostInterface interface {
 	GetRunningPods(ctx context.Context) ([]*v1.Pod, error)
 	RunInContainer(ctx context.Context, name string, uid types.UID, container string, cmd []string) ([]byte, error)
 	CheckpointContainer(ctx context.Context, podUID types.UID, podFullName, containerName string, options *runtimeapi.CheckpointContainerRequest) error
+	CheckpointPod(ctx context.Context, podUID types.UID, podFullName string, options *runtimeapi.CheckpointPodRequest) error
 	GetKubeletContainerLogs(ctx context.Context, podFullName, containerName string, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) error
 	ServeLogs(w http.ResponseWriter, req *http.Request)
 	SyncLoopHealthCheck(req *http.Request) error
@@ -622,6 +624,17 @@ func (s *Server) InstallAuthRequiredHandlers(ctx context.Context) {
 		ws.Route(ws.POST("/{podNamespace}/{podID}/{containerName}").
 			To(s.checkpoint).
 			Operation("checkpoint"))
+		s.restfulCont.Add(ws)
+	}
+
+	// Only enable checkpoint pod API if the feature is enabled
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletLocalPodCheckpointRestore) {
+		s.addMetricsBucketMatcher("checkpointpod")
+		ws = &restful.WebService{}
+		ws.Path(checkpointPodPath).Produces(restful.MIME_JSON)
+		ws.Route(ws.POST("/{podNamespace}/{podID}").
+			To(s.checkpointPod).
+			Operation("checkpointpod"))
 		s.restfulCont.Add(ws)
 	}
 }
@@ -1127,6 +1140,83 @@ func (s *Server) checkpoint(request *restful.Request, response *restful.Response
 		logger,
 		response,
 		[]byte(fmt.Sprintf("{\"items\":[\"%s\"]}", options.Location)),
+	)
+}
+
+// checkpointPod handles the checkpoint pod API request. It checks if the requested
+// podNamespace and pod actually exist and only then calls out
+// to the runtime to actually checkpoint the pod sandbox.
+func (s *Server) checkpointPod(request *restful.Request, response *restful.Response) {
+	ctx := request.Request.Context()
+	logger := klog.FromContext(ctx)
+	pod, ok := s.host.GetPodByName(request.PathParameter("podNamespace"), request.PathParameter("podID"))
+	if !ok {
+		response.WriteError(http.StatusNotFound, fmt.Errorf("pod does not exist"))
+		return
+	}
+
+	options := &runtimeapi.CheckpointPodRequest{
+		Options: make(map[string]string),
+	}
+	// Query parameter to select an optional timeout. Without the timeout parameter
+	// the checkpoint command will use the default CRI timeout.
+	timeouts := request.Request.URL.Query()["timeout"]
+	if len(timeouts) > 0 {
+		// If the user specified one or multiple values for timeouts we
+		// are using the last available value.
+		timeout, err := strconv.ParseInt(timeouts[len(timeouts)-1], 10, 64)
+		if err != nil {
+			response.WriteError(
+				http.StatusBadRequest,
+				fmt.Errorf("cannot parse value of timeout parameter"),
+			)
+			return
+		}
+		options.Timeout = timeout
+	}
+
+	// Query parameter to select if the pod should continue running after checkpoint
+	leaveRunnings := request.Request.URL.Query()["leaveRunning"]
+	if len(leaveRunnings) > 0 {
+		// If the user specified one or multiple values for leaveRunning we
+		// are using the last available value.
+		leaveRunning, err := strconv.ParseBool(leaveRunnings[len(leaveRunnings)-1])
+		if err != nil {
+			response.WriteError(
+				http.StatusBadRequest,
+				fmt.Errorf("cannot parse value of leaveRunning parameter"),
+			)
+			return
+		}
+		if leaveRunning {
+			options.Options["leaveRunning"] = "true"
+		}
+	}
+
+	// Query parameter to specify the export path
+	exports := request.Request.URL.Query()["export"]
+	if len(exports) > 0 {
+		// If the user specified one or multiple values for export we
+		// are using the last available value.
+		options.Path = exports[len(exports)-1]
+	}
+
+	if err := s.host.CheckpointPod(ctx, pod.UID, kubecontainer.GetPodFullName(pod), options); err != nil {
+		response.WriteError(
+			http.StatusInternalServerError,
+			fmt.Errorf(
+				"checkpointing of pod %v/%v failed (%v)",
+				request.PathParameter("podNamespace"),
+				request.PathParameter("podID"),
+				err,
+			),
+		)
+		return
+	}
+	writeJSONResponse(
+		logger,
+		response,
+		[]byte(fmt.Sprintf("{\"items\":[\"%s\"]}", options.Path)),
 	)
 }
 
