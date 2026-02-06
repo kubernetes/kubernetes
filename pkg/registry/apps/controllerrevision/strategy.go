@@ -19,6 +19,7 @@ package controllerrevision
 import (
 	"context"
 
+	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -62,7 +63,8 @@ func (strategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 func (strategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	revision := obj.(*apps.ControllerRevision)
 
-	return validation.ValidateControllerRevisionCreate(revision)
+	allErrs := validation.ValidateControllerRevisionCreate(revision)
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, revision, nil, allErrs, operation.Create)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -79,7 +81,8 @@ func (strategy) AllowUnconditionalUpdate() bool {
 
 func (strategy) ValidateUpdate(ctx context.Context, newObj, oldObj runtime.Object) field.ErrorList {
 	oldRevision, newRevision := oldObj.(*apps.ControllerRevision), newObj.(*apps.ControllerRevision)
-	return validation.ValidateControllerRevisionUpdate(newRevision, oldRevision)
+	allErrs := validation.ValidateControllerRevisionUpdate(newRevision, oldRevision)
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newRevision, oldRevision, allErrs, operation.Update)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
