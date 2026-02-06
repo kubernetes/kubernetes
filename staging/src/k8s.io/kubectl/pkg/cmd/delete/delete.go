@@ -17,6 +17,7 @@ limitations under the License.
 package delete
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"strings"
@@ -466,7 +467,7 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 		ConditionFn: cmdwait.IsDeleted,
 		IOStreams:   o.IOStreams,
 	}
-	err = waitOptions.RunWait()
+	err = waitOptions.RunWaitContext(context.Background())
 	if errors.IsForbidden(err) || errors.IsMethodNotSupported(err) {
 		// if we're forbidden from waiting, we shouldn't fail.
 		// if the resource doesn't support a verb we need, we shouldn't fail.

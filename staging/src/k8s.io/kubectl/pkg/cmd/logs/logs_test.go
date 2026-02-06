@@ -543,7 +543,7 @@ func TestLog(t *testing.T) {
 			opts.Namespace = "test"
 			opts.Object = testPod()
 			opts.Options = &corev1.PodLogOptions{}
-			err := opts.RunLogs()
+			err := opts.RunLogsContext(t.Context())
 
 			if err == nil && len(test.expectedErr) > 0 {
 				t.Fatalf("expected error %q, got none", test.expectedErr)
