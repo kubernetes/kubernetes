@@ -74,6 +74,7 @@ func (g *factoryGenerator) GenerateType(c *generator.Context, t *types.Type, w i
 		gvNewFuncs[groupPkgName] = c.Universe.Function(types.Name{Package: path.Join(g.outputPackage, groupPkgName), Name: "New"})
 	}
 	m := map[string]interface{}{
+		"cacheInformerName":              c.Universe.Type(cacheInformerName),
 		"cacheSharedIndexInformer":       c.Universe.Type(cacheSharedIndexInformer),
 		"cacheTransformFunc":             c.Universe.Type(cacheTransformFunc),
 		"groupVersions":                  g.groupVersions,
@@ -111,6 +112,7 @@ type sharedInformerFactory struct {
 	defaultResync {{.timeDuration|raw}}
 	customResync map[{{.reflectType|raw}}]{{.timeDuration|raw}}
 	transform {{.cacheTransformFunc|raw}}
+	informerName *{{.cacheInformerName|raw}}
 
 	informers map[{{.reflectType|raw}}]{{.cacheSharedIndexInformer|raw}}
 	// startedInformers is used for tracking which informers have been started.
@@ -155,6 +157,21 @@ func WithTransform(transform {{.cacheTransformFunc|raw}}) SharedInformerOption {
 		factory.transform = transform
 		return factory
 	}
+}
+
+// WithInformerName sets the InformerName for informer identity used in metrics.
+// The InformerName must be created via cache.NewInformerName() at startup,
+// which validates global uniqueness. Each informer type will register its
+// GVR under this name.
+func WithInformerName(informerName *{{.cacheInformerName|raw}}) SharedInformerOption {
+	return func(factory *sharedInformerFactory) *sharedInformerFactory {
+		factory.informerName = informerName
+		return factory
+	}
+}
+
+func (f *sharedInformerFactory) InformerName() *{{.cacheInformerName|raw}} {
+	return f.informerName
 }
 
 // NewSharedInformerFactory constructs a new instance of sharedInformerFactory for all namespaces.
@@ -222,6 +239,7 @@ func (f *sharedInformerFactory) Shutdown() {
 
 	// Will return immediately if there is nothing to wait for.
 	f.wg.Wait()
+	f.informerName.Release()
 }
 
 func (f *sharedInformerFactory) WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool {
