@@ -29,11 +29,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
-	pkgfeatures "k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
@@ -95,8 +92,6 @@ func (m *testUserNsPodsManager) GetMaxPods() int {
 
 func TestUserNsManagerAllocate(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)
-
 	customUserNsLength := uint32(1048576)
 
 	cases := []struct {
@@ -178,7 +173,6 @@ func TestUserNsManagerAllocate(t *testing.T) {
 
 func TestMakeUserNsManager(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)
 
 	cases := []struct {
 		name           string
@@ -233,7 +227,6 @@ func TestMakeUserNsManager(t *testing.T) {
 
 func TestUserNsManagerParseUserNsFile(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)
 
 	cases := []struct {
 		name    string
@@ -316,8 +309,6 @@ func TestUserNsManagerParseUserNsFile(t *testing.T) {
 }
 
 func TestGetOrCreateUserNamespaceMappings(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)
-
 	trueVal := true
 	falseVal := false
 
@@ -408,7 +399,6 @@ func TestGetOrCreateUserNamespaceMappings(t *testing.T) {
 
 func TestCleanupOrphanedPodUsernsAllocations(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)
 
 	cases := []struct {
 		name                 string
@@ -499,7 +489,6 @@ func (m *failingUserNsPodsManager) ListPodsFromDisk() ([]types.UID, error) {
 
 func TestMakeUserNsManagerFailsListPod(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)
 
 	testUserNsPodsManager := &failingUserNsPodsManager{}
 	_, err := MakeUserNsManager(logger, testUserNsPodsManager, nil)
@@ -509,7 +498,6 @@ func TestMakeUserNsManagerFailsListPod(t *testing.T) {
 
 func TestRecordBounds(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)
 
 	// Allow exactly for 1 pod
 	testUserNsPodsManager := &testUserNsPodsManager{
