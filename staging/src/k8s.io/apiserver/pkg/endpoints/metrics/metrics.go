@@ -782,7 +782,7 @@ func cleanVerb(verb, suggestedVerb string, request *http.Request, requestInfo *r
 
 // getVerbIfWatch additionally ensures that GET or List would be transformed to WATCH
 func getVerbIfWatch(req *http.Request) string {
-	if strings.ToUpper(req.Method) == MethodGet || strings.ToUpper(req.Method) == request.MethodList {
+	if strings.EqualFold(req.Method, MethodGet) || strings.EqualFold(req.Method, request.MethodList) {
 		// see apimachinery/pkg/runtime/conversion.go Convert_Slice_string_To_bool
 		if values := req.URL.Query()["watch"]; len(values) > 0 {
 			if value := strings.ToLower(values[0]); value != "0" && value != "false" {

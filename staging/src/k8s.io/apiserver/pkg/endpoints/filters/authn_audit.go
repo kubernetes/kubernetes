@@ -64,7 +64,7 @@ func getAuthMethods(req *http.Request) string {
 
 	auth := strings.TrimSpace(req.Header.Get("Authorization"))
 	parts := strings.Split(auth, " ")
-	if len(parts) > 1 && strings.ToLower(parts[0]) == "bearer" {
+	if len(parts) > 1 && strings.EqualFold(parts[0], "bearer") {
 		authMethods = append(authMethods, "bearer")
 	}
 
