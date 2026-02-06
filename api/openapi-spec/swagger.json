@@ -3134,15 +3134,15 @@
         },
         "metadata": {
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta",
-          "description": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
+          "description": "metadata is the standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
         },
         "spec": {
           "$ref": "#/definitions/io.k8s.api.authorization.v1.SubjectAccessReviewSpec",
-          "description": "Spec holds information about the request being evaluated.  spec.namespace must be equal to the namespace you made the request against.  If empty, it is defaulted."
+          "description": "spec holds information about the request being evaluated.  spec.namespace must be equal to the namespace you made the request against.  If empty, it is defaulted."
         },
         "status": {
           "$ref": "#/definitions/io.k8s.api.authorization.v1.SubjectAccessReviewStatus",
-          "description": "Status is filled in by the server and indicates whether the request is allowed or not"
+          "description": "status is filled in by the server and indicates whether the request is allowed or not"
         }
       },
       "required": [
@@ -3161,11 +3161,11 @@
       "description": "NonResourceAttributes includes the authorization attributes available for non-resource requests to the Authorizer interface",
       "properties": {
         "path": {
-          "description": "Path is the URL path of the request",
+          "description": "path is the URL path of the request",
           "type": "string"
         },
         "verb": {
-          "description": "Verb is the standard HTTP verb",
+          "description": "verb is the standard HTTP verb",
           "type": "string"
         }
       },
@@ -3175,7 +3175,7 @@
       "description": "NonResourceRule holds information that describes a rule for the non-resource",
       "properties": {
         "nonResourceURLs": {
-          "description": "NonResourceURLs is a set of partial urls that a user should have access to.  *s are allowed, but only as the full, final step in the path.  \"*\" means all.",
+          "description": "nonResourceURLs is a set of partial urls that a user should have access to.  *s are allowed, but only as the full, final step in the path.  \"*\" means all.",
           "items": {
             "type": "string"
           },
@@ -3183,7 +3183,7 @@
           "x-kubernetes-list-type": "atomic"
         },
         "verbs": {
-          "description": "Verb is a list of kubernetes non-resource API verbs, like: get, post, put, delete, patch, head, options.  \"*\" means all.",
+          "description": "verbs is a list of kubernetes non-resource API verbs, like: get, post, put, delete, patch, head, options.  \"*\" means all.",
           "items": {
             "type": "string"
           },
@@ -3204,7 +3204,7 @@
           "description": "fieldSelector describes the limitation on access based on field.  It can only limit access, not broaden it."
         },
         "group": {
-          "description": "Group is the API Group of the Resource.  \"*\" means all.",
+          "description": "group is the API Group of the Resource.  \"*\" means all.",
           "type": "string"
         },
         "labelSelector": {
@@ -3212,27 +3212,27 @@
           "description": "labelSelector describes the limitation on access based on labels.  It can only limit access, not broaden it."
         },
         "name": {
-          "description": "Name is the name of the resource being requested for a \"get\" or deleted for a \"delete\". \"\" (empty) means all.",
+          "description": "name is the name of the resource being requested for a \"get\" or deleted for a \"delete\". \"\" (empty) means all.",
           "type": "string"
         },
         "namespace": {
-          "description": "Namespace is the namespace of the action being requested.  Currently, there is no distinction between no namespace and all namespaces \"\" (empty) is defaulted for LocalSubjectAccessReviews \"\" (empty) is empty for cluster-scoped resources \"\" (empty) means \"all\" for namespace scoped resources from a SubjectAccessReview or SelfSubjectAccessReview",
+          "description": "namespace is the namespace of the action being requested.  Currently, there is no distinction between no namespace and all namespaces \"\" (empty) is defaulted for LocalSubjectAccessReviews \"\" (empty) is empty for cluster-scoped resources \"\" (empty) means \"all\" for namespace scoped resources from a SubjectAccessReview or SelfSubjectAccessReview",
           "type": "string"
         },
         "resource": {
-          "description": "Resource is one of the existing resource types.  \"*\" means all.",
+          "description": "resource is one of the existing resource types.  \"*\" means all.",
           "type": "string"
         },
         "subresource": {
-          "description": "Subresource is one of the existing resource types.  \"\" means none.",
+          "description": "subresource is one of the existing resource types.  \"\" means none.",
           "type": "string"
         },
         "verb": {
-          "description": "Verb is a kubernetes resource API verb, like: get, list, watch, create, update, delete, proxy.  \"*\" means all.",
+          "description": "verb is a kubernetes resource API verb, like: get, list, watch, create, update, delete, proxy.  \"*\" means all.",
           "type": "string"
         },
         "version": {
-          "description": "Version is the API Version of the Resource.  \"*\" means all.",
+          "description": "version is the API Version of the Resource.  \"*\" means all.",
           "type": "string"
         }
       },
@@ -3242,7 +3242,7 @@
       "description": "ResourceRule is the list of actions the subject is allowed to perform on resources. The list ordering isn't significant, may contain duplicates, and possibly be incomplete.",
       "properties": {
         "apiGroups": {
-          "description": "APIGroups is the name of the APIGroup that contains the resources.  If multiple API groups are specified, any action requested against one of the enumerated resources in any API group will be allowed.  \"*\" means all.",
+          "description": "apiGroups is the name of the APIGroup that contains the resources.  If multiple API groups are specified, any action requested against one of the enumerated resources in any API group will be allowed.  \"*\" means all.",
           "items": {
             "type": "string"
           },
@@ -3250,7 +3250,7 @@
           "x-kubernetes-list-type": "atomic"
         },
         "resourceNames": {
-          "description": "ResourceNames is an optional white list of names that the rule applies to.  An empty set means that everything is allowed.  \"*\" means all.",
+          "description": "resourceNames is an optional white list of names that the rule applies to.  An empty set means that everything is allowed.  \"*\" means all.",
           "items": {
             "type": "string"
           },
@@ -3258,7 +3258,7 @@
           "x-kubernetes-list-type": "atomic"
         },
         "resources": {
-          "description": "Resources is a list of resources this rule applies to.  \"*\" means all in the specified apiGroups.\n \"*/foo\" represents the subresource 'foo' for all resources in the specified apiGroups.",
+          "description": "resources is a list of resources this rule applies to.  \"*\" means all in the specified apiGroups.\n \"*/foo\" represents the subresource 'foo' for all resources in the specified apiGroups.",
           "items": {
             "type": "string"
           },
@@ -3266,7 +3266,7 @@
           "x-kubernetes-list-type": "atomic"
         },
         "verbs": {
-          "description": "Verb is a list of kubernetes resource API verbs, like: get, list, watch, create, update, delete, proxy.  \"*\" means all.",
+          "description": "verbs is a list of kubernetes resource API verbs, like: get, list, watch, create, update, delete, proxy.  \"*\" means all.",
           "items": {
             "type": "string"
           },
@@ -3292,15 +3292,15 @@
         },
         "metadata": {
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta",
-          "description": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
+          "description": "metadata is the standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
         },
         "spec": {
           "$ref": "#/definitions/io.k8s.api.authorization.v1.SelfSubjectAccessReviewSpec",
-          "description": "Spec holds information about the request being evaluated.  user and groups must be empty"
+          "description": "spec holds information about the request being evaluated.  user and groups must be empty"
         },
         "status": {
           "$ref": "#/definitions/io.k8s.api.authorization.v1.SubjectAccessReviewStatus",
-          "description": "Status is filled in by the server and indicates whether the request is allowed or not"
+          "description": "status is filled in by the server and indicates whether the request is allowed or not"
         }
       },
       "required": [
@@ -3316,15 +3316,15 @@
       ]
     },
     "io.k8s.api.authorization.v1.SelfSubjectAccessReviewSpec": {
-      "description": "SelfSubjectAccessReviewSpec is a description of the access request.  Exactly one of ResourceAuthorizationAttributes and NonResourceAuthorizationAttributes must be set",
+      "description": "SelfSubjectAccessReviewSpec is a description of the access request.  Exactly one of resourceAttributes and nonResourceAttributes must be set",
       "properties": {
         "nonResourceAttributes": {
           "$ref": "#/definitions/io.k8s.api.authorization.v1.NonResourceAttributes",
-          "description": "NonResourceAttributes describes information for a non-resource access request"
+          "description": "nonResourceAttributes describes information for a non-resource access request"
         },
         "resourceAttributes": {
           "$ref": "#/definitions/io.k8s.api.authorization.v1.ResourceAttributes",
-          "description": "ResourceAuthorizationAttributes describes information for a resource access request"
+          "description": "resourceAttributes describes information for a resource access request"
         }
       },
       "type": "object"
@@ -3342,15 +3342,15 @@
         },
         "metadata": {
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta",
-          "description": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
+          "description": "metadata is the standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
         },
         "spec": {
           "$ref": "#/definitions/io.k8s.api.authorization.v1.SelfSubjectRulesReviewSpec",
-          "description": "Spec holds information about the request being evaluated."
+          "description": "spec holds information about the request being evaluated."
         },
         "status": {
           "$ref": "#/definitions/io.k8s.api.authorization.v1.SubjectRulesReviewStatus",
-          "description": "Status is filled in by the server and indicates the set of actions a user can perform."
+          "description": "status is filled in by the server and indicates the set of actions a user can perform."
         }
       },
       "required": [
@@ -3369,7 +3369,7 @@
       "description": "SelfSubjectRulesReviewSpec defines the specification for SelfSubjectRulesReview.",
       "properties": {
         "namespace": {
-          "description": "Namespace to evaluate rules for. Required.",
+          "description": "namespace to evaluate rules for. Required.",
           "type": "string"
         }
       },
@@ -3388,15 +3388,15 @@
         },
         "metadata": {
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta",
-          "description": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
+          "description": "metadata is the standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
         },
         "spec": {
           "$ref": "#/definitions/io.k8s.api.authorization.v1.SubjectAccessReviewSpec",
-          "description": "Spec holds information about the request being evaluated"
+          "description": "spec holds information about the request being evaluated"
         },
         "status": {
           "$ref": "#/definitions/io.k8s.api.authorization.v1.SubjectAccessReviewStatus",
-          "description": "Status is filled in by the server and indicates whether the request is allowed or not"
+          "description": "status is filled in by the server and indicates whether the request is allowed or not"
         }
       },
       "required": [
@@ -3412,7 +3412,7 @@
       ]
     },
     "io.k8s.api.authorization.v1.SubjectAccessReviewSpec": {
-      "description": "SubjectAccessReviewSpec is a description of the access request.  Exactly one of ResourceAuthorizationAttributes and NonResourceAuthorizationAttributes must be set",
+      "description": "SubjectAccessReviewSpec is a description of the access request.  Exactly one of resourceAttributes and nonResourceAttributes must be set",
       "properties": {
         "extra": {
           "additionalProperties": {
@@ -3421,11 +3421,11 @@
             },
             "type": "array"
           },
-          "description": "Extra corresponds to the user.Info.GetExtra() method from the authenticator.  Since that is input to the authorizer it needs a reflection here.",
+          "description": "extra corresponds to the user.Info.GetExtra() method from the authenticator.  Since that is input to the authorizer it needs a reflection here.",
           "type": "object"
         },
         "groups": {
-          "description": "Groups is the groups you're testing for.",
+          "description": "groups is the groups you're testing for.",
           "items": {
             "type": "string"
           },
@@ -3434,18 +3434,18 @@
         },
         "nonResourceAttributes": {
           "$ref": "#/definitions/io.k8s.api.authorization.v1.NonResourceAttributes",
-          "description": "NonResourceAttributes describes information for a non-resource access request"
+          "description": "nonResourceAttributes describes information for a non-resource access request"
         },
         "resourceAttributes": {
           "$ref": "#/definitions/io.k8s.api.authorization.v1.ResourceAttributes",
-          "description": "ResourceAuthorizationAttributes describes information for a resource access request"
+          "description": "resourceAttributes describes information for a resource access request"
         },
         "uid": {
-          "description": "UID information about the requesting user.",
+          "description": "uid information about the requesting user.",
           "type": "string"
         },
         "user": {
-          "description": "User is the user you're testing for. If you specify \"User\" but not \"Groups\", then is it interpreted as \"What if User were not a member of any groups",
+          "description": "user is the user you're testing for. If you specify \"User\" but not \"Groups\", then is it interpreted as \"What if User were not a member of any groups",
           "type": "string"
         }
       },
@@ -3455,19 +3455,19 @@
       "description": "SubjectAccessReviewStatus",
       "properties": {
         "allowed": {
-          "description": "Allowed is required. True if the action would be allowed, false otherwise.",
+          "description": "allowed is required. True if the action would be allowed, false otherwise.",
           "type": "boolean"
         },
         "denied": {
-          "description": "Denied is optional. True if the action would be denied, otherwise false. If both allowed is false and denied is false, then the authorizer has no opinion on whether to authorize the action. Denied may not be true if Allowed is true.",
+          "description": "denied is optional. True if the action would be denied, otherwise false. If both allowed is false and denied is false, then the authorizer has no opinion on whether to authorize the action. Denied may not be true if Allowed is true.",
           "type": "boolean"
         },
         "evaluationError": {
-          "description": "EvaluationError is an indication that some error occurred during the authorization check. It is entirely possible to get an error and be able to continue determine authorization status in spite of it. For instance, RBAC can be missing a role, but enough roles are still present and bound to reason about the request.",
+          "description": "evaluationError is an indication that some error occurred during the authorization check. It is entirely possible to get an error and be able to continue determine authorization status in spite of it. For instance, RBAC can be missing a role, but enough roles are still present and bound to reason about the request.",
           "type": "string"
         },
         "reason": {
-          "description": "Reason is optional.  It indicates why a request was allowed or denied.",
+          "description": "reason is optional.  It indicates why a request was allowed or denied.",
           "type": "string"
         }
       },
@@ -3480,15 +3480,15 @@
       "description": "SubjectRulesReviewStatus contains the result of a rules check. This check can be incomplete depending on the set of authorizers the server is configured with and any errors experienced during evaluation. Because authorization rules are additive, if a rule appears in a list it's safe to assume the subject has that permission, even if that list is incomplete.",
       "properties": {
         "evaluationError": {
-          "description": "EvaluationError can appear in combination with Rules. It indicates an error occurred during rule evaluation, such as an authorizer that doesn't support rule evaluation, and that ResourceRules and/or NonResourceRules may be incomplete.",
+          "description": "evaluationError can appear in combination with Rules. It indicates an error occurred during rule evaluation, such as an authorizer that doesn't support rule evaluation, and that ResourceRules and/or NonResourceRules may be incomplete.",
           "type": "string"
         },
         "incomplete": {
-          "description": "Incomplete is true when the rules returned by this call are incomplete. This is most commonly encountered when an authorizer, such as an external authorizer, doesn't support rules evaluation.",
+          "description": "incomplete is true when the rules returned by this call are incomplete. This is most commonly encountered when an authorizer, such as an external authorizer, doesn't support rules evaluation.",
           "type": "boolean"
         },
         "nonResourceRules": {
-          "description": "NonResourceRules is the list of actions the subject is allowed to perform on non-resources. The list ordering isn't significant, may contain duplicates, and possibly be incomplete.",
+          "description": "nonResourceRules is the list of actions the subject is allowed to perform on non-resources. The list ordering isn't significant, may contain duplicates, and possibly be incomplete.",
           "items": {
             "$ref": "#/definitions/io.k8s.api.authorization.v1.NonResourceRule"
           },
@@ -3496,7 +3496,7 @@
           "x-kubernetes-list-type": "atomic"
         },
         "resourceRules": {
-          "description": "ResourceRules is the list of actions the subject is allowed to perform on resources. The list ordering isn't significant, may contain duplicates, and possibly be incomplete.",
+          "description": "resourceRules is the list of actions the subject is allowed to perform on resources. The list ordering isn't significant, may contain duplicates, and possibly be incomplete.",
           "items": {
             "$ref": "#/definitions/io.k8s.api.authorization.v1.ResourceRule"
           },
