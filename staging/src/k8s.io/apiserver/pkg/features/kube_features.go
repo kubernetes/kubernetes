@@ -128,12 +128,31 @@ const (
 	// Enables running declarative validation of APIs, where declared. When enabled, APIs with
 	// declarative validation rules will validate objects using the generated
 	// declarative validation code and compare the results to the regular imperative validation.
-	// See DeclarativeValidationTakeover for more.
+	// See DeclarativeValidationBeta for more.
 	DeclarativeValidation featuregate.Feature = "DeclarativeValidation"
 
 	// owner: @jpbetz @aaron-prindle @yongruilin
 	// kep: http://kep.k8s.io/5073
+	// beta: v1.36
+	//
+	// This feature gate acts as the Global Safety Switch for Beta-stage validation rules (+k8s:beta).
+	// It allows cluster admins to disable enforcement for validations in the Beta stage if
+	// regressions are found, forcing them back to Shadow mode.
+	// In Shadow mode, declarative validation is executed and mismatches against handwritten
+	// validation are logged as metrics, but failures do not reject requests.
+	// Handwritten validation remains authoritative and enforced.
+	// Enforcement logic for resources using WithDeclarativeEnforcement():
+	// - Standard tags (no prefix): Always Enforced (Bypasses this gate).
+	// - Beta tags (+k8s:beta): Enforced when this gate is enabled (default), otherwise Shadowed.
+	// - Alpha tags (+k8s:alpha): Always Shadowed.
+	// This gate has no effect if the master DeclarativeValidation feature gate is disabled.
+	DeclarativeValidationBeta featuregate.Feature = "DeclarativeValidationBeta"
+
+	// owner: @jpbetz @aaron-prindle @yongruilin
+	// kep: http://kep.k8s.io/5073
 	// beta: v1.33
+	//
+	// Deprecated: in favor of DeclarativeValidationBeta.
 	//
 	// When enabled, declarative validation errors are returned directly to the caller,
 	// replacing hand-written validation errors for rules that have declarative implementations.
@@ -375,8 +394,13 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA and LockToDefault in 1.36, remove in 1.39
 	},
 
+	DeclarativeValidationBeta: {
+		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
+	},
+
 	DeclarativeValidationTakeover: {
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Deprecated},
 	},
 
 	DetectCacheInconsistency: {
