@@ -1373,30 +1373,21 @@ func emitCallsToValidators(c *generator.Context, validations []validators.Functi
 	cohorts := sortIntoCohorts(validations)
 
 	// Check if we need cross-cohort early return (specifically for the "update" cohort
-	// when there are subsequent cohorts that could be skipped).
-	// This allows the update cohort to short-circuit all subsequent cohorts.
+	// when it has short-circuit validators that should prevent subsequent validation).
+	// This allows the update cohort to short-circuit all subsequent cohorts, and also
+	// to short-circuit caller-emitted code (type validation, list iteration) when the
+	// update cohort is the only cohort.
 	// See https://github.com/kubernetes/kubernetes/issues/136262
 	needsCrossCohortEarlyReturn := false
-	if len(cohorts) > 1 {
-		// Only need cross-cohort early return if the "update" cohort has short-circuits
-		// and there are subsequent cohorts
-		for i, cohort := range cohorts[:len(cohorts)-1] {
-			cohortName := cohort[0].Cohort
-			// Only the "update" cohort should cause cross-cohort early returns
-			if cohortName == validators.UpdateCohort {
-				for _, v := range cohort {
-					if v.Flags.IsSet(validators.ShortCircuit) {
-						// There's at least one more cohort after this one
-						if i < len(cohorts)-1 {
-							needsCrossCohortEarlyReturn = true
-						}
-						break
-					}
+	for _, cohort := range cohorts {
+		if cohort[0].Cohort == validators.UpdateCohort {
+			for _, v := range cohort {
+				if v.Flags.IsSet(validators.ShortCircuit) {
+					needsCrossCohortEarlyReturn = true
+					break
 				}
 			}
-			if needsCrossCohortEarlyReturn {
-				break
-			}
+			break
 		}
 	}
 
@@ -1534,6 +1525,15 @@ func emitCallsToValidators(c *generator.Context, validations []validators.Functi
 		if cohortName != "" {
 			sw.Do("}()\n", nil)
 		}
+	}
+
+	// When the update cohort is the last (or only) cohort, emit a final
+	// early-return check to protect caller-emitted code (type validation
+	// calls, list iterations) that follows.
+	if needsCrossCohortEarlyReturn && cohorts[len(cohorts)-1][0].Cohort == validators.UpdateCohort {
+		sw.Do("if crossCohortEarlyReturn {\n", nil)
+		sw.Do("  return // short-circuit from previous cohort\n", nil)
+		sw.Do("}\n", nil)
 	}
 }
 

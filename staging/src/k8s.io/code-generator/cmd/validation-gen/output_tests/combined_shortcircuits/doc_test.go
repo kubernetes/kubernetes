@@ -1,5 +1,5 @@
 /*
-Copyright 2026 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -31,14 +31,16 @@ func Test(t *testing.T) {
 			{Name: "group1"},
 			{Name: "group2"},
 		},
-		ImportantField: ptr.To("important"),
+		ImportantField:     ptr.To("important"),
+		OnlyImmutableField: SubStruct{Name: "original"},
 	}
 
 	differentStruct := Struct{
 		PodGroups: []PodGroup{
 			{Name: "different"},
 		},
-		ImportantField: ptr.To("changed"),
+		ImportantField:     ptr.To("changed"),
+		OnlyImmutableField: SubStruct{Name: "changed"},
 	}
 
 	// Update with no changes: valid (unchanged data is skipped).
@@ -52,6 +54,23 @@ func Test(t *testing.T) {
 		field.ErrorList{
 			field.Invalid(field.NewPath("podGroups"), nil, "").WithOrigin("immutable"),
 			field.Invalid(field.NewPath("importantField"), nil, "").WithOrigin("immutable"),
+			field.Invalid(field.NewPath("onlyImmutableField"), nil, "").WithOrigin("immutable"),
+		})
+
+	// Single-cohort case: field with ONLY +k8s:immutable modified on update.
+	// The immutable error must short-circuit sub-field validation (Name's required).
+	st.Value(&Struct{
+		PodGroups:          []PodGroup{{Name: "group1"}},
+		ImportantField:     ptr.To("important"),
+		OnlyImmutableField: SubStruct{},
+	}).OldValue(&Struct{
+		PodGroups:          []PodGroup{{Name: "group1"}},
+		ImportantField:     ptr.To("important"),
+		OnlyImmutableField: SubStruct{Name: "was-set"},
+	}).ExpectMatches(
+		field.ErrorMatcher{}.ByType().ByField().ByOrigin(),
+		field.ErrorList{
+			field.Invalid(field.NewPath("onlyImmutableField"), nil, "").WithOrigin("immutable"),
 		})
 
 	// Create with empty fields: immutable doesn't apply, so required fires.
@@ -60,5 +79,6 @@ func Test(t *testing.T) {
 		field.ErrorList{
 			field.Required(field.NewPath("podGroups"), ""),
 			field.Required(field.NewPath("importantField"), ""),
+			field.Required(field.NewPath("onlyImmutableField", "name"), ""),
 		})
 }

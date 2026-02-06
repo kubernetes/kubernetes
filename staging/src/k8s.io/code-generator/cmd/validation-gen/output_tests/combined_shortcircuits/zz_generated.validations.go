@@ -153,5 +153,58 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			return
 		}(fldPath.Child("importantField"), obj.ImportantField, safe.Field(oldObj, func(oldObj *Struct) *string { return oldObj.ImportantField }), oldObj != nil)...)
 
+	// field Struct.OnlyImmutableField
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *SubStruct, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			crossCohortEarlyReturn := false
+			func() { // cohort update
+				earlyReturn := false
+				if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				crossCohortEarlyReturn = earlyReturn
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
+			if crossCohortEarlyReturn {
+				return // short-circuit from previous cohort
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_SubStruct(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("onlyImmutableField"), &obj.OnlyImmutableField, safe.Field(oldObj, func(oldObj *Struct) *SubStruct { return &oldObj.OnlyImmutableField }), oldObj != nil)...)
+
+	return errs
+}
+
+// Validate_SubStruct validates an instance of SubStruct according
+// to declarative validation rules in the API schema.
+func Validate_SubStruct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *SubStruct) (errs field.ErrorList) {
+	// field SubStruct.Name
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("name"), &obj.Name, safe.Field(oldObj, func(oldObj *SubStruct) *string { return &oldObj.Name }), oldObj != nil)...)
+
 	return errs
 }

@@ -52,16 +52,21 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 // Validate_ImmutableType validates an instance of ImmutableType according
 // to declarative validation rules in the API schema.
 func Validate_ImmutableType(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ImmutableType) (errs field.ErrorList) {
+	crossCohortEarlyReturn := false
 	func() { // cohort update
 		earlyReturn := false
 		if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 			errs = append(errs, e...)
 			earlyReturn = true
 		}
+		crossCohortEarlyReturn = earlyReturn
 		if earlyReturn {
 			return // do not proceed
 		}
 	}()
+	if crossCohortEarlyReturn {
+		return // short-circuit from previous cohort
+	}
 
 	return errs
 }
@@ -79,16 +84,21 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 				return nil
 			}
 			// call field-attached validations
+			crossCohortEarlyReturn := false
 			func() { // cohort update
 				earlyReturn := false
 				if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
 				}
+				crossCohortEarlyReturn = earlyReturn
 				if earlyReturn {
 					return // do not proceed
 				}
 			}()
+			if crossCohortEarlyReturn {
+				return // short-circuit from previous cohort
+			}
 			return
 		}(fldPath.Child("stringField"), &obj.StringField, safe.Field(oldObj, func(oldObj *Struct) *string { return &oldObj.StringField }), oldObj != nil)...)
 
@@ -100,16 +110,21 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 				return nil
 			}
 			// call field-attached validations
+			crossCohortEarlyReturn := false
 			func() { // cohort update
 				earlyReturn := false
 				if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
 				}
+				crossCohortEarlyReturn = earlyReturn
 				if earlyReturn {
 					return // do not proceed
 				}
 			}()
+			if crossCohortEarlyReturn {
+				return // short-circuit from previous cohort
+			}
 			return
 		}(fldPath.Child("stringPtrField"), obj.StringPtrField, safe.Field(oldObj, func(oldObj *Struct) *string { return oldObj.StringPtrField }), oldObj != nil)...)
 
@@ -121,16 +136,21 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 				return nil
 			}
 			// call field-attached validations
+			crossCohortEarlyReturn := false
 			func() { // cohort update
 				earlyReturn := false
 				if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
 				}
+				crossCohortEarlyReturn = earlyReturn
 				if earlyReturn {
 					return // do not proceed
 				}
 			}()
+			if crossCohortEarlyReturn {
+				return // short-circuit from previous cohort
+			}
 			return
 		}(fldPath.Child("structField"), &obj.StructField, safe.Field(oldObj, func(oldObj *Struct) *ComparableStruct { return &oldObj.StructField }), oldObj != nil)...)
 
@@ -142,16 +162,21 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 				return nil
 			}
 			// call field-attached validations
+			crossCohortEarlyReturn := false
 			func() { // cohort update
 				earlyReturn := false
 				if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
 				}
+				crossCohortEarlyReturn = earlyReturn
 				if earlyReturn {
 					return // do not proceed
 				}
 			}()
+			if crossCohortEarlyReturn {
+				return // short-circuit from previous cohort
+			}
 			return
 		}(fldPath.Child("structPtrField"), obj.StructPtrField, safe.Field(oldObj, func(oldObj *Struct) *ComparableStruct { return oldObj.StructPtrField }), oldObj != nil)...)
 
@@ -163,16 +188,21 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 				return nil
 			}
 			// call field-attached validations
+			crossCohortEarlyReturn := false
 			func() { // cohort update
 				earlyReturn := false
 				if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
 				}
+				crossCohortEarlyReturn = earlyReturn
 				if earlyReturn {
 					return // do not proceed
 				}
 			}()
+			if crossCohortEarlyReturn {
+				return // short-circuit from previous cohort
+			}
 			return
 		}(fldPath.Child("noncomparableStructField"), &obj.NonComparableStructField, safe.Field(oldObj, func(oldObj *Struct) *NonComparableStruct { return &oldObj.NonComparableStructField }), oldObj != nil)...)
 
@@ -184,16 +214,21 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 				return nil
 			}
 			// call field-attached validations
+			crossCohortEarlyReturn := false
 			func() { // cohort update
 				earlyReturn := false
 				if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
 				}
+				crossCohortEarlyReturn = earlyReturn
 				if earlyReturn {
 					return // do not proceed
 				}
 			}()
+			if crossCohortEarlyReturn {
+				return // short-circuit from previous cohort
+			}
 			return
 		}(fldPath.Child("noncomparableStructPtrField"), obj.NonComparableStructPtrField, safe.Field(oldObj, func(oldObj *Struct) *NonComparableStruct { return oldObj.NonComparableStructPtrField }), oldObj != nil)...)
 
@@ -205,16 +240,21 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 				return nil
 			}
 			// call field-attached validations
+			crossCohortEarlyReturn := false
 			func() { // cohort update
 				earlyReturn := false
 				if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
 				}
+				crossCohortEarlyReturn = earlyReturn
 				if earlyReturn {
 					return // do not proceed
 				}
 			}()
+			if crossCohortEarlyReturn {
+				return // short-circuit from previous cohort
+			}
 			return
 		}(fldPath.Child("sliceField"), obj.SliceField, safe.Field(oldObj, func(oldObj *Struct) []string { return oldObj.SliceField }), oldObj != nil)...)
 
@@ -226,16 +266,21 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 				return nil
 			}
 			// call field-attached validations
+			crossCohortEarlyReturn := false
 			func() { // cohort update
 				earlyReturn := false
 				if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
 				}
+				crossCohortEarlyReturn = earlyReturn
 				if earlyReturn {
 					return // do not proceed
 				}
 			}()
+			if crossCohortEarlyReturn {
+				return // short-circuit from previous cohort
+			}
 			return
 		}(fldPath.Child("mapField"), obj.MapField, safe.Field(oldObj, func(oldObj *Struct) map[string]string { return oldObj.MapField }), oldObj != nil)...)
 

@@ -1,5 +1,5 @@
 /*
-Copyright 2026 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -57,4 +57,18 @@ type Struct struct {
 	// +k8s:immutable
 	// +k8s:required
 	ImportantField *string `json:"importantField"`
+
+	// This field has ONLY +k8s:immutable (no required/maxItems on this field).
+	// When this is the only validator on the field, the update cohort is the
+	// sole cohort. The short-circuit must still prevent sub-field validation
+	// (e.g. SubStruct.Name's required check) from running on update.
+	// +k8s:immutable
+	OnlyImmutableField SubStruct `json:"onlyImmutableField"`
+}
+
+// SubStruct is a struct with sub-field validations used to test that
+// single-cohort short-circuit works correctly.
+type SubStruct struct {
+	// +k8s:required
+	Name string `json:"name"`
 }
