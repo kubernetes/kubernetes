@@ -136,7 +136,7 @@ type manager struct {
 	allocationMutex        sync.Mutex
 	podsWithPendingResizes []types.UID
 
-	recorder record.EventRecorder
+	recorder record.EventRecorderLogger
 }
 
 func NewManager(
@@ -148,7 +148,7 @@ func NewManager(
 	getActivePods func() []*v1.Pod,
 	getPodByUID func(types.UID) (*v1.Pod, bool),
 	sourcesReady config.SourcesReady,
-	recorder record.EventRecorder,
+	recorder record.EventRecorderLogger,
 ) Manager {
 	// Use klog.TODO() because we currently do not have a proper logger to pass in.
 	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
@@ -196,7 +196,7 @@ func NewInMemoryManager(
 	getActivePods func() []*v1.Pod,
 	getPodByUID func(types.UID) (*v1.Pod, bool),
 	sourcesReady config.SourcesReady,
-	recorder record.EventRecorder,
+	recorder record.EventRecorderLogger,
 ) Manager {
 	return &manager{
 		allocated: state.NewStateMemory(nil),
@@ -626,7 +626,7 @@ func (m *manager) handlePodResourcesResize(logger klog.Logger, pod *v1.Pod) (boo
 		m.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", pod.Generation)
 
 		msg := events.PodResizeStartedMsg(logger, allocatedPod, pod.Generation)
-		m.recorder.Eventf(pod, v1.EventTypeNormal, events.ResizeStarted, msg)
+		m.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeNormal, events.ResizeStarted, msg)
 
 		return true, nil
 	}
@@ -638,7 +638,7 @@ func (m *manager) handlePodResourcesResize(logger klog.Logger, pod *v1.Pod) (boo
 				eventType = events.ResizeInfeasible
 			}
 			msg := events.PodResizePendingMsg(logger, pod, reason, message, pod.Generation)
-			m.recorder.Eventf(pod, v1.EventTypeWarning, eventType, msg)
+			m.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, eventType, msg)
 		}
 	}
 

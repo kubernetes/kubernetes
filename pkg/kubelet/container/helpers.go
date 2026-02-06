@@ -277,14 +277,20 @@ func ExpandContainerCommandAndArgs(container *v1.Container, envs []EnvVar) (comm
 }
 
 // FilterEventRecorder creates an event recorder to record object's event except implicitly required container's, like infra container.
-func FilterEventRecorder(recorder record.EventRecorder) record.EventRecorder {
+func FilterEventRecorder(recorder record.EventRecorderLogger) record.EventRecorderLogger {
 	return &innerEventRecorder{
 		recorder: recorder,
 	}
 }
 
 type innerEventRecorder struct {
-	recorder record.EventRecorder
+	recorder record.EventRecorderLogger
+}
+
+func (irecorder *innerEventRecorder) WithLogger(logger klog.Logger) record.EventRecorderLogger {
+	return &innerEventRecorder{
+		recorder: irecorder.recorder.WithLogger(logger),
+	}
 }
 
 func (irecorder *innerEventRecorder) shouldRecordEvent(object runtime.Object) (*v1.ObjectReference, bool) {

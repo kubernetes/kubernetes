@@ -58,7 +58,7 @@ const (
 
 // Configurer is used for setting up DNS resolver configuration when launching pods.
 type Configurer struct {
-	recorder         record.EventRecorder
+	recorder         record.EventRecorderLogger
 	getHostDNSConfig func(klog.Logger, string) (*runtimeapi.DNSConfig, error)
 	nodeRef          *v1.ObjectReference
 	nodeIPs          []net.IP
@@ -74,7 +74,7 @@ type Configurer struct {
 }
 
 // NewConfigurer returns a DNS configurer for launching pods.
-func NewConfigurer(recorder record.EventRecorder, nodeRef *v1.ObjectReference, nodeIPs []net.IP, clusterDNS []net.IP, clusterDomain, resolverConfig string) *Configurer {
+func NewConfigurer(recorder record.EventRecorderLogger, nodeRef *v1.ObjectReference, nodeIPs []net.IP, clusterDNS []net.IP, clusterDomain, resolverConfig string) *Configurer {
 	return &Configurer{
 		recorder:         recorder,
 		getHostDNSConfig: getHostDNSConfig,
@@ -140,7 +140,7 @@ func (c *Configurer) formDNSSearchFitsLimits(logger klog.Logger, composedSearch 
 
 	if limitsExceeded {
 		err := fmt.Errorf("Search Line limits were exceeded, some search paths have been omitted, the applied search line is: %s", strings.Join(composedSearch, " "))
-		c.recorder.Event(pod, v1.EventTypeWarning, "DNSConfigForming", err.Error())
+		c.recorder.WithLogger(logger).Event(pod, v1.EventTypeWarning, "DNSConfigForming", err.Error())
 		logger.Error(err, "Search Line limits exceeded")
 	}
 	return composedSearch
@@ -150,7 +150,7 @@ func (c *Configurer) formDNSNameserversFitsLimits(logger klog.Logger, nameserver
 	if len(nameservers) > validation.MaxDNSNameservers {
 		nameservers = nameservers[0:validation.MaxDNSNameservers]
 		err := fmt.Errorf("Nameserver limits were exceeded, some nameservers have been omitted, the applied nameserver line is: %s", strings.Join(nameservers, " "))
-		c.recorder.Event(pod, v1.EventTypeWarning, "DNSConfigForming", err.Error())
+		c.recorder.WithLogger(logger).Event(pod, v1.EventTypeWarning, "DNSConfigForming", err.Error())
 		logger.Error(err, "Nameserver limits exceeded")
 	}
 	return nameservers
@@ -178,7 +178,7 @@ func (c *Configurer) generateSearchesForDNSClusterFirst(hostSearch []string, pod
 func (c *Configurer) CheckLimitsForResolvConf(logger klog.Logger) {
 	f, err := os.Open(c.ResolverConfig)
 	if err != nil {
-		c.recorder.Event(c.nodeRef, v1.EventTypeWarning, "CheckLimitsForResolvConf", err.Error())
+		c.recorder.WithLogger(logger).Event(c.nodeRef, v1.EventTypeWarning, "CheckLimitsForResolvConf", err.Error())
 		logger.V(4).Info("Check limits for resolv.conf failed at file open", "err", err)
 		return
 	}
@@ -186,7 +186,7 @@ func (c *Configurer) CheckLimitsForResolvConf(logger klog.Logger) {
 
 	_, hostSearch, _, err := parseResolvConf(f)
 	if err != nil {
-		c.recorder.Event(c.nodeRef, v1.EventTypeWarning, "CheckLimitsForResolvConf", err.Error())
+		c.recorder.WithLogger(logger).Event(c.nodeRef, v1.EventTypeWarning, "CheckLimitsForResolvConf", err.Error())
 		logger.V(4).Info("Check limits for resolv.conf failed at parse resolv.conf", "err", err)
 		return
 	}
@@ -199,7 +199,7 @@ func (c *Configurer) CheckLimitsForResolvConf(logger klog.Logger) {
 
 	if len(hostSearch) > domainCountLimit {
 		log := fmt.Sprintf("Resolv.conf file '%s' contains search line consisting of more than %d domains!", c.ResolverConfig, domainCountLimit)
-		c.recorder.Event(c.nodeRef, v1.EventTypeWarning, "CheckLimitsForResolvConf", log)
+		c.recorder.WithLogger(logger).Event(c.nodeRef, v1.EventTypeWarning, "CheckLimitsForResolvConf", log)
 		logger.V(4).Info("Check limits for resolv.conf failed", "eventlog", log)
 		return
 	}
@@ -207,7 +207,7 @@ func (c *Configurer) CheckLimitsForResolvConf(logger klog.Logger) {
 	for _, search := range hostSearch {
 		if len(search) > utilvalidation.DNS1123SubdomainMaxLength {
 			log := fmt.Sprintf("Resolv.conf file %q contains a search path which length is more than allowed %d chars!", c.ResolverConfig, utilvalidation.DNS1123SubdomainMaxLength)
-			c.recorder.Event(c.nodeRef, v1.EventTypeWarning, "CheckLimitsForResolvConf", log)
+			c.recorder.WithLogger(logger).Event(c.nodeRef, v1.EventTypeWarning, "CheckLimitsForResolvConf", log)
 			logger.V(4).Info("Check limits for resolv.conf failed", "eventlog", log)
 			return
 		}
@@ -215,7 +215,7 @@ func (c *Configurer) CheckLimitsForResolvConf(logger klog.Logger) {
 
 	if len(strings.Join(hostSearch, " ")) > maxDNSSearchListChars {
 		log := fmt.Sprintf("Resolv.conf file '%s' contains search line which length is more than allowed %d chars!", c.ResolverConfig, maxDNSSearchListChars)
-		c.recorder.Event(c.nodeRef, v1.EventTypeWarning, "CheckLimitsForResolvConf", log)
+		c.recorder.WithLogger(logger).Event(c.nodeRef, v1.EventTypeWarning, "CheckLimitsForResolvConf", log)
 		logger.V(4).Info("Check limits for resolv.conf failed", "eventlog", log)
 		return
 	}
@@ -416,8 +416,8 @@ func (c *Configurer) GetPodDNS(ctx context.Context, pod *v1.Pod) (*runtimeapi.DN
 		}
 		// clusterDNS is not known. Pod with ClusterDNSFirst Policy cannot be created.
 		nodeErrorMsg := fmt.Sprintf("kubelet does not have ClusterDNS IP configured and cannot create Pod using %q policy. Falling back to %q policy.", v1.DNSClusterFirst, v1.DNSDefault)
-		c.recorder.Eventf(c.nodeRef, v1.EventTypeWarning, "MissingClusterDNS", nodeErrorMsg)
-		c.recorder.Eventf(pod, v1.EventTypeWarning, "MissingClusterDNS", "pod: %q. %s", format.Pod(pod), nodeErrorMsg)
+		c.recorder.WithLogger(logger).Eventf(c.nodeRef, v1.EventTypeWarning, "MissingClusterDNS", nodeErrorMsg)
+		c.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, "MissingClusterDNS", "pod: %q. %s", format.Pod(pod), nodeErrorMsg)
 		// Fallback to DNSDefault.
 		fallthrough
 	case podDNSHost:
