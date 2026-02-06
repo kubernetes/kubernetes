@@ -17,13 +17,13 @@ limitations under the License.
 package ingressclass
 
 import (
+	"k8s.io/kubernetes/pkg/apis/networking"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	networking "k8s.io/kubernetes/pkg/apis/networking"
 )
 
 var apiVersions = []string{"v1", "v1beta1"}
@@ -94,28 +94,18 @@ func TestDeclarativeValidateUpdateParameters(t *testing.T) {
 				expectedErrs field.ErrorList
 			}{
 				"valid update": {
-					oldObj: mkValidIngressClass(func(obj *networking.IngressClass) {
-						obj.ResourceVersion = "1"
-					}),
-					updateObj: mkValidIngressClass(func(obj *networking.IngressClass) {
-						obj.ResourceVersion = "1"
-					}),
+					oldObj:    mkValidIngressClass(),
+					updateObj: mkValidIngressClass(),
 				},
 				"nil parameters update": {
-					oldObj: mkValidIngressClass(func(obj *networking.IngressClass) {
-						obj.ResourceVersion = "1"
-					}),
+					oldObj: mkValidIngressClass(),
 					updateObj: mkValidIngressClass(func(obj *networking.IngressClass) {
-						obj.ResourceVersion = "1"
 						obj.Spec.Parameters = nil
 					}),
 				},
 				"update fails when parameters name is cleared": {
-					oldObj: mkValidIngressClass(func(obj *networking.IngressClass) {
-						obj.ResourceVersion = "1"
-					}),
+					oldObj: mkValidIngressClass(),
 					updateObj: mkValidIngressClass(func(obj *networking.IngressClass) {
-						obj.ResourceVersion = "1"
 						obj.Spec.Parameters.Name = ""
 					}),
 					expectedErrs: field.ErrorList{
@@ -123,15 +113,41 @@ func TestDeclarativeValidateUpdateParameters(t *testing.T) {
 					},
 				},
 				"update fails when parameters kind is cleared": {
-					oldObj: mkValidIngressClass(func(obj *networking.IngressClass) {
-						obj.ResourceVersion = "1"
-					}),
+					oldObj: mkValidIngressClass(),
 					updateObj: mkValidIngressClass(func(obj *networking.IngressClass) {
-						obj.ResourceVersion = "1"
 						obj.Spec.Parameters.Kind = ""
 					}),
 					expectedErrs: field.ErrorList{
 						field.Required(field.NewPath("spec", "parameters", "kind"), "").MarkAlpha(),
+					},
+				},
+				"update fails when controller is changed": {
+					oldObj: mkValidIngressClass(),
+					updateObj: mkValidIngressClass(func(obj *networking.IngressClass) {
+						obj.Spec.Controller = "example1.com/ingress-controller"
+					}),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("spec.controller"), "", "").WithOrigin("immutable").MarkAlpha(),
+					},
+				},
+				"update fails when controller is cleared": {
+					oldObj: mkValidIngressClass(),
+					updateObj: mkValidIngressClass(func(obj *networking.IngressClass) {
+						obj.Spec.Controller = ""
+					}),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("spec.controller"), "", "").WithOrigin("immutable").MarkAlpha(),
+					},
+				},
+				"update fails when controller is set": {
+					oldObj: mkValidIngressClass(func(obj *networking.IngressClass) {
+						obj.Spec.Controller = ""
+					}),
+					updateObj: mkValidIngressClass(func(obj *networking.IngressClass) {
+						obj.Spec.Controller = "example1.com/ingress-controller"
+					}),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("spec.controller"), "", "").WithOrigin("immutable").MarkAlpha(),
 					},
 				},
 			}
@@ -183,7 +199,7 @@ func mkValidIngressClass(tweaks ...func(obj *networking.IngressClass)) networkin
 			},
 		},
 	}
-
+	obj.ResourceVersion = "1"
 	for _, tweak := range tweaks {
 		tweak(&obj)
 	}

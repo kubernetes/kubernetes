@@ -585,7 +585,7 @@ func validateIngressClassSpec(spec *networking.IngressClassSpec, fldPath *field.
 // validateIngressClassSpecUpdate ensures that IngressClassSpec updates are
 // valid.
 func validateIngressClassSpecUpdate(newSpec, oldSpec *networking.IngressClassSpec, fldPath *field.Path) field.ErrorList {
-	return apivalidation.ValidateImmutableField(newSpec.Controller, oldSpec.Controller, fldPath.Child("controller"))
+	return apivalidation.ValidateImmutableField(newSpec.Controller, oldSpec.Controller, fldPath.Child("controller")).MarkCoveredByDeclarative().WithOrigin("immutable")
 }
 
 // validateIngressTypedLocalObjectReference ensures that Parameters fields are valid.
