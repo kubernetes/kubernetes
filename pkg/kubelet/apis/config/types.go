@@ -234,7 +234,10 @@ type KubeletConfiguration struct {
 	// image garbage collection is never run. Lowest disk usage to garbage
 	// collect to. The percent is calculated as this field value out of 100.
 	ImageGCLowThresholdPercent int32
-	// How frequently to calculate and cache volume disk usage for all pods
+	// volumeStatsAggPeriod is the delay after each disk usage scan completes
+	// before starting the next scan. Results are calculated and cached for all
+	// pod volumes (ephemeral and persistent).
+	// To disable volume calculations, set to zero or a negative number.
 	VolumeStatsAggPeriod metav1.Duration
 	// KubeletCgroups is the absolute name of cgroups to isolate the kubelet in
 	KubeletCgroups string

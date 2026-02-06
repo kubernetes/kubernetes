@@ -70290,7 +70290,7 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 					},
 					"volumeStatsAggPeriod": {
 						SchemaProps: spec.SchemaProps{
-							Description: "volumeStatsAggPeriod is the frequency for calculating and caching volume disk usage for all pods. Default: \"1m\"",
+							Description: "volumeStatsAggPeriod is the delay after each disk usage scan completes before starting the next scan. Results are calculated and cached for all pod volumes (ephemeral and persistent). To disable volume calculations, set to zero or a negative number. Default: \"1m\"",
 							Ref:         ref(metav1.Duration{}.OpenAPIModelName()),
 						},
 					},

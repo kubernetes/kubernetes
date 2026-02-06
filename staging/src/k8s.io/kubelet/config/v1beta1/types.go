@@ -362,8 +362,10 @@ type KubeletConfiguration struct {
 	// Default: 80
 	// +optional
 	ImageGCLowThresholdPercent *int32 `json:"imageGCLowThresholdPercent,omitempty"`
-	// volumeStatsAggPeriod is the frequency for calculating and caching volume
-	// disk usage for all pods.
+	// volumeStatsAggPeriod is the delay after each disk usage scan completes
+	// before starting the next scan. Results are calculated and cached for all
+	// pod volumes (ephemeral and persistent).
+	// To disable volume calculations, set to zero or a negative number.
 	// Default: "1m"
 	// +optional
 	VolumeStatsAggPeriod metav1.Duration `json:"volumeStatsAggPeriod,omitempty"`
