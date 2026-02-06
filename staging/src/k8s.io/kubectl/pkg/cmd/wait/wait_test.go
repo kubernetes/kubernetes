@@ -599,7 +599,7 @@ func TestWaitForDeletion(t *testing.T) {
 				ConditionFn: IsDeleted,
 				IOStreams:   genericiooptions.NewTestIOStreamsDiscard(),
 			}
-			err := o.RunWait()
+			err := o.RunWaitContext(t.Context())
 			switch {
 			case err == nil && len(test.expectedErr) == 0:
 			case err != nil && len(test.expectedErr) == 0:
@@ -1009,7 +1009,7 @@ func TestWaitForCondition(t *testing.T) {
 				ConditionFn: ConditionalWait{conditionName: "the-condition", conditionStatus: "status-value", errOut: io.Discard}.IsConditionMet,
 				IOStreams:   genericiooptions.NewTestIOStreamsDiscard(),
 			}
-			err := o.RunWait()
+			err := o.RunWaitContext(t.Context())
 			switch {
 			case err == nil && len(test.expectedErr) == 0:
 			case err != nil && len(test.expectedErr) == 0:
@@ -1080,7 +1080,7 @@ func TestWaitForCreate(t *testing.T) {
 				ForCondition: "create",
 				IOStreams:    genericiooptions.NewTestIOStreamsDiscard(),
 			}
-			err := o.RunWait()
+			err := o.RunWaitContext(t.Context())
 			switch {
 			case err == nil && len(test.expectedErr) == 0:
 			case err != nil && len(test.expectedErr) == 0:
@@ -1112,7 +1112,7 @@ func TestWaitForDeletionIgnoreNotFound(t *testing.T) {
 		IOStreams:      genericiooptions.NewTestIOStreamsDiscard(),
 		ForCondition:   "delete",
 	}
-	err := o.RunWait()
+	err := o.RunWaitContext(t.Context())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1367,7 +1367,7 @@ func TestWaitForDifferentJSONPathExpression(t *testing.T) {
 				IOStreams: genericiooptions.NewTestIOStreamsDiscard(),
 			}
 
-			err := o.RunWait()
+			err := o.RunWaitContext(t.Context())
 
 			switch {
 			case err == nil && len(test.expectedErr) == 0:
@@ -1630,7 +1630,7 @@ func TestWaitForJSONPathCondition(t *testing.T) {
 				IOStreams: genericiooptions.NewTestIOStreamsDiscard(),
 			}
 
-			err := o.RunWait()
+			err := o.RunWaitContext(t.Context())
 
 			switch {
 			case err == nil && len(test.expectedErr) == 0:
