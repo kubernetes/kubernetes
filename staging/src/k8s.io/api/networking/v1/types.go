@@ -577,6 +577,7 @@ type IngressClassSpec struct {
 	// same implementing controller. This should be specified as a
 	// domain-prefixed path no more than 250 characters in length, e.g.
 	// "acme.io/ingress-controller". This field is immutable.
+	// +k8s:immutable
 	Controller string `json:"controller,omitempty" protobuf:"bytes,1,opt,name=controller"`
 
 	// parameters is a link to a custom resource containing additional
@@ -671,6 +672,7 @@ type IPAddressSpec struct {
 	// ParentRef references the resource that an IPAddress is attached to.
 	// An IPAddress must reference a parent object.
 	// +required
+	// +k8s:immutable
 	ParentRef *ParentReference `json:"parentRef,omitempty" protobuf:"bytes,1,opt,name=parentRef"`
 }
 

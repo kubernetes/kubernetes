@@ -248,6 +248,7 @@ type StatefulSetSpec struct {
 	// selector is a label query over pods that should match the replica count.
 	// It must match the pod template's labels.
 	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
+	// +k8s:immutable
 	Selector *metav1.LabelSelector `json:"selector" protobuf:"bytes,2,opt,name=selector"`
 
 	// template is the object that describes the pod that will be created if
@@ -438,6 +439,7 @@ type DeploymentSpec struct {
 	// Label selector for pods. Existing ReplicaSets whose pods are
 	// selected by this will be the ones affected by this deployment.
 	// It must match the pod template's labels.
+	// +k8s:immutable
 	Selector *metav1.LabelSelector `json:"selector" protobuf:"bytes,2,opt,name=selector"`
 
 	// Template describes the pods that will be created.
@@ -938,6 +940,7 @@ type ReplicaSetSpec struct {
 	// Label keys and values that must match in order to be controlled by this replica set.
 	// It must match the pod template's labels.
 	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
+	// +k8s:immutable
 	Selector *metav1.LabelSelector `json:"selector" protobuf:"bytes,2,opt,name=selector"`
 
 	// Template is the object that describes the pod that will be created if
@@ -1038,6 +1041,7 @@ type ControllerRevision struct {
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Data is the serialized representation of the state.
+	// +k8s:immutable
 	Data runtime.RawExtension `json:"data,omitempty" protobuf:"bytes,2,opt,name=data"`
 
 	// Revision indicates the revision of the state represented by Data.

@@ -43,16 +43,19 @@ type StorageClass struct {
 	// provisioner indicates the type of the provisioner.
 	// +required
 	// +k8s:required
+	// +k8s:immutable
 	Provisioner string `json:"provisioner" protobuf:"bytes,2,opt,name=provisioner"`
 
 	// parameters holds the parameters for the provisioner that should
 	// create volumes of this storage class.
 	// +optional
+	// +k8s:immutable
 	Parameters map[string]string `json:"parameters,omitempty" protobuf:"bytes,3,rep,name=parameters"`
 
 	// reclaimPolicy controls the reclaimPolicy for dynamically provisioned PersistentVolumes of this storage class.
 	// Defaults to Delete.
 	// +optional
+	// +k8s:immutable
 	ReclaimPolicy *v1.PersistentVolumeReclaimPolicy `json:"reclaimPolicy,omitempty" protobuf:"bytes,4,opt,name=reclaimPolicy,casttype=k8s.io/api/core/v1.PersistentVolumeReclaimPolicy"`
 
 	// mountOptions controls the mountOptions for dynamically provisioned PersistentVolumes of this storage class.
@@ -70,6 +73,7 @@ type StorageClass struct {
 	// provisioned and bound.  When unset, VolumeBindingImmediate is used.
 	// This field is only honored by servers that enable the VolumeScheduling feature.
 	// +optional
+	// +k8s:immutable
 	VolumeBindingMode *VolumeBindingMode `json:"volumeBindingMode,omitempty" protobuf:"bytes,7,opt,name=volumeBindingMode"`
 
 	// allowedTopologies restrict the node topologies where volumes can be dynamically provisioned.
@@ -302,6 +306,7 @@ type CSIDriverSpec struct {
 	// This field is immutable.
 	//
 	// +optional
+	// +k8s:immutable
 	AttachRequired *bool `json:"attachRequired,omitempty" protobuf:"varint,1,opt,name=attachRequired"`
 
 	// podInfoOnMount indicates this CSI volume driver requires additional pod information (like podName, podUID, etc.)
