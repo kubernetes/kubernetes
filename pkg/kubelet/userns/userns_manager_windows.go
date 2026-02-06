@@ -47,7 +47,3 @@ func (m *UsernsManager) GetOrCreateUserNamespaceMappings(klog.Logger, *v1.Pod, s
 func (m *UsernsManager) CleanupOrphanedPodUsernsAllocations(context.Context, []*v1.Pod, []*kubecontainer.Pod) error {
 	return nil
 }
-
-func EnabledUserNamespacesSupport() bool {
-	return false
-}
