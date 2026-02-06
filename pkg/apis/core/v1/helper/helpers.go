@@ -51,7 +51,7 @@ func IsExtendedResourceName(name v1.ResourceName) bool {
 // IsPrefixedNativeResource returns true if the resource name is in the
 // *kubernetes.io/ namespace.
 func IsPrefixedNativeResource(name v1.ResourceName) bool {
-	return strings.Contains(string(name), v1.ResourceDefaultNamespacePrefix)
+	return isPrefixedNativeResourceName(string(name), v1.ResourceDefaultNamespacePrefix)
 }
 
 // IsNativeResource returns true if the resource name is in the
@@ -60,6 +60,14 @@ func IsPrefixedNativeResource(name v1.ResourceName) bool {
 func IsNativeResource(name v1.ResourceName) bool {
 	return !strings.Contains(string(name), "/") ||
 		IsPrefixedNativeResource(name)
+}
+
+// isPrefixedNativeResourceName checks for either kubernetes.io/<name> or
+// <subdomain>.kubernetes.io/<name>. It intentionally rejects prefixes like
+// "mykubernetes.io" that only contain "kubernetes.io" as a substring.
+func isPrefixedNativeResourceName(resourceName, nativeResourceNamespacePrefix string) bool {
+	return strings.HasPrefix(resourceName, nativeResourceNamespacePrefix) ||
+		strings.Contains(resourceName, "."+nativeResourceNamespacePrefix)
 }
 
 // IsHugePageResourceName returns true if the resource name has the huge page
