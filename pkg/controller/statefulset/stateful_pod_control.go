@@ -194,9 +194,12 @@ func (spc *StatefulPodControl) UpdateStatefulPod(ctx context.Context, set *apps.
 }
 
 func (spc *StatefulPodControl) DeleteStatefulPod(set *apps.StatefulSet, pod *v1.Pod) error {
-	err := spc.objectMgr.DeletePod(pod)
-	spc.recordPodEvent("delete", set, pod, err)
-	return err
+	if err := spc.objectMgr.DeletePod(pod); err != nil && !apierrors.IsNotFound(err) {
+		spc.recordPodEvent("delete", set, pod, err)
+		return err
+	}
+	spc.recordPodEvent("delete", set, pod, nil)
+	return nil
 }
 
 // ClaimsMatchRetentionPolicy returns false if the PVCs for pod are not consistent with set's PVC deletion policy.
