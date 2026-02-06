@@ -230,7 +230,7 @@ func TestEndpointWithMultiplePodUpdates(t *testing.T) {
 
 	var services []*v1.Service
 	// Create services associated to the pod
-	for i := 0; i < concurrency; i++ {
+	for i := range concurrency {
 		svc := newService(ns.Name, fmt.Sprintf("foo%d", i))
 		_, err = client.CoreV1().Services(ns.Name).Create(tCtx, svc, metav1.CreateOptions{})
 		if err != nil {
@@ -678,7 +678,7 @@ func TestEndpointTruncate(t *testing.T) {
 	// create 1001 Pods to reach endpoint max capacity that is set to 1000
 	allPodNames := sets.New[string]()
 	baseIP := netutils.BigForIP(netutils.ParseIPSloppy("10.0.0.1"))
-	for i := 0; i < 1001; i++ {
+	for i := range 1001 {
 		pod := basePod.DeepCopy()
 		pod.Name = fmt.Sprintf("%s-%d", basePod.Name, i)
 		allPodNames.Insert(pod.Name)
@@ -755,7 +755,7 @@ func TestEndpointTruncate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to get pod %s: %v", truncatedPodName, err)
 	}
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		truncatedPod.Status.Conditions[0].Status = v1.ConditionFalse
 		truncatedPod, err = client.CoreV1().Pods(ns.Name).UpdateStatus(tCtx, truncatedPod, metav1.UpdateOptions{})
 		if err != nil {

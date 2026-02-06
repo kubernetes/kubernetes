@@ -295,7 +295,7 @@ func TestDRA(t *testing.T) {
 }
 
 func createNodes(tCtx ktesting.TContext) {
-	for i := 0; i < numNodes; i++ {
+	for i := range numNodes {
 		nodeName := fmt.Sprintf("worker-%d", i)
 		// Create node.
 		node := &v1.Node{
@@ -533,7 +533,7 @@ func testFilterTimeout(tCtx ktesting.TContext, devicesPerSlice int) {
 	namespace := createTestNamespace(tCtx, nil)
 	class, driverName := createTestClass(tCtx, namespace)
 	deviceNames := make([]string, devicesPerSlice)
-	for i := 0; i < devicesPerSlice; i++ {
+	for i := range devicesPerSlice {
 		deviceNames[i] = fmt.Sprintf("dev-%d", i)
 	}
 	slice := st.MakeResourceSlice("worker-0", driverName).Devices(deviceNames...)
@@ -1163,7 +1163,7 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 		// Stress the controller by repeatedly deleting the slices.
 		// One delete occurs after the sync period is over (because of the Consistently),
 		// the second before (because it's done as quickly as possible).
-		for i := 0; i < 2; i++ {
+		for range 2 {
 			tCtx.Log("deleting ResourceSlices")
 			tCtx.ExpectNoError(tCtx.Client().ResourceV1().ResourceSlices().DeleteCollection(tCtx, metav1.DeleteOptions{}, listDriverSlices), "delete driver slices")
 			expectedStats.NumCreates += int64(len(expectedSlices))
@@ -1176,7 +1176,7 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 		_, getStats, expectedStats := setup(tCtx)
 
 		// Stress the controller by repeatedly updatings the slices.
-		for i := 0; i < 2; i++ {
+		for range 2 {
 			slices, err := tCtx.Client().ResourceV1().ResourceSlices().List(tCtx, listDriverSlices)
 			tCtx.ExpectNoError(err, "list slices")
 			for _, slice := range slices.Items {
@@ -1687,7 +1687,7 @@ func testInvalidResourceSlices(tCtx ktesting.TContext) {
 		"invalid-for-all-nodes": {
 			slices: func() []*st.ResourceSliceWrapper {
 				var slices []*st.ResourceSliceWrapper
-				for i := 0; i < 8; i++ {
+				for i := range 8 {
 					nodeName := fmt.Sprintf("worker-%d", i)
 					invalidPoolSlice1 := st.MakeResourceSlice(nodeName, driverNamePlaceholder).Devices("device-1")
 					invalidPoolSlice1.Name += "-1"

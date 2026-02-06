@@ -126,7 +126,7 @@ func TestCRDExponentialRecursionBug(t *testing.T) {
 	// create a object with nested fields to trigger the bug
 	var m map[string]interface{}
 	m = instance.Object["spec"].(map[string]interface{})
-	for i := 0; i < 50; i++ {
+	for i := range 50 {
 		m[fmt.Sprintf("field%d", i)] = map[string]interface{}{}
 		m = m[fmt.Sprintf("field%d", i)].(map[string]interface{})
 	}
