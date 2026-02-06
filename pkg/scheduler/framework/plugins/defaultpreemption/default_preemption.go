@@ -28,12 +28,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	fwk "k8s.io/kube-scheduler/framework"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
@@ -66,7 +64,7 @@ type IsEligiblePreemptorFunc func(domain preemption.Domain, victim preemption.Pr
 // before adding back victims (starting from the most important) that still fit with the preemptor.
 // The default behavior is to not consider pod affinity between the preemptor and the victims,
 // as affinity between pods that are eligible to preempt each other isn't recommended.
-type MoreImportantVictimFunc func(victim1, victim2 preemption.PreemptionUnit) bool
+type MoreImportantVictimFunc func(victim1, victim2 []*v1.Pod, enableWorkloadAwarePreemption bool) bool
 
 // CanPlacePodsFunc is a function used to verify if the preemptor's pods can be successfully
 // scheduled onto the target domain (a single Node or a set of Nodes) given the current
@@ -115,7 +113,7 @@ func (pl *DefaultPreemption) Name() string {
 }
 
 // New initializes a new plugin and returns it. The plugin type is retained to allow modification.
-func New(_ context.Context, dpArgs runtime.Object, fh fwk.Handle, fts feature.Features) (*DefaultPreemption, error) {
+func New(ctx context.Context, dpArgs runtime.Object, fh fwk.Handle, fts feature.Features) (*DefaultPreemption, error) {
 	args, ok := dpArgs.(*config.DefaultPreemptionArgs)
 	if !ok {
 		return nil, fmt.Errorf("got args of type %T, want *DefaultPreemptionArgs", dpArgs)
@@ -129,7 +127,11 @@ func New(_ context.Context, dpArgs runtime.Object, fh fwk.Handle, fts feature.Fe
 		fts:  fts,
 		args: *args,
 	}
-	pl.Evaluator = preemption.NewEvaluator(Name, fh, &pl, fts.EnableAsyncPreemption)
+	evaluator, err := preemption.NewEvaluator(Name, fh, &pl, fts)
+	if err != nil {
+		return nil, err
+	}
+	pl.Evaluator = evaluator
 
 	// Default behavior: No additional filtering, beyond the internal requirement that the victim pod
 	// have lower priority than the preemptor pod.
@@ -141,7 +143,7 @@ func New(_ context.Context, dpArgs runtime.Object, fh fwk.Handle, fts feature.Fe
 		return true
 	}
 
-	pl.MoreImportantVictim = moreImportantVictim
+	pl.MoreImportantVictim = util.MoreImportantVictim
 
 	pl.CanPlacePods = func(
 		ctx context.Context,
@@ -153,7 +155,7 @@ func New(_ context.Context, dpArgs runtime.Object, fh fwk.Handle, fts feature.Fe
 			return pl.fh.RunFilterPluginsWithNominatedPods(ctx, state, pods[0], nodes[0])
 		}
 
-		// TODO: Adapt this logic to support PodGroups once Workload Scheduling is implemented.
+		// TODO: Adapt this logic to support PodGroups once Workload Scheduling is implemented. https://github.com/kubernetes/kubernetes/pull/136618
 		return nil
 	}
 
@@ -166,6 +168,7 @@ func (pl *DefaultPreemption) PostFilter(ctx context.Context, state fwk.CycleStat
 		metrics.PreemptionAttempts.Inc()
 	}()
 
+	// TODO: Adapt this logic to support PodGroups once Workload Scheduling is implemented. https://github.com/kubernetes/kubernetes/pull/136618
 	preemptor := preemption.NewPodPreemptor(pod)
 
 	result, status := pl.Evaluator.Preempt(ctx, state, preemptor, m)
@@ -257,7 +260,7 @@ func (pl *DefaultPreemption) runPreFilterExtension(ctx context.Context, state fw
 		}
 	}
 
-	return fwk.NewStatus(fwk.Success)
+	return nil
 }
 
 func (pl *DefaultPreemption) SelectVictimsOnDomain(
@@ -267,18 +270,18 @@ func (pl *DefaultPreemption) SelectVictimsOnDomain(
 	domain preemption.Domain,
 	pdbs []*policy.PodDisruptionBudget) ([]*v1.Pod, int, *fwk.Status) {
 	logger := klog.FromContext(ctx)
-	nodeToName := make(map[string]fwk.NodeInfo)
+	nameToNode := make(map[string]fwk.NodeInfo)
 	for _, nodeInfo := range domain.Nodes() {
-		nodeToName[nodeInfo.Node().Name] = nodeInfo
+		nameToNode[nodeInfo.Node().Name] = nodeInfo
 	}
 
 	removePods := func(pu preemption.PreemptionUnit) error {
 		for _, pi := range pu.Pods() {
-			nodeInfo := nodeToName[pi.GetPod().Spec.NodeName] // TODO: what if it's nominated?
+			nodeInfo := nameToNode[pi.GetPod().Spec.NodeName]
 			if err := nodeInfo.RemovePod(logger, pi.GetPod()); err != nil {
 				return err
 			}
-			status := pl.runPreFilterExtension(ctx, state, preemptor.Members(), pi, nodeInfo, pl.fh.RunPreFilterExtensionRemovePod) // TODO: not sure, I believe it should for preeptor on PreFilter plugign level
+			status := pl.runPreFilterExtension(ctx, state, preemptor.Members(), pi, nodeInfo, pl.fh.RunPreFilterExtensionRemovePod)
 			if !status.IsSuccess() {
 				return status.AsError()
 			}
@@ -288,9 +291,9 @@ func (pl *DefaultPreemption) SelectVictimsOnDomain(
 	}
 	addPods := func(pu preemption.PreemptionUnit) error {
 		for _, pi := range pu.Pods() {
-			nodeInfo := nodeToName[pi.GetPod().Spec.NodeName]
+			nodeInfo := nameToNode[pi.GetPod().Spec.NodeName]
 			nodeInfo.AddPodInfo(pi)
-			status := pl.runPreFilterExtension(ctx, state, preemptor.Members(), pi, nodeInfo, pl.fh.RunPreFilterExtensionAddPod) // TODO: not sure, I believe it should for preeptor on PreFilter plugign level
+			status := pl.runPreFilterExtension(ctx, state, preemptor.Members(), pi, nodeInfo, pl.fh.RunPreFilterExtensionAddPod)
 			if !status.IsSuccess() {
 				return status.AsError()
 			}
@@ -303,20 +306,21 @@ func (pl *DefaultPreemption) SelectVictimsOnDomain(
 	allPossiblyAffectedVictims := domain.GetAllPossibleVictims(pl.Evaluator.Handler.SnapshotSharedLister().NodeInfos())
 	for _, victim := range allPossiblyAffectedVictims {
 		if pl.isPreemptionAllowedForDomain(domain, victim, preemptor) {
+
 			potentialVictims = append(potentialVictims, victim)
 		}
 	}
 
-	// No potential victims are found, and so we don't need to evaluate the domain again since its state didn't change.
+	// No preemption victims found for incoming preemptor.
 	if len(potentialVictims) == 0 {
 		return nil, 0, fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "No preemption victims found for incoming pod")
 	}
 
 	for _, victim := range potentialVictims {
 		for key, val := range victim.AffectedNodes() {
-			_, ok := nodeToName[key]
+			_, ok := nameToNode[key]
 			if !ok {
-				nodeToName[key] = val
+				nameToNode[key] = val
 			}
 		}
 
@@ -330,7 +334,7 @@ func (pl *DefaultPreemption) SelectVictimsOnDomain(
 	}
 
 	sort.Slice(potentialVictims, func(i, j int) bool {
-		return moreImportantVictim(potentialVictims[i], potentialVictims[j])
+		return pl.moreImportantVictim(potentialVictims[i], potentialVictims[j], util.MoreImportantVictim)
 	})
 
 	violatingVictims, nonViolatingVictims := filterVictimsWithPDBViolation(potentialVictims, pdbs)
@@ -374,24 +378,24 @@ func (pl *DefaultPreemption) SelectVictimsOnDomain(
 
 		cutoff := sort.Search(len(nonViolatingVictims)+1, func(targetCount int) bool {
 
-			var err error
 			// Move Right: We need to reprieve MORE victims (Add them back to snapshot)
 			if targetCount > currentReprievedCount {
 				for i := currentReprievedCount; i < targetCount; i++ {
-					err = addPods(nonViolatingVictims[i])
+					if err := addPods(nonViolatingVictims[i]); err != nil {
+						searchErr = err
+						return true
+					}
 				}
 			}
 
 			// Move Left: We went too far, need to preempt victims again (Remove from snapshot)
 			if targetCount < currentReprievedCount {
 				for i := targetCount; i < currentReprievedCount; i++ {
-					err = removePods(nonViolatingVictims[i])
+					if err := removePods(nonViolatingVictims[i]); err != nil {
+						searchErr = err
+						return true
+					}
 				}
-			}
-
-			if err != nil {
-				searchErr = err
-				return true
 			}
 
 			// Update Cursor
@@ -435,7 +439,7 @@ func (pl *DefaultPreemption) SelectVictimsOnDomain(
 	}
 
 	sort.Slice(victimsToPreempt, func(i, j int) bool {
-		return pl.MoreImportantVictim(victimsToPreempt[i], victimsToPreempt[j])
+		return pl.moreImportantVictim(victimsToPreempt[i], victimsToPreempt[j], pl.MoreImportantVictim)
 	})
 	var podsToPreempt []*v1.Pod
 	for _, v := range victimsToPreempt {
@@ -574,66 +578,15 @@ func podTerminatingByPreemption(p *v1.Pod) bool {
 	return false
 }
 
-// moreImportantVictim decides which of two preemption units is considered more critical
-// to preserve during the victim selection process.
-//
-// When the scheduler searches for victims to evict, it attempts to "reprieve" (save)
-// the most important units first. Therefore, if this function returns true, 'v1' is
-// more likely to be kept on the node than 'v2'.
-//
-// The comparison logic follows this strict hierarchy:
-// 1. Priority: Higher priority units are always more important.
-//
-//  2. Workload Type (if WorkloadAwarePreemption is enabled):
-//     Atomic workloads (PodGroups) are considered more important than individual Pods
-//     of the same priority. This is because preempting a PodGroup implies evicting
-//     all its members, causing a larger disruption than evicting a single Pod.
-//
-//  3. Creation Time (for Single Pods):
-//     If both units are single Pods, the one with the older StartTime is more important.
-//     This honors the "first-come, first-served" principle and protects long-running
-//     pods from being churned by newer pods of equal priority.
-//
-//  4. Group Size (for PodGroups):
-//     If both units are PodGroups, the one with more members (larger size) is considered
-//     more important. This heuristic aims to avoid the expensive rescheduling cost
-//     associated with restarting massive distributed jobs.
-//
-//  5. Start Time (Tie-breaker for PodGroups):
-//     If sizes are equal, the group that started earlier (has the oldest pod)
-//     is more important. This rewards long-running jobs with stability.
-func moreImportantVictim(v1, v2 preemption.PreemptionUnit) bool {
-	p1 := v1.Priority()
-	p2 := v2.Priority()
-	if p1 != p2 {
-		return p1 > p2
+func (pl *DefaultPreemption) moreImportantVictim(victim1, victim2 preemption.PreemptionUnit, priorityFunc MoreImportantVictimFunc) bool {
+	var pods1 []*v1.Pod
+	var pods2 []*v1.Pod
+	for _, pi := range victim1.Pods() {
+		pods1 = append(pods1, pi.GetPod())
+	}
+	for _, pi := range victim2.Pods() {
+		pods2 = append(pods2, pi.GetPod())
 	}
 
-	workloadAwarePreemptionEnabeld := utilfeature.DefaultFeatureGate.Enabled(features.WorkloadAwarePreemption)
-	if workloadAwarePreemptionEnabeld && v1.IsPodGroup() != v2.IsPodGroup() {
-		return v1.IsPodGroup()
-	}
-	if !v1.IsPodGroup() {
-		return util.GetPodStartTime(v1.Pods()[0].GetPod()).Before(util.GetPodStartTime(v2.Pods()[0].GetPod()))
-	}
-
-	if len(v1.Pods()) != len(v2.Pods()) {
-		return len(v1.Pods()) > len(v2.Pods())
-	}
-
-	t1 := getEarliestPodStartTime(v1.Pods())
-	t2 := getEarliestPodStartTime(v2.Pods())
-	return t1.Before(t2)
-}
-
-// getEarliestPodStartTime finds the oldest StartTime among a list of PodInfos.
-func getEarliestPodStartTime(pods []fwk.PodInfo) *metav1.Time {
-	var earliest *metav1.Time
-	for _, p := range pods {
-		t := util.GetPodStartTime(p.GetPod())
-		if earliest == nil || (t != nil && t.Before(earliest)) {
-			earliest = t
-		}
-	}
-	return earliest
+	return priorityFunc(pods1, pods2, pl.Evaluator.EnableWorkloadAwarePreemption)
 }

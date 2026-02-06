@@ -199,7 +199,7 @@ func (e *Executor) prepareCandidateAsync(c Candidate, preemptor Preemptor, plugi
 		// this node. So, we should remove their nomination. Removing their
 		// nomination updates these pods and moves them to the active queue. It
 		// lets scheduler find another place for them sooner than after waiting for preemption completion.
-		nominatedPods := getLowerPriorityNominatedPods(e.fh, representative, getNodes(c))
+		nominatedPods := getLowerPriorityNominatedPods(e.fh, representative, c.GetNodes())
 		if err := clearNominatedNodeName(ctx, e.fh.ClientSet(), e.fh.APICacher(), nominatedPods...); err != nil {
 			utilruntime.HandleErrorWithContext(ctx, err, "Cannot clear 'NominatedNodeName' field from lower priority pods on the same target node", "node", c.Name())
 			result = metrics.GoroutineResultError
@@ -286,7 +286,7 @@ func (e *Executor) prepareCandidate(ctx context.Context, c Candidate, preemptor 
 	// this node. So, we should remove their nomination. Removing their
 	// nomination updates these pods and moves them to the active queue. It
 	// lets scheduler find another place for them sooner than after waiting for preemption completion.
-	nominatedPods := getLowerPriorityNominatedPods(fh, preemptor.GetRepresentativePod(), getNodes(c))
+	nominatedPods := getLowerPriorityNominatedPods(fh, preemptor.GetRepresentativePod(), c.GetNodes())
 	if err := clearNominatedNodeName(ctx, cs, fh.APICacher(), nominatedPods...); err != nil {
 		utilruntime.HandleErrorWithContext(ctx, err, "Cannot clear 'NominatedNodeName' field")
 		// We do not return as this error is not critical.
@@ -373,18 +373,4 @@ func getLowerPriorityNominatedPods(pn fwk.PodNominator, pod *v1.Pod, nodes []str
 		}
 	}
 	return lowerPriorityPods
-}
-
-func getNodes(s Candidate) []string {
-	names := make(map[string]bool)
-	for _, pod := range s.Victims().Pods {
-		nodeName := pod.Spec.NodeName
-		names[nodeName] = true
-	}
-
-	var res []string
-	for name := range names {
-		res = append(res, name)
-	}
-	return res
 }

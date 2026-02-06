@@ -173,10 +173,10 @@ type Domain interface {
 
 type domain struct {
 	Domain
-	nodes                          []fwk.NodeInfo
-	name                           string
-	podGroupIndex                  map[util.PodGroupKey][]fwk.PodInfo
-	workloadAwarePreemptionEnabled bool
+	nodes              []fwk.NodeInfo
+	name               string
+	podGroupIndex      map[util.PodGroupKey][]fwk.PodInfo
+	allPossibleVictims []PreemptionUnit
 }
 
 func (d *domain) Nodes() []fwk.NodeInfo {
@@ -184,70 +184,46 @@ func (d *domain) Nodes() []fwk.NodeInfo {
 }
 
 func (d *domain) GetAllPossibleVictims(nodeInfoLister fwk.NodeInfoLister) []PreemptionUnit {
-	processedPodGroups := make(map[util.PodGroupKey]bool)
-	var allVictims []PreemptionUnit
-
-	for _, node := range d.nodes {
-		for _, pi := range node.GetPods() {
-			pod := pi.GetPod()
-
-			// TODO: Validate against the PodGroup's policy (PodGroup.PodGroupPolicy).
-			// Currently, the API to retrieve the full PodGroup object is not available.
-			if ref := pod.Spec.WorkloadRef; d.workloadAwarePreemptionEnabled && ref != nil {
-				key := util.NewPodGroupKey(pod.Namespace, pod.Spec.WorkloadRef)
-
-				// Deduplication Check
-				if processedPodGroups[key] {
-					continue
-				}
-				// Get all pods for this gang (Global Lookup via Index)
-				gangPods := d.podGroupIndex[key]
-
-				if len(gangPods) > 0 {
-					// Collect NodeInfo for ALL pods in the gang
-					var gangNodes []fwk.NodeInfo
-					for _, gp := range gangPods {
-						nodeName := gp.GetPod().Spec.NodeName
-						// Use the global lister to find the node, even if it's not in domain
-						if n, err := nodeInfoLister.Get(nodeName); err == nil {
-							gangNodes = append(gangNodes, n.Snapshot())
-						}
-					}
-
-					unit := d.newPreemptionUnit(gangPods, corev1helpers.PodPriority(pod), gangNodes)
-					allVictims = append(allVictims, unit)
-				}
-
-				// Mark as processed so we don't do this again for the next pod in this gang
-				processedPodGroups[key] = true
-
-			} else {
-				// We just pass the current node (slice of 1)
-				unit := d.newPreemptionUnit(
-					[]fwk.PodInfo{pi},
-					corev1helpers.PodPriority(pod),
-					[]fwk.NodeInfo{node}, // Single node slice
-				)
-				allVictims = append(allVictims, unit)
-			}
-		}
-	}
-
-	return allVictims
+	return d.allPossibleVictims
 }
 
 func (d *domain) Snapshot() Domain {
-	var snapshotNodes []fwk.NodeInfo
+	nodeSnapshotMap := make(map[string]fwk.NodeInfo, len(d.nodes))
+	snapshotNodes := make([]fwk.NodeInfo, 0, len(d.nodes))
 
 	for _, node := range d.nodes {
-		snapshotNodes = append(snapshotNodes, node.Snapshot())
+		copy := node.Snapshot()
+		snapshotNodes = append(snapshotNodes, copy)
+		nodeSnapshotMap[node.Node().Name] = copy
+	}
+
+	allPossibleVictims := make([]PreemptionUnit, 0, len(d.allPossibleVictims))
+	for _, v := range d.allPossibleVictims {
+		var victimNodeInfos []fwk.NodeInfo
+		for _, node := range v.AffectedNodes() {
+			nodeName := node.Node().Name
+
+			if existingCopy, ok := nodeSnapshotMap[nodeName]; ok {
+				// Point to the existing snapshot
+				victimNodeInfos = append(victimNodeInfos, existingCopy)
+			} else {
+				// Edge Case: The victim resides on a node that isn't part of the
+				// domain's primary node list (e.g., cross-node preemption scope).
+				// We must snapshot it independently to ensure we don't mutate the original.
+				outsideDomainNodeCopy := node.Snapshot()
+				victimNodeInfos = append(victimNodeInfos, outsideDomainNodeCopy)
+
+				// Cache it in case another victim needs this same orphan node
+				nodeSnapshotMap[nodeName] = outsideDomainNodeCopy
+			}
+		}
+		allPossibleVictims = append(allPossibleVictims, newPreemptionUnit(v.Pods(), v.Priority(), victimNodeInfos))
 	}
 
 	return &domain{
-		nodes:                          snapshotNodes,
-		name:                           d.name,
-		podGroupIndex:                  d.podGroupIndex,
-		workloadAwarePreemptionEnabled: d.workloadAwarePreemptionEnabled,
+		nodes:              snapshotNodes,
+		name:               d.name,
+		allPossibleVictims: allPossibleVictims,
 	}
 }
 
@@ -286,7 +262,7 @@ type preemptionUnit struct {
 	isPodGroup    bool
 }
 
-func (d *domain) newPreemptionUnit(pods []fwk.PodInfo, priority int32, nodeInfos []fwk.NodeInfo) PreemptionUnit {
+func newPreemptionUnit(pods []fwk.PodInfo, priority int32, nodeInfos []fwk.NodeInfo) PreemptionUnit {
 	nodes := make(map[string]fwk.NodeInfo)
 	for _, node := range nodeInfos {
 		nodes[node.Node().Name] = node
@@ -295,7 +271,7 @@ func (d *domain) newPreemptionUnit(pods []fwk.PodInfo, priority int32, nodeInfos
 	return &preemptionUnit{
 		affectedNodes: nodes,
 		priority:      priority,
-		isPodGroup:    len(pods) > 1 || pods[0].GetPod().Spec.WorkloadRef != nil,
+		isPodGroup:    pods[0].GetPod().Spec.WorkloadRef != nil,
 		pods:          pods,
 	}
 }
@@ -323,11 +299,14 @@ type Candidate interface {
 	Victims() *extenderv1.Victims
 	// Name returns the target domain(for pod group)/node name where the preemptor gets nominated to run.
 	Name() string
+	// GetNodes returns name of nodes where victims would be preempted
+	GetNodes() []string
 }
 
 type candidate struct {
 	victims *extenderv1.Victims
 	name    string
+	nodes   []string
 }
 
 // Victims returns s.victims.
@@ -338,6 +317,30 @@ func (s *candidate) Victims() *extenderv1.Victims {
 // Name returns s.name.
 func (s *candidate) Name() string {
 	return s.name
+}
+
+// GetNodes returns the unique names of all nodes where the victims of this candidate are currently running.
+// This identifies the set of nodes that would be affected if this candidate is chosen for preemption.
+func (s *candidate) GetNodes() []string {
+	if s.nodes == nil {
+		uniqueNames := make(map[string]bool)
+
+		for _, pod := range s.Victims().Pods {
+			uniqueNames[pod.Spec.NodeName] = true
+		}
+
+		res := make([]string, 0, len(uniqueNames))
+		for name := range uniqueNames {
+			res = append(res, name)
+		}
+
+		s.nodes = res
+	}
+
+	result := make([]string, len(s.nodes))
+	copy(result, s.nodes)
+
+	return result
 }
 
 type candidateList struct {
@@ -364,11 +367,7 @@ func (cl *candidateList) add(c *candidate) {
 // ensure that all add() operations complete before accessing the elements of
 // the list.
 func (cl *candidateList) size() int32 {
-	n := atomic.LoadInt32(&cl.idx) + 1
-	if n >= int32(len(cl.items)) {
-		n = int32(len(cl.items))
-	}
-	return n
+	return min(atomic.LoadInt32(&cl.idx)+1, int32(len(cl.items)))
 }
 
 // get returns the internal candidate array. This function is NOT atomic and

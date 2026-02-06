@@ -28,14 +28,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2/ktesting"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	fwk "k8s.io/kube-scheduler/framework"
-	"k8s.io/kubernetes/pkg/features"
 	apicache "k8s.io/kubernetes/pkg/scheduler/backend/api_cache"
 	apidispatcher "k8s.io/kubernetes/pkg/scheduler/backend/api_dispatcher"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
@@ -49,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
+	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 var (
@@ -139,11 +137,6 @@ func newPodGroupPreemptor(priority int32, members []*v1.Pod, policy *v1.Preempti
 		isPodGroup:       true,
 		preemptionPolicy: policy,
 	}
-}
-
-func updateWorkloadAwarePreemptionFlag(t featuregatetesting.TB, flag bool) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, flag)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WorkloadAwarePreemption, flag)
 }
 
 func TestDryRunPreemption(t *testing.T) {
@@ -323,7 +316,6 @@ func TestDryRunPreemption(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			updateWorkloadAwarePreemptionFlag(t, tt.workloadAwarePreemption)
 			logger, ctx := ktesting.NewTestContext(t)
 			registeredPlugins := append([]tf.RegisterPluginFunc{
 				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New)},
@@ -375,10 +367,10 @@ func TestDryRunPreemption(t *testing.T) {
 			for cycle, preemptor := range tt.preemptors {
 				state := framework.NewCycleState()
 				pe := Evaluator{
-					PluginName:                     "FakePostFilter",
-					Handler:                        fwk,
-					Interface:                      fakePostPlugin,
-					workloadAwarePreemptionEnabled: tt.workloadAwarePreemption,
+					PluginName:                    "FakePostFilter",
+					Handler:                       fwk,
+					Interface:                     fakePostPlugin,
+					EnableWorkloadAwarePreemption: tt.workloadAwarePreemption,
 				}
 				got, _, _ := pe.DryRunPreemption(ctx, state, preemptor, pe.NewDomains(preemptor, nodeInfos), nil, 0, int32(len(nodeInfos)))
 				// Sort the values (inner victims) and the candidate itself (by its NominatedNodeName).
@@ -464,8 +456,6 @@ func TestSelectCandidate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			updateWorkloadAwarePreemptionFlag(t, tt.workloadAwarePreemption)
-
 			logger, ctx := ktesting.NewTestContext(t)
 			nodes := make([]*v1.Node, len(tt.nodeNames))
 			for i, nodeName := range tt.nodeNames {
@@ -520,10 +510,10 @@ func TestSelectCandidate(t *testing.T) {
 			for _, preemptor := range tt.preemptors {
 				state := framework.NewCycleState()
 				pe := Evaluator{
-					PluginName:                     "FakePreemptionScorePostFilter",
-					Handler:                        fwk,
-					Interface:                      fakePreemptionScorePostFilterPlugin,
-					workloadAwarePreemptionEnabled: tt.workloadAwarePreemption,
+					PluginName:                    "FakePreemptionScorePostFilter",
+					Handler:                       fwk,
+					Interface:                     fakePreemptionScorePostFilterPlugin,
+					EnableWorkloadAwarePreemption: tt.workloadAwarePreemption,
 				}
 				candidates, _, _ := pe.DryRunPreemption(ctx, state, preemptor, pe.NewDomains(preemptor, nodeInfos), nil, 0, int32(len(nodeInfos)))
 				s := pe.SelectCandidate(ctx, candidates)
@@ -800,6 +790,128 @@ func TestCallExtenders(t *testing.T) {
 					if len(gotCandidate.Victims().Pods) != len(wantCandidate.Victims().Pods) {
 						t.Errorf("callExtenders() number of victim pods mismatch for node %s. got: %d, want: %d", gotCandidate.Name(), len(gotCandidate.Victims().Pods), len(wantCandidate.Victims().Pods))
 					}
+				}
+			}
+		})
+	}
+}
+
+func TestBuildPodGroupIndex(t *testing.T) {
+	tests := []struct {
+		name           string
+		enable         bool
+		nodeNames      []string
+		pods           []*v1.Pod
+		expectedKeys   []util.PodGroupKey
+		expectedCounts map[util.PodGroupKey]int
+	}{
+		{
+			nodeNames: []string{"node1"},
+			name:      "Disabled: Returns empty index regardless of pods",
+			enable:    false,
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").UID("p1").Priority(highPriority).WorkloadRef(w1).Node("node1").Obj(),
+				st.MakePod().Name("p2").UID("p2").Priority(highPriority).WorkloadRef(w1).Node("node1").Obj(),
+			},
+			expectedKeys: []util.PodGroupKey{},
+		},
+		{
+			name:   "Basic: Groups pods by WorkloadRef",
+			enable: true,
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").UID("p1").Namespace("default").Priority(highPriority).WorkloadRef(w1).Node("node1").Obj(),
+				st.MakePod().Name("p2").UID("p2").Namespace("default").Priority(highPriority).WorkloadRef(w1).Node("node1").Obj(),
+			},
+			expectedKeys: []util.PodGroupKey{
+				util.NewPodGroupKey("default", w1),
+			},
+			expectedCounts: map[util.PodGroupKey]int{
+				util.NewPodGroupKey("default", w1): 2,
+			},
+		},
+		{
+			nodeNames: []string{"node1"},
+			name:      "Namespace Isolation: Same group name in different namespaces are different keys",
+			enable:    true,
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").UID("p1").Namespace("ns1").Priority(highPriority).WorkloadRef(w1).Node("node1").Obj(),
+				st.MakePod().Name("p2").UID("p2").Namespace("ns2").Priority(highPriority).WorkloadRef(w1).Node("node1").Obj(),
+			},
+			expectedKeys: []util.PodGroupKey{
+				util.NewPodGroupKey("ns1", w1),
+				util.NewPodGroupKey("ns2", w1),
+			},
+			expectedCounts: map[util.PodGroupKey]int{
+				util.NewPodGroupKey("ns1", w1): 1,
+				util.NewPodGroupKey("ns2", w1): 1,
+			},
+		},
+		{
+			name:   "Mixed: Ignores pods without WorkloadRef",
+			enable: true,
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").UID("p1").Namespace("default").Priority(highPriority).WorkloadRef(w1).Node("node1").Obj(),
+				st.MakePod().Name("p2").UID("p2").Namespace("default").Priority(highPriority).Node("node1").Obj(),
+			},
+			expectedKeys: []util.PodGroupKey{
+				util.NewPodGroupKey("default", w1),
+			},
+			expectedCounts: map[util.PodGroupKey]int{
+				util.NewPodGroupKey("default", w1): 1,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			nodes := make([]*v1.Node, len(tt.nodeNames))
+			for i, nodeName := range tt.nodeNames {
+				nodes[i] = st.MakeNode().Name(nodeName).Capacity(veryLargeRes).Obj()
+			}
+			registeredPlugins := append([]tf.RegisterPluginFunc{
+				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New)},
+				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			)
+			var objs []runtime.Object
+			for _, pod := range tt.pods {
+				objs = append(objs, pod)
+			}
+			informerFactory := informers.NewSharedInformerFactory(clientsetfake.NewClientset(objs...), 0)
+			snapshot := internalcache.NewSnapshot(tt.pods, nodes)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			fh, err := tf.NewFramework(
+				ctx,
+				registeredPlugins,
+				"",
+				frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
+				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithLogger(logger),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			index, err := buildPodGroupIndex(fh, tt.enable)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
+			if len(index) != len(tt.expectedKeys) {
+				t.Errorf("Expected %d groups, got %d", len(tt.expectedKeys), len(index))
+			}
+
+			for _, key := range tt.expectedKeys {
+				pods, ok := index[key]
+				if !ok {
+					t.Errorf("Expected key %v not found in index", key)
+					continue
+				}
+
+				expectedCount := tt.expectedCounts[key]
+				if len(pods) != expectedCount {
+					t.Errorf("Group %v: Expected %d pods, got %d", key, expectedCount, len(pods))
 				}
 			}
 		})

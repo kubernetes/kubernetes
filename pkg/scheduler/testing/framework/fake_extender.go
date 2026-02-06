@@ -259,7 +259,9 @@ func (f *FakeExtender) selectVictimsOnNodeByExtender(logger klog.Logger, pod *v1
 			}
 		}
 	}
-	sort.Slice(potentialVictims, func(i, j int) bool { return util.MoreImportantPod(potentialVictims[i], potentialVictims[j]) })
+	sort.Slice(potentialVictims, func(i, j int) bool {
+		return util.MoreImportantVictim([]*v1.Pod{potentialVictims[i]}, []*v1.Pod{potentialVictims[j]}, false)
+	})
 
 	// If the new pod does not fit after removing all the lower priority pods,
 	// we are almost done and this node is not suitable for preemption.

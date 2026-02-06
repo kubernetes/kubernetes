@@ -123,39 +123,112 @@ func TestGetEarliestPodStartTime(t *testing.T) {
 	}
 }
 
-func TestMoreImportantPod(t *testing.T) {
-	currentTime := time.Now()
-	pod1 := newPriorityPodWithStartTime("pod1", 1, currentTime)
-	pod2 := newPriorityPodWithStartTime("pod2", 2, currentTime.Add(time.Second))
-	pod3 := newPriorityPodWithStartTime("pod3", 2, currentTime)
+func TestMoreImportantVictim(t *testing.T) {
+	now := time.Now()
+
+	// Helper: Create a single pod slice (Standard Pod)
+	makePod := func(priority int32, timeOffset time.Duration) []*v1.Pod {
+		return []*v1.Pod{
+			newPriorityPodWithStartTime("pod", priority, now.Add(timeOffset)),
+		}
+	}
+
+	// Helper: Create a Workload/PodGroup slice
+	makePodGroup := func(priority int32, size int, timeOffset time.Duration) []*v1.Pod {
+		var pods []*v1.Pod
+		for i := range size {
+			p := newPriorityPodWithStartTime(fmt.Sprintf("pod-%d", i), priority, now.Add(timeOffset).Add(time.Duration(i)*time.Second))
+			p.Spec.WorkloadRef = &v1.WorkloadReference{
+				Name:     "my-workload",
+				PodGroup: "pod group",
+			}
+			pods = append(pods, p)
+		}
+		return pods
+	}
 
 	tests := map[string]struct {
-		p1       *v1.Pod
-		p2       *v1.Pod
-		expected bool
+		v1                       []*v1.Pod
+		v2                       []*v1.Pod
+		enableWorkloadPreemption bool // Enable Workload Preemption
+		expected                 bool
 	}{
-		"Pod with higher priority": {
-			p1:       pod1,
-			p2:       pod2,
-			expected: false,
+		// 1. Priority Checks
+		"Priority: Higher priority wins (Single vs Single)": {
+			v1:                       makePod(100, 0),
+			v2:                       makePod(50, 0),
+			enableWorkloadPreemption: true,
+			expected:                 true,
 		},
-		"Pod with older created time": {
-			p1:       pod2,
-			p2:       pod3,
-			expected: false,
+		"Priority: Higher priority wins (Group vs Group)": {
+			v1:                       makePodGroup(100, 5, 0),
+			v2:                       makePodGroup(50, 5, 0),
+			enableWorkloadPreemption: true,
+			expected:                 true,
 		},
-		"Pods with same start time": {
-			p1:       pod3,
-			p2:       pod1,
-			expected: true,
+
+		// 2. Workload Type Checks (WorkloadAwarePreemption Enabled)
+		"Type: PodGroup > Single Pod (Same Priority)": {
+			v1:                       makePodGroup(100, 2, 0),
+			v2:                       makePod(100, 0),
+			enableWorkloadPreemption: true,
+			expected:                 true, // v1 is Group, v2 is Single -> v1 is more important
+		},
+		"Type: Single Pod < PodGroup (Same Priority)": {
+			v1:                       makePod(100, 0),
+			v2:                       makePodGroup(100, 2, 0),
+			enableWorkloadPreemption: true,
+			expected:                 false, // v1 is Single, v2 is Group -> v2 is more important
+		},
+
+		// 3. Single Pod Creation Time Checks
+		"Single Pods: Older wins (First come first served)": {
+			v1:                       makePod(100, -10*time.Minute), // Started 10 mins ago
+			v2:                       makePod(100, 0),               // Started now
+			enableWorkloadPreemption: true,
+			expected:                 true,
+		},
+		"Single Pods: Newer loses": {
+			v1:                       makePod(100, 0),
+			v2:                       makePod(100, -10*time.Minute),
+			enableWorkloadPreemption: true,
+			expected:                 false,
+		},
+
+		// 4. Pod Group Size Checks
+		"Groups: Larger group wins": {
+			v1:                       makePodGroup(100, 10, 0), // Size 10
+			v2:                       makePodGroup(100, 5, 0),  // Size 5
+			enableWorkloadPreemption: true,
+			expected:                 true,
+		},
+		"Groups: Smaller group loses": {
+			v1:                       makePodGroup(100, 5, 0),
+			v2:                       makePodGroup(100, 10, 0),
+			enableWorkloadPreemption: true,
+			expected:                 false,
+		},
+
+		// 5. Pod Group Start Time Checks (Tie-breaker for equal size)
+		"Groups (Equal Size): Older group wins": {
+			v1:                       makePodGroup(100, 5, -20*time.Minute), // Older
+			v2:                       makePodGroup(100, 5, 0),               // Newer
+			enableWorkloadPreemption: true,
+			expected:                 true,
+		},
+		"Groups (Equal Size): Newer group loses": {
+			v1:                       makePodGroup(100, 5, 0),
+			v2:                       makePodGroup(100, 5, -20*time.Minute),
+			enableWorkloadPreemption: true,
+			expected:                 false,
 		},
 	}
 
-	for k, v := range tests {
-		t.Run(k, func(t *testing.T) {
-			got := MoreImportantPod(v.p1, v.p2)
-			if got != v.expected {
-				t.Errorf("expected %t but got %t", v.expected, got)
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got := MoreImportantVictim(tc.v1, tc.v2, tc.enableWorkloadPreemption)
+			if got != tc.expected {
+				t.Errorf("expected %t but got %t", tc.expected, got)
 			}
 		})
 	}

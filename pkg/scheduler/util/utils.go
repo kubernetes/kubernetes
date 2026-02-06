@@ -82,18 +82,6 @@ func GetEarliestPodStartTime(victims *extenderv1.Victims) *metav1.Time {
 	return earliestPodStartTime
 }
 
-// MoreImportantPod return true when priority of the first pod is higher than
-// the second one. If two pods' priorities are equal, compare their StartTime,
-// treating the older pod as more important.
-func MoreImportantPod(pod1, pod2 *v1.Pod) bool {
-	p1 := corev1helpers.PodPriority(pod1)
-	p2 := corev1helpers.PodPriority(pod2)
-	if p1 != p2 {
-		return p1 > p2
-	}
-	return GetPodStartTime(pod1).Before(GetPodStartTime(pod2))
-}
-
 // Retriable defines the retriable errors during a scheduling cycle.
 func Retriable(err error) bool {
 	return apierrors.IsInternalError(err) || apierrors.IsServiceUnavailable(err) ||
@@ -242,4 +230,65 @@ func NewPodGroupKey(namespace string, workloadRef *v1.WorkloadReference) PodGrou
 		podGroupName: workloadRef.PodGroup,
 		replicaKey:   workloadRef.PodGroupReplicaKey,
 	}
+}
+
+// MoreImportantVictim decides which of two preemption units is considered more critical.
+//
+// The comparison logic follows this strict hierarchy:
+//
+//  1. Priority: Higher priority units are always more important.
+//
+//  2. Workload Type (if WorkloadAwarePreemption is enabled):
+//     Atomic workloads (PodGroups) are considered more important than individual Pods
+//     of the same priority.
+//
+//  3. Start Time (for Single Pods):
+//     If both units are single Pods, the one with the older StartTime is more important.
+//     This honors "first-come, first-served".
+//
+//  4. Group Size (for PodGroups):
+//     If both units are PodGroups, the one with more members (larger size) is considered
+//     more important. This avoids the high cost of rescheduling massive jobs.
+//
+//  5. Start Time (Tie-breaker for PodGroups):
+//     If sizes are equal, the group that started earlier (has the oldest pod)
+//     is more important.
+func MoreImportantVictim(vi1, vi2 []*v1.Pod, enableWorkloadPreemption bool) bool {
+	isPodGroup := func(p []*v1.Pod) bool {
+		return p[0].Spec.WorkloadRef != nil
+	}
+
+	p1 := *vi1[0].Spec.Priority
+	p2 := *vi2[0].Spec.Priority
+	if p1 != p2 {
+		return p1 > p2
+	}
+
+	if enableWorkloadPreemption && isPodGroup(vi1) != isPodGroup(vi2) {
+		return isPodGroup(vi1)
+	}
+
+	if !isPodGroup(vi1) {
+		return GetPodStartTime(vi1[0]).Before(GetPodStartTime(vi2[0]))
+	}
+
+	if len(vi1) != len(vi2) {
+		return len(vi1) > len(vi2)
+	}
+
+	t1 := getEarliestPodStartTime(vi1)
+	t2 := getEarliestPodStartTime(vi2)
+	return t1.Before(t2)
+}
+
+// getEarliestPodStartTime finds the oldest StartTime among a list of Pods.
+func getEarliestPodStartTime(pods []*v1.Pod) *metav1.Time {
+	var earliest *metav1.Time
+	for _, p := range pods {
+		t := GetPodStartTime(p)
+		if earliest == nil || (t != nil && t.Before(earliest)) {
+			earliest = t
+		}
+	}
+	return earliest
 }
