@@ -126,16 +126,16 @@ func (o *WebhookServingOptions) AddFlags(fs *pflag.FlagSet) {
 
 	fs.StringVar(&o.ServerCert.CertDirectory, "webhook-cert-dir", o.ServerCert.CertDirectory, ""+
 		"The directory where the TLS certs are located. "+
-		"If --tls-cert-file and --tls-private-key-file are provided, this flag will be ignored.")
+		"If --webhook-tls-cert-file and --webhook-tls-private-key-file are provided, this flag will be ignored.")
 
 	fs.StringVar(&o.ServerCert.CertKey.CertFile, "webhook-tls-cert-file", o.ServerCert.CertKey.CertFile, ""+
 		"File containing the default x509 Certificate for HTTPS. (CA cert, if any, concatenated "+
-		"after server cert). If HTTPS serving is enabled, and --tls-cert-file and "+
-		"--tls-private-key-file are not provided, a self-signed certificate and key "+
-		"are generated for the public address and saved to the directory specified by --cert-dir.")
+		"after server cert). If HTTPS serving is enabled, and --webhook-tls-cert-file and "+
+		"--webhook-tls-private-key-file are not provided, a self-signed certificate and key "+
+		"are generated for the public address and saved to the directory specified by --webhook-cert-dir.")
 
 	fs.StringVar(&o.ServerCert.CertKey.KeyFile, "webhook-tls-private-key-file", o.ServerCert.CertKey.KeyFile,
-		"File containing the default x509 private key matching --tls-cert-file.")
+		"File containing the default x509 private key matching --webhook-tls-cert-file.")
 }
 
 func (o *WebhookServingOptions) Validate() []error {
