@@ -25,6 +25,7 @@ import (
 	context "context"
 	fmt "fmt"
 
+	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
@@ -106,7 +107,27 @@ func Validate_StorageClass(ctx context.Context, op operation.Operation, fldPath 
 			return
 		}(fldPath.Child("parameters"), obj.Parameters, safe.Field(oldObj, func(oldObj *storagev1.StorageClass) map[string]string { return oldObj.Parameters }), oldObj != nil)...)
 
-	// field storagev1.StorageClass.ReclaimPolicy has no validation
+	// field storagev1.StorageClass.ReclaimPolicy
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *corev1.PersistentVolumeReclaimPolicy, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("reclaimPolicy"), obj.ReclaimPolicy, safe.Field(oldObj, func(oldObj *storagev1.StorageClass) *corev1.PersistentVolumeReclaimPolicy {
+			return oldObj.ReclaimPolicy
+		}), oldObj != nil)...)
+
 	// field storagev1.StorageClass.MountOptions has no validation
 	// field storagev1.StorageClass.AllowVolumeExpansion has no validation
 	// field storagev1.StorageClass.VolumeBindingMode has no validation

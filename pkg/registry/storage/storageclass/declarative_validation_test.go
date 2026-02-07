@@ -102,6 +102,13 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 				field.Invalid(field.NewPath("parameters"), map[string]string{"new": "value"}, "field is immutable").WithOrigin("immutable"),
 			},
 		},
+		"invalid update reclaimPolicy changed": {
+			oldObj:    mkValidStorageClass(),
+			updateObj: mkValidStorageClass(TweakReclaimPolicy(api.PersistentVolumeReclaimRetain)),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("reclaimPolicy"), api.PersistentVolumeReclaimRetain, "field is immutable").WithOrigin("immutable"),
+			},
+		},
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
@@ -147,5 +154,11 @@ func TweakProvisioner(provisioner string) func(obj *storage.StorageClass) {
 func TweakParameters(parameters map[string]string) func(obj *storage.StorageClass) {
 	return func(obj *storage.StorageClass) {
 		obj.Parameters = parameters
+	}
+}
+
+func TweakReclaimPolicy(reclaimPolicy api.PersistentVolumeReclaimPolicy) func(obj *storage.StorageClass) {
+	return func(obj *storage.StorageClass) {
+		obj.ReclaimPolicy = &reclaimPolicy
 	}
 }
