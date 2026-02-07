@@ -66,9 +66,7 @@ func ValidateStorageClassUpdate(storageClass, oldStorageClass *storage.StorageCl
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("parameters"), "updates to parameters are forbidden."))
 	}
 
-	if storageClass.Provisioner != oldStorageClass.Provisioner {
-		allErrs = append(allErrs, field.Forbidden(field.NewPath("provisioner"), "updates to provisioner are forbidden."))
-	}
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(storageClass.Provisioner, oldStorageClass.Provisioner, field.NewPath("provisioner")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
 
 	if *storageClass.ReclaimPolicy != *oldStorageClass.ReclaimPolicy {
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("reclaimPolicy"), "updates to reclaimPolicy are forbidden."))

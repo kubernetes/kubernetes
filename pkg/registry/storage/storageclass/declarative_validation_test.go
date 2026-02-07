@@ -85,23 +85,21 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		expectedErrs field.ErrorList
 	}{
 		"valid update": {
-			oldObj:    mkValidStorageClass(func(obj *storage.StorageClass) { obj.ResourceVersion = "1" }),
-			updateObj: mkValidStorageClass(func(obj *storage.StorageClass) { obj.ResourceVersion = "1" }),
+			oldObj:    mkValidStorageClass(),
+			updateObj: mkValidStorageClass(),
 		},
-		"invalid update provisioner": {
-			oldObj: mkValidStorageClass(func(obj *storage.StorageClass) { obj.ResourceVersion = "1" }),
-			updateObj: mkValidStorageClass(func(obj *storage.StorageClass) {
-				obj.ResourceVersion = "1"
-				obj.Provisioner = ""
-			}),
+		"invalid update provisioner changed": {
+			oldObj:    mkValidStorageClass(),
+			updateObj: mkValidStorageClass(TweakProvisioner("kubernetes.io/aws-ebs")),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("provisioner"), ""),
-				field.Forbidden(field.NewPath("provisioner"), "updates to provisioner are forbidden."),
+				field.Invalid(field.NewPath("provisioner"), "kubernetes.io/aws-ebs", "field is immutable").WithOrigin("immutable"),
 			},
 		},
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
+			tc.oldObj.ResourceVersion = "1"
+			tc.updateObj.ResourceVersion = "2"
 			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
 				APIPrefix:         "apis",
 				APIGroup:          "storage.k8s.io",
@@ -131,4 +129,10 @@ func mkValidStorageClass(tweaks ...func(obj *storage.StorageClass)) storage.Stor
 		tweak(&obj)
 	}
 	return obj
+}
+
+func TweakProvisioner(provisioner string) func(obj *storage.StorageClass) {
+	return func(obj *storage.StorageClass) {
+		obj.Provisioner = provisioner
+	}
 }
