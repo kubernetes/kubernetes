@@ -777,6 +777,7 @@ func ValidateIPAddress(ipAddress *networking.IPAddress) field.ErrorList {
 	errs := validateIPAddressParentReference(ipAddress.Spec.ParentRef, field.NewPath("spec"))
 	allErrs = append(allErrs, errs...)
 	return allErrs
+
 }
 
 // validateIPAddressParentReference ensures that the IPAddress ParenteReference exists and is valid.

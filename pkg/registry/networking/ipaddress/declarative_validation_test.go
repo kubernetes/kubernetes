@@ -113,6 +113,24 @@ func TestDeclarativeValidateIPAddressUpdate(t *testing.T) {
 						}(),
 					},
 				},
+				"set parentRef": {
+					oldObj: mkValidIPAddress(withResourceVersion("1"), withNilParentRef),
+					updateObj: mkValidIPAddress(
+						withResourceVersion("2"),
+						withParentRefName("new-name"),
+					),
+					expectedErrs: field.ErrorList{
+						func() *field.Error {
+							e := field.Invalid(field.NewPath("spec", "parentRef"), &networking.ParentReference{
+								Group:    "apps",
+								Resource: "deployments",
+								Name:     "new-name",
+							}, "field is immutable")
+							e.Origin = "immutable"
+							return e
+						}(),
+					},
+				},
 				"unset parentRef": {
 					oldObj: mkValidIPAddress(withResourceVersion("1")),
 					updateObj: mkValidIPAddress(
