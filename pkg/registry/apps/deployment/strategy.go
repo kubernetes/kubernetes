@@ -19,6 +19,7 @@ package deployment
 import (
 	"context"
 	"fmt"
+	"k8s.io/apimachinery/pkg/api/operation"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -83,7 +84,8 @@ func (deploymentStrategy) PrepareForCreate(ctx context.Context, obj runtime.Obje
 func (deploymentStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	deployment := obj.(*apps.Deployment)
 	opts := pod.GetValidationOptionsFromPodTemplate(&deployment.Spec.Template, nil)
-	return appsvalidation.ValidateDeployment(deployment, opts)
+	allErrs := appsvalidation.ValidateDeployment(deployment, opts)
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, deployment, nil, allErrs, operation.Create)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -130,8 +132,7 @@ func (deploymentStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.O
 
 	opts := pod.GetValidationOptionsFromPodTemplate(&newDeployment.Spec.Template, &oldDeployment.Spec.Template)
 	allErrs := appsvalidation.ValidateDeploymentUpdate(newDeployment, oldDeployment, opts)
-
-	return allErrs
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newDeployment, oldDeployment, allErrs, operation.Update)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
