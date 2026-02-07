@@ -109,6 +109,13 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 				field.Invalid(field.NewPath("reclaimPolicy"), api.PersistentVolumeReclaimRetain, "field is immutable").WithOrigin("immutable"),
 			},
 		},
+		"invalid update volumeBindingMode changed": {
+			oldObj:    mkValidStorageClass(),
+			updateObj: mkValidStorageClass(TweakVolumeBindingMode(storage.VolumeBindingWaitForFirstConsumer)),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("volumeBindingMode"), storage.VolumeBindingWaitForFirstConsumer, "field is immutable").WithOrigin("immutable"),
+			},
+		},
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
@@ -160,5 +167,11 @@ func TweakParameters(parameters map[string]string) func(obj *storage.StorageClas
 func TweakReclaimPolicy(reclaimPolicy api.PersistentVolumeReclaimPolicy) func(obj *storage.StorageClass) {
 	return func(obj *storage.StorageClass) {
 		obj.ReclaimPolicy = &reclaimPolicy
+	}
+}
+
+func TweakVolumeBindingMode(volumeBindingMode storage.VolumeBindingMode) func(obj *storage.StorageClass) {
+	return func(obj *storage.StorageClass) {
+		obj.VolumeBindingMode = &volumeBindingMode
 	}
 }
