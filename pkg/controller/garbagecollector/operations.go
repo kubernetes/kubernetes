@@ -67,8 +67,8 @@ func (gc *GarbageCollector) deleteObject(item objectReference, resourceVersion s
 		// check if the ownerReferences changed
 		liveObject, liveErr := resourceClient.Get(context.TODO(), item.Name, metav1.GetOptions{})
 		if errors.IsNotFound(liveErr) {
-			// object we wanted to delete is gone, success!
-			return nil
+			// object we wanted to delete is gone, return NotFound so caller can handle it consistently
+			return liveErr
 		}
 		if liveErr == nil && liveObject.UID == item.UID && liveObject.ResourceVersion != resourceVersion && reflect.DeepEqual(liveObject.OwnerReferences, ownersAtResourceVersion) {
 			// object changed, causing a conflict error, but ownerReferences did not change.
