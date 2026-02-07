@@ -4997,7 +4997,7 @@ func updatePodStatuses(ctx context.Context, clientSet clientset.Interface, updat
 	wg := sync.WaitGroup{}
 	wg.Add(len(updates))
 	errCh := make(chan error, len(updates))
-	var updated int32
+	var updated atomic.Int32
 
 	for _, pod := range updates {
 		go func() {
@@ -5005,7 +5005,7 @@ func updatePodStatuses(ctx context.Context, clientSet clientset.Interface, updat
 			if err != nil {
 				errCh <- err
 			} else {
-				atomic.AddInt32(&updated, 1)
+				updated.Add(1)
 			}
 			wg.Done()
 		}()
@@ -5014,10 +5014,10 @@ func updatePodStatuses(ctx context.Context, clientSet clientset.Interface, updat
 
 	select {
 	case err := <-errCh:
-		return int(updated), fmt.Errorf("updating Pod status: %w", err)
+		return int(updated.Load()), fmt.Errorf("updating Pod status: %w", err)
 	default:
 	}
-	return int(updated), nil
+	return int(updated.Load()), nil
 }
 
 func setJobPhaseForIndex(ctx context.Context, clientSet clientset.Interface, jobObj *batchv1.Job, phase v1.PodPhase, ix int) error {

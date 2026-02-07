@@ -608,7 +608,8 @@ func (d *Driver) SetUp(tCtx ktesting.TContext, kubeletRootDir string, nodes *Nod
 		}
 		// All listeners running in this pod use a new unique local port number
 		// by atomically incrementing this variable.
-		listenerPort := int32(9000)
+		var listenerPort atomic.Int32
+		listenerPort.Store(9000)
 		rollingUpdateUID := pod.UID
 		serialize := true
 		if !d.RollingUpdate {
@@ -781,7 +782,7 @@ var errListenerDone = errors.New("listener is shutting down")
 // listen returns the function which the kubeletplugin helper needs to open a listening socket.
 // For that it spins up hostpathplugin in the pod for the desired node
 // and connects to hostpathplugin via port forwarding.
-func (d *Driver) listen(tCtx ktesting.TContext, pod *v1.Pod, port *int32) func(ctx context.Context, endpoint string) (net.Listener, error) {
+func (d *Driver) listen(tCtx ktesting.TContext, pod *v1.Pod, port *atomic.Int32) func(ctx context.Context, endpoint string) (net.Listener, error) {
 	return func(ctx context.Context, endpoint string) (l net.Listener, e error) {
 		// No need create sockets, the kubelet is not expected to use them.
 		if !d.WithKubelet {
@@ -799,7 +800,7 @@ func (d *Driver) listen(tCtx ktesting.TContext, pod *v1.Pod, port *int32) func(c
 		}
 
 		// "Allocate" a new port by by bumping the per-pod counter by one.
-		port := atomic.AddInt32(port, 1)
+		port := port.Add(1)
 
 		logger := klog.FromContext(ctx)
 		logger = klog.LoggerWithName(logger, "socket-listener")

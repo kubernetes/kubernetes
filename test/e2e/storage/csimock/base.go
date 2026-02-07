@@ -1086,13 +1086,13 @@ func createFSGroupRequestPreHook(nodeStageFsGroup, nodePublishFsGroup *string) *
 
 // createPreHook counts invocations of a certain method (identified by a substring in the full gRPC method name).
 func createPreHook(method string, callback func(counter int64) error) *drivers.Hooks {
-	var counter int64
+	var counter atomic.Int64
 
 	return &drivers.Hooks{
 		Pre: func() func(ctx context.Context, fullMethod string, request interface{}) (reply interface{}, err error) {
 			return func(ctx context.Context, fullMethod string, request interface{}) (reply interface{}, err error) {
 				if strings.Contains(fullMethod, method) {
-					counter := atomic.AddInt64(&counter, 1)
+					counter := counter.Add(1)
 					return nil, callback(counter)
 				}
 				return nil, nil

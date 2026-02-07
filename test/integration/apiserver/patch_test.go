@@ -71,7 +71,7 @@ func TestPatchConflicts(t *testing.T) {
 	}
 	client := clientSet.CoreV1().RESTClient()
 
-	successes := int32(0)
+	var successes atomic.Int32
 
 	// Run a lot of simultaneous patch operations to exercise internal API server retry of application of patches that do not specify resourceVersion.
 	// They should all succeed.
@@ -116,15 +116,15 @@ func TestPatchConflicts(t *testing.T) {
 				t.Errorf("patch of %s with $patch directive was ineffective, didn't delete the entry in the ownerReference slice: %#v", "secrets", UIDs[i])
 			}
 
-			atomic.AddInt32(&successes, 1)
+			successes.Add(1)
 		}(i)
 	}
 	wg.Wait()
 
-	if successes < int32(numOfConcurrentPatches) {
-		t.Errorf("Expected at least %d successful patches for %s, got %d", numOfConcurrentPatches, "secrets", successes)
+	if successes.Load() < int32(numOfConcurrentPatches) {
+		t.Errorf("Expected at least %d successful patches for %s, got %d", numOfConcurrentPatches, "secrets", successes.Load())
 	} else {
-		t.Logf("Got %d successful patches for %s", successes, "secrets")
+		t.Logf("Got %d successful patches for %s", successes.Load(), "secrets")
 	}
 
 }

@@ -757,9 +757,8 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 			Description: Four levels of Pods in ReplicaSets with different levels of Priority, restricted by given CPU limits MUST launch. Priority 1 - 3 Pods MUST spawn first followed by Priority 4 Pod. The ReplicaSets with Replicas MUST contain the expected number of Replicas.
 		*/
 		framework.ConformanceIt("runs ReplicaSets to verify preemption running path", func(ctx context.Context) {
-			podNamesSeen := []int32{0, 0, 0}
+			var podNamesSeen [3]atomic.Int32
 
-			// create a pod controller to list/watch pod events from the test framework namespace
 			_, podController := cache.NewInformer(
 				&cache.ListWatch{
 					ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
@@ -775,17 +774,19 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 				cache.ResourceEventHandlerFuncs{
 					AddFunc: func(obj interface{}) {
 						if pod, ok := obj.(*v1.Pod); ok {
-							if strings.HasPrefix(pod.Name, "rs-pod1") {
-								atomic.AddInt32(&podNamesSeen[0], 1)
-							} else if strings.HasPrefix(pod.Name, "rs-pod2") {
-								atomic.AddInt32(&podNamesSeen[1], 1)
-							} else if strings.HasPrefix(pod.Name, "rs-pod3") {
-								atomic.AddInt32(&podNamesSeen[2], 1)
+							switch {
+							case strings.HasPrefix(pod.Name, "rs-pod1"):
+								podNamesSeen[0].Add(1)
+							case strings.HasPrefix(pod.Name, "rs-pod2"):
+								podNamesSeen[1].Add(1)
+							case strings.HasPrefix(pod.Name, "rs-pod3"):
+								podNamesSeen[2].Add(1)
 							}
 						}
 					},
 				},
 			)
+
 			go podController.Run(ctx.Done())
 
 			// prepare three ReplicaSet
@@ -838,7 +839,12 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 				runPauseRS(ctx, f, rsConfs[i])
 			}
 
-			framework.Logf("pods created so far: %v", podNamesSeen)
+			framework.Logf(
+				"pods created so far: [%d %d %d]",
+				podNamesSeen[0].Load(),
+				podNamesSeen[1].Load(),
+				podNamesSeen[2].Load(),
+			)
 			framework.Logf("length of pods created so far: %v", len(podNamesSeen))
 
 			// create a Preemptor Pod
@@ -856,7 +862,12 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 			preemptorPod := createPod(ctx, f, preemptorPodConf)
 			waitForPreemptingWithTimeout(ctx, f, preemptorPod, framework.PodGetTimeout)
 
-			framework.Logf("pods created so far: %v", podNamesSeen)
+			framework.Logf(
+				"pods created so far: [%d %d %d]",
+				podNamesSeen[0].Load(),
+				podNamesSeen[1].Load(),
+				podNamesSeen[2].Load(),
+			)
 
 			// count pods number of ReplicaSet{1,2,3}:
 			// - if it's more than expected replicas, it denotes its pods have been over-preempted
@@ -865,7 +876,7 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 			expectedRSPods := []int32{1 * 2, 1 * 2, 1}
 			err := wait.PollUntilContextTimeout(ctx, framework.Poll, framework.PollShortTimeout, false, func(ctx context.Context) (bool, error) {
 				for i := 0; i < len(podNamesSeen); i++ {
-					got := atomic.LoadInt32(&podNamesSeen[i])
+					got := podNamesSeen[i].Load()
 					if got < expectedRSPods[i] {
 						framework.Logf("waiting for rs%d to observe %d pod creations, got %d", i+1, expectedRSPods[i], got)
 						return false, nil
@@ -876,7 +887,12 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 				return true, nil
 			})
 			if err != nil {
-				framework.Logf("pods created so far: %v", podNamesSeen)
+				framework.Logf(
+					"pods created so far: [%d %d %d]",
+					podNamesSeen[0].Load(),
+					podNamesSeen[1].Load(),
+					podNamesSeen[2].Load(),
+				)
 				framework.Failf("failed pod observation expectations: %v", err)
 			}
 
@@ -884,7 +900,7 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 			// the state is stable; otherwise, pods may be over-preempted.
 			time.Sleep(5 * time.Second)
 			for i := 0; i < len(podNamesSeen); i++ {
-				got := atomic.LoadInt32(&podNamesSeen[i])
+				got := podNamesSeen[i].Load()
 				if got < expectedRSPods[i] {
 					framework.Failf("pods of ReplicaSet%d have been under-preempted: expect %v pod names, but got %d", i+1, expectedRSPods[i], got)
 				} else if got > expectedRSPods[i] {
