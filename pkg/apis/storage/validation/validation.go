@@ -62,9 +62,7 @@ func ValidateStorageClass(storageClass *storage.StorageClass) field.ErrorList {
 // ValidateStorageClassUpdate tests if an update to StorageClass is valid.
 func ValidateStorageClassUpdate(storageClass, oldStorageClass *storage.StorageClass) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&storageClass.ObjectMeta, &oldStorageClass.ObjectMeta, field.NewPath("metadata"))
-	if !reflect.DeepEqual(oldStorageClass.Parameters, storageClass.Parameters) {
-		allErrs = append(allErrs, field.Forbidden(field.NewPath("parameters"), "updates to parameters are forbidden."))
-	}
+	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(storageClass.Parameters, oldStorageClass.Parameters, field.NewPath("parameters")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
 
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(storageClass.Provisioner, oldStorageClass.Provisioner, field.NewPath("provisioner")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
 

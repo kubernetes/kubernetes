@@ -95,6 +95,13 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 				field.Invalid(field.NewPath("provisioner"), "kubernetes.io/aws-ebs", "field is immutable").WithOrigin("immutable"),
 			},
 		},
+		"invalid update parameters changed": {
+			oldObj:    mkValidStorageClass(),
+			updateObj: mkValidStorageClass(TweakParameters(map[string]string{"new": "value"})),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("parameters"), map[string]string{"new": "value"}, "field is immutable").WithOrigin("immutable"),
+			},
+		},
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
@@ -134,5 +141,11 @@ func mkValidStorageClass(tweaks ...func(obj *storage.StorageClass)) storage.Stor
 func TweakProvisioner(provisioner string) func(obj *storage.StorageClass) {
 	return func(obj *storage.StorageClass) {
 		obj.Provisioner = provisioner
+	}
+}
+
+func TweakParameters(parameters map[string]string) func(obj *storage.StorageClass) {
+	return func(obj *storage.StorageClass) {
+		obj.Parameters = parameters
 	}
 }

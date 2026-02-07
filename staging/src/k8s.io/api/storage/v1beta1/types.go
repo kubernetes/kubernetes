@@ -51,6 +51,7 @@ type StorageClass struct {
 	// parameters holds the parameters for the provisioner that should
 	// create volumes of this storage class.
 	// +optional
+	// +k8s:immutable
 	Parameters map[string]string `json:"parameters,omitempty" protobuf:"bytes,3,rep,name=parameters"`
 
 	// reclaimPolicy controls the reclaimPolicy for dynamically provisioned PersistentVolumes of this storage class.
