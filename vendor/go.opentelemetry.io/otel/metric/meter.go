@@ -244,7 +244,11 @@ type Meter interface {
 // Callbacks. Meaning, it should not report measurements for an instrument with
 // the same attributes as another Callback will report.
 //
-// The function needs to be concurrent safe.
+// The function needs to be reentrant and concurrent safe.
+//
+// Note that Go's mutexes are not reentrant, and locking a mutex takes
+// an indefinite amount of time. It is therefore advised to avoid
+// using mutexes inside callbacks.
 type Callback func(context.Context, Observer) error
 
 // Observer records measurements for multiple instruments in a Callback.
