@@ -845,7 +845,7 @@ func TestManifestFilesAreEqual(t *testing.T) {
 			tmpdir := t.TempDir()
 
 			// write 2 manifests
-			for i := 0; i < 2; i++ {
+			for i := range 2 {
 				if rt.podYamls[i] != "" {
 					manifestPath := filepath.Join(tmpdir, strconv.Itoa(i)+".yaml")
 					err := os.WriteFile(manifestPath, []byte(rt.podYamls[i]), 0644)

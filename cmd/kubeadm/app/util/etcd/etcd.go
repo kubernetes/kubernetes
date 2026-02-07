@@ -677,7 +677,7 @@ func (c *Client) getClusterStatus() (map[string]*clientv3.StatusResponse, error)
 
 // WaitForClusterAvailable returns true if all endpoints in the cluster are available after retry attempts, an error is returned otherwise
 func (c *Client) WaitForClusterAvailable(retries int, retryInterval time.Duration) (bool, error) {
-	for i := 0; i < retries; i++ {
+	for i := range retries {
 		if i > 0 {
 			klog.V(1).Infof("[etcd] Waiting %v until next retry\n", retryInterval)
 			time.Sleep(retryInterval)

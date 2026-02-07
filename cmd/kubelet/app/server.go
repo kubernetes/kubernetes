@@ -1155,7 +1155,7 @@ func InitializeTLS(ctx context.Context, kf *options.KubeletFlags, kc *kubeletcon
 
 	if len(tlsCipherSuites) > 0 {
 		insecureCiphers := cliflag.InsecureTLSCiphers()
-		for i := 0; i < len(tlsCipherSuites); i++ {
+		for i := range tlsCipherSuites {
 			for cipherName, cipherID := range insecureCiphers {
 				if tlsCipherSuites[i] == cipherID {
 					logger.Info("Use of insecure cipher detected.", "cipher", cipherName)
@@ -1395,7 +1395,7 @@ func getCgroupDriverFromCRI(ctx context.Context, s *options.KubeletServer, kubeD
 	)
 	// Retry a couple of times, hoping that any errors are transient.
 	// Fail quickly on known, non transient errors.
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		runtimeConfig, err = kubeDeps.RemoteRuntimeService.RuntimeConfig(ctx)
 		if err != nil {
 			s, ok := status.FromError(err)
