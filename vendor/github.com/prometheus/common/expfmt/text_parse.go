@@ -48,8 +48,10 @@ func (e ParseError) Error() string {
 	return fmt.Sprintf("text format parsing error in line %d: %s", e.Line, e.Msg)
 }
 
-// TextParser is used to parse the simple and flat text-based exchange format. Its
-// zero value is ready to use.
+// TextParser is used to parse the simple and flat text-based exchange format.
+//
+// TextParser instances must be created with NewTextParser, the zero value of
+// TextParser is invalid.
 type TextParser struct {
 	metricFamiliesByName map[string]*dto.MetricFamily
 	buf                  *bufio.Reader // Where the parsed input is read through.
@@ -129,7 +131,42 @@ func (p *TextParser) TextToMetricFamilies(in io.Reader) (map[string]*dto.MetricF
 	if p.err != nil && errors.Is(p.err, io.EOF) {
 		p.parseError("unexpected end of input stream")
 	}
+	for _, histogramMetric := range p.histograms {
+		normalizeHistogram(histogramMetric.GetHistogram())
+	}
 	return p.metricFamiliesByName, p.err
+}
+
+// normalizeHistogram makes sure that all the buckets and the count in each
+// histogram is either completely float or completely integer.
+func normalizeHistogram(histogram *dto.Histogram) {
+	if histogram == nil {
+		return
+	}
+	anyFloats := false
+	if histogram.GetSampleCountFloat() != 0 {
+		anyFloats = true
+	} else {
+		for _, b := range histogram.GetBucket() {
+			if b.GetCumulativeCountFloat() != 0 {
+				anyFloats = true
+				break
+			}
+		}
+	}
+	if !anyFloats {
+		return
+	}
+	if histogram.GetSampleCountFloat() == 0 {
+		histogram.SampleCountFloat = proto.Float64(float64(histogram.GetSampleCount()))
+		histogram.SampleCount = nil
+	}
+	for _, b := range histogram.GetBucket() {
+		if b.GetCumulativeCountFloat() == 0 {
+			b.CumulativeCountFloat = proto.Float64(float64(b.GetCumulativeCount()))
+			b.CumulativeCount = nil
+		}
+	}
 }
 
 func (p *TextParser) reset(in io.Reader) {
@@ -281,7 +318,9 @@ func (p *TextParser) readingLabels() stateFn {
 	// Summaries/histograms are special. We have to reset the
 	// currentLabels map, currentQuantile and currentBucket before starting to
 	// read labels.
-	if p.currentMF.GetType() == dto.MetricType_SUMMARY || p.currentMF.GetType() == dto.MetricType_HISTOGRAM {
+	if p.currentMF.GetType() == dto.MetricType_SUMMARY ||
+		p.currentMF.GetType() == dto.MetricType_HISTOGRAM ||
+		p.currentMF.GetType() == dto.MetricType_GAUGE_HISTOGRAM {
 		p.currentLabels = map[string]string{}
 		p.currentLabels[string(model.MetricNameLabel)] = p.currentMF.GetName()
 		p.currentQuantile = math.NaN()
@@ -374,7 +413,9 @@ func (p *TextParser) startLabelName() stateFn {
 	// Special summary/histogram treatment. Don't add 'quantile' and 'le'
 	// labels to 'real' labels.
 	if (p.currentMF.GetType() != dto.MetricType_SUMMARY || p.currentLabelPair.GetName() != model.QuantileLabel) &&
-		(p.currentMF.GetType() != dto.MetricType_HISTOGRAM || p.currentLabelPair.GetName() != model.BucketLabel) {
+		((p.currentMF.GetType() != dto.MetricType_HISTOGRAM &&
+			p.currentMF.GetType() != dto.MetricType_GAUGE_HISTOGRAM) ||
+			p.currentLabelPair.GetName() != model.BucketLabel) {
 		p.currentLabelPairs = append(p.currentLabelPairs, p.currentLabelPair)
 	}
 	// Check for duplicate label names.
@@ -425,7 +466,7 @@ func (p *TextParser) startLabelValue() stateFn {
 		}
 	}
 	// Similar special treatment of histograms.
-	if p.currentMF.GetType() == dto.MetricType_HISTOGRAM {
+	if p.currentMF.GetType() == dto.MetricType_HISTOGRAM || p.currentMF.GetType() == dto.MetricType_GAUGE_HISTOGRAM {
 		if p.currentLabelPair.GetName() == model.BucketLabel {
 			if p.currentBucket, p.err = parseFloat(p.currentLabelPair.GetValue()); p.err != nil {
 				// Create a more helpful error message.
@@ -476,7 +517,7 @@ func (p *TextParser) readingValue() stateFn {
 			p.summaries[signature] = p.currentMetric
 			p.currentMF.Metric = append(p.currentMF.Metric, p.currentMetric)
 		}
-	case dto.MetricType_HISTOGRAM:
+	case dto.MetricType_HISTOGRAM, dto.MetricType_GAUGE_HISTOGRAM:
 		signature := model.LabelsToSignature(p.currentLabels)
 		if histogram := p.histograms[signature]; histogram != nil {
 			p.currentMetric = histogram
@@ -522,24 +563,38 @@ func (p *TextParser) readingValue() stateFn {
 				},
 			)
 		}
-	case dto.MetricType_HISTOGRAM:
+	case dto.MetricType_HISTOGRAM, dto.MetricType_GAUGE_HISTOGRAM:
 		// *sigh*
 		if p.currentMetric.Histogram == nil {
 			p.currentMetric.Histogram = &dto.Histogram{}
 		}
 		switch {
 		case p.currentIsHistogramCount:
-			p.currentMetric.Histogram.SampleCount = proto.Uint64(uint64(value))
+			if uintValue := uint64(value); value == float64(uintValue) {
+				p.currentMetric.Histogram.SampleCount = proto.Uint64(uintValue)
+			} else {
+				if value < 0 {
+					p.parseError(fmt.Sprintf("negative count for histogram %q", p.currentMF.GetName()))
+					return nil
+				}
+				p.currentMetric.Histogram.SampleCountFloat = proto.Float64(value)
+			}
 		case p.currentIsHistogramSum:
 			p.currentMetric.Histogram.SampleSum = proto.Float64(value)
 		case !math.IsNaN(p.currentBucket):
-			p.currentMetric.Histogram.Bucket = append(
-				p.currentMetric.Histogram.Bucket,
-				&dto.Bucket{
-					UpperBound:      proto.Float64(p.currentBucket),
-					CumulativeCount: proto.Uint64(uint64(value)),
-				},
-			)
+			b := &dto.Bucket{
+				UpperBound: proto.Float64(p.currentBucket),
+			}
+			if uintValue := uint64(value); value == float64(uintValue) {
+				b.CumulativeCount = proto.Uint64(uintValue)
+			} else {
+				if value < 0 {
+					p.parseError(fmt.Sprintf("negative bucket population for histogram %q", p.currentMF.GetName()))
+					return nil
+				}
+				b.CumulativeCountFloat = proto.Float64(value)
+			}
+			p.currentMetric.Histogram.Bucket = append(p.currentMetric.Histogram.Bucket, b)
 		}
 	default:
 		p.err = fmt.Errorf("unexpected type for metric name %q", p.currentMF.GetName())
@@ -602,10 +657,18 @@ func (p *TextParser) readingType() stateFn {
 	if p.readTokenUntilNewline(false); p.err != nil {
 		return nil // Unexpected end of input.
 	}
-	metricType, ok := dto.MetricType_value[strings.ToUpper(p.currentToken.String())]
+	typ := strings.ToUpper(p.currentToken.String()) // Tolerate any combination of upper and lower case.
+	metricType, ok := dto.MetricType_value[typ]     // Tolerate "gauge_histogram" (not originally part of the text format).
 	if !ok {
-		p.parseError(fmt.Sprintf("unknown metric type %q", p.currentToken.String()))
-		return nil
+		// We also want to tolerate "gaugehistogram" to mark a gauge
+		// histogram, because that string is used in OpenMetrics. Note,
+		// however, that gauge histograms do not officially exist in the
+		// classic text format.
+		if typ != "GAUGEHISTOGRAM" {
+			p.parseError(fmt.Sprintf("unknown metric type %q", p.currentToken.String()))
+			return nil
+		}
+		metricType = int32(dto.MetricType_GAUGE_HISTOGRAM)
 	}
 	p.currentMF.Type = dto.MetricType(metricType).Enum()
 	return p.startOfLine
@@ -855,7 +918,8 @@ func (p *TextParser) setOrCreateCurrentMF() {
 	}
 	histogramName := histogramMetricName(name)
 	if p.currentMF = p.metricFamiliesByName[histogramName]; p.currentMF != nil {
-		if p.currentMF.GetType() == dto.MetricType_HISTOGRAM {
+		if p.currentMF.GetType() == dto.MetricType_HISTOGRAM ||
+			p.currentMF.GetType() == dto.MetricType_GAUGE_HISTOGRAM {
 			if isCount(name) {
 				p.currentIsHistogramCount = true
 			}

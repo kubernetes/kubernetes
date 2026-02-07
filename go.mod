@@ -17,9 +17,9 @@ require (
 	github.com/Microsoft/hnslib v0.1.2
 	github.com/blang/semver/v4 v4.0.0
 	github.com/container-storage-interface/spec v1.9.0
-	github.com/coredns/corefile-migration v1.0.29
+	github.com/coredns/corefile-migration v1.0.30
 	github.com/coreos/go-oidc v2.5.0+incompatible
-	github.com/coreos/go-systemd/v22 v22.6.0
+	github.com/coreos/go-systemd/v22 v22.7.0
 	github.com/cpuguy83/go-md2man/v2 v2.0.6
 	github.com/cyphar/filepath-securejoin v0.6.1
 	github.com/distribution/reference v0.6.0
@@ -46,7 +46,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2
 	github.com/prometheus/client_golang v1.23.2
 	github.com/prometheus/client_model v0.6.2
-	github.com/prometheus/common v0.66.1
+	github.com/prometheus/common v0.67.5
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/spf13/cobra v1.10.0
 	github.com/spf13/pflag v1.0.9
@@ -103,7 +103,7 @@ require (
 	k8s.io/kms v0.0.0
 	k8s.io/kube-aggregator v0.0.0
 	k8s.io/kube-controller-manager v0.0.0
-	k8s.io/kube-openapi v0.0.0-20250910181357-589584f1c912
+	k8s.io/kube-openapi v0.0.0-20260127142750-a19766b6e2d4
 	k8s.io/kube-proxy v0.0.0
 	k8s.io/kube-scheduler v0.0.0
 	k8s.io/kubectl v0.0.0
@@ -113,7 +113,7 @@ require (
 	k8s.io/pod-security-admission v0.0.0
 	k8s.io/sample-apiserver v0.0.0
 	k8s.io/system-validators v1.12.1
-	k8s.io/utils v0.0.0-20251219084037-98d557b7f1e7
+	k8s.io/utils v0.0.0-20260108192941-914a6e750570
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730
 	sigs.k8s.io/knftables v0.0.17
 	sigs.k8s.io/randfill v1.0.0
@@ -184,7 +184,7 @@ require (
 	github.com/opencontainers/runtime-spec v1.3.0 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/pquerna/cachecontrol v0.1.0 // indirect
-	github.com/prometheus/procfs v0.16.1 // indirect
+	github.com/prometheus/procfs v0.19.2 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/soheilhy/cmux v0.1.5 // indirect

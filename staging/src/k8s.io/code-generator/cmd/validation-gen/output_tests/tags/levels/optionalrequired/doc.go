@@ -1,8 +1,5 @@
-//go:build !go1.19
-// +build !go1.19
-
 /*
-Copyright 2022 The Kubernetes Authors.
+Copyright 2025 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,16 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package exec
+// +k8s:validation-gen=TypeMeta
+// +k8s:validation-gen-scheme-registry=k8s.io/code-generator/cmd/validation-gen/testscheme.Scheme
 
-import (
-	osexec "os/exec"
-)
+package optionalrequired
 
-func maskErrDotCmd(cmd *osexec.Cmd) *osexec.Cmd {
-	return cmd
-}
+import "k8s.io/code-generator/cmd/validation-gen/testscheme"
 
-func maskErrDot(err error) error {
-	return err
+var localSchemeBuilder = testscheme.New()
+
+type Struct struct {
+	TypeMeta int
+
+	// +k8s:alpha=+k8s:required
+	RequiredField *string `json:"requiredField"`
+
+	// +k8s:beta=+k8s:required
+	RequiredFieldBeta *string `json:"requiredFieldBeta"`
 }

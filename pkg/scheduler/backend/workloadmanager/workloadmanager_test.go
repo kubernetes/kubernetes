@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/klog/v2/ktesting"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
@@ -76,7 +77,9 @@ func TestWorkloadManager_AddPod(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			manager := New()
+			logger, _ := ktesting.NewTestContext(t)
+
+			manager := New(logger)
 			for _, p := range tt.initPods {
 				manager.AddPod(p)
 			}
@@ -178,7 +181,9 @@ func TestWorkloadManager_UpdatePod(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			manager := New()
+			logger, _ := ktesting.NewTestContext(t)
+
+			manager := New(logger)
 
 			manager.AddPod(tt.oldPod)
 			if tt.assumePod {
@@ -250,7 +255,9 @@ func TestWorkloadManager_DeletePod(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			manager := New()
+			logger, _ := ktesting.NewTestContext(t)
+
+			manager := New(logger)
 			for _, p := range tt.initPods {
 				manager.AddPod(p)
 			}

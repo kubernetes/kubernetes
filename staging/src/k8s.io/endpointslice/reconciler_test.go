@@ -2209,6 +2209,49 @@ func TestReconcile_TrafficDistribution(t *testing.T) {
 	}
 }
 
+// TestReconcileHeadlessServiceNoPorts verifies that headless services with no ports
+// don't cause EndpointSlice churn. Validates fix for https://github.com/kubernetes/kubernetes/issues/133474
+func TestReconcileHeadlessServiceNoPorts(t *testing.T) {
+	namespace := "test"
+	client := newClientset()
+	setupMetrics()
+
+	svc := corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "headless-no-ports",
+			Namespace: namespace,
+			UID:       "test-uid",
+		},
+		Spec: corev1.ServiceSpec{
+			ClusterIP:  corev1.ClusterIPNone,
+			Selector:   map[string]string{"foo": "bar"},
+			IPFamilies: []corev1.IPFamily{corev1.IPv4Protocol},
+		},
+	}
+
+	pod := newPod(1, namespace, true, 1, false)
+
+	r := newReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: pod.Spec.NodeName}}}, defaultMaxEndpointsPerSlice)
+
+	reconcileHelper(t, r, &svc, []*corev1.Pod{pod}, []*discovery.EndpointSlice{}, time.Now())
+	assert.Len(t, client.Actions(), 1, "Expected 1 additional clientset action")
+	expectActions(t, client.Actions(), 1, "create", "endpointslices")
+
+	var existingSlices []*discovery.EndpointSlice
+	for _, slice := range fetchEndpointSlices(t, client, namespace) {
+		copy := slice.DeepCopy()
+		// replicate API server behavior which serializes this empty slice as nil
+		copy.Ports = nil
+		existingSlices = append(existingSlices, copy)
+	}
+	assert.Len(t, existingSlices, 1, "Expected 1 endpoint slices")
+
+	reconcileHelper(t, r, &svc, []*corev1.Pod{pod}, existingSlices, time.Now())
+
+	assert.Len(t, client.Actions(), 2, "Expected second reconcile to only list")
+	expectActions(t, client.Actions(), 1, "list", "endpointslices")
+}
+
 // Test Helpers
 
 func newReconciler(client *fake.Clientset, nodes []*corev1.Node, maxEndpointsPerSlice int32) *Reconciler {

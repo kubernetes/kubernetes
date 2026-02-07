@@ -741,7 +741,7 @@ resources:
 
 	const podCount = 1_000
 
-	for i := 0; i < podCount; i++ {
+	for i := range podCount {
 		if _, err := client.CoreV1().Pods(testNamespace).Create(ctx, &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: fmt.Sprintf("dek-reuse-%04d", i+1), // making creation order match returned list order / nonce counter
@@ -1147,7 +1147,7 @@ resources:
 
 	secrets := make([]*api.Secret, dataLen)
 
-	for i := 0; i < dataLen; i++ {
+	for i := range dataLen {
 		secrets[i] = &api.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      fmt.Sprintf("test-secret-%d", i),
@@ -1166,7 +1166,7 @@ resources:
 			b.Fatal(err)
 		}
 
-		for i := 0; i < dataLen; i++ {
+		for i := range dataLen {
 			out, err := secretStorage.Create(ctx, secrets[i], noValidation, &metav1.CreateOptions{})
 			if err != nil {
 				b.Fatal(err)
@@ -1294,7 +1294,7 @@ resources:
 
 	secrets := make([]*corev1.Secret, dataLen)
 
-	for i := 0; i < dataLen; i++ {
+	for i := range dataLen {
 		secrets[i] = &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      fmt.Sprintf("test-secret-%d", i),
@@ -1313,7 +1313,7 @@ resources:
 			b.Fatal(err)
 		}
 
-		for i := 0; i < dataLen; i++ {
+		for i := range dataLen {
 			out, err := secretStorage.Create(ctx, secrets[i], metav1.CreateOptions{})
 			if err != nil {
 				b.Fatal(err)

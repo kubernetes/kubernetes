@@ -131,7 +131,7 @@ func BuildGenericConfig(
 		return
 	}
 
-	if lastErr = s.SecureServing.ApplyTo(&genericConfig.SecureServing, &genericConfig.LoopbackClientConfig); lastErr != nil {
+	if lastErr = s.SecureServing.ApplyToConfig(genericConfig); lastErr != nil {
 		return
 	}
 

@@ -121,12 +121,28 @@ func (f *envVarFeatureGates) Enabled(key Feature) bool {
 // Features set via this method take precedence over
 // the features set via environment variables.
 func (f *envVarFeatureGates) Set(featureName Feature, featureValue bool) error {
+	return f.set(featureName, featureValue, false)
+}
+
+// SetForTesting sets the given feature to the given value. This method
+// bypasses the check for locked features and should only be used for
+// testing purposes.
+//
+// Features set via this method take precedence over
+// the features set via environment variables.
+func (f *envVarFeatureGates) SetForTesting(featureName Feature, featureValue bool) error {
+	return f.set(featureName, featureValue, true)
+}
+
+func (f *envVarFeatureGates) set(featureName Feature, featureValue bool, allowChangingLockedFeatures bool) error {
 	feature, ok := f.known[featureName]
 	if !ok {
 		return fmt.Errorf("feature %q is not registered in FeatureGates %q", featureName, f.callSiteName)
 	}
-	if feature.LockToDefault && feature.Default != featureValue {
-		return fmt.Errorf("cannot set feature gate %q to %v, feature is locked to %v", featureName, featureValue, feature.Default)
+	if !allowChangingLockedFeatures {
+		if feature.LockToDefault && feature.Default != featureValue {
+			return fmt.Errorf("cannot set feature gate %q to %v, feature is locked to %v", featureName, featureValue, feature.Default)
+		}
 	}
 
 	f.lockEnabledViaSetMethod.Lock()
@@ -141,13 +157,6 @@ func (f *envVarFeatureGates) Set(featureName Feature, featureValue bool) error {
 // read from the corresponding environmental variable.
 func (f *envVarFeatureGates) getEnabledMapFromEnvVar() map[Feature]bool {
 	f.readEnvVarsOnce.Do(func() {
-		// This code does not really support contextual logging. Making it do so has huge
-		// implications for several call chains because the Enabled call then needs
-		// a `*WithLogger` variant. This does not matter in Kubernetes itself because
-		// all Kubernetes components replace the feature gate implementation used
-		// by client-go, but it might matter elsewhere.
-		logger := klog.Background()
-
 		featureGatesState := map[Feature]bool{}
 		for feature, featureSpec := range f.known {
 			featureState, featureStateSet := os.LookupEnv(fmt.Sprintf("KUBE_FEATURE_%s", feature))
@@ -157,10 +166,10 @@ func (f *envVarFeatureGates) getEnabledMapFromEnvVar() map[Feature]bool {
 			boolVal, boolErr := strconv.ParseBool(featureState)
 			switch {
 			case boolErr != nil:
-				utilruntime.HandleErrorWithLogger(logger, boolErr, "Could not set feature gate", "feature", feature, "desiredState", featureState)
+				utilruntime.HandleError(fmt.Errorf("cannot set feature gate %q to %q, due to %v", feature, featureState, boolErr))
 			case featureSpec.LockToDefault:
 				if boolVal != featureSpec.Default {
-					utilruntime.HandleErrorWithLogger(logger, nil, "Could not set feature gate, feature is locked", "feature", feature, "desiredState", featureState, "lockedState", featureSpec.Default)
+					utilruntime.HandleError(fmt.Errorf("cannot set feature gate %q to %q, feature is locked to %v", feature, featureState, featureSpec.Default))
 					break
 				}
 				featureGatesState[feature] = featureSpec.Default
@@ -173,10 +182,10 @@ func (f *envVarFeatureGates) getEnabledMapFromEnvVar() map[Feature]bool {
 
 		for feature, featureSpec := range f.known {
 			if featureState, ok := featureGatesState[feature]; ok {
-				logger.V(1).Info("Feature gate updated state", "feature", feature, "enabled", featureState)
+				klog.V(1).InfoS("Feature gate updated state", "feature", feature, "enabled", featureState)
 				continue
 			}
-			logger.V(1).Info("Feature gate default state", "feature", feature, "enabled", featureSpec.Default)
+			klog.V(1).InfoS("Feature gate default state", "feature", feature, "enabled", featureSpec.Default)
 		}
 	})
 	return f.enabledViaEnvVar.Load().(map[Feature]bool)

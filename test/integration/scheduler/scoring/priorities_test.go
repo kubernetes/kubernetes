@@ -356,7 +356,7 @@ func TestPodAffinityScoring(t *testing.T) {
 	labelValue := "S1"
 	topologyKey := "node-topologykey"
 	topologyValues := []string{}
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		topologyValues = append(topologyValues, fmt.Sprintf("topologyvalue%d", i))
 	}
 	tests := []struct {
@@ -1187,7 +1187,7 @@ func TestDefaultPodTopologySpreadScoring(t *testing.T) {
 	nodeNum := 300
 
 	zoneForNode := make(map[string]string)
-	for i := 0; i < nodeNum; i++ {
+	for i := range nodeNum {
 		nodeName := fmt.Sprintf("node-%d", i)
 		zone := fmt.Sprintf("zone-%d", i%3)
 		zoneForNode[nodeName] = zone
@@ -1226,7 +1226,7 @@ func TestDefaultPodTopologySpreadScoring(t *testing.T) {
 	for _, nPods := range []int{3, 9, 15} {
 		// Append nPods each iteration.
 		t.Run(fmt.Sprintf("%d-pods", totalPodCnt+nPods), func(t *testing.T) {
-			for i := 0; i < nPods; i++ {
+			for range nPods {
 				p := st.MakePod().Name(fmt.Sprintf("p-%d", totalPodCnt)).Label("service", serviceName).Container(pause).Obj()
 				_, err = cs.CoreV1().Pods(ns).Create(testCtx.Ctx, p, metav1.CreateOptions{})
 				if err != nil {

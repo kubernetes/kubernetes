@@ -55,7 +55,6 @@ import (
 	e2eevents "k8s.io/kubernetes/test/e2e/framework/events"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	dratest "k8s.io/kubernetes/test/integration/dra"
-	"k8s.io/kubernetes/test/utils/ktesting"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/ptr"
 )
@@ -711,7 +710,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 
 			// We expect one ResourceSlice per node from the driver.
 			getSlices := oldDriver.NewGetSlices()
-			ktesting.Eventually(tCtx, getSlices).Should(gomega.HaveField("Items", gomega.HaveLen(len(nodes.NodeNames))))
+			tCtx.Eventually(getSlices).Should(gomega.HaveField("Items", gomega.HaveLen(len(nodes.NodeNames))))
 			initialSlices := getSlices(tCtx)
 
 			// Same driver name, different socket paths because of rolling update.
@@ -752,7 +751,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 
 			// We expect one ResourceSlice per node from the driver.
 			getSlices := oldDriver.NewGetSlices()
-			ktesting.Eventually(tCtx, getSlices).Should(gomega.HaveField("Items", gomega.HaveLen(len(nodes.NodeNames))))
+			tCtx.Eventually(getSlices).Should(gomega.HaveField("Items", gomega.HaveLen(len(nodes.NodeNames))))
 			initialSlices := getSlices(tCtx)
 
 			// Same driver name, different socket paths because of rolling update.
@@ -795,7 +794,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 
 			// Collect set of resource slices for that driver.
 			listSlices := oldDriver.NewGetSlices()
-			ktesting.Eventually(tCtx, listSlices).Should(gomega.HaveField("Items", gomega.Not(gomega.BeEmpty())), "driver should have published ResourceSlices, got none")
+			tCtx.Eventually(listSlices).Should(gomega.HaveField("Items", gomega.Not(gomega.BeEmpty())), "driver should have published ResourceSlices, got none")
 			oldSlices := listSlices(tCtx)
 			if len(oldSlices.Items) == 0 {
 				framework.Fail("driver should have published ResourceSlices, got none")

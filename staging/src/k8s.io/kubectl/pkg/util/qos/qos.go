@@ -18,7 +18,6 @@ package qos
 
 import (
 	core "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -37,10 +36,6 @@ func GetPodQOS(pod *core.Pod) core.PodQOSClass {
 	return ComputePodQOS(pod)
 }
 
-// zeroQuantity represents a resource.Quantity with value "0", used as a baseline
-// for resource comparisons.
-var zeroQuantity = resource.MustParse("0")
-
 // processResourceList adds non-zero quantities for supported QoS compute resources
 // quantities from newList to list.
 func processResourceList(list, newList core.ResourceList) {
@@ -48,7 +43,7 @@ func processResourceList(list, newList core.ResourceList) {
 		if !isSupportedQoSComputeResource(name) {
 			continue
 		}
-		if quantity.Cmp(zeroQuantity) == 1 {
+		if quantity.Sign() == 1 {
 			delta := quantity.DeepCopy()
 			if _, exists := list[name]; !exists {
 				list[name] = delta
@@ -69,7 +64,7 @@ func getQOSResources(list core.ResourceList) sets.Set[string] {
 		if !isSupportedQoSComputeResource(name) {
 			continue
 		}
-		if quantity.Cmp(zeroQuantity) == 1 {
+		if quantity.Sign() == 1 {
 			qosResources.Insert(string(name))
 		}
 	}

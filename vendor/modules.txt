@@ -97,7 +97,7 @@ github.com/containerd/typeurl/v2
 # github.com/coredns/caddy v1.1.1
 ## explicit; go 1.13
 github.com/coredns/caddy/caddyfile
-# github.com/coredns/corefile-migration v1.0.29
+# github.com/coredns/corefile-migration v1.0.30
 ## explicit; go 1.14
 github.com/coredns/corefile-migration/migration
 github.com/coredns/corefile-migration/migration/corefile
@@ -107,7 +107,7 @@ github.com/coreos/go-oidc
 # github.com/coreos/go-semver v0.3.1
 ## explicit; go 1.8
 github.com/coreos/go-semver/semver
-# github.com/coreos/go-systemd/v22 v22.6.0
+# github.com/coreos/go-systemd/v22 v22.7.0
 ## explicit; go 1.23
 github.com/coreos/go-systemd/v22/daemon
 github.com/coreos/go-systemd/v22/dbus
@@ -513,12 +513,12 @@ github.com/prometheus/client_golang/prometheus/testutil/promlint/validations
 # github.com/prometheus/client_model v0.6.2
 ## explicit; go 1.22.0
 github.com/prometheus/client_model/go
-# github.com/prometheus/common v0.66.1
-## explicit; go 1.23.0
+# github.com/prometheus/common v0.67.5
+## explicit; go 1.24.0
 github.com/prometheus/common/expfmt
 github.com/prometheus/common/model
-# github.com/prometheus/procfs v0.16.1
-## explicit; go 1.23.0
+# github.com/prometheus/procfs v0.19.2
+## explicit; go 1.24.0
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
 github.com/prometheus/procfs/internal/util
@@ -1124,7 +1124,7 @@ k8s.io/klog/v2/textlogger
 ## explicit; go 1.25.0
 # k8s.io/kube-controller-manager v0.0.0 => ./staging/src/k8s.io/kube-controller-manager
 ## explicit; go 1.25.0
-# k8s.io/kube-openapi v0.0.0-20250910181357-589584f1c912
+# k8s.io/kube-openapi v0.0.0-20260127142750-a19766b6e2d4
 ## explicit; go 1.23.0
 k8s.io/kube-openapi/cmd/openapi-gen
 k8s.io/kube-openapi/cmd/openapi-gen/args
@@ -1175,7 +1175,7 @@ k8s.io/kube-openapi/pkg/validation/validate
 # k8s.io/system-validators v1.12.1
 ## explicit; go 1.16
 k8s.io/system-validators/validators
-# k8s.io/utils v0.0.0-20251219084037-98d557b7f1e7
+# k8s.io/utils v0.0.0-20260108192941-914a6e750570
 ## explicit; go 1.23
 k8s.io/utils/buffer
 k8s.io/utils/clock
@@ -1194,6 +1194,7 @@ k8s.io/utils/net
 k8s.io/utils/path
 k8s.io/utils/ptr
 k8s.io/utils/strings
+k8s.io/utils/third_party/forked/golang/btree
 k8s.io/utils/trace
 # sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.34.0
 ## explicit; go 1.21

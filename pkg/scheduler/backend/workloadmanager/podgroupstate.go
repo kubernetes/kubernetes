@@ -17,12 +17,14 @@ limitations under the License.
 package workloadmanager
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
 )
 
@@ -38,6 +40,19 @@ type podGroupKey struct {
 	podGroupName string
 	replicaKey   string
 }
+
+func (pgk podGroupKey) GetName() string {
+	if pgk.replicaKey == "" {
+		return fmt.Sprintf("%s-%s", pgk.workloadName, pgk.podGroupName)
+	}
+	return fmt.Sprintf("%s-%s-%s", pgk.workloadName, pgk.podGroupName, pgk.replicaKey)
+}
+
+func (pgk podGroupKey) GetNamespace() string {
+	return pgk.namespace
+}
+
+var _ klog.KMetadata = &podGroupKey{}
 
 func newPodGroupKey(namespace string, workloadRef *v1.WorkloadReference) podGroupKey {
 	return podGroupKey{

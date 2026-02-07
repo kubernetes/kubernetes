@@ -23,19 +23,19 @@ import (
 // Rule is a tuple of APIGroups, APIVersion, and Resources.It is recommended
 // to make sure that all the tuple expansions are valid.
 type Rule struct {
-	// APIGroups is the API groups the resources belong to. '*' is all groups.
+	// apiGroups is the API groups the resources belong to. '*' is all groups.
 	// If '*' is present, the length of the slice must be one.
 	// Required.
 	// +listType=atomic
 	APIGroups []string `json:"apiGroups,omitempty" protobuf:"bytes,1,rep,name=apiGroups"`
 
-	// APIVersions is the API versions the resources belong to. '*' is all versions.
+	// apiVersions is the API versions the resources belong to. '*' is all versions.
 	// If '*' is present, the length of the slice must be one.
 	// Required.
 	// +listType=atomic
 	APIVersions []string `json:"apiVersions,omitempty" protobuf:"bytes,2,rep,name=apiVersions"`
 
-	// Resources is a list of resources this rule applies to.
+	// resources is a list of resources this rule applies to.
 	//
 	// For example:
 	// 'pods' means pods.
@@ -141,12 +141,12 @@ const (
 // ValidatingAdmissionPolicy describes the definition of an admission validation policy that accepts or rejects an object without changing it.
 type ValidatingAdmissionPolicy struct {
 	metav1.TypeMeta `json:",inline"`
-	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
+	// metadata is the standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
-	// Specification of the desired behavior of the ValidatingAdmissionPolicy.
+	// spec defines the desired behavior of the ValidatingAdmissionPolicy.
 	Spec ValidatingAdmissionPolicySpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
-	// The status of the ValidatingAdmissionPolicy, including warnings that are useful to determine if the policy
+	// status represents the current status of the ValidatingAdmissionPolicy, including warnings that are useful to determine if the policy
 	// behaves in the expected way.
 	// Populated by the system.
 	// Read-only.
@@ -156,14 +156,14 @@ type ValidatingAdmissionPolicy struct {
 
 // ValidatingAdmissionPolicyStatus represents the status of an admission validation policy.
 type ValidatingAdmissionPolicyStatus struct {
-	// The generation observed by the controller.
+	// observedGeneration is the generation observed by the controller.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty" protobuf:"varint,1,opt,name=observedGeneration"`
-	// The results of type checking for each expression.
+	// typeChecking contains the results of type checking for each expression.
 	// Presence of this field indicates the completion of the type checking.
 	// +optional
 	TypeChecking *TypeChecking `json:"typeChecking,omitempty" protobuf:"bytes,2,opt,name=typeChecking"`
-	// The conditions represent the latest available observations of a policy's current state.
+	// conditions represent the latest available observations of a policy's current state.
 	// +optional
 	// +listType=map
 	// +listMapKey=type
@@ -176,7 +176,7 @@ type ValidatingAdmissionPolicyConditionType string
 // TypeChecking contains results of type checking the expressions in the
 // ValidatingAdmissionPolicy
 type TypeChecking struct {
-	// The type checking warnings for each expression.
+	// expressionWarnings contains the type checking warnings for each expression.
 	// +optional
 	// +listType=atomic
 	ExpressionWarnings []ExpressionWarning `json:"expressionWarnings,omitempty" protobuf:"bytes,1,rep,name=expressionWarnings"`
@@ -184,11 +184,11 @@ type TypeChecking struct {
 
 // ExpressionWarning is a warning information that targets a specific expression.
 type ExpressionWarning struct {
-	// The path to the field that refers the expression.
+	// fieldRef is the path to the field that refers to the expression.
 	// For example, the reference to the expression of the first item of
 	// validations is "spec.validations[0].expression"
 	FieldRef string `json:"fieldRef" protobuf:"bytes,2,opt,name=fieldRef"`
-	// The content of type checking information in a human-readable form.
+	// warning contains the content of type checking information in a human-readable form.
 	// Each line of the warning contains the type that the expression is checked
 	// against, followed by the type check error from the compiler.
 	Warning string `json:"warning" protobuf:"bytes,3,opt,name=warning"`
@@ -200,7 +200,7 @@ type ExpressionWarning struct {
 // ValidatingAdmissionPolicyList is a list of ValidatingAdmissionPolicy.
 type ValidatingAdmissionPolicyList struct {
 	metav1.TypeMeta `json:",inline"`
-	// Standard list metadata.
+	// metadata is the standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -210,21 +210,21 @@ type ValidatingAdmissionPolicyList struct {
 
 // ValidatingAdmissionPolicySpec is the specification of the desired behavior of the AdmissionPolicy.
 type ValidatingAdmissionPolicySpec struct {
-	// ParamKind specifies the kind of resources used to parameterize this policy.
+	// paramKind specifies the kind of resources used to parameterize this policy.
 	// If absent, there are no parameters for this policy and the param CEL variable will not be provided to validation expressions.
 	// If ParamKind refers to a non-existent kind, this policy definition is mis-configured and the FailurePolicy is applied.
 	// If paramKind is specified but paramRef is unset in ValidatingAdmissionPolicyBinding, the params variable will be null.
 	// +optional
 	ParamKind *ParamKind `json:"paramKind,omitempty" protobuf:"bytes,1,rep,name=paramKind"`
 
-	// MatchConstraints specifies what resources this policy is designed to validate.
+	// matchConstraints specifies what resources this policy is designed to validate.
 	// The AdmissionPolicy cares about a request if it matches _all_ Constraints.
 	// However, in order to prevent clusters from being put into an unstable state that cannot be recovered from via the API
 	// ValidatingAdmissionPolicy cannot match ValidatingAdmissionPolicy and ValidatingAdmissionPolicyBinding.
 	// Required.
 	MatchConstraints *MatchResources `json:"matchConstraints,omitempty" protobuf:"bytes,2,rep,name=matchConstraints"`
 
-	// Validations contain CEL expressions which is used to apply the validation.
+	// validations contain CEL expressions which is used to apply the validation.
 	// Validations and AuditAnnotations may not both be empty; a minimum of one Validations or AuditAnnotations is
 	// required.
 	// +listType=atomic
@@ -255,7 +255,7 @@ type ValidatingAdmissionPolicySpec struct {
 	// +optional
 	AuditAnnotations []AuditAnnotation `json:"auditAnnotations,omitempty" protobuf:"bytes,5,rep,name=auditAnnotations"`
 
-	// MatchConditions is a list of conditions that must be met for a request to be validated.
+	// matchConditions is a list of conditions that must be met for a request to be validated.
 	// Match conditions filter requests that have already been matched by the rules,
 	// namespaceSelector, and objectSelector. An empty list of matchConditions matches all requests.
 	// There are a maximum of 64 match conditions allowed.
@@ -277,7 +277,7 @@ type ValidatingAdmissionPolicySpec struct {
 	// +optional
 	MatchConditions []MatchCondition `json:"matchConditions,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,6,rep,name=matchConditions"`
 
-	// Variables contain definitions of variables that can be used in composition of other expressions.
+	// variables contain definitions of variables that can be used in composition of other expressions.
 	// Each variable is defined as a named CEL expression.
 	// The variables defined here will be available under `variables` in other expressions of the policy
 	// except MatchConditions because MatchConditions are evaluated before the rest of the policy.
@@ -295,19 +295,19 @@ type ValidatingAdmissionPolicySpec struct {
 // ParamKind is a tuple of Group Kind and Version.
 // +structType=atomic
 type ParamKind struct {
-	// APIVersion is the API group version the resources belong to.
+	// apiVersion is the API group version the resources belong to.
 	// In format of "group/version".
 	// Required.
 	APIVersion string `json:"apiVersion,omitempty" protobuf:"bytes,1,rep,name=apiVersion"`
 
-	// Kind is the API kind the resources belong to.
+	// kind is the API kind the resources belong to.
 	// Required.
 	Kind string `json:"kind,omitempty" protobuf:"bytes,2,rep,name=kind"`
 }
 
 // Validation specifies the CEL expression which is used to apply the validation.
 type Validation struct {
-	// Expression represents the expression which will be evaluated by CEL.
+	// expression represents the expression which will be evaluated by CEL.
 	// ref: https://github.com/google/cel-spec
 	// CEL expressions have access to the contents of the API request/response, organized into CEL variables as well as some other useful variables:
 	//
@@ -349,7 +349,7 @@ type Validation struct {
 	//     non-intersecting keys are appended, retaining their partial order.
 	// Required.
 	Expression string `json:"expression" protobuf:"bytes,1,opt,name=Expression"`
-	// Message represents the message displayed when validation fails. The message is required if the Expression contains
+	// message represents the message displayed when validation fails. The message is required if the Expression contains
 	// line breaks. The message must not contain line breaks.
 	// If unset, the message is "failed rule: {Rule}".
 	// e.g. "must be a URL with the host matching spec.host"
@@ -358,7 +358,7 @@ type Validation struct {
 	// If unset, the message is "failed Expression: {Expression}".
 	// +optional
 	Message string `json:"message,omitempty" protobuf:"bytes,2,opt,name=message"`
-	// Reason represents a machine-readable description of why this validation failed.
+	// reason represents a machine-readable description of why this validation failed.
 	// If this is the first validation in the list to fail, this reason, as well as the
 	// corresponding HTTP response code, are used in the
 	// HTTP response to the client.
@@ -383,12 +383,12 @@ type Validation struct {
 // Variable is the definition of a variable that is used for composition. A variable is defined as a named expression.
 // +structType=atomic
 type Variable struct {
-	// Name is the name of the variable. The name must be a valid CEL identifier and unique among all variables.
+	// name is the name of the variable. The name must be a valid CEL identifier and unique among all variables.
 	// The variable can be accessed in other expressions through `variables`
 	// For example, if name is "foo", the variable will be available as `variables.foo`
 	Name string `json:"name" protobuf:"bytes,1,opt,name=Name"`
 
-	// Expression is the expression that will be evaluated as the value of the variable.
+	// expression is the expression that will be evaluated as the value of the variable.
 	// The CEL expression has access to the same identifiers as the CEL expressions in Validation.
 	Expression string `json:"expression" protobuf:"bytes,2,opt,name=Expression"`
 }
@@ -448,10 +448,10 @@ type AuditAnnotation struct {
 // given (policy, binding, param) combination is within its own CEL budget.
 type ValidatingAdmissionPolicyBinding struct {
 	metav1.TypeMeta `json:",inline"`
-	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
+	// metadata is the standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
-	// Specification of the desired behavior of the ValidatingAdmissionPolicyBinding.
+	// spec defines the desired behavior of the ValidatingAdmissionPolicyBinding.
 	Spec ValidatingAdmissionPolicyBindingSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 }
 
@@ -461,7 +461,7 @@ type ValidatingAdmissionPolicyBinding struct {
 // ValidatingAdmissionPolicyBindingList is a list of ValidatingAdmissionPolicyBinding.
 type ValidatingAdmissionPolicyBindingList struct {
 	metav1.TypeMeta `json:",inline"`
-	// Standard list metadata.
+	// metadata is the standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -471,7 +471,7 @@ type ValidatingAdmissionPolicyBindingList struct {
 
 // ValidatingAdmissionPolicyBindingSpec is the specification of the ValidatingAdmissionPolicyBinding.
 type ValidatingAdmissionPolicyBindingSpec struct {
-	// PolicyName references a ValidatingAdmissionPolicy name which the ValidatingAdmissionPolicyBinding binds to.
+	// policyName references a ValidatingAdmissionPolicy name which the ValidatingAdmissionPolicyBinding binds to.
 	// If the referenced resource does not exist, this binding is considered invalid and will be ignored
 	// Required.
 	// +required
@@ -485,7 +485,7 @@ type ValidatingAdmissionPolicyBindingSpec struct {
 	// +optional
 	ParamRef *ParamRef `json:"paramRef,omitempty" protobuf:"bytes,2,rep,name=paramRef"`
 
-	// MatchResources declares what resources match this binding and will be validated by it.
+	// matchResources declares what resources match this binding and will be validated by it.
 	// Note that this is intersected with the policy's matchConstraints, so only requests that are matched by the policy can be selected by this.
 	// If this is unset, all resources matched by the policy are validated by this binding
 	// When resourceRules is unset, it does not constrain resource matching. If a resource is matched by the other fields of this object, it will be validated.
@@ -533,6 +533,8 @@ type ValidatingAdmissionPolicyBindingSpec struct {
 	//
 	// Required.
 	// +listType=set
+	// +required
+	// +k8s:required
 	ValidationActions []ValidationAction `json:"validationActions,omitempty" protobuf:"bytes,4,rep,name=validationActions"`
 }
 
@@ -581,7 +583,7 @@ type ParamRef struct {
 	// +optional
 	Selector *metav1.LabelSelector `json:"selector,omitempty" protobuf:"bytes,3,rep,name=selector"`
 
-	// `parameterNotFoundAction` controls the behavior of the binding when the resource
+	// parameterNotFoundAction controls the behavior of the binding when the resource
 	// exists, and name or selector is valid, but there are no parameters
 	// matched by the binding. If the value is set to `Allow`, then no
 	// matched parameters will be treated as successful validation by the binding.
@@ -599,7 +601,7 @@ type ParamRef struct {
 // The exclude rules take precedence over include rules (if a resource matches both, it is excluded)
 // +structType=atomic
 type MatchResources struct {
-	// NamespaceSelector decides whether to run the admission control policy on an object based
+	// namespaceSelector decides whether to run the admission control policy on an object based
 	// on whether the namespace for that object matches the selector. If the
 	// object itself is a namespace, the matching is performed on
 	// object.metadata.labels. If the object is another cluster scoped resource,
@@ -644,7 +646,7 @@ type MatchResources struct {
 	// Default to the empty LabelSelector, which matches everything.
 	// +optional
 	NamespaceSelector *metav1.LabelSelector `json:"namespaceSelector,omitempty" protobuf:"bytes,1,opt,name=namespaceSelector"`
-	// ObjectSelector decides whether to run the validation based on if the
+	// objectSelector decides whether to run the validation based on if the
 	// object has matching labels. objectSelector is evaluated against both
 	// the oldObject and newObject that would be sent to the cel validation, and
 	// is considered to match if either object matches the selector. A null
@@ -657,12 +659,12 @@ type MatchResources struct {
 	// Default to the empty LabelSelector, which matches everything.
 	// +optional
 	ObjectSelector *metav1.LabelSelector `json:"objectSelector,omitempty" protobuf:"bytes,2,opt,name=objectSelector"`
-	// ResourceRules describes what operations on what resources/subresources the ValidatingAdmissionPolicy matches.
+	// resourceRules describes what operations on what resources/subresources the ValidatingAdmissionPolicy matches.
 	// The policy cares about an operation if it matches _any_ Rule.
 	// +listType=atomic
 	// +optional
 	ResourceRules []NamedRuleWithOperations `json:"resourceRules,omitempty" protobuf:"bytes,3,rep,name=resourceRules"`
-	// ExcludeResourceRules describes what operations on what resources/subresources the ValidatingAdmissionPolicy should not care about.
+	// excludeResourceRules describes what operations on what resources/subresources the ValidatingAdmissionPolicy should not care about.
 	// The exclude rules take precedence over include rules (if a resource matches both, it is excluded)
 	// +listType=atomic
 	// +optional
@@ -706,7 +708,7 @@ const (
 // NamedRuleWithOperations is a tuple of Operations and Resources with ResourceNames.
 // +structType=atomic
 type NamedRuleWithOperations struct {
-	// ResourceNames is an optional white list of names that the rule applies to.  An empty set means that everything is allowed.
+	// resourceNames is an optional white list of names that the rule applies to.  An empty set means that everything is allowed.
 	// +listType=atomic
 	// +optional
 	ResourceNames []string `json:"resourceNames,omitempty" protobuf:"bytes,1,rep,name=resourceNames"`
@@ -722,10 +724,10 @@ type NamedRuleWithOperations struct {
 // ValidatingWebhookConfiguration describes the configuration of and admission webhook that accept or reject and object without changing it.
 type ValidatingWebhookConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
-	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
+	// metadata is the standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
-	// Webhooks is a list of webhooks and the affected resources and operations.
+	// webhooks is a list of webhooks and the affected resources and operations.
 	// +optional
 	// +patchMergeKey=name
 	// +patchStrategy=merge
@@ -740,7 +742,7 @@ type ValidatingWebhookConfiguration struct {
 // ValidatingWebhookConfigurationList is a list of ValidatingWebhookConfiguration.
 type ValidatingWebhookConfigurationList struct {
 	metav1.TypeMeta `json:",inline"`
-	// Standard list metadata.
+	// metadata is the standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -756,10 +758,10 @@ type ValidatingWebhookConfigurationList struct {
 // MutatingWebhookConfiguration describes the configuration of and admission webhook that accept or reject and may change the object.
 type MutatingWebhookConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
-	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
+	// metadata is the standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
-	// Webhooks is a list of webhooks and the affected resources and operations.
+	// webhooks is a list of webhooks and the affected resources and operations.
 	// +optional
 	// +patchMergeKey=name
 	// +patchStrategy=merge
@@ -774,7 +776,7 @@ type MutatingWebhookConfiguration struct {
 // MutatingWebhookConfigurationList is a list of MutatingWebhookConfiguration.
 type MutatingWebhookConfigurationList struct {
 	metav1.TypeMeta `json:",inline"`
-	// Standard list metadata.
+	// metadata is the standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -784,18 +786,18 @@ type MutatingWebhookConfigurationList struct {
 
 // ValidatingWebhook describes an admission webhook and the resources and operations it applies to.
 type ValidatingWebhook struct {
-	// The name of the admission webhook.
+	// name is the name of the admission webhook.
 	// Name should be fully qualified, e.g., imagepolicy.kubernetes.io, where
 	// "imagepolicy" is the name of the webhook, and kubernetes.io is the name
 	// of the organization.
 	// Required.
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 
-	// ClientConfig defines how to communicate with the hook.
+	// clientConfig defines how to communicate with the hook.
 	// Required
 	ClientConfig WebhookClientConfig `json:"clientConfig" protobuf:"bytes,2,opt,name=clientConfig"`
 
-	// Rules describes what operations on what resources/subresources the webhook cares about.
+	// rules describes what operations on what resources/subresources the webhook cares about.
 	// The webhook cares about an operation if it matches _any_ Rule.
 	// However, in order to prevent ValidatingAdmissionWebhooks and MutatingAdmissionWebhooks
 	// from putting the cluster in a state which cannot be recovered from without completely
@@ -804,7 +806,7 @@ type ValidatingWebhook struct {
 	// +listType=atomic
 	Rules []RuleWithOperations `json:"rules,omitempty" protobuf:"bytes,3,rep,name=rules"`
 
-	// FailurePolicy defines how unrecognized errors from the admission endpoint are handled -
+	// failurePolicy defines how unrecognized errors from the admission endpoint are handled -
 	// allowed values are Ignore or Fail. Defaults to Fail.
 	// +optional
 	FailurePolicy *FailurePolicyType `json:"failurePolicy,omitempty" protobuf:"bytes,4,opt,name=failurePolicy,casttype=FailurePolicyType"`
@@ -826,7 +828,7 @@ type ValidatingWebhook struct {
 	// +optional
 	MatchPolicy *MatchPolicyType `json:"matchPolicy,omitempty" protobuf:"bytes,9,opt,name=matchPolicy,casttype=MatchPolicyType"`
 
-	// NamespaceSelector decides whether to run the webhook on an object based
+	// namespaceSelector decides whether to run the webhook on an object based
 	// on whether the namespace for that object matches the selector. If the
 	// object itself is a namespace, the matching is performed on
 	// object.metadata.labels. If the object is another cluster scoped resource,
@@ -872,7 +874,7 @@ type ValidatingWebhook struct {
 	// +optional
 	NamespaceSelector *metav1.LabelSelector `json:"namespaceSelector,omitempty" protobuf:"bytes,5,opt,name=namespaceSelector"`
 
-	// ObjectSelector decides whether to run the webhook based on if the
+	// objectSelector decides whether to run the webhook based on if the
 	// object has matching labels. objectSelector is evaluated against both
 	// the oldObject and newObject that would be sent to the webhook, and
 	// is considered to match if either object matches the selector. A null
@@ -886,7 +888,7 @@ type ValidatingWebhook struct {
 	// +optional
 	ObjectSelector *metav1.LabelSelector `json:"objectSelector,omitempty" protobuf:"bytes,10,opt,name=objectSelector"`
 
-	// SideEffects states whether this webhook has side effects.
+	// sideEffects states whether this webhook has side effects.
 	// Acceptable values are: None, NoneOnDryRun (webhooks created via v1beta1 may also specify Some or Unknown).
 	// Webhooks with side effects MUST implement a reconciliation system, since a request may be
 	// rejected by a future step in the admission chain and the side effects therefore need to be undone.
@@ -894,7 +896,7 @@ type ValidatingWebhook struct {
 	// sideEffects == Unknown or Some.
 	SideEffects *SideEffectClass `json:"sideEffects" protobuf:"bytes,6,opt,name=sideEffects,casttype=SideEffectClass"`
 
-	// TimeoutSeconds specifies the timeout for this webhook. After the timeout passes,
+	// timeoutSeconds specifies the timeout for this webhook. After the timeout passes,
 	// the webhook call will be ignored or the API call will fail based on the
 	// failure policy.
 	// The timeout value must be between 1 and 30 seconds.
@@ -902,7 +904,7 @@ type ValidatingWebhook struct {
 	// +optional
 	TimeoutSeconds *int32 `json:"timeoutSeconds,omitempty" protobuf:"varint,7,opt,name=timeoutSeconds"`
 
-	// AdmissionReviewVersions is an ordered list of preferred `AdmissionReview`
+	// admissionReviewVersions is an ordered list of preferred `AdmissionReview`
 	// versions the Webhook expects. API server will try to use first version in
 	// the list which it supports. If none of the versions specified in this list
 	// supported by API server, validation will fail for this object.
@@ -912,7 +914,7 @@ type ValidatingWebhook struct {
 	// +listType=atomic
 	AdmissionReviewVersions []string `json:"admissionReviewVersions" protobuf:"bytes,8,rep,name=admissionReviewVersions"`
 
-	// MatchConditions is a list of conditions that must be met for a request to be sent to this
+	// matchConditions is a list of conditions that must be met for a request to be sent to this
 	// webhook. Match conditions filter requests that have already been matched by the rules,
 	// namespaceSelector, and objectSelector. An empty list of matchConditions matches all requests.
 	// There are a maximum of 64 match conditions allowed.
@@ -934,18 +936,18 @@ type ValidatingWebhook struct {
 
 // MutatingWebhook describes an admission webhook and the resources and operations it applies to.
 type MutatingWebhook struct {
-	// The name of the admission webhook.
+	// name is the name of the admission webhook.
 	// Name should be fully qualified, e.g., imagepolicy.kubernetes.io, where
 	// "imagepolicy" is the name of the webhook, and kubernetes.io is the name
 	// of the organization.
 	// Required.
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 
-	// ClientConfig defines how to communicate with the hook.
+	// clientConfig defines how to communicate with the hook.
 	// Required
 	ClientConfig WebhookClientConfig `json:"clientConfig" protobuf:"bytes,2,opt,name=clientConfig"`
 
-	// Rules describes what operations on what resources/subresources the webhook cares about.
+	// rules describes what operations on what resources/subresources the webhook cares about.
 	// The webhook cares about an operation if it matches _any_ Rule.
 	// However, in order to prevent ValidatingAdmissionWebhooks and MutatingAdmissionWebhooks
 	// from putting the cluster in a state which cannot be recovered from without completely
@@ -954,7 +956,7 @@ type MutatingWebhook struct {
 	// +listType=atomic
 	Rules []RuleWithOperations `json:"rules,omitempty" protobuf:"bytes,3,rep,name=rules"`
 
-	// FailurePolicy defines how unrecognized errors from the admission endpoint are handled -
+	// failurePolicy defines how unrecognized errors from the admission endpoint are handled -
 	// allowed values are Ignore or Fail. Defaults to Fail.
 	// +optional
 	FailurePolicy *FailurePolicyType `json:"failurePolicy,omitempty" protobuf:"bytes,4,opt,name=failurePolicy,casttype=FailurePolicyType"`
@@ -976,7 +978,7 @@ type MutatingWebhook struct {
 	// +optional
 	MatchPolicy *MatchPolicyType `json:"matchPolicy,omitempty" protobuf:"bytes,9,opt,name=matchPolicy,casttype=MatchPolicyType"`
 
-	// NamespaceSelector decides whether to run the webhook on an object based
+	// namespaceSelector decides whether to run the webhook on an object based
 	// on whether the namespace for that object matches the selector. If the
 	// object itself is a namespace, the matching is performed on
 	// object.metadata.labels. If the object is another cluster scoped resource,
@@ -1022,7 +1024,7 @@ type MutatingWebhook struct {
 	// +optional
 	NamespaceSelector *metav1.LabelSelector `json:"namespaceSelector,omitempty" protobuf:"bytes,5,opt,name=namespaceSelector"`
 
-	// ObjectSelector decides whether to run the webhook based on if the
+	// objectSelector decides whether to run the webhook based on if the
 	// object has matching labels. objectSelector is evaluated against both
 	// the oldObject and newObject that would be sent to the webhook, and
 	// is considered to match if either object matches the selector. A null
@@ -1036,7 +1038,7 @@ type MutatingWebhook struct {
 	// +optional
 	ObjectSelector *metav1.LabelSelector `json:"objectSelector,omitempty" protobuf:"bytes,11,opt,name=objectSelector"`
 
-	// SideEffects states whether this webhook has side effects.
+	// sideEffects states whether this webhook has side effects.
 	// Acceptable values are: None, NoneOnDryRun (webhooks created via v1beta1 may also specify Some or Unknown).
 	// Webhooks with side effects MUST implement a reconciliation system, since a request may be
 	// rejected by a future step in the admission chain and the side effects therefore need to be undone.
@@ -1044,7 +1046,7 @@ type MutatingWebhook struct {
 	// sideEffects == Unknown or Some.
 	SideEffects *SideEffectClass `json:"sideEffects" protobuf:"bytes,6,opt,name=sideEffects,casttype=SideEffectClass"`
 
-	// TimeoutSeconds specifies the timeout for this webhook. After the timeout passes,
+	// timeoutSeconds specifies the timeout for this webhook. After the timeout passes,
 	// the webhook call will be ignored or the API call will fail based on the
 	// failure policy.
 	// The timeout value must be between 1 and 30 seconds.
@@ -1052,7 +1054,7 @@ type MutatingWebhook struct {
 	// +optional
 	TimeoutSeconds *int32 `json:"timeoutSeconds,omitempty" protobuf:"varint,7,opt,name=timeoutSeconds"`
 
-	// AdmissionReviewVersions is an ordered list of preferred `AdmissionReview`
+	// admissionReviewVersions is an ordered list of preferred `AdmissionReview`
 	// versions the Webhook expects. API server will try to use first version in
 	// the list which it supports. If none of the versions specified in this list
 	// supported by API server, validation will fail for this object.
@@ -1080,7 +1082,7 @@ type MutatingWebhook struct {
 	// +optional
 	ReinvocationPolicy *ReinvocationPolicyType `json:"reinvocationPolicy,omitempty" protobuf:"bytes,10,opt,name=reinvocationPolicy,casttype=ReinvocationPolicyType"`
 
-	// MatchConditions is a list of conditions that must be met for a request to be sent to this
+	// matchConditions is a list of conditions that must be met for a request to be sent to this
 	// webhook. Match conditions filter requests that have already been matched by the rules,
 	// namespaceSelector, and objectSelector. An empty list of matchConditions matches all requests.
 	// There are a maximum of 64 match conditions allowed.
@@ -1118,7 +1120,7 @@ const (
 // RuleWithOperations is a tuple of Operations and Resources. It is recommended to make
 // sure that all the tuple expansions are valid.
 type RuleWithOperations struct {
-	// Operations is the operations the admission hook cares about - CREATE, UPDATE, DELETE, CONNECT or *
+	// operations is the operations the admission hook cares about - CREATE, UPDATE, DELETE, CONNECT or *
 	// for all of those operations and any future admission operations that are added.
 	// If '*' is present, the length of the slice must be one.
 	// Required.
@@ -1145,7 +1147,7 @@ const (
 // WebhookClientConfig contains the information to make a TLS
 // connection with the webhook
 type WebhookClientConfig struct {
-	// `url` gives the location of the webhook, in standard URL form
+	// url gives the location of the webhook, in standard URL form
 	// (`scheme://host:port/path`). Exactly one of `url` or `service`
 	// must be specified.
 	//
@@ -1174,7 +1176,7 @@ type WebhookClientConfig struct {
 	// +optional
 	URL *string `json:"url,omitempty" protobuf:"bytes,3,opt,name=url"`
 
-	// `service` is a reference to the service for this webhook. Either
+	// service is a reference to the service for this webhook. Either
 	// `service` or `url` must be specified.
 	//
 	// If the webhook is running within the cluster, then you should use `service`.
@@ -1182,7 +1184,7 @@ type WebhookClientConfig struct {
 	// +optional
 	Service *ServiceReference `json:"service,omitempty" protobuf:"bytes,1,opt,name=service"`
 
-	// `caBundle` is a PEM encoded CA bundle which will be used to validate the webhook's server certificate.
+	// caBundle is a PEM encoded CA bundle which will be used to validate the webhook's server certificate.
 	// If unspecified, system trust roots on the apiserver are used.
 	// +optional
 	CABundle []byte `json:"caBundle,omitempty" protobuf:"bytes,2,opt,name=caBundle"`
@@ -1190,19 +1192,19 @@ type WebhookClientConfig struct {
 
 // ServiceReference holds a reference to Service.legacy.k8s.io
 type ServiceReference struct {
-	// `namespace` is the namespace of the service.
+	// namespace is the namespace of the service.
 	// Required
 	Namespace string `json:"namespace" protobuf:"bytes,1,opt,name=namespace"`
-	// `name` is the name of the service.
+	// name is the name of the service.
 	// Required
 	Name string `json:"name" protobuf:"bytes,2,opt,name=name"`
 
-	// `path` is an optional URL path which will be sent in any request to
+	// path is an optional URL path which will be sent in any request to
 	// this service.
 	// +optional
 	Path *string `json:"path,omitempty" protobuf:"bytes,3,opt,name=path"`
 
-	// If specified, the port on the service that hosting webhook.
+	// port is the port on the service that hosts the webhook.
 	// Default to 443 for backward compatibility.
 	// `port` should be a valid port number (1-65535, inclusive).
 	// +optional
@@ -1211,7 +1213,7 @@ type ServiceReference struct {
 
 // MatchCondition represents a condition which must by fulfilled for a request to be sent to a webhook.
 type MatchCondition struct {
-	// Name is an identifier for this match condition, used for strategic merging of MatchConditions,
+	// name is an identifier for this match condition, used for strategic merging of MatchConditions,
 	// as well as providing an identifier for logging purposes. A good name should be descriptive of
 	// the associated expression.
 	// Name must be a qualified name consisting of alphanumeric characters, '-', '_' or '.', and
@@ -1222,7 +1224,7 @@ type MatchCondition struct {
 	// Required.
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 
-	// Expression represents the expression which will be evaluated by CEL. Must evaluate to bool.
+	// expression represents the expression which will be evaluated by CEL. Must evaluate to bool.
 	// CEL expressions have access to the contents of the AdmissionRequest and Authorizer, organized into CEL variables:
 	//
 	// 'object' - The object from the incoming request. The value is null for DELETE requests.

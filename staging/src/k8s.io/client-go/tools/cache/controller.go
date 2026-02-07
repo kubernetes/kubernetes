@@ -429,6 +429,14 @@ type InformerOptions struct {
 	// for them.
 	// Optional - if unset no additional transforming is happening.
 	Transform TransformFunc
+
+	// Identifier is used to identify the FIFO for metrics and logging purposes.
+	// If not set, metrics will not be published.
+	Identifier InformerNameAndResource
+
+	// FIFOMetricsProvider is the metrics provider for the FIFO queue.
+	// If not set, metrics will be no-ops.
+	FIFOMetricsProvider FIFOMetricsProvider
 }
 
 // NewInformerWithOptions returns a Store and a controller for populating the store
@@ -776,7 +784,7 @@ func newInformer(clientState Store, options InformerOptions, keyFunc KeyFunc) Co
 	// KeyLister, that way resync operations will result in the correct set
 	// of update/delete deltas.
 
-	fifo := newQueueFIFO(clientState, options.Transform)
+	fifo := newQueueFIFO(clientState, options.Transform, options.Identifier, options.FIFOMetricsProvider)
 
 	cfg := &Config{
 		Queue:            fifo,
@@ -798,11 +806,13 @@ func newInformer(clientState Store, options InformerOptions, keyFunc KeyFunc) Co
 	return New(cfg)
 }
 
-func newQueueFIFO(clientState Store, transform TransformFunc) Queue {
+func newQueueFIFO(clientState Store, transform TransformFunc, identifier InformerNameAndResource, metricsProvider FIFOMetricsProvider) Queue {
 	if clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.InOrderInformers) {
 		options := RealFIFOOptions{
-			KeyFunction: MetaNamespaceKeyFunc,
-			Transformer: transform,
+			KeyFunction:     MetaNamespaceKeyFunc,
+			Transformer:     transform,
+			Identifier:      identifier,
+			MetricsProvider: metricsProvider,
 		}
 		// If atomic events are enabled, unset clientState in the case of atomic events as we cannot pass a
 		// store to an atomic fifo.

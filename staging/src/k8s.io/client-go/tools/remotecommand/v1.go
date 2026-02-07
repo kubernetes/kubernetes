@@ -31,7 +31,6 @@ import (
 // non-interactive stdin data has ended. See https://issues.k8s.io/13394 and
 // https://issues.k8s.io/13395 for more details.
 type streamProtocolV1 struct {
-	logger klog.Logger
 	StreamOptions
 
 	errorStream  httpstream.Stream
@@ -53,10 +52,10 @@ func (p *streamProtocolV1) stream(logger klog.Logger, conn streamCreator, ready 
 	errorChan := make(chan error)
 
 	cp := func(s string, dst io.Writer, src io.Reader) {
-		p.logger.V(6).Info("Copying", "data", s)
-		defer p.logger.V(6).Info("Done copying", "data", s)
+		logger.V(6).Info("Copying", "data", s)
+		defer logger.V(6).Info("Done copying", "data", s)
 		if _, err := io.Copy(dst, src); err != nil && err != io.EOF {
-			p.logger.Error(err, "Error copying", "data", s)
+			logger.Error(err, "Error copying", "data", s)
 		}
 		if s == v1.StreamTypeStdout || s == v1.StreamTypeStderr {
 			doneChan <- struct{}{}

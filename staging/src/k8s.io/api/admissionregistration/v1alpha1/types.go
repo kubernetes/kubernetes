@@ -83,12 +83,12 @@ const (
 // ValidatingAdmissionPolicy describes the definition of an admission validation policy that accepts or rejects an object without changing it.
 type ValidatingAdmissionPolicy struct {
 	metav1.TypeMeta `json:",inline"`
-	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
+	// metadata is the standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
-	// Specification of the desired behavior of the ValidatingAdmissionPolicy.
+	// spec defines the desired behavior of the ValidatingAdmissionPolicy.
 	Spec ValidatingAdmissionPolicySpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
-	// The status of the ValidatingAdmissionPolicy, including warnings that are useful to determine if the policy
+	// status represents the current status of the ValidatingAdmissionPolicy, including warnings that are useful to determine if the policy
 	// behaves in the expected way.
 	// Populated by the system.
 	// Read-only.
@@ -98,14 +98,14 @@ type ValidatingAdmissionPolicy struct {
 
 // ValidatingAdmissionPolicyStatus represents the status of a ValidatingAdmissionPolicy.
 type ValidatingAdmissionPolicyStatus struct {
-	// The generation observed by the controller.
+	// observedGeneration is the generation observed by the controller.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty" protobuf:"varint,1,opt,name=observedGeneration"`
-	// The results of type checking for each expression.
+	// typeChecking contains the results of type checking for each expression.
 	// Presence of this field indicates the completion of the type checking.
 	// +optional
 	TypeChecking *TypeChecking `json:"typeChecking,omitempty" protobuf:"bytes,2,opt,name=typeChecking"`
-	// The conditions represent the latest available observations of a policy's current state.
+	// conditions represent the latest available observations of a policy's current state.
 	// +optional
 	// +listType=map
 	// +listMapKey=type
@@ -115,7 +115,7 @@ type ValidatingAdmissionPolicyStatus struct {
 // TypeChecking contains results of type checking the expressions in the
 // ValidatingAdmissionPolicy
 type TypeChecking struct {
-	// The type checking warnings for each expression.
+	// expressionWarnings contains the type checking warnings for each expression.
 	// +optional
 	// +listType=atomic
 	ExpressionWarnings []ExpressionWarning `json:"expressionWarnings,omitempty" protobuf:"bytes,1,rep,name=expressionWarnings"`
@@ -123,11 +123,11 @@ type TypeChecking struct {
 
 // ExpressionWarning is a warning information that targets a specific expression.
 type ExpressionWarning struct {
-	// The path to the field that refers the expression.
+	// fieldRef is the path to the field that refers to the expression.
 	// For example, the reference to the expression of the first item of
 	// validations is "spec.validations[0].expression"
 	FieldRef string `json:"fieldRef" protobuf:"bytes,2,opt,name=fieldRef"`
-	// The content of type checking information in a human-readable form.
+	// warning contains the content of type checking information in a human-readable form.
 	// Each line of the warning contains the type that the expression is checked
 	// against, followed by the type check error from the compiler.
 	Warning string `json:"warning" protobuf:"bytes,3,opt,name=warning"`
@@ -139,7 +139,7 @@ type ExpressionWarning struct {
 // ValidatingAdmissionPolicyList is a list of ValidatingAdmissionPolicy.
 type ValidatingAdmissionPolicyList struct {
 	metav1.TypeMeta `json:",inline"`
-	// Standard list metadata.
+	// metadata is the standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -149,21 +149,21 @@ type ValidatingAdmissionPolicyList struct {
 
 // ValidatingAdmissionPolicySpec is the specification of the desired behavior of the AdmissionPolicy.
 type ValidatingAdmissionPolicySpec struct {
-	// ParamKind specifies the kind of resources used to parameterize this policy.
+	// paramKind specifies the kind of resources used to parameterize this policy.
 	// If absent, there are no parameters for this policy and the param CEL variable will not be provided to validation expressions.
 	// If ParamKind refers to a non-existent kind, this policy definition is mis-configured and the FailurePolicy is applied.
 	// If paramKind is specified but paramRef is unset in ValidatingAdmissionPolicyBinding, the params variable will be null.
 	// +optional
 	ParamKind *ParamKind `json:"paramKind,omitempty" protobuf:"bytes,1,rep,name=paramKind"`
 
-	// MatchConstraints specifies what resources this policy is designed to validate.
+	// matchConstraints specifies what resources this policy is designed to validate.
 	// The AdmissionPolicy cares about a request if it matches _all_ Constraints.
 	// However, in order to prevent clusters from being put into an unstable state that cannot be recovered from via the API
 	// ValidatingAdmissionPolicy cannot match ValidatingAdmissionPolicy and ValidatingAdmissionPolicyBinding.
 	// Required.
 	MatchConstraints *MatchResources `json:"matchConstraints,omitempty" protobuf:"bytes,2,rep,name=matchConstraints"`
 
-	// Validations contain CEL expressions which is used to apply the validation.
+	// validations contain CEL expressions which is used to apply the validation.
 	// Validations and AuditAnnotations may not both be empty; a minimum of one Validations or AuditAnnotations is
 	// required.
 	// +listType=atomic
@@ -194,7 +194,7 @@ type ValidatingAdmissionPolicySpec struct {
 	// +optional
 	AuditAnnotations []AuditAnnotation `json:"auditAnnotations,omitempty" protobuf:"bytes,5,rep,name=auditAnnotations"`
 
-	// MatchConditions is a list of conditions that must be met for a request to be validated.
+	// matchConditions is a list of conditions that must be met for a request to be validated.
 	// Match conditions filter requests that have already been matched by the rules,
 	// namespaceSelector, and objectSelector. An empty list of matchConditions matches all requests.
 	// There are a maximum of 64 match conditions allowed.
@@ -216,7 +216,7 @@ type ValidatingAdmissionPolicySpec struct {
 	// +optional
 	MatchConditions []MatchCondition `json:"matchConditions,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,6,rep,name=matchConditions"`
 
-	// Variables contain definitions of variables that can be used in composition of other expressions.
+	// variables contain definitions of variables that can be used in composition of other expressions.
 	// Each variable is defined as a named CEL expression.
 	// The variables defined here will be available under `variables` in other expressions of the policy
 	// except MatchConditions because MatchConditions are evaluated before the rest of the policy.
@@ -236,19 +236,19 @@ type MatchCondition v1.MatchCondition
 // ParamKind is a tuple of Group Kind and Version.
 // +structType=atomic
 type ParamKind struct {
-	// APIVersion is the API group version the resources belong to.
+	// apiVersion is the API group version the resources belong to.
 	// In format of "group/version".
 	// Required.
 	APIVersion string `json:"apiVersion,omitempty" protobuf:"bytes,1,rep,name=apiVersion"`
 
-	// Kind is the API kind the resources belong to.
+	// kind is the API kind the resources belong to.
 	// Required.
 	Kind string `json:"kind,omitempty" protobuf:"bytes,2,rep,name=kind"`
 }
 
 // Validation specifies the CEL expression which is used to apply the validation.
 type Validation struct {
-	// Expression represents the expression which will be evaluated by CEL.
+	// expression represents the expression which will be evaluated by CEL.
 	// ref: https://github.com/google/cel-spec
 	// CEL expressions have access to the contents of the API request/response, organized into CEL variables as well as some other useful variables:
 	//
@@ -290,7 +290,7 @@ type Validation struct {
 	//     non-intersecting keys are appended, retaining their partial order.
 	// Required.
 	Expression string `json:"expression" protobuf:"bytes,1,opt,name=Expression"`
-	// Message represents the message displayed when validation fails. The message is required if the Expression contains
+	// message represents the message displayed when validation fails. The message is required if the Expression contains
 	// line breaks. The message must not contain line breaks.
 	// If unset, the message is "failed rule: {Rule}".
 	// e.g. "must be a URL with the host matching spec.host"
@@ -299,7 +299,7 @@ type Validation struct {
 	// If unset, the message is "failed Expression: {Expression}".
 	// +optional
 	Message string `json:"message,omitempty" protobuf:"bytes,2,opt,name=message"`
-	// Reason represents a machine-readable description of why this validation failed.
+	// reason represents a machine-readable description of why this validation failed.
 	// If this is the first validation in the list to fail, this reason, as well as the
 	// corresponding HTTP response code, are used in the
 	// HTTP response to the client.
@@ -323,12 +323,12 @@ type Validation struct {
 
 // Variable is the definition of a variable that is used for composition.
 type Variable struct {
-	// Name is the name of the variable. The name must be a valid CEL identifier and unique among all variables.
+	// name is the name of the variable. The name must be a valid CEL identifier and unique among all variables.
 	// The variable can be accessed in other expressions through `variables`
 	// For example, if name is "foo", the variable will be available as `variables.foo`
 	Name string `json:"name" protobuf:"bytes,1,opt,name=Name"`
 
-	// Expression is the expression that will be evaluated as the value of the variable.
+	// expression is the expression that will be evaluated as the value of the variable.
 	// The CEL expression has access to the same identifiers as the CEL expressions in Validation.
 	Expression string `json:"expression" protobuf:"bytes,2,opt,name=Expression"`
 }
@@ -388,10 +388,10 @@ type AuditAnnotation struct {
 // given (policy, binding, param) combination is within its own CEL budget.
 type ValidatingAdmissionPolicyBinding struct {
 	metav1.TypeMeta `json:",inline"`
-	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
+	// metadata is the standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
-	// Specification of the desired behavior of the ValidatingAdmissionPolicyBinding.
+	// spec defines the desired behavior of the ValidatingAdmissionPolicyBinding.
 	Spec ValidatingAdmissionPolicyBindingSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 }
 
@@ -401,7 +401,7 @@ type ValidatingAdmissionPolicyBinding struct {
 // ValidatingAdmissionPolicyBindingList is a list of ValidatingAdmissionPolicyBinding.
 type ValidatingAdmissionPolicyBindingList struct {
 	metav1.TypeMeta `json:",inline"`
-	// Standard list metadata.
+	// metadata is the standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -411,7 +411,7 @@ type ValidatingAdmissionPolicyBindingList struct {
 
 // ValidatingAdmissionPolicyBindingSpec is the specification of the ValidatingAdmissionPolicyBinding.
 type ValidatingAdmissionPolicyBindingSpec struct {
-	// PolicyName references a ValidatingAdmissionPolicy name which the ValidatingAdmissionPolicyBinding binds to.
+	// policyName references a ValidatingAdmissionPolicy name which the ValidatingAdmissionPolicyBinding binds to.
 	// If the referenced resource does not exist, this binding is considered invalid and will be ignored
 	// Required.
 	// +required
@@ -425,7 +425,7 @@ type ValidatingAdmissionPolicyBindingSpec struct {
 	// +optional
 	ParamRef *ParamRef `json:"paramRef,omitempty" protobuf:"bytes,2,rep,name=paramRef"`
 
-	// MatchResources declares what resources match this binding and will be validated by it.
+	// matchResources declares what resources match this binding and will be validated by it.
 	// Note that this is intersected with the policy's matchConstraints, so only requests that are matched by the policy can be selected by this.
 	// If this is unset, all resources matched by the policy are validated by this binding
 	// When resourceRules is unset, it does not constrain resource matching. If a resource is matched by the other fields of this object, it will be validated.
@@ -473,6 +473,8 @@ type ValidatingAdmissionPolicyBindingSpec struct {
 	//
 	// Required.
 	// +listType=set
+	// +required
+	// +k8s:required
 	ValidationActions []ValidationAction `json:"validationActions,omitempty" protobuf:"bytes,4,rep,name=validationActions"`
 }
 
@@ -480,7 +482,7 @@ type ValidatingAdmissionPolicyBindingSpec struct {
 // expressions of rules applied by a policy binding.
 // +structType=atomic
 type ParamRef struct {
-	// `name` is the name of the resource being referenced.
+	// name is the name of the resource being referenced.
 	//
 	// `name` and `selector` are mutually exclusive properties. If one is set,
 	// the other must be unset.
@@ -518,7 +520,7 @@ type ParamRef struct {
 	// +optional
 	Selector *metav1.LabelSelector `json:"selector,omitempty" protobuf:"bytes,3,rep,name=selector"`
 
-	// `parameterNotFoundAction` controls the behavior of the binding when the resource
+	// parameterNotFoundAction controls the behavior of the binding when the resource
 	// exists, and name or selector is valid, but there are no parameters
 	// matched by the binding. If the value is set to `Allow`, then no
 	// matched parameters will be treated as successful validation by the binding.
@@ -536,7 +538,7 @@ type ParamRef struct {
 // The exclude rules take precedence over include rules (if a resource matches both, it is excluded)
 // +structType=atomic
 type MatchResources struct {
-	// NamespaceSelector decides whether to run the admission control policy on an object based
+	// namespaceSelector decides whether to run the admission control policy on an object based
 	// on whether the namespace for that object matches the selector. If the
 	// object itself is a namespace, the matching is performed on
 	// object.metadata.labels. If the object is another cluster scoped resource,
@@ -581,7 +583,7 @@ type MatchResources struct {
 	// Default to the empty LabelSelector, which matches everything.
 	// +optional
 	NamespaceSelector *metav1.LabelSelector `json:"namespaceSelector,omitempty" protobuf:"bytes,1,opt,name=namespaceSelector"`
-	// ObjectSelector decides whether to run the policy based on if the
+	// objectSelector decides whether to run the policy based on if the
 	// object has matching labels. objectSelector is evaluated against both
 	// the oldObject and newObject that would be sent to the policy's expression (CEL), and
 	// is considered to match if either object matches the selector. A null
@@ -594,12 +596,12 @@ type MatchResources struct {
 	// Default to the empty LabelSelector, which matches everything.
 	// +optional
 	ObjectSelector *metav1.LabelSelector `json:"objectSelector,omitempty" protobuf:"bytes,2,opt,name=objectSelector"`
-	// ResourceRules describes what operations on what resources/subresources the admission policy matches.
+	// resourceRules describes what operations on what resources/subresources the admission policy matches.
 	// The policy cares about an operation if it matches _any_ Rule.
 	// +listType=atomic
 	// +optional
 	ResourceRules []NamedRuleWithOperations `json:"resourceRules,omitempty" protobuf:"bytes,3,rep,name=resourceRules"`
-	// ExcludeResourceRules describes what operations on what resources/subresources the policy should not care about.
+	// excludeResourceRules describes what operations on what resources/subresources the policy should not care about.
 	// The exclude rules take precedence over include rules (if a resource matches both, it is excluded)
 	// +listType=atomic
 	// +optional
@@ -644,7 +646,7 @@ const (
 // NamedRuleWithOperations is a tuple of Operations and Resources with ResourceNames.
 // +structType=atomic
 type NamedRuleWithOperations struct {
-	// ResourceNames is an optional white list of names that the rule applies to.  An empty set means that everything is allowed.
+	// resourceNames is an optional white list of names that the rule applies to.  An empty set means that everything is allowed.
 	// +listType=atomic
 	// +optional
 	ResourceNames []string `json:"resourceNames,omitempty" protobuf:"bytes,1,rep,name=resourceNames"`
@@ -677,10 +679,10 @@ const (
 // MutatingAdmissionPolicy describes the definition of an admission mutation policy that mutates the object coming into admission chain.
 type MutatingAdmissionPolicy struct {
 	metav1.TypeMeta `json:",inline"`
-	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
+	// metadata is the standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
-	// Specification of the desired behavior of the MutatingAdmissionPolicy.
+	// spec defines the desired behavior of the MutatingAdmissionPolicy.
 	Spec MutatingAdmissionPolicySpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 }
 
@@ -690,7 +692,7 @@ type MutatingAdmissionPolicy struct {
 // MutatingAdmissionPolicyList is a list of MutatingAdmissionPolicy.
 type MutatingAdmissionPolicyList struct {
 	metav1.TypeMeta `json:",inline"`
-	// Standard list metadata.
+	// metadata is the standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -965,10 +967,10 @@ const (
 // given (policy, binding, param) combination is within its own CEL budget.
 type MutatingAdmissionPolicyBinding struct {
 	metav1.TypeMeta `json:",inline"`
-	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
+	// metadata is the standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
-	// Specification of the desired behavior of the MutatingAdmissionPolicyBinding.
+	// spec defines the desired behavior of the MutatingAdmissionPolicyBinding.
 	Spec MutatingAdmissionPolicyBindingSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 }
 
@@ -978,7 +980,7 @@ type MutatingAdmissionPolicyBinding struct {
 // MutatingAdmissionPolicyBindingList is a list of MutatingAdmissionPolicyBinding.
 type MutatingAdmissionPolicyBindingList struct {
 	metav1.TypeMeta `json:",inline"`
-	// Standard list metadata.
+	// metadata is the standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`

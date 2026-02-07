@@ -55,6 +55,6 @@ func (d *declarativeValidationNative) Docs() TagDoc {
 		Tag:            d.TagName(),
 		Description:    "Indicates that all validations for the field, including any on the field's type, are declarative and do not have a corresponding handwritten equivalent. This is only allowed for validations that are 'Stable'. When used, validation errors will be marked to show they originated from a declarative-only validation.",
 		Scopes:         d.ValidScopes().UnsortedList(),
-		StabilityLevel: Stable,
+		StabilityLevel: TagStabilityLevelStable,
 	}
 }

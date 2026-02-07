@@ -17,7 +17,6 @@ limitations under the License.
 package portforward
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -36,7 +35,6 @@ const PingPeriod = 10 * time.Second
 
 // tunnelingDialer implements "httpstream.Dial" interface
 type tunnelingDialer struct {
-	logger    klog.Logger
 	url       *url.URL
 	transport http.RoundTripper
 	holder    websocket.ConnectionHolder
@@ -45,22 +43,12 @@ type tunnelingDialer struct {
 // NewTunnelingDialer creates and returns the tunnelingDialer structure which implemements the "httpstream.Dialer"
 // interface. The dialer can upgrade a websocket request, creating a websocket connection. This function
 // returns an error if one occurs.
-//
-//logcheck:context // NewSPDYOverWebsocketDialerWithLogger should be used instead of NewSPDYOverWebsocketDialer in code which supports contextual logging.
 func NewSPDYOverWebsocketDialer(url *url.URL, config *restclient.Config) (httpstream.Dialer, error) {
-	return NewSPDYOverWebsocketDialerWithLogger(klog.Background(), url, config)
-}
-
-// NewTunnelingDialer creates and returns the tunnelingDialer structure which implemements the "httpstream.Dialer"
-// interface. The dialer can upgrade a websocket request, creating a websocket connection. This function
-// returns an error if one occurs.
-func NewSPDYOverWebsocketDialerWithLogger(logger klog.Logger, url *url.URL, config *restclient.Config) (httpstream.Dialer, error) {
 	transport, holder, err := websocket.RoundTripperFor(config)
 	if err != nil {
 		return nil, err
 	}
 	return &tunnelingDialer{
-		logger:    logger,
 		url:       url,
 		transport: transport,
 		holder:    holder,
@@ -71,10 +59,9 @@ func NewSPDYOverWebsocketDialerWithLogger(logger klog.Logger, url *url.URL, conf
 // containing a WebSockets connection (which implements "net.Conn"). Also
 // returns the protocol negotiated, or an error.
 func (d *tunnelingDialer) Dial(protocols ...string) (httpstream.Connection, string, error) {
-	// There is no passed context, so use the background context when creating request for now.
-	ctx := klog.NewContext(context.Background(), d.logger)
+	// There is no passed context, so skip the context when creating request for now.
 	// Websockets requires "GET" method: RFC 6455 Sec. 4.1 (page 17).
-	req, err := http.NewRequestWithContext(ctx, "GET", d.url.String(), nil)
+	req, err := http.NewRequest("GET", d.url.String(), nil)
 	if err != nil {
 		return nil, "", err
 	}
@@ -85,7 +72,7 @@ func (d *tunnelingDialer) Dial(protocols ...string) (httpstream.Connection, stri
 		tunnelingProtocol := constants.WebsocketsSPDYTunnelingPrefix + protocol
 		tunnelingProtocols = append(tunnelingProtocols, tunnelingProtocol)
 	}
-	d.logger.V(4).Info("Before WebSocket Upgrade Connection...")
+	klog.V(4).Infoln("Before WebSocket Upgrade Connection...")
 	conn, err := websocket.Negotiate(d.transport, d.holder, req, tunnelingProtocols...)
 	if err != nil {
 		return nil, "", err
@@ -95,10 +82,10 @@ func (d *tunnelingDialer) Dial(protocols ...string) (httpstream.Connection, stri
 	}
 	protocol := conn.Subprotocol()
 	protocol = strings.TrimPrefix(protocol, constants.WebsocketsSPDYTunnelingPrefix)
-	d.logger.V(4).Info("Negotiation complete", "protocol", protocol)
+	klog.V(4).Infof("negotiated protocol: %s", protocol)
 
 	// Wrap the websocket connection which implements "net.Conn".
-	tConn := NewTunnelingConnectionWithLogger(klog.LoggerWithName(d.logger, "client"), conn)
+	tConn := NewTunnelingConnection("client", conn)
 	// Create SPDY connection injecting the previously created tunneling connection.
 	spdyConn, err := spdy.NewClientConnectionWithPings(tConn, PingPeriod)
 

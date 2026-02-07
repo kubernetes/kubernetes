@@ -1301,7 +1301,7 @@ func TestFrameworkHandler_IterateOverWaitingPods(t *testing.T) {
 			// Wait all pods in waitSchedulingPods to be scheduled.
 			wg.Wait()
 
-			utiltesting.Eventually(tCtx, func(utiltesting.TContext) sets.Set[string] {
+			tCtx.Eventually(func(utiltesting.TContext) sets.Set[string] {
 				// Ensure that all waitingPods in scheduler can be obtained from any profiles.
 				actualPodNamesInWaitingPods := sets.New[string]()
 				for _, schedFramework := range scheduler.Profiles {

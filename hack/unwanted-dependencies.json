@@ -1,10 +1,6 @@
 {
   "spec": {
     "pinnedModules": {
-      "github.com/libopenstorage/openstorage": {
-        "Version": "v1.0.0",
-        "Reason": "portworx csi driver has been deprecated and will be removed - https://github.com/kubernetes/enhancements/issues/2589"
-      },
       "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc": {
         "Version": "v0.63.0",
         "Reason": "v0.64.0 has nil pointer panic when nil TracerProvider is passed - https://github.com/kubernetes/kubernetes/issues/135865"
@@ -25,6 +21,7 @@
       "github.com/containerd/cgroups": "standardize on single cgroups library from runc, refer #128157",
       "github.com/davecgh/go-spew": "refer to #103942",
       "github.com/evanphx/json-patch/v5": "refer to https://github.com/kubernetes/kubernetes/pull/91622#issuecomment-637087847",
+      "github.com/flynn/go-shlex": "unmaintained, archive mode",
       "github.com/form3tech-oss/jwt-go": "unmaintained, archive mode",
       "github.com/getsentry/raven-go": "unmaintained, archive mode",
       "github.com/go-bindata/go-bindata": "refer to #99829",
@@ -67,6 +64,7 @@
       "github.com/influxdata/influxdb1-client": "db/datastore clients should not be required",
       "github.com/json-iterator/go": "refer to #105030",
       "github.com/klauspost/compress": "unreviewable assembly code, `prometheus/client_golang` should use stdlib instead",
+      "github.com/kr/pty": "unmaintained, archive mode",
       "github.com/mailru/easyjson": "unmaintained",
       "github.com/miekg/dns": "no dns client/server should be required",
       "github.com/mindprince/gonvml": "depends on nvml.h that does not appear to permit modification, redistribution",
@@ -141,6 +139,9 @@
         "sigs.k8s.io/kustomize/kustomize/v5",
         "sigs.k8s.io/kustomize/kyaml"
       ],
+      "github.com/flynn/go-shlex": [
+        "github.com/coredns/caddy"
+      ],
       "github.com/gogo/protobuf": [
         "github.com/containerd/containerd/api",
         "github.com/containerd/errdefs/pkg",
@@ -170,8 +171,7 @@
         "sigs.k8s.io/apiserver-network-proxy/konnectivity-client"
       ],
       "github.com/google/btree": [
-        "go.etcd.io/etcd/server/v3",
-        "k8s.io/apiserver"
+        "go.etcd.io/etcd/server/v3"
       ],
       "github.com/google/gofuzz": [
         "github.com/json-iterator/go"

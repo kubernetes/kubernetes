@@ -152,7 +152,7 @@ func (g *genValidations) GenerateType(c *generator.Context, t *types.Type, w io.
 // typeDiscoverer contains fields necessary to build graphs of types.
 type typeDiscoverer struct {
 	initialized bool
-	validator   validators.Validator
+	validator   validators.ValidationExtractor
 	inputToPkg  map[string]string
 
 	// constantsByType holds a map of type to constants of that type.
@@ -165,7 +165,7 @@ type typeDiscoverer struct {
 
 // NewTypeDiscoverer creates a NewTypeDiscoverer.
 // Init must be called before calling DiscoverType.
-func NewTypeDiscoverer(validator validators.Validator, inputToPkg map[string]string) *typeDiscoverer {
+func NewTypeDiscoverer(validator validators.ValidationExtractor, inputToPkg map[string]string) *typeDiscoverer {
 	return &typeDiscoverer{
 		validator:       validator,
 		inputToPkg:      inputToPkg,
@@ -247,9 +247,9 @@ type typeNode struct {
 	// hasValidations. These let us emit the iteration code for list and
 	// map types, but we might not have enough information to know if we can
 	// skip them at discovery time.
-	typeValIterations    validators.Validations    // validations on each val
-	typeKeyIterations    validators.Validations    // validations on each key
-	lowestStabilityLevel validators.StabilityLevel // populated to the lowest stability level of any validation in this type
+	typeValIterations    validators.Validations       // validations on each val
+	typeKeyIterations    validators.Validations       // validations on each key
+	lowestStabilityLevel validators.TagStabilityLevel // populated to the lowest stability level of any validation in this type
 }
 
 // DiscoverType walks the given type recursively, building a type-graph in this
@@ -306,7 +306,7 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 	// This is the type-node being assembled in the rest of this function.
 	thisNode := &typeNode{
 		valueType:            t,
-		lowestStabilityLevel: validators.Stable,
+		lowestStabilityLevel: validators.TagStabilityLevelStable,
 	}
 	td.typeNodes[t] = thisNode
 
@@ -595,7 +595,7 @@ func (td *typeDiscoverer) verifySupportedType(t *types.Type) error {
 // discoverStruct walks a struct type recursively.
 func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path) error {
 	var fields []*childNode
-	structLowestStability := validators.Stable
+	structLowestStability := validators.TagStabilityLevelStable
 
 	klog.V(5).InfoS("discoverStruct", "type", thisNode.valueType)
 
@@ -813,8 +813,8 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 // analyzeFieldTags processes the tags for a field, checking for declarative native
 // validation and stability levels.
 // This returns lowest stability level of tags for the field.
-func (td *typeDiscoverer) analyzeFieldTags(tags []codetags.Tag, node *childNode, fldPath *field.Path) (validators.StabilityLevel, error) {
-	fieldLowestStabilityLevel := validators.Stable
+func (td *typeDiscoverer) analyzeFieldTags(tags []codetags.Tag, node *childNode, fldPath *field.Path) (validators.TagStabilityLevel, error) {
+	fieldLowestStabilityLevel := validators.TagStabilityLevelStable
 	var isDeclarativeNative bool
 	for _, tag := range tags {
 		if tag.Name == declarativeNativeTag {
@@ -838,13 +838,13 @@ func (td *typeDiscoverer) analyzeFieldTags(tags []codetags.Tag, node *childNode,
 			if stability, err := td.validator.Stability(tag.Name); err != nil {
 				// This case should ideally not be hit if our tag registry is complete.
 				return fieldLowestStabilityLevel, fmt.Errorf("field %s: error occurred while finding stability level for %s tag: %w", fldPath.String(), tag.Name, err)
-			} else if stability != validators.Stable {
+			} else if stability != validators.TagStabilityLevelStable {
 				return fieldLowestStabilityLevel, fmt.Errorf("field %s: +k8s:declarativeValidationNative can only be used with stable validation tags, but found %q which is %s", fldPath.String(), tag.Name, stability)
 			}
 		}
 
 		// If the type has non stable validations.
-		if node.node != nil && node.node.lowestStabilityLevel != validators.Stable {
+		if node.node != nil && node.node.lowestStabilityLevel != validators.TagStabilityLevelStable {
 			return fieldLowestStabilityLevel, fmt.Errorf("field %s: is marked with +k8s:declarativeValidationNative but its type %q contains non-stable validation tags", fldPath.String(), node.node.valueType.Name)
 		}
 	}
@@ -1419,6 +1419,12 @@ func emitCallsToValidators(c *generator.Context, validations []validators.Functi
 					toGolangSourceDataLiteral(sw, c, arg)
 				}
 				sw.Do(")", targs)
+				switch v.StabilityLevel {
+				case validators.ValidationStabilityLevelAlpha:
+					sw.Do(".MarkAlpha()", nil)
+				case validators.ValidationStabilityLevelBeta:
+					sw.Do(".MarkBeta()", nil)
+				}
 			}
 
 			// If validation is conditional, wrap the validation function with a conditions check.
@@ -1786,6 +1792,12 @@ func emitFunctionCall(sw *generator.SnippetWriter, c *generator.Context, v valid
 		toGolangSourceDataLiteral(sw, c, arg)
 	}
 	sw.Do(")", nil)
+	switch v.StabilityLevel {
+	case validators.ValidationStabilityLevelAlpha:
+		sw.Do(".MarkAlpha()", nil)
+	case validators.ValidationStabilityLevelBeta:
+		sw.Do(".MarkBeta()", nil)
+	}
 }
 
 // getLeafTypeAndPrefixes returns the "leaf value type" for a given type, as

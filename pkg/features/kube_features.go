@@ -357,13 +357,6 @@ const (
 	// Enables support of HPA scaling to zero pods when an object or custom metric is configured.
 	HPAScaleToZero featuregate.Feature = "HPAScaleToZero"
 
-	// owner: @deepakkinni @xing-yang
-	// kep: https://kep.k8s.io/2644
-	//
-	// Honor Persistent Volume Reclaim Policy when it is "Delete" irrespective of PV-PVC
-	// deletion ordering.
-	HonorPVReclaimPolicy featuregate.Feature = "HonorPVReclaimPolicy"
-
 	// owner: @HirazawaUi
 	// kep: https://kep.k8s.io/4762
 	//
@@ -1151,6 +1144,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	CSIServiceAccountTokenSecrets: {
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.36; remove in 1.39
 	},
 
 	CSIVolumeHealth: {
@@ -1257,7 +1251,8 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	DisableNodeKubeProxyVersion: {
 		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Deprecated},
-		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Deprecated}, // lock to default in 1.34 and remove in v1.37
+		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Deprecated},
+		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Deprecated, LockToDefault: true}, // lock to default in 1.36 and remove in v1.39
 	},
 
 	DynamicResourceAllocation: {
@@ -1283,6 +1278,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	ExternalServiceAccountTokenSigner: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	},
 
 	GangScheduling: {
@@ -1315,12 +1311,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	HPAScaleToZero: {
 		{Version: version.MustParse("1.16"), Default: false, PreRelease: featuregate.Alpha},
-	},
-
-	HonorPVReclaimPolicy: {
-		{Version: version.MustParse("1.23"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.36
 	},
 
 	HostnameOverride: {
@@ -1410,6 +1400,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	KubeletFineGrainedAuthz: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	},
 
 	KubeletInUserNamespace: {
@@ -1979,6 +1970,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	genericfeatures.DeclarativeValidation: {
 		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA and LockToDefault in 1.36, remove in 1.39
 	},
 
 	genericfeatures.DeclarativeValidationTakeover: {
@@ -2056,12 +2048,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	genericfeatures.StructuredAuthenticationConfigurationJWKSMetrics: {
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
-	},
-
-	genericfeatures.StructuredAuthorizationConfiguration: {
-		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	},
 
 	genericfeatures.TokenRequestServiceAccountUIDValidation: {
@@ -2207,8 +2193,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	HPAConfigurableTolerance: {},
 
 	HPAScaleToZero: {},
-
-	HonorPVReclaimPolicy: {},
 
 	HostnameOverride: {},
 
@@ -2499,8 +2483,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	genericfeatures.StructuredAuthenticationConfigurationEgressSelector: {genericfeatures.StructuredAuthenticationConfiguration},
 
 	genericfeatures.StructuredAuthenticationConfigurationJWKSMetrics: {genericfeatures.StructuredAuthenticationConfiguration},
-
-	genericfeatures.StructuredAuthorizationConfiguration: {},
 
 	genericfeatures.TokenRequestServiceAccountUIDValidation: {},
 

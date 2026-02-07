@@ -1,4 +1,4 @@
-// Copyright 2019 The Prometheus Authors
+// Copyright The Prometheus Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -66,6 +66,10 @@ type Meminfo struct {
 	// Memory which has been evicted from RAM, and is temporarily
 	// on the disk
 	SwapFree *uint64
+	// Memory consumed by the zswap backend (compressed size)
+	Zswap *uint64
+	// Amount of anonymous memory stored in zswap (original size)
+	Zswapped *uint64
 	// Memory which is waiting to get written back to the disk
 	Dirty *uint64
 	// Memory which is actively being written back to the disk
@@ -85,6 +89,8 @@ type Meminfo struct {
 	// amount of memory dedicated to the lowest level of page
 	// tables.
 	PageTables *uint64
+	// secondary page tables.
+	SecPageTables *uint64
 	// NFS pages sent to the server, but not yet committed to
 	// stable storage
 	NFSUnstable *uint64
@@ -129,15 +135,18 @@ type Meminfo struct {
 	Percpu            *uint64
 	HardwareCorrupted *uint64
 	AnonHugePages     *uint64
+	FileHugePages     *uint64
 	ShmemHugePages    *uint64
 	ShmemPmdMapped    *uint64
 	CmaTotal          *uint64
 	CmaFree           *uint64
+	Unaccepted        *uint64
 	HugePagesTotal    *uint64
 	HugePagesFree     *uint64
 	HugePagesRsvd     *uint64
 	HugePagesSurp     *uint64
 	Hugepagesize      *uint64
+	Hugetlb           *uint64
 	DirectMap4k       *uint64
 	DirectMap2M       *uint64
 	DirectMap1G       *uint64
@@ -161,6 +170,8 @@ type Meminfo struct {
 	MlockedBytes           *uint64
 	SwapTotalBytes         *uint64
 	SwapFreeBytes          *uint64
+	ZswapBytes             *uint64
+	ZswappedBytes          *uint64
 	DirtyBytes             *uint64
 	WritebackBytes         *uint64
 	AnonPagesBytes         *uint64
@@ -171,6 +182,7 @@ type Meminfo struct {
 	SUnreclaimBytes        *uint64
 	KernelStackBytes       *uint64
 	PageTablesBytes        *uint64
+	SecPageTablesBytes     *uint64
 	NFSUnstableBytes       *uint64
 	BounceBytes            *uint64
 	WritebackTmpBytes      *uint64
@@ -182,11 +194,14 @@ type Meminfo struct {
 	PercpuBytes            *uint64
 	HardwareCorruptedBytes *uint64
 	AnonHugePagesBytes     *uint64
+	FileHugePagesBytes     *uint64
 	ShmemHugePagesBytes    *uint64
 	ShmemPmdMappedBytes    *uint64
 	CmaTotalBytes          *uint64
 	CmaFreeBytes           *uint64
+	UnacceptedBytes        *uint64
 	HugepagesizeBytes      *uint64
+	HugetlbBytes           *uint64
 	DirectMap4kBytes       *uint64
 	DirectMap2MBytes       *uint64
 	DirectMap1GBytes       *uint64
@@ -287,6 +302,12 @@ func parseMemInfo(r io.Reader) (*Meminfo, error) {
 		case "SwapFree:":
 			m.SwapFree = &val
 			m.SwapFreeBytes = &valBytes
+		case "Zswap:":
+			m.Zswap = &val
+			m.ZswapBytes = &valBytes
+		case "Zswapped:":
+			m.Zswapped = &val
+			m.ZswappedBytes = &valBytes
 		case "Dirty:":
 			m.Dirty = &val
 			m.DirtyBytes = &valBytes
@@ -317,6 +338,9 @@ func parseMemInfo(r io.Reader) (*Meminfo, error) {
 		case "PageTables:":
 			m.PageTables = &val
 			m.PageTablesBytes = &valBytes
+		case "SecPageTables:":
+			m.SecPageTables = &val
+			m.SecPageTablesBytes = &valBytes
 		case "NFS_Unstable:":
 			m.NFSUnstable = &val
 			m.NFSUnstableBytes = &valBytes
@@ -350,6 +374,9 @@ func parseMemInfo(r io.Reader) (*Meminfo, error) {
 		case "AnonHugePages:":
 			m.AnonHugePages = &val
 			m.AnonHugePagesBytes = &valBytes
+		case "FileHugePages:":
+			m.FileHugePages = &val
+			m.FileHugePagesBytes = &valBytes
 		case "ShmemHugePages:":
 			m.ShmemHugePages = &val
 			m.ShmemHugePagesBytes = &valBytes
@@ -362,6 +389,9 @@ func parseMemInfo(r io.Reader) (*Meminfo, error) {
 		case "CmaFree:":
 			m.CmaFree = &val
 			m.CmaFreeBytes = &valBytes
+		case "Unaccepted:":
+			m.Unaccepted = &val
+			m.UnacceptedBytes = &valBytes
 		case "HugePages_Total:":
 			m.HugePagesTotal = &val
 		case "HugePages_Free:":
@@ -373,6 +403,9 @@ func parseMemInfo(r io.Reader) (*Meminfo, error) {
 		case "Hugepagesize:":
 			m.Hugepagesize = &val
 			m.HugepagesizeBytes = &valBytes
+		case "Hugetlb:":
+			m.Hugetlb = &val
+			m.HugetlbBytes = &valBytes
 		case "DirectMap4k:":
 			m.DirectMap4k = &val
 			m.DirectMap4kBytes = &valBytes

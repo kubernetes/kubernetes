@@ -21,7 +21,7 @@ package v1alpha1
 // MatchConditionApplyConfiguration represents a declarative configuration of the MatchCondition type for use
 // with apply.
 type MatchConditionApplyConfiguration struct {
-	// Name is an identifier for this match condition, used for strategic merging of MatchConditions,
+	// name is an identifier for this match condition, used for strategic merging of MatchConditions,
 	// as well as providing an identifier for logging purposes. A good name should be descriptive of
 	// the associated expression.
 	// Name must be a qualified name consisting of alphanumeric characters, '-', '_' or '.', and
@@ -31,7 +31,7 @@ type MatchConditionApplyConfiguration struct {
 	//
 	// Required.
 	Name *string `json:"name,omitempty"`
-	// Expression represents the expression which will be evaluated by CEL. Must evaluate to bool.
+	// expression represents the expression which will be evaluated by CEL. Must evaluate to bool.
 	// CEL expressions have access to the contents of the AdmissionRequest and Authorizer, organized into CEL variables:
 	//
 	// 'object' - The object from the incoming request. The value is null for DELETE requests.

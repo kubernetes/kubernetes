@@ -70,7 +70,7 @@ func (m *kubeGenericRuntimeManager) PullImage(ctx context.Context, image kubecon
 	return "", nil, utilerrors.NewAggregate(pullErrs)
 }
 
-// GetImageRef gets the reference (digest or ID) of the image which has already been in
+// GetImageRef gets the ID of the image which has already been in
 // the local storage. It returns ("", nil) if the image isn't in the local storage.
 func (m *kubeGenericRuntimeManager) GetImageRef(ctx context.Context, image kubecontainer.ImageSpec) (string, error) {
 	logger := klog.FromContext(ctx)
@@ -81,10 +81,6 @@ func (m *kubeGenericRuntimeManager) GetImageRef(ctx context.Context, image kubec
 	}
 	if resp.Image == nil {
 		return "", nil
-	}
-	// Prefer returning a digest reference over an image ID to ensure pull record lookups work correctly.
-	if len(resp.Image.RepoDigests) > 0 {
-		return resp.Image.RepoDigests[0], nil
 	}
 	return resp.Image.Id, nil
 }

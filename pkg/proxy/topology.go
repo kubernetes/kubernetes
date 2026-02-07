@@ -162,12 +162,7 @@ func CategorizeEndpoints(endpoints []Endpoint, svcInfo ServicePort, nodeName str
 //     hinted for this node's zone, then it returns "PreferSameZone".
 //   - Otherwise it returns "" (meaning, no topology / default traffic distribution).
 func topologyModeFromHints(svcInfo ServicePort, endpoints []Endpoint, nodeName, zone string) string {
-	if len(endpoints) == 0 {
-		// The code below assumes at least 1 endpoint; if there are no endpoints,
-		// there are no hints.
-		return ""
-	}
-
+	hasReadyEndpoints := false
 	hasEndpointForNode := false
 	allEndpointsHaveNodeHints := true
 	hasEndpointForZone := false
@@ -176,6 +171,7 @@ func topologyModeFromHints(svcInfo ServicePort, endpoints []Endpoint, nodeName, 
 		if !endpoint.IsReady() {
 			continue
 		}
+		hasReadyEndpoints = true
 
 		if endpoint.NodeHints().Len() == 0 {
 			allEndpointsHaveNodeHints = false
@@ -188,6 +184,11 @@ func topologyModeFromHints(svcInfo ServicePort, endpoints []Endpoint, nodeName, 
 		} else if endpoint.ZoneHints().Has(zone) {
 			hasEndpointForZone = true
 		}
+	}
+
+	// If no ready endpoints exist, there are no hints to consider
+	if !hasReadyEndpoints {
+		return ""
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.PreferSameTrafficDistribution) {

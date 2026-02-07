@@ -136,40 +136,34 @@ func Init(tb TB, opts ...InitOption) TContext {
 		Deadline() (time.Time, bool)
 	})
 
-	ctx := interruptCtx
+	ctx := defaultProgressReporter.init(tb)
 	var header func() string
 	if c.PerTestOutput {
 		logger := newLogger(tb, c.BufferLogs)
-		ctx = klog.NewContext(interruptCtx, logger)
+		ctx = klog.NewContext(ctx, logger)
 		header = klogHeader
 	}
 
+	var cancelTimeout func(cause string)
 	if deadlineOK {
 		if deadline, ok := deadlineTB.Deadline(); ok {
 			timeLeft := time.Until(deadline)
 			timeLeft -= CleanupGracePeriod
-			ctx, cancel := withTimeout(ctx, tb, timeLeft, fmt.Sprintf("test suite deadline (%s) is close, need to clean up before the %s cleanup grace period", deadline.Truncate(time.Second), CleanupGracePeriod))
-			tc := TC{
-				Context:   ctx,
-				testingTB: testingTB{TB: tb},
-				cancel:    cancel,
-			}
-			return &tc
+			ctx, cancelTimeout = withTimeout(ctx, tb, timeLeft, fmt.Sprintf("test suite deadline (%s) is close, need to clean up before the %s cleanup grace period", deadline.Truncate(time.Second), CleanupGracePeriod))
 		}
 	}
-	tCtx := WithCancel(InitCtx(ctx, tb))
-	tCtx.perTestHeader = header
-	tCtx.Cleanup(func() {
-		tCtx.Cancel(cleanupErr(tCtx.Name()).Error())
-	})
 
-	// Only enable signal handling if we are sure that we are not
-	// in a Ginkgo suite. Only structs from the testing package
-	// can implement this interface because it contains an "internal"
-	// method, so this has to run under `go test`.
-	if _, ok := tb.(testing.TB); ok {
-		initSignalsOnce.Do(initSignals)
+	// Construct new TContext with context and settings as determined above.
+	tCtx := InitCtx(ctx, tb)
+	if cancelTimeout != nil {
+		tCtx.cancel = cancelTimeout
+	} else {
+		tCtx = tCtx.WithCancel()
+		tCtx.Cleanup(func() {
+			tCtx.Cancel(cleanupErr(tCtx.Name()).Error())
+		})
 	}
+	tCtx.perTestHeader = header
 
 	return tCtx
 }
@@ -252,7 +246,7 @@ func (tc *TC) withTB(tb TB) TContext {
 		logger := newLogger(tb, false /* don't buffer logs in sub-test */)
 		tc.Context = klog.NewContext(tc.Context, logger)
 	}
-	tc = WithCancel(tc)
+	tc = tc.WithCancel()
 	return tc
 }
 
@@ -302,11 +296,6 @@ func run(tc *TC, name string, syncTest bool, cb func(tc *TC)) bool {
 	return false
 }
 
-// Deprecated: use tCtx.WithContext instead
-func WithContext(tCtx TContext, ctx context.Context) TContext {
-	return tCtx.WithContext(ctx)
-}
-
 // WithContext constructs a new TContext with a different Context instance.
 // This can be used in callbacks which receive a Context, for example
 // from Gomega:
@@ -326,11 +315,6 @@ func (tc *TC) WithContext(ctx context.Context) TContext {
 		tc = tc.WithLogger(logger)
 	}
 	return tc
-}
-
-// Deprecated: use tCtx.WithValue instead
-func WithValue(tCtx TContext, key, val any) TContext {
-	return tCtx.WithValue(key, val)
 }
 
 // WithValue wraps [context.WithValue] such that the result is again a TContext.
@@ -486,7 +470,7 @@ func (tc *TC) CleanupCtx(cb func(TContext)) {
 	if tb, ok := tc.TB().(ContextTB); ok {
 		// Use context from base TB (most likely Ginkgo).
 		tb.CleanupCtx(func(ctx context.Context) {
-			tCtx := WithContext(tc, ctx)
+			tCtx := tc.WithContext(ctx)
 			cb(tCtx)
 		})
 		return
@@ -497,7 +481,7 @@ func (tc *TC) CleanupCtx(cb func(TContext)) {
 		// context then has *no* deadline. In the code path above for
 		// Ginkgo, Ginkgo is more sophisticated and also applies
 		// timeouts to cleanup calls which accept a context.
-		childCtx := WithContext(tc, context.WithoutCancel(tc))
+		childCtx := tc.WithContext(context.WithoutCancel(tc))
 		cb(childCtx)
 	})
 }

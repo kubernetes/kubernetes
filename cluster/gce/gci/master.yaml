@@ -129,6 +129,8 @@ write_files:
       WantedBy=multi-user.target
 
 runcmd:
+ - systemctl mask apt-news.service apt-news.timer esm-cache.service snapd.service snapd.socket lxd-installer.socket ubuntu-advantage.service unattended-upgrades.service motd-news.timer update-notifier-motd.timer update-notifier-download.timer || true
+ - systemctl stop unattended-upgrades.service || true
  - systemctl daemon-reload
  - systemctl enable kube-bootstrap-logs-forwarder.service
  - systemctl enable kube-master-installation.service

@@ -559,9 +559,13 @@ func writeDiscoveryResponse(
 		return
 	}
 	var targetGV schema.GroupVersion
-	if mediaType.Convert == nil ||
-		(mediaType.Convert.GroupVersion() != apidiscoveryv2.SchemeGroupVersion &&
-			mediaType.Convert.GroupVersion() != apidiscoveryv2beta1.SchemeGroupVersion) {
+	if mediaType.Convert == nil {
+		utilruntime.HandleError(fmt.Errorf("expected aggregated discovery group version, got unknown group and version"))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if mediaType.Convert.GroupVersion() != apidiscoveryv2.SchemeGroupVersion &&
+		mediaType.Convert.GroupVersion() != apidiscoveryv2beta1.SchemeGroupVersion {
 		utilruntime.HandleError(fmt.Errorf("expected aggregated discovery group version, got group: %s, version %s", mediaType.Convert.Group, mediaType.Convert.Version))
 		w.WriteHeader(http.StatusInternalServerError)
 		return

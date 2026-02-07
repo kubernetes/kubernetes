@@ -17,41 +17,30 @@ limitations under the License.
 package cached
 
 import (
-	"context"
 	"sync"
 
 	"k8s.io/client-go/openapi"
 )
 
 type groupversion struct {
-	delegate openapi.GroupVersionWithContext
+	delegate openapi.GroupVersion
 
 	lock sync.Mutex
 	docs map[string]docInfo
 }
-
-var (
-	_ openapi.GroupVersion            = &groupversion{}
-	_ openapi.GroupVersionWithContext = &groupversion{}
-)
 
 type docInfo struct {
 	data []byte
 	err  error
 }
 
-func newGroupVersion(delegate openapi.GroupVersionWithContext) *groupversion {
+func newGroupVersion(delegate openapi.GroupVersion) *groupversion {
 	return &groupversion{
 		delegate: delegate,
 	}
 }
 
-// Deprecated: use SchemaWithContext instead.
 func (g *groupversion) Schema(contentType string) ([]byte, error) {
-	return g.SchemaWithContext(context.Background(), contentType)
-}
-
-func (g *groupversion) SchemaWithContext(ctx context.Context, contentType string) ([]byte, error) {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 
@@ -61,7 +50,7 @@ func (g *groupversion) SchemaWithContext(ctx context.Context, contentType string
 			g.docs = make(map[string]docInfo)
 		}
 
-		cachedInfo.data, cachedInfo.err = g.delegate.SchemaWithContext(ctx, contentType)
+		cachedInfo.data, cachedInfo.err = g.delegate.Schema(contentType)
 		g.docs[contentType] = cachedInfo
 	}
 

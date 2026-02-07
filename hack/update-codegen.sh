@@ -113,7 +113,7 @@ fi
 # Some of the later codegens depend on the results of this, so it needs to come
 # first in the case of regenerating everything.
 function codegen::protobuf() {
-    if [[ -n "${LINT:-}" ]]; then                                                             
+    if [[ -n "${LINT:-}" ]]; then
         if [[ "${KUBE_VERBOSE}" -gt 2 ]]; then
             kube::log::status "No linter for protobuf codegen"
         fi
@@ -657,7 +657,8 @@ function codegen::openapi() {
     kube::util::read-array tag_files < <(
         k8s_tag_files_except \
             staging/src/k8s.io/code-generator \
-            staging/src/k8s.io/sample-apiserver
+            staging/src/k8s.io/sample-apiserver \
+            staging/src/k8s.io/sample-controller
         )
 
     local tag_dirs=()

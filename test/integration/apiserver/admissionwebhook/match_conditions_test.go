@@ -1086,7 +1086,7 @@ func newMarkerPod(namespace string) *corev1.Pod {
 
 func repeatedMatchConditions(size int) []admissionregistrationv1.MatchCondition {
 	matchConditions := make([]admissionregistrationv1.MatchCondition, 0, size)
-	for i := 0; i < size; i++ {
+	for i := range size {
 		matchConditions = append(matchConditions, admissionregistrationv1.MatchCondition{
 			Name:       "repeated-" + strconv.Itoa(i),
 			Expression: "true",
@@ -1098,7 +1098,7 @@ func repeatedMatchConditions(size int) []admissionregistrationv1.MatchCondition 
 // generate n matchConditions with provided expression
 func generateMatchConditionsWithAuthzCheck(num int, exp string) []admissionregistrationv1.MatchCondition {
 	var conditions = make([]admissionregistrationv1.MatchCondition, num)
-	for i := 0; i < num; i++ {
+	for i := range num {
 		conditions[i].Name = "test" + strconv.Itoa(i)
 		conditions[i].Expression = exp
 	}

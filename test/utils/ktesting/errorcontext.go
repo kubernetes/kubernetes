@@ -22,11 +22,6 @@ import (
 	"strings"
 )
 
-// Deprecated: use tCtx.WithError instead
-func WithError(tCtx TContext, err *error) (TContext, func()) {
-	return tCtx.WithError(err)
-}
-
 // WithError creates a context where test failures are collected and stored in
 // the provided error instance when the caller is done. Use it like this:
 //

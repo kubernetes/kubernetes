@@ -105,7 +105,7 @@ func getFakeClient(t *testing.T, nodeName, driverName string, slice *resourceapi
 
 func requireNoSlices(tCtx ktesting.TContext) {
 	tCtx.Helper()
-	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) error {
+	tCtx.Eventually(func(tCtx ktesting.TContext) error {
 		slices, err := tCtx.Client().ResourceV1().ResourceSlices().List(tCtx, metav1.ListOptions{})
 		if err != nil {
 			return err
@@ -203,12 +203,12 @@ func TestRegistrationHandler(t *testing.T) {
 			service := drapb.DRAPluginService
 			tmp := t.TempDir()
 			endpointA := path.Join(tmp, socketFileA)
-			teardownA, err := setupFakeGRPCServer(service, endpointA)
+			teardownA, err := setupFakeGRPCServer(tCtx, service, endpointA)
 			require.NoError(t, err)
 			tCtx.Cleanup(teardownA)
 
 			endpoint := path.Join(tmp, test.socketFile)
-			teardown, err := setupFakeGRPCServer(service, endpoint)
+			teardown, err := setupFakeGRPCServer(tCtx, service, endpoint)
 			require.NoError(t, err)
 			tCtx.Cleanup(teardown)
 
@@ -218,7 +218,7 @@ func TestRegistrationHandler(t *testing.T) {
 			if test.withClient {
 				fakeClient := getFakeClient(t, nodeName, test.driverName, getSlice("test-slice"))
 				client = fakeClient
-				tCtx = ktesting.WithClients(tCtx, nil, nil, client, nil, nil)
+				tCtx = tCtx.WithClients(nil, nil, client, nil, nil)
 			}
 
 			// The DRAPluginManager wipes all slices at startup.
@@ -307,7 +307,7 @@ func TestConnectionHandling(t *testing.T) {
 
 			slice := getSlice(sliceName)
 			client := getFakeClient(t, nodeName, driverName, slice)
-			tCtx = ktesting.WithClients(tCtx, nil, nil, client, nil, nil)
+			tCtx = tCtx.WithClients(nil, nil, client, nil, nil)
 
 			// The handler wipes all slices at startup.
 			draPlugins := NewDRAPluginManager(tCtx, client, getFakeNode, &mockStreamHandler{}, test.delay)
@@ -316,7 +316,7 @@ func TestConnectionHandling(t *testing.T) {
 
 			// Run GRPC service.
 			endpoint := path.Join(t.TempDir(), "dra.sock")
-			teardown, err := setupFakeGRPCServer(service, endpoint)
+			teardown, err := setupFakeGRPCServer(tCtx, service, endpoint)
 			require.NoError(t, err)
 			defer teardown()
 
@@ -345,7 +345,7 @@ func TestConnectionHandling(t *testing.T) {
 
 				// Start up gRPC server again.
 				tCtx.Log("Restarting plugin gRPC server")
-				teardown, err = setupFakeGRPCServer(service, endpoint)
+				teardown, err = setupFakeGRPCServer(tCtx, service, endpoint)
 				require.NoError(t, err)
 				defer teardown()
 

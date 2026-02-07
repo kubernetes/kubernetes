@@ -50,7 +50,6 @@ type DeviceClassLister = internal.DeviceClassLister
 type Features = internal.Features
 type DeviceID = internal.DeviceID
 
-// types_experimental
 type SharedDeviceID = internal.SharedDeviceID
 type ConsumedCapacityCollection = internal.ConsumedCapacityCollection
 type ConsumedCapacity = internal.ConsumedCapacity

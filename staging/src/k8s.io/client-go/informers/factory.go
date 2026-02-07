@@ -62,6 +62,7 @@ type sharedInformerFactory struct {
 	defaultResync    time.Duration
 	customResync     map[reflect.Type]time.Duration
 	transform        cache.TransformFunc
+	informerName     *cache.InformerName
 
 	informers map[reflect.Type]cache.SharedIndexInformer
 	// startedInformers is used for tracking which informers have been started.
@@ -106,6 +107,21 @@ func WithTransform(transform cache.TransformFunc) SharedInformerOption {
 		factory.transform = transform
 		return factory
 	}
+}
+
+// WithInformerName sets the InformerName for informer identity used in metrics.
+// The InformerName must be created via cache.NewInformerName() at startup,
+// which validates global uniqueness. Each informer type will register its
+// GVR under this name.
+func WithInformerName(informerName *cache.InformerName) SharedInformerOption {
+	return func(factory *sharedInformerFactory) *sharedInformerFactory {
+		factory.informerName = informerName
+		return factory
+	}
+}
+
+func (f *sharedInformerFactory) InformerName() *cache.InformerName {
+	return f.informerName
 }
 
 // NewSharedInformerFactory constructs a new instance of sharedInformerFactory for all namespaces.
@@ -172,6 +188,7 @@ func (f *sharedInformerFactory) Shutdown() {
 
 	// Will return immediately if there is nothing to wait for.
 	f.wg.Wait()
+	f.informerName.Release()
 }
 
 func (f *sharedInformerFactory) WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool {

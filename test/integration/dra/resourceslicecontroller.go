@@ -45,15 +45,15 @@ func TestCreateResourceSlices(tCtx ktesting.TContext, numSlices int) {
 		Slices: make([]resourceslice.Slice, numSlices),
 	}
 	numDevices := 0
-	for i := 0; i < numSlices; i++ {
+	for i := range numSlices {
 		devices := make([]resourceapi.Device, resourceapi.ResourceSliceMaxDevices)
-		for e := 0; e < resourceapi.ResourceSliceMaxDevices; e++ {
+		for e := range resourceapi.ResourceSliceMaxDevices {
 			device := resourceapi.Device{
 				Name:       devicePrefix + strings.Repeat("x", validation.DNS1035LabelMaxLength-len(devicePrefix)-6) + fmt.Sprintf("%06d", numDevices),
 				Attributes: make(map[resourceapi.QualifiedName]resourceapi.DeviceAttribute, resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice),
 			}
 			numDevices++
-			for j := 0; j < resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice; j++ {
+			for j := range resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice {
 				name := resourceapi.QualifiedName(domain + "/" + strings.Repeat("x", resourceapi.DeviceMaxIDLength-4) + fmt.Sprintf("%04d", j))
 				device.Attributes[name] = resourceapi.DeviceAttribute{
 					StringValue: &stringValue,

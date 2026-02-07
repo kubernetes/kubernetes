@@ -46,6 +46,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -564,6 +565,9 @@ func TestAuthzCoverage(t *testing.T) {
 	defer fw.testHTTPServer.Close()
 
 	for _, fineGrained := range []bool{false, true} {
+		if !fineGrained {
+			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+		}
 		t.Run(fmt.Sprintf("fineGrained=%v", fineGrained), func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletFineGrainedAuthz, fineGrained)
 			// method:path -> has coverage
@@ -686,6 +690,9 @@ func TestAuthFilters(t *testing.T) {
 	attributesGetter := NewNodeAuthorizerAttributesGetter(authzTestNodeName)
 
 	for _, fineGraned := range []bool{false, true} {
+		if !fineGraned {
+			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+		}
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletFineGrainedAuthz, fineGraned)
 		for _, tc := range AuthzTestCases(fineGraned) {
 			t.Run(fmt.Sprintf("method=%v:path=%v:fineGrained=%v", tc.Method, tc.Path, fineGraned), func(t *testing.T) {

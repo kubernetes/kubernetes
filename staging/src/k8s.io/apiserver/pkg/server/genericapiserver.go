@@ -49,6 +49,7 @@ import (
 	discoveryendpoint "k8s.io/apiserver/pkg/endpoints/discovery/aggregated"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/apiserver/pkg/server/flagz"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/routes"
 	"k8s.io/apiserver/pkg/server/statusz"
@@ -112,6 +113,9 @@ type GenericAPIServer struct {
 
 	// LoopbackClientConfig is a config for a privileged loopback connection to the API server
 	LoopbackClientConfig *restclient.Config
+
+	// Flagz is used to set up flagz endpoint.
+	Flagz flagz.Reader
 
 	// minRequestTimeout is how short the request timeout can be.  This is used to build the RESTHandler
 	minRequestTimeout time.Duration
@@ -463,8 +467,15 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 	}
 	s.installReadyz()
 
+	componentName := "apiserver"
 	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentStatusz) {
-		statusz.Install(s.Handler.NonGoRestfulMux, "apiserver", statusz.NewRegistry(s.EffectiveVersion, statusz.WithListedPaths(s.ListedPaths())))
+		statusz.Install(s.Handler.NonGoRestfulMux, componentName, statusz.NewRegistry(s.EffectiveVersion, statusz.WithListedPaths(s.ListedPaths())))
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentFlagz) {
+		if s.Flagz != nil {
+			flagz.Install(s.Handler.NonGoRestfulMux, componentName, s.Flagz)
+		}
 	}
 
 	return preparedGenericAPIServer{s}

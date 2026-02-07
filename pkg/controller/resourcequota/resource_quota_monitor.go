@@ -176,7 +176,7 @@ func (qm *QuotaMonitor) controllerFor(ctx context.Context, resource schema.Group
 		shared.Informer().AddEventHandlerWithResyncPeriod(handlers, qm.resyncPeriod())
 		return shared.Informer().GetController(), nil
 	}
-	logger.V(4).Error(err, "QuotaMonitor unable to use a shared informer", "resource", resource.String())
+	logger.V(4).Info("QuotaMonitor unable to use a shared informer", "resource", resource.String(), "err", err)
 
 	// TODO: if we can share storage with garbage collector, it may make sense to support other resources
 	// until that time, aggregated api servers will have to run their own controller to reconcile their own quota.

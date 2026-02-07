@@ -48,6 +48,7 @@ kube::codegen::gen_openapi \
 kube::codegen::gen_client \
     --with-watch \
     --with-applyconfig \
+    --applyconfig-openapi-schema <(go run k8s.io/sample-apiserver/pkg/generated/openapi/cmd/models-schema) \
     --output-dir "${SCRIPT_ROOT}/pkg/generated" \
     --output-pkg "${THIS_PKG}/pkg/generated" \
     --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt" \

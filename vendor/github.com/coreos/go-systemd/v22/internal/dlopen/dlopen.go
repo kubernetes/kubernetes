@@ -69,7 +69,7 @@ func (l *LibHandle) GetSymbolPointer(symbol string) (unsafe.Pointer, error) {
 	p := C.dlsym(l.Handle, sym)
 	e := C.dlerror()
 	if e != nil {
-		return nil, fmt.Errorf("error resolving symbol %q: %v", symbol, errors.New(C.GoString(e)))
+		return nil, fmt.Errorf("error resolving symbol %q: %s", symbol, C.GoString(e))
 	}
 
 	return p, nil
@@ -85,7 +85,7 @@ func (l *LibHandle) Close() error {
 	C.dlclose(l.Handle)
 	e := C.dlerror()
 	if e != nil {
-		return fmt.Errorf("error closing %v: %v", l.Libname, errors.New(C.GoString(e)))
+		return fmt.Errorf("error closing %v: %s", l.Libname, C.GoString(e))
 	}
 
 	return nil
