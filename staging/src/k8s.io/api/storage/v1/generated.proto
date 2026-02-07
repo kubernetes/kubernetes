@@ -435,16 +435,19 @@ message StorageClass {
   // provisioner indicates the type of the provisioner.
   // +required
   // +k8s:required
+  // +k8s:immutable
   optional string provisioner = 2;
 
   // parameters holds the parameters for the provisioner that should
   // create volumes of this storage class.
   // +optional
+  // +k8s:immutable
   map<string, string> parameters = 3;
 
   // reclaimPolicy controls the reclaimPolicy for dynamically provisioned PersistentVolumes of this storage class.
   // Defaults to Delete.
   // +optional
+  // +k8s:immutable
   optional string reclaimPolicy = 4;
 
   // mountOptions controls the mountOptions for dynamically provisioned PersistentVolumes of this storage class.
@@ -462,6 +465,7 @@ message StorageClass {
   // provisioned and bound.  When unset, VolumeBindingImmediate is used.
   // This field is only honored by servers that enable the VolumeScheduling feature.
   // +optional
+  // +k8s:immutable
   optional string volumeBindingMode = 7;
 
   // allowedTopologies restrict the node topologies where volumes can be dynamically provisioned.
