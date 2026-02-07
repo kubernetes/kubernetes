@@ -48,12 +48,12 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 	return nil
 }
 
-var unionMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_union_union_undiscriminated_simple_Struct_ = validate.NewUnionMembership(validate.NewUnionMember("m1"), validate.NewUnionMember("m2"), validate.NewUnionMember("m3"), validate.NewUnionMember("m4"))
+var unionMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_union_undiscriminated_simple_Struct_ = validate.NewUnionMembership(validate.NewUnionMember("m1"), validate.NewUnionMember("m2"), validate.NewUnionMember("m3"), validate.NewUnionMember("m4"))
 
 // Validate_Struct validates an instance of Struct according
 // to declarative validation rules in the API schema.
 func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Struct) (errs field.ErrorList) {
-	errs = append(errs, validate.Union(ctx, op, fldPath, obj, oldObj, unionMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_union_union_undiscriminated_simple_Struct_, func(obj *Struct) bool {
+	errs = append(errs, validate.Union(ctx, op, fldPath, obj, oldObj, unionMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_union_undiscriminated_simple_Struct_, func(obj *Struct) bool {
 		if obj == nil {
 			return false
 		}
