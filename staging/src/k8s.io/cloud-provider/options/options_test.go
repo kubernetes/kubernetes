@@ -33,6 +33,7 @@ import (
 	cpconfig "k8s.io/cloud-provider/config"
 	nodeconfig "k8s.io/cloud-provider/controllers/node/config"
 	serviceconfig "k8s.io/cloud-provider/controllers/service/config"
+	cliflag "k8s.io/component-base/cli/flag"
 	componentbaseconfig "k8s.io/component-base/config"
 	cmconfig "k8s.io/controller-manager/config"
 	cmoptions "k8s.io/controller-manager/options"
@@ -202,6 +203,10 @@ func TestAddFlags(t *testing.T) {
 		"--use-service-account-credentials=false",
 		"--concurrent-node-syncs=5",
 		"--webhooks=foo,bar,-baz",
+		"--webhook-disable-http2-serving=true",
+		"--webhook-tls-cipher-suites=TLS_RSA_WITH_AES_128_CBC_SHA,TLS_RSA_WITH_AES_256_CBC_SHA",
+		"--webhook-tls-min-version=VersionTLS13",
+		"--webhook-tls-sni-cert-key=example.crt,example.key:example.com",
 	}
 	err = fs.Parse(args)
 	if err != nil {
@@ -275,8 +280,16 @@ func TestAddFlags(t *testing.T) {
 					CertDirectory: "",
 					PairName:      "cloud-controller-manager-webhook",
 				},
-				BindPort:    10260,
-				BindAddress: netutils.ParseIPSloppy("0.0.0.0"),
+				BindPort:            10260,
+				BindAddress:         netutils.ParseIPSloppy("0.0.0.0"),
+				DisableHTTP2Serving: true,
+				CipherSuites:        []string{"TLS_RSA_WITH_AES_128_CBC_SHA", "TLS_RSA_WITH_AES_256_CBC_SHA"},
+				MinTLSVersion:       "VersionTLS13",
+				SNICertKeys: []cliflag.NamedCertKey{{
+					CertFile: "example.crt",
+					KeyFile:  "example.key",
+					Names:    []string{"example.com"},
+				}},
 			},
 		},
 		SecureServing: (&apiserveroptions.SecureServingOptions{
