@@ -2837,6 +2837,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 }
 
 func init() {
+	registerOpenshiftFeatures()
+
 	// Register all client-go features with kube's feature gate instance and make all client-go
 	// feature checks use kube's instance. The effect is that for kube binaries, client-go
 	// features are wired to the existing --feature-gates flag just as all other features
