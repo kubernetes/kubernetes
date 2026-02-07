@@ -357,13 +357,6 @@ const (
 	// Enables support of HPA scaling to zero pods when an object or custom metric is configured.
 	HPAScaleToZero featuregate.Feature = "HPAScaleToZero"
 
-	// owner: @deepakkinni @xing-yang
-	// kep: https://kep.k8s.io/2644
-	//
-	// Honor Persistent Volume Reclaim Policy when it is "Delete" irrespective of PV-PVC
-	// deletion ordering.
-	HonorPVReclaimPolicy featuregate.Feature = "HonorPVReclaimPolicy"
-
 	// owner: @HirazawaUi
 	// kep: https://kep.k8s.io/4762
 	//
@@ -1320,12 +1313,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.16"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
-	HonorPVReclaimPolicy: {
-		{Version: version.MustParse("1.23"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.36
-	},
-
 	HostnameOverride: {
 		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
@@ -2206,8 +2193,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	HPAConfigurableTolerance: {},
 
 	HPAScaleToZero: {},
-
-	HonorPVReclaimPolicy: {},
 
 	HostnameOverride: {},
 

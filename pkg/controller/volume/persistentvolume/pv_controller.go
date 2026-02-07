@@ -1333,12 +1333,6 @@ func (ctrl *PersistentVolumeController) deleteVolumeOperation(ctx context.Contex
 		return "", nil
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.HonorPVReclaimPolicy) {
-		if newVolume.GetDeletionTimestamp() != nil {
-			logger.V(3).Info("Volume is already being deleted", "volumeName", volume.Name)
-			return "", nil
-		}
-	}
 	needsReclaim, err := ctrl.isVolumeReleased(logger, newVolume)
 	if err != nil {
 		logger.V(3).Info("Error reading claim for volume", "volumeName", volume.Name, "err", err)
@@ -1529,12 +1523,8 @@ func (ctrl *PersistentVolumeController) doDeleteVolume(ctx context.Context, volu
 		return pluginName, false, err
 	}
 	logger.V(2).Info("Volume deleted", "volumeName", volume.Name)
-	// Remove in-tree delete finalizer on the PV as the volume has been deleted from the underlying storage
-	if utilfeature.DefaultFeatureGate.Enabled(features.HonorPVReclaimPolicy) {
-		err = ctrl.removeDeletionProtectionFinalizer(ctx, volume)
-		if err != nil {
-			return pluginName, true, err
-		}
+	if err := ctrl.removeDeletionProtectionFinalizer(ctx, volume); err != nil {
+		return pluginName, true, err
 	}
 	return pluginName, true, nil
 }
@@ -1740,11 +1730,9 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(
 	metav1.SetMetaDataAnnotation(&volume.ObjectMeta, storagehelpers.AnnBoundByController, "yes")
 	metav1.SetMetaDataAnnotation(&volume.ObjectMeta, storagehelpers.AnnDynamicallyProvisioned, plugin.GetPluginName())
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.HonorPVReclaimPolicy) {
-		if volume.Spec.PersistentVolumeReclaimPolicy == v1.PersistentVolumeReclaimDelete {
-			// Add In-Tree protection finalizer here only when the reclaim policy is `Delete`
-			volume.SetFinalizers([]string{storagehelpers.PVDeletionInTreeProtectionFinalizer})
-		}
+	if volume.Spec.PersistentVolumeReclaimPolicy == v1.PersistentVolumeReclaimDelete {
+		// Add In-Tree protection finalizer here only when the reclaim policy is `Delete`
+		volume.SetFinalizers([]string{storagehelpers.PVDeletionInTreeProtectionFinalizer})
 	}
 
 	// Try to create the PV object several times
