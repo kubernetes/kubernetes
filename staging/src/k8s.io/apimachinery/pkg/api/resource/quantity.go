@@ -530,55 +530,6 @@ func (q *Quantity) AsInt64() (int64, bool) {
 	return q.i.AsInt64()
 }
 
-// AsInt64OrMax returns the quantity as an int64 when an exact integer
-// representation is possible.
-//
-// If the quantity’s numeric value exceeds the maximum magnitude that Kubernetes
-// safely supports for internal decimal operations, the result is clamped to the
-// nearest supported boundary and ok is returned as true.
-//
-// This method explicitly opts into saturation semantics. Unlike AsInt64, it may
-// return a clamped value for quantities that are outside the supported range.
-// AsInt64 never performs rounding or clamping and only reports whether an exact
-// int64 representation is possible.
-//
-// The clamping boundary used here is ±(10^18 − 1), which represents the largest
-// magnitude Kubernetes considers safe for internal decimal canonicalization.
-// Values within the numeric range but lacking sufficient internal headroom are
-// preserved exactly and are not clamped.
-//
-// Callers should use this method only when saturation behavior is acceptable and
-// loss of exact numeric ordering for out-of-range values is understood.
-func (q *Quantity) AsInt64OrMax() (int64, bool) {
-
-	// Fast path: exact integer conversion already supported
-	if v, ok := q.AsInt64(); ok {
-		return v, true
-	}
-
-	const maxBoundaryInt64 = int64(999_999_999_999_999_999)
-	const minBoundaryInt64 = int64(-999_999_999_999_999_999)
-
-	maxBoundary := inf.NewDec(maxBoundaryInt64, 0)
-	minBoundary := inf.NewDec(minBoundaryInt64, 0)
-
-	if q.d.Dec == nil {
-		return 0, false
-	}
-
-	d := new(inf.Dec).Set(q.d.Dec)
-
-	if d.Cmp(maxBoundary) > 0 {
-		return maxBoundaryInt64, true
-	}
-
-	if d.Cmp(minBoundary) < 0 {
-		return minBoundaryInt64, true
-	}
-
-	return 0, false
-}
-
 // ToDec promotes the quantity in place to use an inf.Dec representation and returns itself.
 func (q *Quantity) ToDec() *Quantity {
 	if q.d.Dec == nil {
