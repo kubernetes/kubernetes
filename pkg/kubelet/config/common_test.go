@@ -36,6 +36,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
 	"k8s.io/kubernetes/pkg/apis/core"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/securitycontext"
@@ -416,6 +418,83 @@ func TestStaticPodNameGenerate(t *testing.T) {
 					t.Fail()
 				}
 			}
+		}
+	}
+}
+
+func TestGetStaticPodPriorityWarning(t *testing.T) {
+	testCases := []struct {
+		podName           string
+		priority          *int32
+		priorityClassName string
+		shouldWarn        bool
+		warning           string
+	}{
+		{
+			podName:           "static-pod-with-priorityclassname-and-nil-priority",
+			priority:          nil,
+			priorityClassName: "invalid-priority-class-name",
+			shouldWarn:        true,
+			warning:           "Static Pod has non-nil PriorityClassName and nil Priority. Kubelet will not make use of the priority. Mirror pod creation may fail.",
+		},
+		{
+			podName:           "static-pod-with-priority-without-priorityclassname",
+			priority:          ptr.To(int32(2000001000)),
+			priorityClassName: "",
+			shouldWarn:        true,
+			warning:           "Static Pod has Priority set without PriorityClassName. Mirror Pod creation may fail if the default priority class doesn't match the given priority",
+		},
+		{
+			podName:           "static-pod-with-priority-and-priorityclassname",
+			priority:          ptr.To(int32(2000001000)),
+			priorityClassName: "system-node-critical",
+			shouldWarn:        false,
+			warning:           "",
+		},
+		{
+			podName:           "static-pod-with-invalid-priority",
+			priority:          ptr.To(int32(0)),
+			priorityClassName: "",
+			shouldWarn:        true,
+			warning:           "Static Pod has Priority set without PriorityClassName. Mirror Pod creation may fail if the default priority class doesn't match the given priority",
+		},
+		{
+			podName:           "static-pod-with-invalid-priorityclassname",
+			priority:          ptr.To(int32(2000001000)),
+			priorityClassName: "invalid-priority-class-name",
+			shouldWarn:        true,
+			warning:           "Static Pod has non-standard values for Priority and PriorityClassName. Mirror Pod may be attempted to be evicted from the node ineffectively",
+		},
+	}
+
+	for _, tc := range testCases {
+		pod := &v1.Pod{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: "",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test",
+				UID:       "12345",
+				Namespace: "mynamespace",
+			},
+			Spec: v1.PodSpec{
+				RestartPolicy:     v1.RestartPolicyNever,
+				Priority:          tc.priority,
+				PriorityClassName: tc.priorityClassName,
+				Containers: []v1.Container{{
+					Name:  "image",
+					Image: "test/image",
+				}},
+			},
+		}
+		internalPod := &api.Pod{}
+		if err := k8s_api_v1.Convert_v1_Pod_To_core_Pod(pod, internalPod, nil); err != nil {
+			t.Fatalf("%s: Cannot convert pod %#v, %#v", tc.podName, pod, err)
+		}
+
+		warning := getStaticPodPriorityWarning(internalPod)
+		if tc.shouldWarn && warning != tc.warning {
+			t.Errorf("unexpected error: %v (%s)", warning, pod)
 		}
 	}
 }
