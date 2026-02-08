@@ -816,8 +816,8 @@ func (ssc *defaultStatefulSetControl) updateStatefulSetStatus(
 	ctx context.Context,
 	set *apps.StatefulSet,
 	status *apps.StatefulSetStatus) error {
-	// complete any in progress rolling update if necessary
-	completeRollingUpdate(set, status)
+	// complete any in progress update if necessary
+	completeUpdate(set, status)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.MaxUnavailableStatefulSet) {
 		// Update metrics - this ensures metrics are always updated regardless of update strategy

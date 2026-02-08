@@ -1834,3 +1834,102 @@ func TestGetStatefulSetMaxUnavailable(t *testing.T) {
 		})
 	}
 }
+
+func TestCompleteUpdate(t *testing.T) {
+	tests := []struct {
+		name            string
+		strategyType    apps.StatefulSetUpdateStrategyType
+		replicas        int32
+		readyReplicas   int32
+		updatedReplicas int32
+		totalReplicas   int32
+		currentRevision string
+		updateRevision  string
+		expectPromoted  bool
+	}{
+		{
+			name:            "RollingUpdate: all replicas updated and ready",
+			strategyType:    apps.RollingUpdateStatefulSetStrategyType,
+			replicas:        3,
+			readyReplicas:   3,
+			updatedReplicas: 3,
+			totalReplicas:   3,
+			currentRevision: "rev-1",
+			updateRevision:  "rev-2",
+			expectPromoted:  true,
+		},
+		{
+			name:            "OnDelete: all replicas updated and ready",
+			strategyType:    apps.OnDeleteStatefulSetStrategyType,
+			replicas:        3,
+			readyReplicas:   3,
+			updatedReplicas: 3,
+			totalReplicas:   3,
+			currentRevision: "rev-1",
+			updateRevision:  "rev-2",
+			expectPromoted:  true,
+		},
+		{
+			name:            "OnDelete: partial update",
+			strategyType:    apps.OnDeleteStatefulSetStrategyType,
+			replicas:        3,
+			readyReplicas:   3,
+			updatedReplicas: 1,
+			totalReplicas:   3,
+			currentRevision: "rev-1",
+			updateRevision:  "rev-2",
+			expectPromoted:  false,
+		},
+		{
+			name:            "RollingUpdate: not all ready",
+			strategyType:    apps.RollingUpdateStatefulSetStrategyType,
+			replicas:        3,
+			readyReplicas:   2,
+			updatedReplicas: 3,
+			totalReplicas:   3,
+			currentRevision: "rev-1",
+			updateRevision:  "rev-2",
+			expectPromoted:  false,
+		},
+		{
+			name:            "not all replicas created",
+			strategyType:    apps.RollingUpdateStatefulSetStrategyType,
+			replicas:        3,
+			readyReplicas:   2,
+			updatedReplicas: 2,
+			totalReplicas:   2,
+			currentRevision: "rev-1",
+			updateRevision:  "rev-2",
+			expectPromoted:  false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			set := newStatefulSet(tc.replicas)
+			set.Spec.UpdateStrategy.Type = tc.strategyType
+
+			status := apps.StatefulSetStatus{
+				Replicas:        tc.totalReplicas,
+				ReadyReplicas:   tc.readyReplicas,
+				UpdatedReplicas: tc.updatedReplicas,
+				CurrentRevision: tc.currentRevision,
+				UpdateRevision:  tc.updateRevision,
+			}
+			completeUpdate(set, &status)
+
+			if tc.expectPromoted {
+				if status.CurrentRevision != tc.updateRevision {
+					t.Errorf("expected CurrentRevision to be promoted to %q, got %q", tc.updateRevision, status.CurrentRevision)
+				}
+				if status.CurrentReplicas != tc.updatedReplicas {
+					t.Errorf("expected CurrentReplicas to be %d, got %d", tc.updatedReplicas, status.CurrentReplicas)
+				}
+			} else {
+				if status.CurrentRevision != tc.currentRevision {
+					t.Errorf("expected CurrentRevision to remain %q, got %q", tc.currentRevision, status.CurrentRevision)
+				}
+			}
+		})
+	}
+}
