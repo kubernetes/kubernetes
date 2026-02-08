@@ -23,8 +23,13 @@ import (
 )
 
 const (
-	// maxInt64Factors is the highest value that will be checked when removing factors of 10 from an int64.
-	// It is also the maximum decimal digits that can be represented with an int64.
+// maxInt64Factors defines the maximum number of base-10 digits that may be
+// safely represented using int64Amount.
+//
+// This limit ensures all internal operations on int64Amount remain within
+// int64 bounds, including scaling and canonicalization steps that may
+// temporarily multiply the value. Values exceeding this limit must fall
+// back to an arbitrary-precision representation.
 	maxInt64Factors = 18
 )
 

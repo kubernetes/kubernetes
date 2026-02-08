@@ -299,6 +299,14 @@ func ParseQuantity(str string) (Quantity, error) {
 	switch format {
 	case DecimalExponent, DecimalSI:
 		scale = exponent
+		
+		// precision represents the remaining base-10 digit headroom available for
+		// safely representing this value using int64Amount.
+		//
+		// This is not mathematical precision (e.g. significant digits). Instead, it
+		// tracks how many additional decimal digits can be introduced by internal
+		// scaling or canonicalization steps before overflowing int64. A negative
+		// precision indicates the value must fall back to arbitrary-precision handling.
 		precision = maxInt64Factors - int32(len(num)+len(denom))
 	case BinarySI:
 		scale = 0
@@ -910,6 +918,7 @@ func (q *Quantity) SetScaled(value int64, scale Scale) {
 // +protobuf.options.(gogoproto.goproto_stringer)=false
 // +k8s:deepcopy-gen=true
 // +k8s:openapi-model-package=io.k8s.apimachinery.pkg.api.resource
+
 type QuantityValue struct {
 	Quantity
 }
