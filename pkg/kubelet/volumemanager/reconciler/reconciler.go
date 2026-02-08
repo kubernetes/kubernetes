@@ -18,8 +18,8 @@ package reconciler
 
 import (
 	"context"
+	"time"
 
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 )
 
@@ -27,7 +27,16 @@ func (rc *reconciler) Run(ctx context.Context, stopCh <-chan struct{}) {
 	logger := klog.FromContext(ctx)
 	rc.reconstructVolumes(logger)
 	logger.Info("Reconciler: start to sync state")
-	wait.Until(func() { rc.reconcile(ctx) }, rc.loopSleepDuration, stopCh)
+	for {
+		rc.reconcile(ctx)
+		select {
+		case <-stopCh:
+			return
+		case <-rc.pokeCh:
+			// Woken up early because new work arrived.
+		case <-time.After(rc.loopSleepDuration):
+		}
+	}
 }
 
 func (rc *reconciler) reconcile(ctx context.Context) {

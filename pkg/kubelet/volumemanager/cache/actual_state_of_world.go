@@ -192,6 +192,11 @@ type ActualStateOfWorld interface {
 
 	// UpdateReconstructedVolumeAttachability updates volume attachability from the API server.
 	UpdateReconstructedVolumeAttachability(volumeName v1.UniqueVolumeName, volumeAttachable bool)
+
+	// SetVolumeStateChangedNotify sets a callback that is invoked whenever
+	// a volume mount or unmount state changes (e.g. AddPodToVolume or
+	// DeletePodFromVolume). The callback must be non-blocking.
+	SetVolumeStateChangedNotify(fn func())
 }
 
 // MountedVolume represents a volume that has successfully been mounted to a pod.
@@ -266,6 +271,9 @@ type actualStateOfWorld struct {
 	// volumePluginMgr is the volume plugin manager used to create volume
 	// plugin objects.
 	volumePluginMgr *volume.VolumePluginMgr
+	// onVolumeStateChanged is an optional callback invoked when a volume
+	// mount or unmount state changes. It must be non-blocking.
+	onVolumeStateChanged func()
 	sync.RWMutex
 }
 
@@ -529,6 +537,12 @@ func (asw *actualStateOfWorld) CheckAndMarkDeviceUncertainViaReconstruction(volu
 
 }
 
+func (asw *actualStateOfWorld) SetVolumeStateChangedNotify(fn func()) {
+	asw.Lock()
+	defer asw.Unlock()
+	asw.onVolumeStateChanged = fn
+}
+
 func (asw *actualStateOfWorld) MarkVolumeAsMounted(markVolumeOpts operationexecutor.MarkVolumeOpts) error {
 	return asw.AddPodToVolume(markVolumeOpts)
 }
@@ -781,6 +795,9 @@ func (asw *actualStateOfWorld) AddPodToVolume(markVolumeOpts operationexecutor.M
 		}
 	}
 
+	if asw.onVolumeStateChanged != nil {
+		asw.onVolumeStateChanged()
+	}
 	return nil
 }
 
@@ -894,6 +911,9 @@ func (asw *actualStateOfWorld) DeletePodFromVolume(
 		delete(asw.foundDuringReconstruction[volumeName], podName)
 	}
 
+	if asw.onVolumeStateChanged != nil {
+		asw.onVolumeStateChanged()
+	}
 	return nil
 }
 

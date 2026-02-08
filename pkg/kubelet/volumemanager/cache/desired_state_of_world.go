@@ -139,6 +139,11 @@ type DesiredStateOfWorld interface {
 	// so as it can be compared against actual size and volume expansion performed
 	// if necessary
 	UpdatePersistentVolumeSize(volumeName v1.UniqueVolumeName, size resource.Quantity)
+
+	// SetVolumeAddedNotify sets a callback that is invoked whenever a new
+	// pod-volume pair is added via AddPodToVolume. The callback must be
+	// non-blocking.
+	SetVolumeAddedNotify(fn func())
 }
 
 // VolumeToMount represents a volume that is attached to this node and needs to
@@ -173,6 +178,9 @@ type desiredStateOfWorld struct {
 	podErrors map[types.UniquePodName]sets.Set[string]
 	// seLinuxTranslator translates v1.SELinuxOptions to a file SELinux label.
 	seLinuxTranslator util.SELinuxLabelTranslator
+	// onVolumeAdded is an optional callback invoked when a new pod-volume
+	// pair is added. It must be non-blocking.
+	onVolumeAdded func()
 
 	sync.RWMutex
 }
@@ -399,6 +407,9 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 		outerVolumeSpecNames: outerVolumeSpecNames,
 		mountRequestTime:     mountRequestTime,
 	}
+	if dsw.onVolumeAdded != nil {
+		dsw.onVolumeAdded()
+	}
 	return volumeName, nil
 }
 
@@ -434,6 +445,12 @@ func (dsw *desiredStateOfWorld) getSELinuxLabel(logger klog.Logger, volumeSpec *
 	}
 
 	return labelInfo.SELinuxMountLabel, labelInfo.PluginSupportsSELinuxContextMount, nil
+}
+
+func (dsw *desiredStateOfWorld) SetVolumeAddedNotify(fn func()) {
+	dsw.Lock()
+	defer dsw.Unlock()
+	dsw.onVolumeAdded = fn
 }
 
 func (dsw *desiredStateOfWorld) MarkVolumesReportedInUse(
