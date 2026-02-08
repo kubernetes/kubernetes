@@ -94,7 +94,7 @@ func testValidateUpdateForDeclarative(t *testing.T, apiVersion string) {
 			old:    mkValidControllerRevision(),
 			update: mkValidControllerRevision(tweakData([]byte(`{"foo":"baz"}`))),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("data"), runtime.RawExtension{Raw: []byte(`{"foo":"baz"}`)}, "field is immutable").WithOrigin("immutable"),
+				field.Invalid(field.NewPath("data"), "field is immutable", "").WithOrigin("immutable"),
 			},
 		},
 		// TODO: Add more test cases
