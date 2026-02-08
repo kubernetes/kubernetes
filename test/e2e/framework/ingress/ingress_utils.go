@@ -213,14 +213,14 @@ func CreateIngressComformanceTests(ctx context.Context, jig *TestJig, ns string,
 	// Platform agnostic list of tests that must be satisfied by all controllers
 	tests := []ConformanceTests{
 		{
-			fmt.Sprintf("should create a basic HTTP ingress"),
+			"should create a basic HTTP ingress",
 			func() { jig.CreateIngress(ctx, manifestPath, ns, annotations, annotations) },
-			fmt.Sprintf("waiting for urls on basic HTTP ingress"),
+			"waiting for urls on basic HTTP ingress",
 		},
 		{
 			fmt.Sprintf("should terminate TLS for host %v", tlsHost),
 			func() { jig.SetHTTPS(ctx, tlsSecretName, tlsHost) },
-			fmt.Sprintf("waiting for HTTPS updates to reflect in ingress"),
+			"waiting for HTTPS updates to reflect in ingress",
 		},
 		{
 			fmt.Sprintf("should update url map for host %v to expose a single url: %v", updateURLMapHost, updateURLMapPath),
@@ -256,7 +256,7 @@ func CreateIngressComformanceTests(ctx context.Context, jig *TestJig, ns string,
 				route := fmt.Sprintf("http://%v%v", jig.Address, pathToFail)
 				framework.ExpectNoError(PollURL(ctx, route, updateURLMapHost, e2eservice.LoadBalancerCleanupTimeout, jig.PollInterval, &http.Client{Timeout: IngressReqTimeout}, true))
 			},
-			fmt.Sprintf("Waiting for path updates to reflect in L7"),
+			"Waiting for path updates to reflect in L7",
 		},
 	}
 	// Skip the Update TLS cert test for kubemci: https://github.com/GoogleCloudPlatform/k8s-multicluster-ingress/issues/141.

@@ -684,7 +684,7 @@ func runServiceAndWorkloadForResourceConsumer(ctx context.Context, c clientset.I
 		framework.Failf(invalidKind)
 	}
 
-	ginkgo.By(fmt.Sprintf("Running controller"))
+	ginkgo.By("Running controller")
 	controllerName := name + "-ctrl"
 	_, err = createService(ctx, c, controllerName, ns, map[string]string{}, map[string]string{"name": controllerName}, port, targetPort)
 	framework.ExpectNoError(err)

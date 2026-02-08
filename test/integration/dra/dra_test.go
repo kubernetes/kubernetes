@@ -1059,10 +1059,7 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 	factor := time.Duration(10)
 	mutationCacheTTL := resourceslice.DefaultMutationCacheTTL / factor
 	syncDelay := resourceslice.DefaultSyncDelay / factor
-	quiesencePeriod := syncDelay
-	if mutationCacheTTL > quiesencePeriod {
-		quiesencePeriod = mutationCacheTTL
-	}
+	quiesencePeriod := max(mutationCacheTTL, syncDelay)
 	quiesencePeriod += 10 * time.Second
 
 	var gotDroppedFieldError atomic.Bool
