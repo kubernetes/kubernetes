@@ -34379,7 +34379,6 @@ func schema_k8sio_api_extensions_v1beta1_DaemonSetSpec(ref common.ReferenceCallb
 						},
 					},
 				},
-				Required: []string{"template"},
 			},
 		},
 		Dependencies: []string{
@@ -34486,7 +34485,6 @@ func schema_k8sio_api_extensions_v1beta1_DaemonSetStatus(ref common.ReferenceCal
 						},
 					},
 				},
-				Required: []string{"currentNumberScheduled", "numberMisscheduled", "desiredNumberScheduled", "numberReady"},
 			},
 		},
 		Dependencies: []string{
@@ -34734,7 +34732,7 @@ func schema_k8sio_api_extensions_v1beta1_DeploymentRollback(ref common.Reference
 						},
 					},
 				},
-				Required: []string{"name", "rollbackTo"},
+				Required: []string{"name"},
 			},
 		},
 		Dependencies: []string{
@@ -34816,7 +34814,6 @@ func schema_k8sio_api_extensions_v1beta1_DeploymentSpec(ref common.ReferenceCall
 						},
 					},
 				},
-				Required: []string{"template"},
 			},
 		},
 		Dependencies: []string{
@@ -35310,7 +35307,6 @@ func schema_k8sio_api_extensions_v1beta1_IngressPortStatus(ref common.ReferenceC
 						},
 					},
 				},
-				Required: []string{"port", "protocol"},
 			},
 		},
 	}
@@ -35835,7 +35831,6 @@ func schema_k8sio_api_extensions_v1beta1_NetworkPolicySpec(ref common.ReferenceC
 						},
 					},
 				},
-				Required: []string{"podSelector"},
 			},
 		},
 		Dependencies: []string{
@@ -36113,7 +36108,6 @@ func schema_k8sio_api_extensions_v1beta1_ReplicaSetStatus(ref common.ReferenceCa
 						},
 					},
 				},
-				Required: []string{"replicas"},
 			},
 		},
 		Dependencies: []string{
@@ -36310,7 +36304,6 @@ func schema_k8sio_api_extensions_v1beta1_ScaleStatus(ref common.ReferenceCallbac
 						},
 					},
 				},
-				Required: []string{"replicas"},
 			},
 		},
 	}

@@ -56,9 +56,11 @@ message DaemonSet {
 // DaemonSetCondition describes the state of a DaemonSet at a certain point.
 message DaemonSetCondition {
   // Type of DaemonSet condition.
+  // +required
   optional string type = 1;
 
   // Status of the condition, one of True, False, Unknown.
+  // +required
   optional string status = 2;
 
   // Last time the condition transitioned from one status to another.
@@ -99,6 +101,7 @@ message DaemonSetSpec {
   // that matches the template's node selector (or on every node if no node
   // selector is specified).
   // More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template
+  // +optional
   optional .k8s.io.api.core.v1.PodTemplateSpec template = 2;
 
   // An update strategy to replace existing DaemonSet pods with new pods.
@@ -130,20 +133,24 @@ message DaemonSetStatus {
   // The number of nodes that are running at least 1
   // daemon pod and are supposed to run the daemon pod.
   // More info: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/
+  // +optional
   optional int32 currentNumberScheduled = 1;
 
   // The number of nodes that are running the daemon pod, but are
   // not supposed to run the daemon pod.
   // More info: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/
+  // +optional
   optional int32 numberMisscheduled = 2;
 
   // The total number of nodes that should be running the daemon
   // pod (including nodes correctly running the daemon pod).
   // More info: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/
+  // +optional
   optional int32 desiredNumberScheduled = 3;
 
   // The number of nodes that should be running the daemon pod and have one
   // or more of the daemon pod running and ready.
+  // +optional
   optional int32 numberReady = 4;
 
   // The most recent generation observed by the daemon set controller.
@@ -219,21 +226,27 @@ message Deployment {
 // DeploymentCondition describes the state of a deployment at a certain point.
 message DeploymentCondition {
   // Type of deployment condition.
+  // +required
   optional string type = 1;
 
   // Status of the condition, one of True, False, Unknown.
+  // +required
   optional string status = 2;
 
   // The last time this condition was updated.
+  // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastUpdateTime = 6;
 
   // Last time the condition transitioned from one status to another.
+  // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 7;
 
   // The reason for the condition's last transition.
+  // +optional
   optional string reason = 4;
 
   // A human readable message indicating details about the transition.
+  // +optional
   optional string message = 5;
 }
 
@@ -251,6 +264,7 @@ message DeploymentList {
 // DeploymentRollback stores the information required to rollback a deployment.
 message DeploymentRollback {
   // Required: This must match the Name of a deployment.
+  // +required
   optional string name = 1;
 
   // The annotations to be updated to a deployment
@@ -258,6 +272,7 @@ message DeploymentRollback {
   map<string, string> updatedAnnotations = 2;
 
   // The config of this deployment rollback.
+  // +optional
   optional RollbackConfig rollbackTo = 3;
 }
 
@@ -274,6 +289,7 @@ message DeploymentSpec {
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 2;
 
   // Template describes the pods that will be created.
+  // +optional
   optional .k8s.io.api.core.v1.PodTemplateSpec template = 3;
 
   // The deployment strategy to use to replace existing pods with new ones.
@@ -350,6 +366,7 @@ message DeploymentStatus {
   optional int32 terminatingReplicas = 9;
 
   // Represents the latest available observations of a deployment's current state.
+  // +optional
   // +patchMergeKey=type
   // +patchStrategy=merge
   // +listType=map
@@ -403,10 +420,12 @@ message HTTPIngressPath {
   //   or treat it identically to Prefix or Exact path types.
   // Implementations are required to support all path types.
   // Defaults to ImplementationSpecific.
+  // +optional
   optional string pathType = 3;
 
   // Backend defines the referenced service endpoint to which the traffic
   // will be forwarded to.
+  // +required
   optional IngressBackend backend = 2;
 }
 
@@ -417,6 +436,7 @@ message HTTPIngressPath {
 // or '#'.
 message HTTPIngressRuleValue {
   // A collection of paths that map requests to backends.
+  // +required
   // +listType=atomic
   repeated HTTPIngressPath paths = 1;
 }
@@ -428,6 +448,7 @@ message HTTPIngressRuleValue {
 message IPBlock {
   // CIDR is a string representing the IP Block
   // Valid examples are "192.168.1.0/24" or "2001:db8::/64"
+  // +required
   optional string cidr = 1;
 
   // Except is a slice of CIDRs that should not be included within an IP Block
@@ -515,10 +536,12 @@ message IngressLoadBalancerStatus {
 // IngressPortStatus represents the error condition of a service port
 message IngressPortStatus {
   // Port is the port number of the ingress port.
+  // +optional
   optional int32 port = 1;
 
   // Protocol is the protocol of the ingress port.
   // The supported values are: "TCP", "UDP", "SCTP"
+  // +optional
   optional string protocol = 2;
 
   // Error is to record the problem with the service port
@@ -585,6 +608,7 @@ message IngressRuleValue {
   // as defined by RFC 3986. Paths must begin with a '/'.
   // A backend defines the referenced service endpoint to which the traffic
   // will be forwarded to.
+  // +optional
   optional HTTPIngressRuleValue http = 1;
 }
 
@@ -778,6 +802,7 @@ message NetworkPolicySpec {
   // same set of pods.  In this case, the ingress rules for each are combined additively.
   // This field is NOT optional and follows standard label selector semantics.
   // An empty podSelector matches all pods in this namespace.
+  // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector podSelector = 1;
 
   // List of ingress rules to be applied to the selected pods.
@@ -844,9 +869,11 @@ message ReplicaSet {
 // ReplicaSetCondition describes the state of a replica set at a certain point.
 message ReplicaSetCondition {
   // Type of replica set condition.
+  // +required
   optional string type = 1;
 
   // Status of the condition, one of True, False, Unknown.
+  // +required
   optional string status = 2;
 
   // The last time the condition transitioned from one status to another.
@@ -907,6 +934,7 @@ message ReplicaSetSpec {
 message ReplicaSetStatus {
   // Replicas is the most recently observed number of non-terminating pods.
   // More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicaset
+  // +optional
   optional int32 replicas = 1;
 
   // The number of non-terminating pods that have labels matching the labels of the pod template of the replicaset.
@@ -1048,6 +1076,7 @@ message ScaleSpec {
 // represents the current status of a scale subresource.
 message ScaleStatus {
   // actual number of observed instances of the scaled object.
+  // +optional
   optional int32 replicas = 1;
 
   // selector is a label query over pods that should match the replicas count. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
