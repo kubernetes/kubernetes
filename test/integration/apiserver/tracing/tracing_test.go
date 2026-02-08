@@ -460,7 +460,7 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 				{
 					name: "etcdserverpb.KV/Txn",
 					attributes: map[string]func(*commonv1.AnyValue) bool{
-						"rpc.system": func(v *commonv1.AnyValue) bool {
+						"rpc.system.name": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "grpc"
 						},
 					},
@@ -568,7 +568,7 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 				{
 					name: "etcdserverpb.KV/Range",
 					attributes: map[string]func(*commonv1.AnyValue) bool{
-						"rpc.system": func(v *commonv1.AnyValue) bool {
+						"rpc.system.name": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "grpc"
 						},
 					},
@@ -658,7 +658,7 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 				{
 					name: "etcdserverpb.KV/Range",
 					attributes: map[string]func(*commonv1.AnyValue) bool{
-						"rpc.system": func(v *commonv1.AnyValue) bool {
+						"rpc.system.name": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "grpc"
 						},
 					},
@@ -784,7 +784,7 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 				{
 					name: "etcdserverpb.KV/Txn",
 					attributes: map[string]func(*commonv1.AnyValue) bool{
-						"rpc.system": func(v *commonv1.AnyValue) bool {
+						"rpc.system.name": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "grpc"
 						},
 					},
@@ -928,7 +928,7 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 				{
 					name: "etcdserverpb.KV/Txn",
 					attributes: map[string]func(*commonv1.AnyValue) bool{
-						"rpc.system": func(v *commonv1.AnyValue) bool {
+						"rpc.system.name": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "grpc"
 						},
 					},
@@ -1022,7 +1022,7 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 				{
 					name: "etcdserverpb.KV/Txn",
 					attributes: map[string]func(*commonv1.AnyValue) bool{
-						"rpc.system": func(v *commonv1.AnyValue) bool {
+						"rpc.system.name": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "grpc"
 						},
 					},
