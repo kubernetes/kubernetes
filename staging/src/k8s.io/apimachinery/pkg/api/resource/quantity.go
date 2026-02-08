@@ -299,7 +299,7 @@ func ParseQuantity(str string) (Quantity, error) {
 	switch format {
 	case DecimalExponent, DecimalSI:
 		scale = exponent
-		
+
 		// precision represents the remaining base-10 digit headroom available for
 		// safely representing this value using int64Amount.
 		//

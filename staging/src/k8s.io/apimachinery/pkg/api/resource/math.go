@@ -23,13 +23,13 @@ import (
 )
 
 const (
-// maxInt64Factors defines the maximum number of base-10 digits that may be
-// safely represented using int64Amount.
-//
-// This limit ensures all internal operations on int64Amount remain within
-// int64 bounds, including scaling and canonicalization steps that may
-// temporarily multiply the value. Values exceeding this limit must fall
-// back to an arbitrary-precision representation.
+	// maxInt64Factors defines the maximum number of base-10 digits that may be
+	// safely represented using int64Amount.
+	//
+	// This limit ensures all internal operations on int64Amount remain within
+	// int64 bounds, including scaling and canonicalization steps that may
+	// temporarily multiply the value. Values exceeding this limit must fall
+	// back to an arbitrary-precision representation.
 	maxInt64Factors = 18
 )
 
