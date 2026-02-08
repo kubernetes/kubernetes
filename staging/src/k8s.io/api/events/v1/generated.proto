@@ -42,6 +42,7 @@ message Event {
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // eventTime is the time when this Event was first observed. It is required.
+  // +required
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.MicroTime eventTime = 2;
 
   // series is data about the Event series this event represents or nil if it's a singleton Event.
@@ -50,18 +51,22 @@ message Event {
 
   // reportingController is the name of the controller that emitted this Event, e.g. `kubernetes.io/kubelet`.
   // This field cannot be empty for new Events.
+  // +required
   optional string reportingController = 4;
 
   // reportingInstance is the ID of the controller instance, e.g. `kubelet-xyzf`.
   // This field cannot be empty for new Events and it can have at most 128 characters.
+  // +required
   optional string reportingInstance = 5;
 
   // action is what action was taken/failed regarding to the regarding object. It is machine-readable.
   // This field cannot be empty for new Events and it can have at most 128 characters.
+  // +required
   optional string action = 6;
 
   // reason is why the action was taken. It is human-readable.
   // This field cannot be empty for new Events and it can have at most 128 characters.
+  // +required
   optional string reason = 7;
 
   // regarding contains the object this Event is about. In most cases it's an Object reporting controller
@@ -84,6 +89,7 @@ message Event {
   // type is the type of this event (Normal, Warning), new types could be added in the future.
   // It is machine-readable.
   // This field cannot be empty for new Events.
+  // +required
   optional string type = 11;
 
   // deprecatedSource is the deprecated field assuring backward compatibility with core.v1 Event type.
@@ -120,9 +126,11 @@ message EventList {
 // how this struct is updated on heartbeats and can guide customized reporter implementations.
 message EventSeries {
   // count is the number of occurrences in this series up to the last heartbeat time.
+  // +required
   optional int32 count = 1;
 
   // lastObservedTime is the time when last Event from the series was seen before last heartbeat.
+  // +required
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.MicroTime lastObservedTime = 2;
 }
 
