@@ -100,6 +100,15 @@ func setDefaults_KubeSchedulerProfile(logger klog.Logger, prof *configv1.KubeSch
 			Args: runtime.RawExtension{Object: args},
 		})
 	}
+
+	if prof.PluginInfluence != nil {
+		if prof.PluginInfluence.TopK == 0 {
+			prof.PluginInfluence.TopK = config.DefaultPluginInfluenceTopK
+		}
+		if prof.PluginInfluence.SamplePercent == 0 {
+			prof.PluginInfluence.SamplePercent = config.DefaultPluginInfluenceSamplePercent
+		}
+	}
 }
 
 // SetDefaults_KubeSchedulerConfiguration sets additional defaults

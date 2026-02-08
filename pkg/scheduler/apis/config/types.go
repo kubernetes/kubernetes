@@ -128,6 +128,22 @@ type KubeSchedulerProfile struct {
 	// Omitting config args for a plugin is equivalent to using the default config
 	// for that plugin.
 	PluginConfig []PluginConfig
+
+	// PluginInfluence enables analysis-only influence metrics for Score plugins.
+	// This does not affect scheduling decisions.
+	PluginInfluence *PluginInfluence
+}
+
+// PluginInfluence configures analysis-only influence metrics for Score plugins.
+type PluginInfluence struct {
+	// Enabled controls whether influence analysis is performed.
+	Enabled bool
+
+	// SamplePercent is the percentage of scheduling cycles to analyze.
+	SamplePercent int32
+
+	// TopK is the number of top-ranked nodes used to compute overlap metrics.
+	TopK int32
 }
 
 // Plugins include multiple extension points. When specified, the list of plugins for
@@ -215,6 +231,12 @@ const (
 	// that once found feasible, the scheduler stops looking for more nodes.
 	// A value of 0 means adaptive, meaning the scheduler figures out a proper default.
 	DefaultPercentageOfNodesToScore = 0
+
+	// DefaultPluginInfluenceTopK is the default top-K used in influence analysis.
+	DefaultPluginInfluenceTopK int32 = 5
+
+	// DefaultPluginInfluenceSamplePercent is the default sampling percent for influence analysis.
+	DefaultPluginInfluenceSamplePercent int32 = 20
 
 	// MaxCustomPriorityScore is the max score UtilizationShapePoint expects.
 	MaxCustomPriorityScore int64 = 10

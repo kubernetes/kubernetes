@@ -169,6 +169,22 @@ type KubeSchedulerProfile struct {
 	// +listType=map
 	// +listMapKey=name
 	PluginConfig []PluginConfig `json:"pluginConfig,omitempty"`
+
+	// PluginInfluence enables analysis-only influence metrics for Score plugins.
+	// This does not affect scheduling decisions.
+	PluginInfluence *PluginInfluence `json:"pluginInfluence,omitempty"`
+}
+
+// PluginInfluence configures analysis-only influence metrics for Score plugins.
+type PluginInfluence struct {
+	// Enabled controls whether influence analysis is performed.
+	Enabled bool `json:"enabled,omitempty"`
+
+	// SamplePercent is the percentage of scheduling cycles to analyze.
+	SamplePercent int32 `json:"samplePercent,omitempty"`
+
+	// TopK is the number of top-ranked nodes used to compute overlap metrics.
+	TopK int32 `json:"topK,omitempty"`
 }
 
 // Plugins include multiple extension points. When specified, the list of plugins for

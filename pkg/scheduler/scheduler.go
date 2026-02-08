@@ -104,6 +104,8 @@ type Scheduler struct {
 	// Profiles are the scheduling profiles.
 	Profiles profile.Map
 
+	pluginInfluenceConfigs map[string]*schedulerapi.PluginInfluence
+
 	client clientset.Interface
 
 	nodeInfoSnapshot *internalcache.Snapshot
@@ -429,6 +431,14 @@ func New(ctx context.Context,
 	debugger := cachedebugger.New(nodeLister, podLister, schedulerCache, podQueue)
 	debugger.ListenForSignal(ctx)
 
+	pluginInfluenceConfigs := make(map[string]*schedulerapi.PluginInfluence, len(options.profiles))
+	for i := range options.profiles {
+		cfg := options.profiles[i].PluginInfluence
+		if cfg != nil {
+			pluginInfluenceConfigs[options.profiles[i].SchedulerName] = cfg
+		}
+	}
+
 	sched := &Scheduler{
 		Cache:                                  schedulerCache,
 		client:                                 client,
@@ -438,6 +448,7 @@ func New(ctx context.Context,
 		StopEverything:                         stopEverything,
 		SchedulingQueue:                        podQueue,
 		Profiles:                               profiles,
+		pluginInfluenceConfigs:                 pluginInfluenceConfigs,
 		logger:                                 logger,
 		APIDispatcher:                          apiDispatcher,
 		nominatedNodeNameForExpectationEnabled: feature.DefaultFeatureGate.Enabled(features.NominatedNodeNameForExpectation),
