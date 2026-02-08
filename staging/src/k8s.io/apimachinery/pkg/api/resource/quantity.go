@@ -523,7 +523,6 @@ func (q *Quantity) AsFloat64Slow() float64 {
 // AsInt64 returns a representation of the current value as an int64 if a fast conversion
 // is possible. If false is returned, callers must use the inf.Dec form of this quantity.
 func (q *Quantity) AsInt64() (int64, bool) {
-
 	if q.d.Dec != nil {
 		return 0, false
 	}
@@ -869,7 +868,6 @@ func (q *Quantity) SetScaled(value int64, scale Scale) {
 // +protobuf.options.(gogoproto.goproto_stringer)=false
 // +k8s:deepcopy-gen=true
 // +k8s:openapi-model-package=io.k8s.apimachinery.pkg.api.resource
-
 type QuantityValue struct {
 	Quantity
 }
