@@ -836,11 +836,8 @@ func (ssc *defaultStatefulSetControl) updateStatefulSetStatus(
 		metrics.MaxUnavailable.WithLabelValues(set.Namespace, set.Name, podManagementPolicy).Set(float64(maxUnavailable))
 	}
 
-	// Set Available condition: available if we have at least (replicas - maxUnavailable) pods available.
-	minAvailable := int32(replicaCount - maxUnavailable)
-	if minAvailable < 0 {
-		minAvailable = 0
-	}
+	// Set Available condition
+	minAvailable := max(int32(replicaCount-maxUnavailable), 0)
 	if status.AvailableReplicas >= minAvailable {
 		condition := NewStatefulSetCondition(
 			apps.StatefulSetAvailable,
