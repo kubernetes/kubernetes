@@ -368,7 +368,7 @@ func DoTestPodScheduling(ns *v1.Namespace, t *testing.T, cs clientset.Interface)
 	goodCondition := v1.NodeCondition{
 		Type:              v1.NodeReady,
 		Status:            v1.ConditionTrue,
-		Reason:            fmt.Sprintf("schedulable condition"),
+		Reason:            "schedulable condition",
 		LastHeartbeatTime: metav1.Time{Time: time.Now()},
 	}
 	node := &v1.Node{

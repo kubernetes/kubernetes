@@ -118,10 +118,7 @@ func (op *createResourceClaimsOp) run(tCtx ktesting.TContext) {
 		}
 	}
 
-	workers := op.Count
-	if workers > 30 {
-		workers = 30
-	}
+	workers := min(op.Count, 30)
 	workqueue.ParallelizeUntil(tCtx, workers, op.Count, create)
 	if createErr != nil {
 		tCtx.Fatal(createErr.Error())
