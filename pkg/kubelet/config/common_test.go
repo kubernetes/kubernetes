@@ -36,7 +36,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
 	"k8s.io/kubernetes/pkg/apis/core"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
@@ -487,7 +486,7 @@ func TestGetStaticPodPriorityWarning(t *testing.T) {
 				}},
 			},
 		}
-		internalPod := &api.Pod{}
+		internalPod := &core.Pod{}
 		if err := k8s_api_v1.Convert_v1_Pod_To_core_Pod(pod, internalPod, nil); err != nil {
 			t.Fatalf("%s: Cannot convert pod %#v, %#v", tc.podName, pod, err)
 		}
