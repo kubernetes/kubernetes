@@ -24,9 +24,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/apis/scheduling/validation"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // workloadStrategy implements behavior for Workload objects.
@@ -42,7 +44,10 @@ func (workloadStrategy) NamespaceScoped() bool {
 	return true
 }
 
-func (workloadStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {}
+func (workloadStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+	workload := obj.(*scheduling.Workload)
+	dropDisabledFields(workload, nil)
+}
 
 func (workloadStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	workloadScheduling := obj.(*scheduling.Workload)
@@ -60,7 +65,11 @@ func (workloadStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
-func (workloadStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {}
+func (workloadStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
+	newWorkload := obj.(*scheduling.Workload)
+	oldWorkload := old.(*scheduling.Workload)
+	dropDisabledFields(newWorkload, oldWorkload)
+}
 
 func (workloadStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	allErrs := validation.ValidateWorkloadUpdate(obj.(*scheduling.Workload), old.(*scheduling.Workload))
@@ -73,4 +82,35 @@ func (workloadStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.O
 
 func (workloadStrategy) AllowUnconditionalUpdate() bool {
 	return true
+}
+
+// dropDisabledFields removes fields which are covered by a feature gate.
+func dropDisabledFields(newWorkload, oldWorkload *scheduling.Workload) {
+	dropDisabledDisruptionModeFields(newWorkload, oldWorkload)
+}
+
+// dropDisabledDisruptionModeFields drops DisruptionMode fields from the new workload
+// if they were not used in the old workload.
+func dropDisabledDisruptionModeFields(newWorkload, oldWorkload *scheduling.Workload) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadAwarePreemption) || disruptionModeInUse(oldWorkload) {
+		// No need to drop anything.
+		return
+	}
+	for _, pg := range newWorkload.Spec.PodGroups {
+		if pg.Policy.Gang != nil {
+			pg.Policy.Gang.DisruptionMode = nil
+		}
+	}
+}
+
+func disruptionModeInUse(workload *scheduling.Workload) bool {
+	if workload == nil {
+		return false
+	}
+	for _, pg := range workload.Spec.PodGroups {
+		if pg.Policy.Gang != nil && pg.Policy.Gang.DisruptionMode != nil {
+			return true
+		}
+	}
+	return false
 }

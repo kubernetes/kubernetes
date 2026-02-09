@@ -44,6 +44,15 @@ message GangSchedulingPolicy {
   // +k8s:required
   // +k8s:minimum=0
   optional int32 minCount = 1;
+
+  // DisruptionMode defines the mode in which a given PodGroup can be disrupted.
+  // One of Pod, PodGroup.
+  // Defaults to Pod if unset.
+  //
+  // +featureGate=WorkloadAwarePreemption
+  // +optional
+  // +k8s:optional
+  optional string disruptionMode = 2;
 }
 
 // PodGroup represents a set of pods with a common scheduling policy.

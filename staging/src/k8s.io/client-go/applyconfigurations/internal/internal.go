@@ -14339,6 +14339,9 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.scheduling.v1alpha1.GangSchedulingPolicy
   map:
     fields:
+    - name: disruptionMode
+      type:
+        scalar: string
     - name: minCount
       type:
         scalar: numeric

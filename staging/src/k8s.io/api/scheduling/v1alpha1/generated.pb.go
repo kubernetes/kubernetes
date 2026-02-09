@@ -94,6 +94,13 @@ func (m *GangSchedulingPolicy) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.DisruptionMode != nil {
+		i -= len(*m.DisruptionMode)
+		copy(dAtA[i:], *m.DisruptionMode)
+		i = encodeVarintGenerated(dAtA, i, uint64(len(*m.DisruptionMode)))
+		i--
+		dAtA[i] = 0x12
+	}
 	i = encodeVarintGenerated(dAtA, i, uint64(m.MinCount))
 	i--
 	dAtA[i] = 0x8
@@ -492,6 +499,10 @@ func (m *GangSchedulingPolicy) Size() (n int) {
 	var l int
 	_ = l
 	n += 1 + sovGenerated(uint64(m.MinCount))
+	if m.DisruptionMode != nil {
+		l = len(*m.DisruptionMode)
+		n += 1 + l + sovGenerated(uint64(l))
+	}
 	return n
 }
 
@@ -646,6 +657,7 @@ func (this *GangSchedulingPolicy) String() string {
 	}
 	s := strings.Join([]string{`&GangSchedulingPolicy{`,
 		`MinCount:` + fmt.Sprintf("%v", this.MinCount) + `,`,
+		`DisruptionMode:` + valueToStringGenerated(this.DisruptionMode) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -863,6 +875,39 @@ func (m *GangSchedulingPolicy) Unmarshal(dAtA []byte) error {
 					break
 				}
 			}
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field DisruptionMode", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			s := DisruptionMode(dAtA[iNdEx:postIndex])
+			m.DisruptionMode = &s
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])

@@ -53290,6 +53290,14 @@ func schema_k8sio_api_scheduling_v1alpha1_GangSchedulingPolicy(ref common.Refere
 							Format:      "int32",
 						},
 					},
+					"disruptionMode": {
+						SchemaProps: spec.SchemaProps{
+							Description: "DisruptionMode defines the mode in which a given PodGroup can be disrupted. One of Pod, PodGroup. Defaults to Pod if unset.\n\n\nPossible enum values:\n - `\"Pod\"` means that individual pods can be disrupted or preempted independently. It doesn't depend on exact set of Pods currently running in this PodGroup.\n - `\"PodGroup\"` means that the whole PodGroup replica needs to be disrupted or preempted together.",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"Pod", "PodGroup"},
+						},
+					},
 				},
 				Required: []string{"minCount"},
 			},

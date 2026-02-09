@@ -211,6 +211,19 @@ type BasicSchedulingPolicy struct {
 	// (gang) scheduling.
 }
 
+// DisruptionMode describes the mode in which a PodGroup can be disrupted (e.g. preempted).
+// +enum
+type DisruptionMode string
+
+const (
+	// DisruptionModePod means that individual pods can be disrupted or preempted independently.
+	// It doesn't depend on exact set of Pods currently running in this PodGroup.
+	DisruptionModePod DisruptionMode = "Pod"
+	// DisruptionModePodGroup means that the whole PodGroup replica needs to be disrupted or
+	// preempted together.
+	DisruptionModePodGroup DisruptionMode = "PodGroup"
+)
+
 // GangSchedulingPolicy defines the parameters for gang scheduling.
 type GangSchedulingPolicy struct {
 	// MinCount is the minimum number of pods that must be schedulable or scheduled
@@ -221,4 +234,13 @@ type GangSchedulingPolicy struct {
 	// +k8s:required
 	// +k8s:minimum=0
 	MinCount int32 `json:"minCount" protobuf:"varint,1,opt,name=minCount"`
+
+	// DisruptionMode defines the mode in which a given PodGroup can be disrupted.
+	// One of Pod, PodGroup.
+	// Defaults to Pod if unset.
+	//
+	// +featureGate=WorkloadAwarePreemption
+	// +optional
+	// +k8s:optional
+	DisruptionMode *DisruptionMode `json:"disruptionMode,omitempty" protobuf:"bytes,2,opt,name=disruptionMode"`
 }
