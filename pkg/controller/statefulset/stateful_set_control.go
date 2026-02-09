@@ -33,6 +33,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/history"
 	"k8s.io/kubernetes/pkg/controller/statefulset/metrics"
 	"k8s.io/kubernetes/pkg/features"
@@ -766,7 +767,11 @@ func updateStatefulSetAfterInvariantEstablished(ctx context.Context, ssc *defaul
 	unavailablePods := 0
 
 	for target := len(replicas) - 1; target >= 0; target-- {
-		if isUnavailable(replicas[target], set.Spec.MinReadySeconds, now) {
+		if !podutil.IsPodAvailable(replicas[target], set.Spec.MinReadySeconds, metav1.Time{Time: now}) &&
+			// We only count unavailable pods that are either updated or in the process of being terminated
+			// for update to avoid getting stuck when the number of unavailable pods is greater than maxUnavailable.
+			// i.e., current revision template is referencing an image that does not exist, and all pods are failing to start.
+			(getPodRevision(replicas[target]) == updateRevision.Name || isTerminating(replicas[target])) {
 			unavailablePods++
 		}
 	}
