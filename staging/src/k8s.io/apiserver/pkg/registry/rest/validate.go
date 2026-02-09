@@ -76,24 +76,24 @@ func WithNormalizationRules(rules []field.NormalizationRule) ValidationConfig {
 	}
 }
 
-// WithDeclarativeNative marks the validation configuration to indicate that it includes
-// declarative validations that are defined *only* declaratively, lacking corresponding imperative validation.
-// When set, declarative validation is always executed regardless of feature gates. Errors marked as
-// declarative-native are separated from the full set and returned alongside imperative errors.
-func WithDeclarativeNative() ValidationConfig {
+// WithDeclarativeEnforcement marks the validation configuration to indicate that it includes
+// declarative validations that should follow the fine-grained Validation Lifecycle.
+// When set, declarative validation is always executed regardless of feature gates.
+// Authority is determined by individual tag prefixes (+k8s:alpha, +k8s:beta) and the
+// DeclarativeValidationBeta safety switch.
+func WithDeclarativeEnforcement() ValidationConfig {
 	return func(config *validationConfigOption) {
-		config.containsDeclarativeNative = true
+		config.declarativeEnforcement = true
 	}
 }
 
 type validationConfigOption struct {
-	opType                    operation.Type
-	options                   []string
-	takeover                  bool
-	subresourceGVKMapper      GroupVersionKindProvider
-	validationIdentifier      string
-	normalizationRules        []field.NormalizationRule
-	containsDeclarativeNative bool
+	opType                 operation.Type
+	options                []string
+	subresourceGVKMapper   GroupVersionKindProvider
+	validationIdentifier   string
+	normalizationRules     []field.NormalizationRule
+	declarativeEnforcement bool
 }
 
 // validateDeclaratively validates obj and oldObj against declarative
@@ -345,12 +345,18 @@ func metricIdentifier(ctx context.Context, scheme *runtime.Scheme, obj runtime.O
 	return identifier, errs
 }
 
-// ValidateDeclarativelyWithMigrationChecks runs declarative validation, and conditionally compares results
-// with imperative validation and merges errors based on the feature gate and `takeover` flag.
-// It proceeds if either the DeclarativeValidation feature gate is enabled or `containsDeclarativeNative` is set.
+// ValidateDeclarativelyWithMigrationChecks executes declarative validation and implements the Validation Lifecycle strategy.
+// It manages the transition from handwritten (HV) to declarative (DV) validation by controlling enforcement:
+//   - Standard: Enforced if declarativeEnforcement is set. HV counterparts are expected to be deleted from source.
+//   - Beta: Enforced if declarativeEnforcement is set AND DeclarativeValidationBeta feature gate is enabled.
+//     When enforced, corresponding HV errors are filtered out. Otherwise, DV is shadowed.
+//   - Alpha: Always shadowed; HV remains authoritative.
+//
+// Mismatches between HV and DV are logged if the DeclarativeValidation gate is enabled.
+// Mismatch checking is limited to Alpha and Beta stages when explicit enforcement is active.
 func ValidateDeclarativelyWithMigrationChecks(ctx context.Context, scheme *runtime.Scheme, obj, oldObj runtime.Object, errs field.ErrorList, opType operation.Type, configOpts ...ValidationConfig) field.ErrorList {
 	declarativeValidationEnabled := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidation)
-	takeover := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationTakeover)
+	betaEnabled := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationBeta)
 
 	validationIdentifier, err := metricIdentifier(ctx, scheme, obj, opType)
 	if err != nil {
@@ -361,50 +367,86 @@ func ValidateDeclarativelyWithMigrationChecks(ctx context.Context, scheme *runti
 	// Directly create the config and call the core validation logic.
 	cfg := &validationConfigOption{
 		opType:               opType,
-		takeover:             takeover,
 		validationIdentifier: validationIdentifier,
 	}
 	for _, opt := range configOpts {
 		opt(cfg)
 	}
 
-	// Short-circuit if neither DeclarativeValidation is enabled nor the object contains declarative native validation.
-	if !(declarativeValidationEnabled || cfg.containsDeclarativeNative) {
+	// Short-circuit if neither DeclarativeValidation is enabled nor the object is explicitly configured for declarative enforcement.
+	if !declarativeValidationEnabled && !cfg.declarativeEnforcement {
 		return errs
 	}
 
 	// Call the panic-safe wrapper with the real validation function.
-	declarativeErrs := panicSafeValidateFunc(validateDeclaratively, cfg.takeover || cfg.containsDeclarativeNative, cfg.validationIdentifier)(ctx, scheme, obj, oldObj, cfg)
-
-	mirroredDVErrors := field.ErrorList{}
-	dvNativeErrors := field.ErrorList{}
-
-	// When declarative native validation is present, we need to separate declarative native errors
-	// from mirrored declarative errors. This is to avoid comparing declarative native errors (which
-	// have no imperative equivalent) with handwritten imperative errors.
-	if cfg.containsDeclarativeNative {
-		for _, err := range declarativeErrs {
-			if err.DeclarativeNative {
-				dvNativeErrors = append(dvNativeErrors, err)
-			} else if err.Type == field.ErrorTypeInternal {
-				// Internal errors should fail both types of validation.
-				dvNativeErrors = append(dvNativeErrors, err)
-				mirroredDVErrors = append(mirroredDVErrors, err)
-			} else {
-				mirroredDVErrors = append(mirroredDVErrors, err)
-			}
-		}
-	} else {
-		mirroredDVErrors = declarativeErrs
-	}
+	// We should fail if validation is enforced.
+	declarativeErrs := panicSafeValidateFunc(validateDeclaratively, cfg.declarativeEnforcement, cfg.validationIdentifier)(ctx, scheme, obj, oldObj, cfg)
 
 	if declarativeValidationEnabled {
-		compareDeclarativeErrorsAndEmitMismatches(ctx, errs, mirroredDVErrors, takeover, validationIdentifier, cfg.normalizationRules)
-		if takeover {
-			errs = append(errs.RemoveCoveredByDeclarative(), mirroredDVErrors...)
+		// Log mismatches.
+		// When explicit strategy is used (declarativeEnforcement), Standard errors are authoritative
+		// and may not have handwritten counterparts (e.g., in new APIs).
+		// We only mismatch check Alpha and Beta errors in this mode.
+		mismatchCandidateErrs := declarativeErrs
+		if cfg.declarativeEnforcement {
+			mismatchCandidateErrs = nil
+			for _, err := range declarativeErrs {
+				level := err.ValidationStabilityLevel.String()
+				if level == "alpha" || level == "beta" {
+					mismatchCandidateErrs = append(mismatchCandidateErrs, err)
+				}
+			}
 		}
+
+		// We pass betaEnabled (and enforcement) as the takeover flag to avoid changing logic elsewhere for now.
+		compareDeclarativeErrorsAndEmitMismatches(ctx, errs, mismatchCandidateErrs, cfg.declarativeEnforcement && betaEnabled, validationIdentifier, cfg.normalizationRules)
 	}
-	errs = append(errs, dvNativeErrors...)
+
+	if !cfg.declarativeEnforcement {
+		// If enforcement is not enabled, we shadow declarative errors with hand-written ones, so we return early here.
+		return errs
+	}
+
+	// Filter HV errors
+	// We remove HV errors that are covered by declarative validation AND are enforced.
+	errs = errs.Filter(func(e error) bool {
+		var fe *field.Error
+		if !errors.As(e, &fe) || !fe.CoveredByDeclarative {
+			return false
+		}
+
+		// Explicit Strategy
+		level := fe.ValidationStabilityLevel.String()
+		if level == "beta" {
+			// Beta validations are enforced only if the Beta feature gate is enabled.
+			return betaEnabled
+		}
+		// For Standard validations, we keep the handwritten error for now to avoid losing coverage
+		// before it is deleted from source. Alpha validations are always shadowed (kept).
+		return false
+	})
+
+	// Append Enforced DV errors
+	for _, dvErr := range declarativeErrs {
+		// Internal errors should always fail validation.
+		if dvErr.Type == field.ErrorTypeInternal {
+			errs = append(errs, dvErr)
+			continue
+		}
+
+		level := dvErr.ValidationStabilityLevel.String()
+		if level == "beta" {
+			if betaEnabled {
+				errs = append(errs, dvErr)
+			}
+			continue
+		}
+		if level == "alpha" {
+			continue // Always shadowed
+		}
+		errs = append(errs, dvErr) // Standard
+	}
+
 	return errs
 }
 
