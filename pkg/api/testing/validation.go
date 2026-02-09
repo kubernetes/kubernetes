@@ -30,7 +30,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	validationmetrics "k8s.io/apiserver/pkg/validation"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"sigs.k8s.io/randfill"
 )
@@ -304,6 +307,10 @@ func verifyValidationEquivalence(t *testing.T, expectedErrs field.ErrorList, run
 	var declarativeBetaDisabledErrs field.ErrorList
 	var imperativeErrs field.ErrorList
 
+	// Reset metrics to ensure a clean state for mismatch checking
+	legacyregistry.Reset()
+	defer legacyregistry.Reset()
+
 	// The errOutputMatcher is used to verify the output matches the expected errors in test cases.
 	// TODO: Use ByValidationStabilityLevel once we want to explicitly verify the lifecycle stage of declarative
 	// validations (e.g. during promotion from Alpha to Beta), ensuring they are generated with the intended
@@ -312,6 +319,7 @@ func verifyValidationEquivalence(t *testing.T, expectedErrs field.ErrorList, run
 
 	// 1. Declarative Validation with Beta Gate Enabled
 	t.Run("with declarative validation (Beta enabled)", func(t *testing.T) {
+		validationmetrics.ResetValidationMetricsInstance()
 		featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 			features.DeclarativeValidation:     true,
 			features.DeclarativeValidationBeta: true,
@@ -323,10 +331,14 @@ func verifyValidationEquivalence(t *testing.T, expectedErrs field.ErrorList, run
 		} else if len(declarativeBetaEnabledErrs) != 0 {
 			t.Errorf("expected no errors, but got: %v", declarativeBetaEnabledErrs)
 		}
+
+		// Ensure no mismatches were logged/metrics incremented
+		testutil.AssertVectorCount(t, "apiserver_validation_declarative_validation_mismatch_total", nil, 0)
 	})
 
 	// 2. Declarative Validation with Beta Gate Disabled
 	t.Run("with declarative validation (Beta disabled)", func(t *testing.T) {
+		validationmetrics.ResetValidationMetricsInstance()
 		featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 			features.DeclarativeValidation:     true,
 			features.DeclarativeValidationBeta: false,
@@ -338,8 +350,10 @@ func verifyValidationEquivalence(t *testing.T, expectedErrs field.ErrorList, run
 		} else if len(declarativeBetaDisabledErrs) != 0 {
 			t.Errorf("expected no errors, but got: %v", declarativeBetaDisabledErrs)
 		}
-	})
 
+		// Ensure no mismatches were logged/metrics incremented
+		testutil.AssertVectorCount(t, "apiserver_validation_declarative_validation_mismatch_total", nil, 0)
+	})
 	// 3. Legacy Hand Written Validation
 	// TODO: Remove this test case in 1.39 when emulation for 1.35 is no longer needed.
 	t.Run("hand written validation", func(t *testing.T) {

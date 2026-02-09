@@ -198,17 +198,16 @@ func gatherDeclarativeValidationMismatches(imperativeErrs, declarativeErrs field
 	}
 
 	fuzzyMatcher := field.ErrorMatcher{}.ByType().ByOrigin().RequireOriginWhenInvalid().ByFieldNormalized(normalizationRules)
-	exactMatcher := field.ErrorMatcher{}.Exactly()
 
-	// Dedupe imperative errors of exact error matches as they are
-	// not intended and come from (buggy) duplicate validation calls
+	// Dedupe imperative errors using the fuzzy matcher (type, field, and origin) as they are
+	// not intended and come from (buggy) duplicate validation calls.
 	// This is necessary as without deduping we could get unmatched
-	// imperative errors for cases that are correct (matching)
+	// imperative errors for cases that are correct (matching).
 	dedupedImperativeErrs := field.ErrorList{}
 	for _, err := range imperativeErrs {
 		found := false
 		for _, existingErr := range dedupedImperativeErrs {
-			if exactMatcher.Matches(existingErr, err) {
+			if fuzzyMatcher.Matches(existingErr, err) {
 				found = true
 				break
 			}
