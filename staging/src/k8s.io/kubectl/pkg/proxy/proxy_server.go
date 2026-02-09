@@ -17,12 +17,12 @@ limitations under the License.
 package proxy
 
 import (
-	"fmt"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -230,7 +230,13 @@ func NewProxyHandler(apiProxyPrefix string, filter *FilterServer, cfg *rest.Conf
 
 // Listen is a simple wrapper around net.Listen.
 func (s *Server) Listen(address string, port int) (net.Listener, error) {
-	return net.Listen("tcp", fmt.Sprintf("%s:%d", address, port))
+	// This function used to not use net.JoinHostPort, so it wouldn't accept correct
+	// IPv6 addresses. However, it *did* accept IPv6 addresses if you manually added
+	// brackets around them. For compatibility, it now accepts both forms.
+	if strings.HasPrefix(address, "[") && strings.HasSuffix(address, "]") {
+		address = address[1 : len(address)-1]
+	}
+	return net.Listen("tcp", net.JoinHostPort(address, strconv.Itoa(port)))
 }
 
 // ListenUnix does net.Listen for a unix socket
