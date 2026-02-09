@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 	"time"
 
@@ -1530,8 +1531,6 @@ func (ctrl *PersistentVolumeController) doDeleteVolume(ctx context.Context, volu
 }
 
 func (ctrl *PersistentVolumeController) removeDeletionProtectionFinalizer(ctx context.Context, volume *v1.PersistentVolume) error {
-	var err error
-	pvUpdateNeeded := false
 	// Retrieve latest version
 	logger := klog.FromContext(ctx)
 	newVolume, err := ctrl.kubeClient.CoreV1().PersistentVolumes().Get(ctx, volume.Name, metav1.GetOptions{})
@@ -1542,12 +1541,8 @@ func (ctrl *PersistentVolumeController) removeDeletionProtectionFinalizer(ctx co
 	volume = newVolume
 	volumeClone := volume.DeepCopy()
 	pvFinalizers := volumeClone.Finalizers
-	if pvFinalizers != nil && slice.ContainsString(pvFinalizers, storagehelpers.PVDeletionInTreeProtectionFinalizer, nil) {
-		pvUpdateNeeded = true
-		pvFinalizers = slice.RemoveString(pvFinalizers, storagehelpers.PVDeletionInTreeProtectionFinalizer, nil)
-	}
-	if pvUpdateNeeded {
-		volumeClone.SetFinalizers(pvFinalizers)
+	if pvFinalizers != nil && slices.Contains(pvFinalizers, storagehelpers.PVDeletionInTreeProtectionFinalizer) {
+		volumeClone.SetFinalizers(slice.RemoveString(pvFinalizers, storagehelpers.PVDeletionInTreeProtectionFinalizer, nil))
 		_, err = ctrl.kubeClient.CoreV1().PersistentVolumes().Update(ctx, volumeClone, metav1.UpdateOptions{})
 		if err != nil {
 			return fmt.Errorf("persistent volume controller can't update finalizer: %v", err)
