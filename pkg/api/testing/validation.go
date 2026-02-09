@@ -300,41 +300,56 @@ func VerifyUpdateValidationEquivalence(t *testing.T, ctx context.Context, obj, o
 // verifyValidationEquivalence is a generic helper that verifies validation equivalence with and without declarative validation.
 func verifyValidationEquivalence(t *testing.T, expectedErrs field.ErrorList, runValidations func() field.ErrorList, opt *validationOption) {
 	t.Helper()
-	var declarativeTakeoverErrs field.ErrorList
+	var declarativeBetaEnabledErrs field.ErrorList
+	var declarativeBetaDisabledErrs field.ErrorList
 	var imperativeErrs field.ErrorList
 
 	// The errOutputMatcher is used to verify the output matches the expected errors in test cases.
+	// TODO: Use ByValidationStabilityLevel once we want to explicitly verify the lifecycle stage of declarative
+	// validations (e.g. during promotion from Alpha to Beta), ensuring they are generated with the intended
+	// stability levels.
 	errOutputMatcher := field.ErrorMatcher{}.ByType().ByOrigin().ByFieldNormalized(opt.NormalizationRules).ByDeclarativeNative()
 
-	// We only need to test both gate enabled and disabled together, because
-	// 1) the DeclarativeValidationTakeover won't take effect if DeclarativeValidation is disabled.
-	// 2) the validation output, when only DeclarativeValidation is enabled, is the same as when both gates are disabled.
-	t.Run("with declarative validation", func(t *testing.T) {
+	// 1. Declarative Validation with Beta Gate Enabled
+	t.Run("with declarative validation (Beta enabled)", func(t *testing.T) {
 		featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-			features.DeclarativeValidation:         true,
-			features.DeclarativeValidationTakeover: true,
+			features.DeclarativeValidation:     true,
+			features.DeclarativeValidationBeta: true,
 		})
-		declarativeTakeoverErrs = runValidations()
+		declarativeBetaEnabledErrs = runValidations()
 
 		if len(expectedErrs) > 0 {
-			errOutputMatcher.Test(t, expectedErrs, declarativeTakeoverErrs)
-		} else if len(declarativeTakeoverErrs) != 0 {
-			t.Errorf("expected no errors, but got: %v", declarativeTakeoverErrs)
-		}
-
-		// make sure all errors marked by covered by declarative validations, are actually covered.
-		for _, err := range declarativeTakeoverErrs {
-			if err.CoveredByDeclarative {
-				t.Errorf("error %v should be covered by declarative validation", err)
-			}
+			errOutputMatcher.Test(t, expectedErrs, declarativeBetaEnabledErrs)
+		} else if len(declarativeBetaEnabledErrs) != 0 {
+			t.Errorf("expected no errors, but got: %v", declarativeBetaEnabledErrs)
 		}
 	})
 
+	// 2. Declarative Validation with Beta Gate Disabled
+	t.Run("with declarative validation (Beta disabled)", func(t *testing.T) {
+		featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+			features.DeclarativeValidation:     true,
+			features.DeclarativeValidationBeta: false,
+		})
+		declarativeBetaDisabledErrs = runValidations()
+
+		if len(expectedErrs) > 0 {
+			errOutputMatcher.Test(t, expectedErrs, declarativeBetaDisabledErrs)
+		} else if len(declarativeBetaDisabledErrs) != 0 {
+			t.Errorf("expected no errors, but got: %v", declarativeBetaDisabledErrs)
+		}
+	})
+
+	// 3. Legacy Hand Written Validation
+	// TODO: Remove this test case in 1.39 when emulation for 1.35 is no longer needed.
 	t.Run("hand written validation", func(t *testing.T) {
+		// Even when DeclarativeValidation gate is disabled, if the object's strategy has explicit
+		// declarative enforcement enabled, Standard declarative validations still run and are enforced.
+		// Emulating 1.35 ensures the DeclarativeValidationBeta gate is also effectively disabled (evaluated as false)
+		// because the feature gate was not introduced until 1.36.
 		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
 		featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-			features.DeclarativeValidationTakeover: false,
-			features.DeclarativeValidation:         false,
+			features.DeclarativeValidation: false,
 		})
 		imperativeErrs = runValidations()
 
@@ -350,8 +365,9 @@ func verifyValidationEquivalence(t *testing.T, expectedErrs field.ErrorList, run
 		t.SkipNow()
 	}
 
-	// The equivalenceMatcher is used to verify the output errors from hand-written imperative validation
-	// are equivalent to the output errors when DeclarativeValidationTakeover is enabled.
+	// The equivalenceMatcher is used to verify that the output errors from hand-written imperative validation
+	// are equivalent to the output errors in all declarative validation scenarios (Beta enabled/disabled).
+	// This ensures that enabling the feature gates does not change the validation outcome.
 	equivalenceMatcher := field.ErrorMatcher{}.ByType().ByOrigin()
 	if len(opt.NormalizationRules) > 0 {
 		equivalenceMatcher = equivalenceMatcher.ByFieldNormalized(opt.NormalizationRules)
@@ -363,7 +379,9 @@ func verifyValidationEquivalence(t *testing.T, expectedErrs field.ErrorList, run
 	// TODO: remove this once ErrorMatcher has been extended to handle this form of deduplication.
 	imperativeErrs = deDuplicateErrors(imperativeErrs, equivalenceMatcher)
 
-	equivalenceMatcher.Test(t, imperativeErrs, declarativeTakeoverErrs)
+	// Verify equivalence across all scenarios
+	equivalenceMatcher.Test(t, imperativeErrs, declarativeBetaEnabledErrs)
+	equivalenceMatcher.Test(t, imperativeErrs, declarativeBetaDisabledErrs)
 }
 
 // deDuplicateErrors removes duplicate errors from an ErrorList based on the provided matcher.
