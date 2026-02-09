@@ -72,26 +72,23 @@ func TestRangeStreamList(t *testing.T) {
 	t.Logf("Waiting for watch cache init to trigger RangeStream metric")
 
 	// Verify RangeStream was used via metrics
-	if err := verifyRangeStreamMetric(tCtx, clientSet, "secrets"); err != nil {
+	if err := verifyRangeStreamMetric(tCtx, clientSet, "secrets", 200); err != nil {
 		t.Errorf("Failed to verify RangeStream metric: %v", err)
 	}
 }
 
-func verifyRangeStreamMetric(ctx context.Context, client clientset.Interface, resource string) error {
+func verifyRangeStreamMetric(ctx context.Context, client clientset.Interface, resource string, expectedCount int) error {
 	return wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
 		body, err := client.CoreV1().RESTClient().Get().AbsPath("/metrics").DoRaw(ctx)
 		if err != nil {
 			return false, err
 		}
 
-		// Look for etcd_request_duration_seconds_count{group="",operation="listStream",resource="secrets"}
-		// Note: The metric output format might slightly vary in ordering of labels.
-		// We scan for the line containing our expected labels.
+		// Look for etcd_range_stream_fetched_objects_total{group="",resource="secrets"}
 		for _, line := range strings.Split(string(body), "\n") {
-			if strings.HasPrefix(line, "etcd_request_duration_seconds_count") {
+			if strings.HasPrefix(line, "etcd_range_stream_fetched_objects_total") {
 				// Check for presence of key labels independent of order
-				if strings.Contains(line, fmt.Sprintf("operation=\"listStream\"")) &&
-					strings.Contains(line, fmt.Sprintf("resource=\"%s\"", resource)) {
+				if strings.Contains(line, fmt.Sprintf("resource=\"%s\"", resource)) {
 					// Parse value
 					parts := strings.Split(line, " ")
 					if len(parts) != 2 {
@@ -101,7 +98,7 @@ func verifyRangeStreamMetric(ctx context.Context, client clientset.Interface, re
 					if err != nil {
 						return false, fmt.Errorf("failed to parse metric value: %v", err)
 					}
-					if val > 0 {
+					if int(val) == expectedCount {
 						return true, nil
 					}
 				}
