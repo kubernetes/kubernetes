@@ -5785,6 +5785,7 @@ message Secret {
   // Used to facilitate programmatic handling of secret data.
   // More info: https://kubernetes.io/docs/concepts/configuration/secret/#secret-types
   // +optional
+  // +k8s:immutable
   optional string type = 3;
 }
 

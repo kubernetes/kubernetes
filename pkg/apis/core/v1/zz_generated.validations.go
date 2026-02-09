@@ -48,6 +48,14 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 		}
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
+	// type Secret
+	scheme.AddValidationFunc((*corev1.Secret)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_Secret(ctx, op, nil /* fldPath */, obj.(*corev1.Secret), safe.Cast[*corev1.Secret](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
 	return nil
 }
 
@@ -132,5 +140,36 @@ func Validate_ReplicationControllerSpec(ctx context.Context, op operation.Operat
 
 	// field corev1.ReplicationControllerSpec.Selector has no validation
 	// field corev1.ReplicationControllerSpec.Template has no validation
+	return errs
+}
+
+// Validate_Secret validates an instance of Secret according
+// to declarative validation rules in the API schema.
+func Validate_Secret(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *corev1.Secret) (errs field.ErrorList) {
+	// field corev1.Secret.TypeMeta has no validation
+	// field corev1.Secret.ObjectMeta has no validation
+	// field corev1.Secret.Immutable has no validation
+	// field corev1.Secret.Data has no validation
+	// field corev1.Secret.StringData has no validation
+
+	// field corev1.Secret.Type
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *corev1.SecretType, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("type"), &obj.Type, safe.Field(oldObj, func(oldObj *corev1.Secret) *corev1.SecretType { return &oldObj.Type }), oldObj != nil)...)
+
 	return errs
 }
