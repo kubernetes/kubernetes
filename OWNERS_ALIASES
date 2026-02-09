@@ -337,6 +337,7 @@ aliases:
     - dgrisonnet
     - rexagod
     - richabanker
+    - pohly
   # sig-instrumentation-emeritus
   # - brancz
   # - DirectXMan12
@@ -575,6 +576,7 @@ aliases:
     - mikezappa87 # Network
     - mrunalp # Node
     - msau42 # Storage
+    - pohly # Instrumentation
     - rexagod # Instrumentation
     - richabanker # Instrumentation
     - saad-ali # Storage
