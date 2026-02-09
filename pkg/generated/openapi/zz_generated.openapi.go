@@ -34361,6 +34361,7 @@ func schema_k8sio_api_discovery_v1_EndpointPort(ref common.ReferenceCallback) co
 						},
 					},
 				},
+				Required: []string{"protocol"},
 			},
 			VendorExtensible: spec.VendorExtensible{
 				Extensions: spec.Extensions{
@@ -34752,6 +34753,7 @@ func schema_k8sio_api_discovery_v1beta1_EndpointPort(ref common.ReferenceCallbac
 						},
 					},
 				},
+				Required: []string{"protocol"},
 			},
 		},
 	}
@@ -34831,7 +34833,7 @@ func schema_k8sio_api_discovery_v1beta1_EndpointSlice(ref common.ReferenceCallba
 						},
 					},
 				},
-				Required: []string{"addressType", "endpoints"},
+				Required: []string{"addressType"},
 			},
 		},
 		Dependencies: []string{

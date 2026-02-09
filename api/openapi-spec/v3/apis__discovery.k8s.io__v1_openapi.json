@@ -158,6 +158,9 @@
             "type": "string"
           }
         },
+        "required": [
+          "protocol"
+        ],
         "type": "object",
         "x-kubernetes-map-type": "atomic"
       },
