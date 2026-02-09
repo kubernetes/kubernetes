@@ -54,6 +54,9 @@ func (mockKV) Do(ctx context.Context, op clientv3.Op) (clientv3.OpResponse, erro
 func (mockKV) Txn(ctx context.Context) clientv3.Txn {
 	return nil
 }
+func (mockKV) GetStream(ctx context.Context, key string, opts ...clientv3.OpOption) (clientv3.GetStreamResponse, error) {
+	return nil, nil
+}
 
 func TestCreateHealthcheck(t *testing.T) {
 	etcdConfig := testserver.NewTestConfig(t)

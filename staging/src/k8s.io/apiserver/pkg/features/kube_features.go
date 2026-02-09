@@ -282,6 +282,11 @@ const (
 	//
 	// Allow the API server to stream individual items instead of chunking
 	WatchList featuregate.Feature = "WatchList"
+
+	// owner: @jefftree
+	//
+	// Enables the efficient RangeStream protocol for list operations in etcd.
+	RangeStream featuregate.Feature = "RangeStream"
 )
 
 func init() {
@@ -486,5 +491,9 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		// switch this back to false because the json and proto streaming encoders appear to work better.
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	RangeStream: {
+		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
 	},
 }

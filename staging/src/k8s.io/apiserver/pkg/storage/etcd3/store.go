@@ -58,7 +58,7 @@ const (
 	// maxLimit is a maximum page limit increase used when fetching objects from etcd.
 	// This limit is used only for increasing page size by kube-apiserver. If request
 	// specifies larger limit initially, it won't be changed.
-	maxLimit = 10000
+	maxLimit = 10
 )
 
 // authenticatedDataString satisfies the value.Context interface. It uses the key to
@@ -900,7 +900,9 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 
 func (s *store) getList(ctx context.Context, keyPrefix string, recursive bool, options kubernetes.ListOptions) (resp kubernetes.ListResponse, err error) {
 	startTime := time.Now()
-	if recursive {
+	// TODO: Figure out rangestream with regular lists that bypass WatchCache. Keep this off for now.
+	if false && recursive && utilfeature.DefaultFeatureGate.Enabled(features.RangeStream) {
+		// RangeStream used for direct List calls (e.g. from controllers or when WatchList is disabled)
 		rangeStart := keyPrefix
 		if options.Continue != "" {
 			rangeStart = options.Continue
