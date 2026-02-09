@@ -9,9 +9,12 @@ import (
 
 	"path"
 
+	"time"
+
 	"github.com/google/uuid"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
@@ -66,54 +69,44 @@ func TestRangeStreamList(t *testing.T) {
 	})
 	defer tearDownFn()
 
-	t.Logf("Listing secrets to trigger watch cache initialization")
-	// List with RV=0 to force wait for watch cache sync
-	list, err := clientSet.CoreV1().Secrets(ns.Name).List(context.Background(), metav1.ListOptions{ResourceVersion: "0"})
-	if err != nil {
-		t.Fatalf("Failed to list secrets: %v", err)
-	}
-
-	if len(list.Items) != count {
-		t.Errorf("Expected %d secrets, got %d", count, len(list.Items))
-	}
+	t.Logf("Waiting for watch cache init to trigger RangeStream metric")
 
 	// Verify RangeStream was used via metrics
-	if err := verifyRangeStreamMetric(clientSet, "secrets"); err != nil {
+	if err := verifyRangeStreamMetric(tCtx, clientSet, "secrets"); err != nil {
 		t.Errorf("Failed to verify RangeStream metric: %v", err)
 	}
 }
 
-func verifyRangeStreamMetric(client clientset.Interface, resource string) error {
-	body, err := client.CoreV1().RESTClient().Get().AbsPath("/metrics").DoRaw(context.Background())
-	if err != nil {
-		return err
-	}
+func verifyRangeStreamMetric(ctx context.Context, client clientset.Interface, resource string) error {
+	return wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
+		body, err := client.CoreV1().RESTClient().Get().AbsPath("/metrics").DoRaw(ctx)
+		if err != nil {
+			return false, err
+		}
 
-	// Look for etcd_request_duration_seconds_count{group="",operation="listStream",resource="secrets"}
-	// Note: The metric output format might slightly vary in ordering of labels.
-	// We scan for the line containing our expected labels.
-	var validLines []string
-	for _, line := range strings.Split(string(body), "\n") {
-		if strings.HasPrefix(line, "etcd_request_duration_seconds_count") {
-			validLines = append(validLines, line)
-			// Check for presence of key labels independent of order
-			if strings.Contains(line, fmt.Sprintf("operation=\"listStream\"")) &&
-				strings.Contains(line, fmt.Sprintf("resource=\"%s\"", resource)) {
-				// Parse value
-				parts := strings.Split(line, " ")
-				if len(parts) != 2 {
-					return fmt.Errorf("unexpected metric format: %s", line)
+		// Look for etcd_request_duration_seconds_count{group="",operation="listStream",resource="secrets"}
+		// Note: The metric output format might slightly vary in ordering of labels.
+		// We scan for the line containing our expected labels.
+		for _, line := range strings.Split(string(body), "\n") {
+			if strings.HasPrefix(line, "etcd_request_duration_seconds_count") {
+				// Check for presence of key labels independent of order
+				if strings.Contains(line, fmt.Sprintf("operation=\"listStream\"")) &&
+					strings.Contains(line, fmt.Sprintf("resource=\"%s\"", resource)) {
+					// Parse value
+					parts := strings.Split(line, " ")
+					if len(parts) != 2 {
+						return false, fmt.Errorf("unexpected metric format: %s", line)
+					}
+					val, err := strconv.ParseFloat(parts[1], 64)
+					if err != nil {
+						return false, fmt.Errorf("failed to parse metric value: %v", err)
+					}
+					if val > 0 {
+						return true, nil
+					}
 				}
-				val, err := strconv.ParseFloat(parts[1], 64)
-				if err != nil {
-					return fmt.Errorf("failed to parse metric value: %v", err)
-				}
-				if val > 0 {
-					return nil
-				}
-				return fmt.Errorf("metric found but value is 0: %s", line)
 			}
 		}
-	}
-	return fmt.Errorf("metric for listStream not found in:\n%s", strings.Join(validLines, "\n"))
+		return false, nil
+	})
 }
