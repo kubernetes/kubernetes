@@ -201,10 +201,6 @@
         "k8s.io/kube-openapi",
         "sigs.k8s.io/structured-merge-diff/v6"
       ],
-      "github.com/pkg/errors": [
-        "sigs.k8s.io/kustomize/api",
-        "sigs.k8s.io/kustomize/kustomize/v5"
-      ],
       "github.com/planetscale/vtprotobuf": [
         "google.golang.org/grpc"
       ],
