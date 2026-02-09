@@ -556,7 +556,7 @@
                 "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2.ContainerResourceMetricStatus"
               }
             ],
-            "description": "container resource refers to a resource metric (such as those specified in requests and limits) known to Kubernetes describing a single container in each pod in the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source."
+            "description": "containerResource refers to a resource metric (such as those specified in requests and limits) known to Kubernetes describing a single container in each pod in the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source."
           },
           "external": {
             "allOf": [
@@ -640,7 +640,7 @@
         "description": "MetricValueStatus holds the current value for a metric",
         "properties": {
           "averageUtilization": {
-            "description": "currentAverageUtilization is the current value of the average of the resource metric across all relevant pods, represented as a percentage of the requested value of the resource for the pods.",
+            "description": "averageUtilization is the current value of the average of the resource metric across all relevant pods, represented as a percentage of the requested value of the resource for the pods.",
             "format": "int32",
             "type": "integer"
           },
@@ -720,7 +720,7 @@
               }
             ],
             "default": {},
-            "description": "DescribedObject specifies the descriptions of a object,such as kind,name apiVersion"
+            "description": "describedObject specifies the descriptions of a object,such as kind,name apiVersion"
           },
           "metric": {
             "allOf": [

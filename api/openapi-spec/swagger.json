@@ -3547,7 +3547,7 @@
         },
         "metadata": {
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta",
-          "description": "Standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
+          "description": "metadata is the standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
         },
         "spec": {
           "$ref": "#/definitions/io.k8s.api.autoscaling.v1.HorizontalPodAutoscalerSpec",
@@ -3617,7 +3617,7 @@
         },
         "scaleTargetRef": {
           "$ref": "#/definitions/io.k8s.api.autoscaling.v1.CrossVersionObjectReference",
-          "description": "reference to scaled resource; horizontal pod autoscaler will learn the current resource consumption and will set the desired number of pods by using its Scale subresource."
+          "description": "scaleTargetRef is the reference to scaled resource; horizontal pod autoscaler will learn the current resource consumption and will set the desired number of pods by using its Scale subresource."
         },
         "targetCPUUtilizationPercentage": {
           "description": "targetCPUUtilizationPercentage is the target average CPU utilization (represented as a percentage of requested CPU) over all the pods; if not specified the default autoscaling policy will be used.",
@@ -3678,7 +3678,7 @@
         },
         "metadata": {
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta",
-          "description": "Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata."
+          "description": "metadata is the standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata."
         },
         "spec": {
           "$ref": "#/definitions/io.k8s.api.autoscaling.v1.ScaleSpec",
@@ -4135,7 +4135,7 @@
       "properties": {
         "containerResource": {
           "$ref": "#/definitions/io.k8s.api.autoscaling.v2.ContainerResourceMetricStatus",
-          "description": "container resource refers to a resource metric (such as those specified in requests and limits) known to Kubernetes describing a single container in each pod in the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source."
+          "description": "containerResource refers to a resource metric (such as those specified in requests and limits) known to Kubernetes describing a single container in each pod in the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source."
         },
         "external": {
           "$ref": "#/definitions/io.k8s.api.autoscaling.v2.ExternalMetricStatus",
@@ -4193,7 +4193,7 @@
       "description": "MetricValueStatus holds the current value for a metric",
       "properties": {
         "averageUtilization": {
-          "description": "currentAverageUtilization is the current value of the average of the resource metric across all relevant pods, represented as a percentage of the requested value of the resource for the pods.",
+          "description": "averageUtilization is the current value of the average of the resource metric across all relevant pods, represented as a percentage of the requested value of the resource for the pods.",
           "format": "int32",
           "type": "integer"
         },
@@ -4240,7 +4240,7 @@
         },
         "describedObject": {
           "$ref": "#/definitions/io.k8s.api.autoscaling.v2.CrossVersionObjectReference",
-          "description": "DescribedObject specifies the descriptions of a object,such as kind,name apiVersion"
+          "description": "describedObject specifies the descriptions of a object,such as kind,name apiVersion"
         },
         "metric": {
           "$ref": "#/definitions/io.k8s.api.autoscaling.v2.MetricIdentifier",
