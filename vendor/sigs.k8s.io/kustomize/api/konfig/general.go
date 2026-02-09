@@ -46,4 +46,7 @@ const (
 
 	// Label key that indicates the resources are validated by a validator
 	ValidatedByLabelKey = "validated-by"
+
+	// Annotation key for marking helm-generated resources to skip namespace transformation
+	HelmGeneratedAnnotation = ConfigAnnoDomain + "/helm-generated"
 )
