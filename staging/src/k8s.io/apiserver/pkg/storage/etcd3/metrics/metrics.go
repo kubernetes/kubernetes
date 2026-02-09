@@ -134,6 +134,14 @@ var (
 		},
 		[]string{},
 	)
+	etcdRangeStreamFetchedObjectsTotal = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Name:           "etcd_range_stream_fetched_objects_total",
+			Help:           "Number of objects fetched via RangeStream.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"group", "resource"},
+	)
 	listStorageCount = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
 			Name:           "apiserver_storage_list_total",
@@ -204,6 +212,7 @@ func Register() {
 		legacyregistry.MustRegister(etcdEventsReceivedCounts)
 		legacyregistry.MustRegister(etcdBookmarkCounts)
 		legacyregistry.MustRegister(etcdLeaseObjectCounts)
+		legacyregistry.MustRegister(etcdRangeStreamFetchedObjectsTotal)
 		legacyregistry.MustRegister(listStorageCount)
 		legacyregistry.MustRegister(listStorageNumFetched)
 		legacyregistry.MustRegister(listStorageNumSelectorEvals)
@@ -263,6 +272,11 @@ func RecordEtcdEvent(groupResource schema.GroupResource) {
 // RecordEtcdBookmark updates the etcd_bookmark_counts metric.
 func RecordEtcdBookmark(groupResource schema.GroupResource) {
 	etcdBookmarkCounts.WithLabelValues(groupResource.Group, groupResource.Resource).Inc()
+}
+
+// RecordRangeStreamFetchedObjects updates the etcd_range_stream_fetched_objects_total metric.
+func RecordRangeStreamFetchedObjects(groupResource schema.GroupResource, count int) {
+	etcdRangeStreamFetchedObjectsTotal.WithLabelValues(groupResource.Group, groupResource.Resource).Add(float64(count))
 }
 
 // RecordDecodeError sets the storage_decode_errors metrics.
