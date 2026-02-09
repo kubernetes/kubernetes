@@ -352,8 +352,5 @@ func (rv *ResourceVersionController) failMigration(ctx context.Context, svm *svm
 			setStatusConditions(svm, svmv1beta1.MigrationFailed, migrationFailedStatusReason, message),
 			metav1.UpdateOptions{},
 		)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }

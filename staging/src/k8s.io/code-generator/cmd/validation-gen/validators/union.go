@@ -128,12 +128,9 @@ func (unionDiscriminatorTagValidator) ValidScopes() sets.Set[Scope] {
 
 func (udtv unionDiscriminatorTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
 	err := processDiscriminatorValidations(udtv.shared, context, tag)
-	if err != nil {
-		return Validations{}, err
-	}
 	// This tag does not actually emit any validations, it just accumulates
 	// information. The validation is done by the unionTypeOrFieldValidator.
-	return Validations{}, nil
+	return Validations{}, err
 }
 
 func (udtv unionDiscriminatorTagValidator) Docs() TagDoc {
@@ -167,12 +164,9 @@ func (unionMemberTagValidator) ValidScopes() sets.Set[Scope] {
 
 func (umtv unionMemberTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
 	err := processMemberValidations(umtv.shared, context, tag)
-	if err != nil {
-		return Validations{}, err
-	}
 	// This tag does not actually emit any validations, it just accumulates
 	// information. The validation is done by the unionTypeOrFieldValidator.
-	return Validations{}, nil
+	return Validations{}, err
 }
 
 func (umtv unionMemberTagValidator) Docs() TagDoc {

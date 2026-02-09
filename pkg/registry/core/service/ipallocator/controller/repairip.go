@@ -432,10 +432,7 @@ func (r *RepairIPAddress) recreateIPAddress(name string, svc *v1.Service) error 
 		return err
 	}
 	_, err = r.client.NetworkingV1().IPAddresses().Create(context.Background(), newIPAddress(name, svc), metav1.CreateOptions{})
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func (r *RepairIPAddress) ipWorker() {

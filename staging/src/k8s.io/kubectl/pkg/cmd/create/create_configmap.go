@@ -183,11 +183,7 @@ func (o *ConfigMapOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 	}
 
 	o.ValidationDirective, err = cmdutil.GetValidationDirective(cmd)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // Validate checks if ConfigMapOptions has sufficient value to run

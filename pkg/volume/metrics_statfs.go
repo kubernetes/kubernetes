@@ -52,11 +52,7 @@ func (md *metricsStatFS) GetMetrics() (*Metrics, error) {
 	}
 
 	err := md.getFsInfo(metrics)
-	if err != nil {
-		return metrics, err
-	}
-
-	return metrics, nil
+	return metrics, err
 }
 
 // getFsInfo writes metrics.Capacity, metrics.Used and metrics.Available from the filesystem info

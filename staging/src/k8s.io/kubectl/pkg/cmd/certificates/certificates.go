@@ -104,11 +104,7 @@ func (o *CertificateOptions) Complete(restClientGetter genericclioptions.RESTCli
 	}
 
 	o.certificatesV1Client, err = v1.NewForConfig(clientConfig)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // Validate checks if the provided `certificate` arguments are valid

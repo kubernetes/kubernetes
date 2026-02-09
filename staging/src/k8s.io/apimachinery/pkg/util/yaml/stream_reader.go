@@ -96,10 +96,7 @@ func (r *StreamReader) ReadN(want int) ([]byte, error) {
 func (r *StreamReader) Peek(n int) ([]byte, error) {
 	buf, err := r.ReadN(n)
 	r.RewindN(len(buf))
-	if err != nil {
-		return buf, err
-	}
-	return buf, nil
+	return buf, err
 }
 
 // Rewind resets the reader to the beginning of the buffered data.

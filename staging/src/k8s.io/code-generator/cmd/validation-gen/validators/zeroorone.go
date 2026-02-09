@@ -109,12 +109,9 @@ func (zeroOrOneOfMemberTagValidator) ValidScopes() sets.Set[Scope] {
 
 func (zmtv zeroOrOneOfMemberTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
 	err := processMemberValidations(zmtv.shared, context, tag)
-	if err != nil {
-		return Validations{}, err
-	}
 	// This tag does not actually emit any validations, it just accumulates
-	// information. The validation is done by the zeroOrOneOfTypeOrFieldValidator.
-	return Validations{}, nil
+	// information. The validation is done by the unionTypeOrFieldValidator.
+	return Validations{}, err
 }
 
 func (zmtv zeroOrOneOfMemberTagValidator) Docs() TagDoc {

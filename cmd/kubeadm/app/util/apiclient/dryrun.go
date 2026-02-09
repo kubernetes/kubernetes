@@ -101,11 +101,7 @@ func (d *DryRun) WithRestConfig(config *rest.Config) error {
 	}
 
 	d.dynamicClient, err = dynamic.NewForConfig(config)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // WithWriter sets the io.Writer used for printing by the DryRun.
