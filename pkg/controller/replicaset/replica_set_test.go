@@ -57,6 +57,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/test/utils/ktesting"
+	testingclock "k8s.io/utils/clock/testing"
 	"k8s.io/utils/ptr"
 )
 
@@ -2173,5 +2174,59 @@ func TestGetPodKeys(t *testing.T) {
 				t.Errorf("%s: unexpected keys for pods to delete, expected %v, got %v", test.name, test.expectedPodKeys, podKeys)
 			}
 		}
+	}
+}
+
+// TestEnqueueIfNotBackingOffPreventsBackoffInflation verifies that event-driven
+// enqueue calls do not bypass the rate limiter's backoff delay.
+func TestEnqueueIfNotBackingOffPreventsBackoffInflation(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	labelMap := map[string]string{"foo": "bar"}
+	rs := newReplicaSet(5, labelMap)
+	client := fake.NewSimpleClientset(rs)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	manager, informers := testNewReplicaSetControllerFromClient(t, client, stopCh, BurstReplicas)
+
+	informers.Apps().V1().ReplicaSets().Informer().GetIndexer().Add(rs)
+
+	fakePodControl := controller.FakePodControl{Err: fmt.Errorf("quota exceeded")}
+	manager.podControl = &fakePodControl
+
+	// Replace the queue with one backed by a fake clock so the delay heap
+	// timer never fires and items placed by AddRateLimited stay pending.
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	manager.queue = workqueue.NewTypedRateLimitingQueueWithConfig(
+		workqueue.DefaultTypedControllerRateLimiter[string](),
+		workqueue.TypedRateLimitingQueueConfig[string]{Clock: fakeClock},
+	)
+
+	rsKey := GetKey(rs, t)
+
+	// Seed the first sync: Add puts the key directly into the FIFO queue,
+	// syncHandler fails, AddRateLimited places it in the delay heap.
+	manager.queue.Add(rsKey)
+	ctx := context.TODO()
+	manager.processNextWorkItem(ctx)
+	if got := manager.queue.NumRequeues(rsKey); got != 1 {
+		t.Fatalf("after first failed sync: NumRequeues = %d, want 1", got)
+	}
+	if got := manager.queue.Len(); got != 0 {
+		t.Fatalf("FIFO queue should be empty after first sync, got Len = %d", got)
+	}
+
+	// Simulate a burst of event-driven enqueue calls.
+	pod := newPod("event-pod", rs, v1.PodRunning, nil, true)
+	for i := 0; i < 10; i++ {
+		manager.enqueueRS(rs)
+		manager.addPod(logger, pod)
+		manager.deletePod(logger, pod)
+	}
+
+	if got := manager.queue.Len(); got != 0 {
+		t.Errorf("FIFO queue Len = %d after event-driven enqueues, want 0 (enqueue should have been suppressed)", got)
+	}
+	if got := manager.queue.NumRequeues(rsKey); got != 1 {
+		t.Errorf("NumRequeues = %d, want 1 (backoff counter should not have been inflated)", got)
 	}
 }

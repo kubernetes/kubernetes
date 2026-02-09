@@ -327,7 +327,7 @@ func (rsc *ReplicaSetController) enqueueRS(rs *apps.ReplicaSet) {
 		return
 	}
 
-	rsc.queue.Add(key)
+	rsc.enqueueIfNotBackingOff(key)
 }
 
 func (rsc *ReplicaSetController) enqueueRSAfter(rs *apps.ReplicaSet, duration time.Duration) {
@@ -338,6 +338,20 @@ func (rsc *ReplicaSetController) enqueueRSAfter(rs *apps.ReplicaSet, duration ti
 	}
 
 	rsc.queue.AddAfter(key, duration)
+}
+
+// enqueueIfNotBackingOff adds the key to the work queue only if it is not already in
+// rate-limited backoff so that backoff can grow at the intended pace.
+//
+// When a sync fails, processNextWorkItem calls AddRateLimited which places the
+// key in the delay heap with an exponential backoff.
+// A direct Add() would bypass that delay and be processed immediately,
+// incrementing the failure counter again on the next failure. This creates a
+// tight loop that rapidly inflates the backoff to its 1000s cap.
+func (rsc *ReplicaSetController) enqueueIfNotBackingOff(key string) {
+	if rsc.queue.NumRequeues(key) == 0 {
+		rsc.queue.Add(key)
+	}
 }
 
 func (rsc *ReplicaSetController) addRS(logger klog.Logger, obj interface{}) {
@@ -434,7 +448,7 @@ func (rsc *ReplicaSetController) addPod(logger klog.Logger, obj interface{}) {
 		}
 		logger.V(4).Info("Pod created", "pod", klog.KObj(pod), "detail", pod)
 		rsc.expectations.CreationObserved(logger, rsKey)
-		rsc.queue.Add(rsKey)
+		rsc.enqueueIfNotBackingOff(rsKey)
 		return
 	}
 
@@ -566,7 +580,7 @@ func (rsc *ReplicaSetController) deletePod(logger klog.Logger, obj interface{}) 
 	}
 	logger.V(4).Info("Pod deleted", "delete_by", utilruntime.GetCaller(), "deletion_timestamp", pod.DeletionTimestamp, "pod", klog.KObj(pod))
 	rsc.expectations.DeletionObserved(logger, rsKey, controller.PodKey(pod))
-	rsc.queue.Add(rsKey)
+	rsc.enqueueIfNotBackingOff(rsKey)
 }
 
 // worker runs a worker thread that just dequeues items, processes them, and marks them done.
