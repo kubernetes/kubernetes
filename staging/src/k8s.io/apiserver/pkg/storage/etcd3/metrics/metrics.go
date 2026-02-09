@@ -54,6 +54,7 @@ var (
 		},
 		[]string{"operation", "group", "resource"},
 	)
+
 	etcdRequestCounts = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
 			Name:           "etcd_requests_total",
@@ -174,6 +175,15 @@ var (
 		},
 		[]string{"group", "resource"},
 	)
+	WatchCacheInitializationDuration = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Name:           "etcd_watch_cache_initialization_duration_seconds",
+			Help:           "Histogram of watch cache initialization duration in seconds.",
+			StabilityLevel: compbasemetrics.ALPHA,
+			Buckets:        []float64{0.005, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10, 20, 30, 60, 120, 240},
+		},
+		[]string{"group", "resource"},
+	)
 )
 
 var registerMetrics sync.Once
@@ -183,6 +193,7 @@ func Register() {
 	// Register the metrics.
 	registerMetrics.Do(func() {
 		legacyregistry.MustRegister(etcdRequestLatency)
+
 		legacyregistry.MustRegister(etcdRequestCounts)
 		legacyregistry.MustRegister(etcdRequestErrorCounts)
 		legacyregistry.MustRegister(objectCounts)
@@ -198,6 +209,7 @@ func Register() {
 		legacyregistry.MustRegister(listStorageNumSelectorEvals)
 		legacyregistry.MustRegister(listStorageNumReturned)
 		legacyregistry.MustRegister(decodeErrorCounts)
+		legacyregistry.MustRegister(WatchCacheInitializationDuration)
 	})
 }
 
@@ -240,6 +252,8 @@ func RecordEtcdRequest(verb string, groupResource schema.GroupResource, err erro
 		etcdRequestErrorCounts.WithLabelValues(verb, groupResource.Group, groupResource.Resource).Inc()
 	}
 }
+
+
 
 // RecordEtcdEvent updated the etcd_events_received_total metric.
 func RecordEtcdEvent(groupResource schema.GroupResource) {
@@ -292,6 +306,11 @@ func RecordStorageListMetrics(groupResource schema.GroupResource, numFetched, nu
 	listStorageNumFetched.WithLabelValues(groupResource.Group, groupResource.Resource).Add(float64(numFetched))
 	listStorageNumSelectorEvals.WithLabelValues(groupResource.Group, groupResource.Resource).Add(float64(numEvald))
 	listStorageNumReturned.WithLabelValues(groupResource.Group, groupResource.Resource).Add(float64(numReturned))
+}
+
+// RecordWatchCacheInitialization sets the metrics for watch cache initialization duration.
+func RecordWatchCacheInitialization(groupResource schema.GroupResource, startTime time.Time) {
+	WatchCacheInitializationDuration.WithLabelValues(groupResource.Group, groupResource.Resource).Observe(sinceInSeconds(startTime))
 }
 
 type Monitor interface {

@@ -269,9 +269,12 @@ func (wc *watchChan) RequestWatchProgress() error {
 // The revision to watch will be set to the revision in response.
 // All events sent will have isCreated=true
 func (wc *watchChan) sync() error {
+	syncStartTime := time.Now()
 	opts := []clientv3.OpOption{}
 	if wc.recursive {
-		opts = append(opts, clientv3.WithLimit(defaultWatcherMaxLimit))
+		if !utilfeature.DefaultFeatureGate.Enabled(features.RangeStream) {
+			opts = append(opts, clientv3.WithLimit(defaultWatcherMaxLimit))
+		}
 		rangeEnd := clientv3.GetPrefixRangeEnd(wc.key)
 		opts = append(opts, clientv3.WithRange(rangeEnd))
 	}
@@ -281,46 +284,87 @@ func (wc *watchChan) sync() error {
 	var withRev int64
 	var getResp *clientv3.GetResponse
 
-	metricsOp := "get"
-	if wc.recursive {
-		metricsOp = "list"
-	}
-
 	preparedKey := wc.key
 
 	for {
 		startTime := time.Now()
-		getResp, err = wc.watcher.client.KV.Get(wc.ctx, preparedKey, opts...)
-		metrics.RecordEtcdRequest(metricsOp, wc.watcher.groupResource, err, startTime)
-		if err != nil {
-			return interpretListError(err, true, preparedKey, wc.key)
-		}
+		// options.Continue is not supported in RangeStream yet, so we don't handle it here.
+		// However, watcher sync doesn't traditionally use Continue/Limit pagination in the same way store.GetList does.
+		// We can try to use RangeStream here.
 
-		if len(getResp.Kvs) == 0 && getResp.More {
-			return fmt.Errorf("no results were found, but etcd indicated there were more values remaining")
-		}
+		// Use RangeStream for recursive lists
+		if wc.recursive && utilfeature.DefaultFeatureGate.Enabled(features.RangeStream) {
+			klog.V(4).Infof("Using RangeStream for watcher sync on %s", preparedKey)
+			streamResp, err := wc.watcher.client.KV.GetStream(wc.ctx, preparedKey, opts...)
+			metrics.RecordEtcdRequest("listStream", wc.watcher.groupResource, err, startTime)
+			if err != nil {
+				return interpretListError(err, true, preparedKey, wc.key)
+			}
 
-		// send items from the response until no more results
-		for i, kv := range getResp.Kvs {
-			lastKey = kv.Key
-			wc.queueEvent(parseKV(kv))
-			// free kv early. Long lists can take O(seconds) to decode.
-			getResp.Kvs[i] = nil
-		}
+			// In RangeStream, we receive a stream of GetResponse.
+			// We need to iterate over them.
+			var streamRev int64
+			for r := range streamResp {
+				if r.Err != nil {
+					return interpretListError(r.Err, true, preparedKey, wc.key)
+				}
 
-		if withRev == 0 {
-			wc.initialRev = getResp.Header.Revision
-		}
+				rangeResp := r.RangeStreamResponse.RangeResponse
+				for i, kv := range rangeResp.Kvs {
+					lastKey = kv.Key
+					wc.queueEvent(parseKV(kv))
+					rangeResp.Kvs[i] = nil
+				}
 
-		// no more results remain
-		if !getResp.More {
+				if streamRev == 0 {
+					streamRev = rangeResp.Header.Revision
+				}
+			}
+
+			// RangeStream done. "More" concept applies to the stream itself essentially.
+			// If we finished the stream without error, we are done.
+			if withRev == 0 {
+				withRev = streamRev
+				wc.initialRev = streamRev
+			}
+			metrics.RecordWatchCacheInitialization(wc.watcher.groupResource, syncStartTime)
 			return nil
-		}
 
-		preparedKey = string(lastKey) + "\x00"
-		if withRev == 0 {
-			withRev = getResp.Header.Revision
-			opts = append(opts, clientv3.WithRev(withRev))
+		} else {
+			// Non-recursive, standard Get
+			getResp, err = wc.watcher.client.KV.Get(wc.ctx, preparedKey, opts...)
+			metrics.RecordEtcdRequest("get", wc.watcher.groupResource, err, startTime)
+			if err != nil {
+				return interpretListError(err, true, preparedKey, wc.key)
+			}
+
+			if len(getResp.Kvs) == 0 && getResp.More {
+				return fmt.Errorf("no results were found, but etcd indicated there were more values remaining")
+			}
+
+			// send items from the response until no more results
+			for i, kv := range getResp.Kvs {
+				lastKey = kv.Key
+				wc.queueEvent(parseKV(kv))
+				// free kv early. Long lists can take O(seconds) to decode.
+				getResp.Kvs[i] = nil
+			}
+
+			if withRev == 0 {
+				wc.initialRev = getResp.Header.Revision
+			}
+
+			// no more results remain
+			if !getResp.More {
+				// metrics.RecordWatchCacheInitialization(wc.watcher.groupResource, syncStartTime)
+				return nil
+			}
+
+			preparedKey = string(lastKey) + "\x00"
+			if withRev == 0 {
+				withRev = getResp.Header.Revision
+				opts = append(opts, clientv3.WithRev(withRev))
+			}
 		}
 	}
 }
