@@ -60,9 +60,7 @@ func TestCacheAddRemovePod(t *testing.T) {
 	}
 
 	// Remove pod
-	if err := cache.RemovePod(logger, pod); err != nil {
-		t.Errorf("unexpected error removing pod: %v", err)
-	}
+	cache.RemovePod(logger, pod)
 	if cache.PodCount() != 0 {
 		t.Errorf("expected 0 pods, got %d", cache.PodCount())
 	}
@@ -96,7 +94,7 @@ func TestCacheConcurrentAccess(t *testing.T) {
 
 	// Writer goroutine
 	go func() {
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			pod := makePod(fmt.Sprintf("pod-%d", i), "10m", "10Mi")
 			cache.AddPod(pod)
 			cache.RemovePod(logger, pod)
@@ -106,7 +104,7 @@ func TestCacheConcurrentAccess(t *testing.T) {
 
 	// Reader goroutine
 	go func() {
-		for i := 0; i < 100; i++ {
+		for range 100 {
 			_ = cache.Snapshot()
 			_ = cache.PodCount()
 		}
@@ -158,9 +156,7 @@ func TestCacheUpdatePod(t *testing.T) {
 
 	// Update pod with new resources
 	newPod := makePod("test-pod", "200m", "512Mi")
-	if err := cache.UpdatePod(logger, oldPod, newPod); err != nil {
-		t.Errorf("unexpected error updating pod: %v", err)
-	}
+	cache.UpdatePod(logger, oldPod, newPod)
 
 	// Verify updated state
 	snapshot = cache.Snapshot()

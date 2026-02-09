@@ -32,7 +32,7 @@ import (
 // Each pod has 2 containers to simulate typical workloads.
 func generatePods(count int) []*v1.Pod {
 	pods := make([]*v1.Pod, count)
-	for i := 0; i < count; i++ {
+	for i := range count {
 		pods[i] = &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      fmt.Sprintf("pod-%d", i),
@@ -99,7 +99,7 @@ func BenchmarkNewNodeInfo(b *testing.B) {
 	pods := generatePods(100)
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = framework.NewNodeInfo(pods...)
 	}
 }
@@ -112,7 +112,7 @@ func BenchmarkCacheSnapshot(b *testing.B) {
 	}
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = cache.Snapshot()
 	}
 }
@@ -187,7 +187,7 @@ func BenchmarkResizeRetryScenario(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
 			// Current: rebuild NodeInfo on every retry
-			for r := 0; r < retryCount; r++ {
+			for range retryCount {
 				nodeInfo := framework.NewNodeInfo(existingPods...)
 				nodeInfo.SetNode(node)
 			}
@@ -204,7 +204,7 @@ func BenchmarkResizeRetryScenario(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			// New: snapshot from cache on each retry
-			for r := 0; r < retryCount; r++ {
+			for range retryCount {
 				nodeInfo := cache.Snapshot()
 				nodeInfo.SetNode(node)
 			}
