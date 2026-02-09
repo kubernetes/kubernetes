@@ -129,6 +129,13 @@ func RedirectChecker(followNonLocalRedirects bool) func(*http.Request, []*http.R
 	}
 
 	return func(req *http.Request, via []*http.Request) error {
+		if len(via) == 0 {
+			return nil
+		}
+
+		orig := via[0].URL
+
+		// Back cross-host OR cross-scheme redirects
 		if req.URL.Hostname() != via[0].URL.Hostname() {
 			return http.ErrUseLastResponse
 		}
