@@ -33652,7 +33652,7 @@ func schema_k8sio_api_discovery_v1beta1_EndpointSlice(ref common.ReferenceCallba
 						},
 					},
 				},
-				Required: []string{"addressType", "endpoints"},
+				Required: []string{"addressType"},
 			},
 		},
 		Dependencies: []string{
