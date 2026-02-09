@@ -3686,7 +3686,7 @@ function kube-down() {
     for group in ${all_instance_groups[@]:-}; do
       {
         if gcloud compute instance-groups managed describe "${group}" --project "${PROJECT}" --zone "${ZONE}" &>/dev/null; then
-          gcloud compute instance-groups managed delete \
+          retry-gcloud-unavailable gcloud compute instance-groups managed delete \
             --project "${PROJECT}" \
             --quiet \
             --zone "${ZONE}" \
@@ -3920,6 +3920,48 @@ function kube-down() {
     fi
   fi
   set -e
+}
+
+function retry-gcloud-unavailable() {
+  if [[ $# -eq 0 ]]; then
+    echo "retry: no command provided" >&2
+    return 2
+  fi
+
+  local max_attempts=5
+  local attempt=1
+  local delay=30
+  local exit_code=0
+  local cmd_out
+
+  while (( attempt <= max_attempts )); do
+      cmd_out=$(mktemp)
+
+      if "${@}" 2> >(tee "${cmd_out}" >&2); then
+        rm -f "${cmd_out}"
+        return 0
+      fi
+
+      if grep -q 'Error 502' "${cmd_out}"; then
+        printf '[%s] Attempt %d/%d failed (exit=%d). Retrying in %s seconds …\n' \
+          "$(date '+%Y-%m-%d %H:%M:%S')" "$attempt" "$max_attempts" "$exit_code" "$delay" >&2
+      else
+        echo "Attempt ${attempt}/${max_attempts} failed with a non‑502 error:"
+        cat "${cmd_out}" >&2
+        rm -f "${cmd_out}"
+        exit $exit_code
+      fi
+
+      if (( attempt == max_attempts )); then
+          break
+      fi
+
+      sleep "$delay"
+
+      ((attempt++))
+  done
+
+  return "$exit_code"
 }
 
 # Prints name of one of the master replicas in the current zone. It will be either
