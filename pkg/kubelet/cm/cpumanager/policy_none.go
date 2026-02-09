@@ -75,3 +75,7 @@ func (p *nonePolicy) GetPodTopologyHints(_ logr.Logger, s state.State, pod *v1.P
 func (p *nonePolicy) GetAllocatableCPUs(m state.State) cpuset.CPUSet {
 	return cpuset.New()
 }
+
+func (p *nonePolicy) CanAllocateExclusively() bool {
+	return false
+}

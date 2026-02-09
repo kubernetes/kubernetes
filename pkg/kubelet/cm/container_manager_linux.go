@@ -1123,3 +1123,8 @@ func (cm *containerManagerImpl) UpdateAllocatedResourcesStatus(pod *v1.Pod, stat
 func (cm *containerManagerImpl) Updates() <-chan resourceupdates.Update {
 	return cm.resourceUpdates
 }
+
+func (cm *containerManagerImpl) CanAllocateExclusively(res v1.ResourceName) bool {
+	// run from the cheapest to the most expensive
+	return cm.cpuManager.CanAllocateExclusively(res) || cm.memoryManager.CanAllocateExclusively(res) || cm.deviceManager.CanAllocateExclusively(res)
+}
